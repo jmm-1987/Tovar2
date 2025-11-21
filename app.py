@@ -108,47 +108,51 @@ def migrate_database():
             except Exception as e2:
                 print(f"Error al crear tablas: {e2}")
 
-# Ejecutar migración al iniciar la aplicación
-migrate_database()
-
 @app.route('/')
 def index():
     """Página principal con lista de pedidos"""
-    # Obtener todos los pedidos
-    pedidos = Pedido.query.all()
-    
-    # Calcular fecha objetivo de entrega (20 días desde aceptación) y clasificar
-    hoy = datetime.now().date()
-    
-    for pedido in pedidos:
-        # Si no tiene fecha objetivo pero tiene fecha de aceptación, calcularla (20 días)
-        if pedido.fecha_aceptacion and not pedido.fecha_objetivo:
-            pedido.fecha_objetivo = pedido.fecha_aceptacion + timedelta(days=20)
+    try:
+        # Obtener todos los pedidos
+        pedidos = Pedido.query.all()
         
-        if pedido.fecha_objetivo:
-            # Calcular días restantes hasta la fecha objetivo
-            dias_restantes = (pedido.fecha_objetivo - hoy).days
+        # Calcular fecha objetivo de entrega (20 días desde aceptación) y clasificar
+        hoy = datetime.now().date()
+        
+        for pedido in pedidos:
+            # Si no tiene fecha objetivo pero tiene fecha de aceptación, calcularla (20 días)
+            if pedido.fecha_aceptacion and not pedido.fecha_objetivo:
+                pedido.fecha_objetivo = pedido.fecha_aceptacion + timedelta(days=20)
             
-            # Clasificar fecha objetivo según días restantes
-            if dias_restantes <= 5:
-                # 5 días o menos (incluye vencidos): Rojo
-                pedido.fecha_class = 'urgente'
-            elif dias_restantes <= 10:
-                # Entre 6 y 10 días: Naranja
-                pedido.fecha_class = 'proxima'
+            if pedido.fecha_objetivo:
+                # Calcular días restantes hasta la fecha objetivo
+                dias_restantes = (pedido.fecha_objetivo - hoy).days
+                
+                # Clasificar fecha objetivo según días restantes
+                if dias_restantes <= 5:
+                    # 5 días o menos (incluye vencidos): Rojo
+                    pedido.fecha_class = 'urgente'
+                elif dias_restantes <= 10:
+                    # Entre 6 y 10 días: Naranja
+                    pedido.fecha_class = 'proxima'
+                else:
+                    # Más de 10 días: Verde
+                    pedido.fecha_class = 'ok'
             else:
-                # Más de 10 días: Verde
-                pedido.fecha_class = 'ok'
-        else:
-            pedido.fecha_class = ''
-    
-    # Ordenar por fecha objetivo (más próximos primero), los que no tienen fecha objetivo al final
-    pedidos.sort(key=lambda p: (
-        p.fecha_objetivo if p.fecha_objetivo else datetime.max.date(),
-        p.fecha_aceptacion if p.fecha_aceptacion else datetime.max.date()
-    ))
-    
-    return render_template('index.html', pedidos=pedidos)
+                pedido.fecha_class = ''
+        
+        # Ordenar por fecha objetivo (más próximos primero), los que no tienen fecha objetivo al final
+        pedidos.sort(key=lambda p: (
+            p.fecha_objetivo if p.fecha_objetivo else datetime.max.date(),
+            p.fecha_aceptacion if p.fecha_aceptacion else datetime.max.date()
+        ))
+        
+        return render_template('index.html', pedidos=pedidos)
+    except Exception as e:
+        import traceback
+        error_msg = f"Error en index: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)
+        flash(f'Error al cargar el panel de control: {str(e)}', 'error')
+        return render_template('index.html', pedidos=[])
 
 @app.route('/pedidos')
 def listado_pedidos():
@@ -966,10 +970,42 @@ def init_db():
         # Inicializar prendas predefinidas
         init_prendas()
 
+# Función para inicializar la aplicación (se ejecuta después de que todas las rutas estén registradas)
+def initialize_app():
+    """Inicializar la aplicación y la base de datos"""
+    try:
+        with app.app_context():
+            try:
+                migrate_database()
+                # Inicializar prendas predefinidas
+                init_prendas()
+                print("✓ Aplicación inicializada correctamente")
+            except Exception as e:
+                print(f"⚠ Error en inicialización: {e}")
+                import traceback
+                print(traceback.format_exc())
+                # Intentar crear tablas básicas como fallback
+                try:
+                    db.create_all()
+                    print("✓ Tablas creadas como fallback")
+                except Exception as e2:
+                    print(f"⚠ Error al crear tablas: {e2}")
+    except Exception as e:
+        # Si hay un error crítico, al menos registrar que ocurrió
+        print(f"⚠ Error crítico en initialize_app: {e}")
+        import traceback
+        print(traceback.format_exc())
+
+# Inicializar la aplicación cuando se importa el módulo
+# Esto asegura que la base de datos esté lista cuando Gunicorn inicie
+# Usar un try-except para asegurar que la aplicación se cargue incluso si hay errores
+try:
+    initialize_app()
+except Exception as e:
+    print(f"⚠ Error al inicializar aplicación (continuando de todos modos): {e}")
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
-        # Inicializar prendas predefinidas
-        init_prendas()
+    print("✓ Aplicación iniciada correctamente")
+    print(f"✓ Rutas disponibles: {[rule.rule for rule in app.url_map.iter_rules()]}")
     app.run(debug=True)
 
