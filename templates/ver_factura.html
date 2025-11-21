@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}Factura Pedido #{{ pedido.id }} - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="{{ url_for('facturacion') }}" class="btn btn-primary" style="padding: 10px 20px; text-decoration: none; display: inline-block;">
+        ← Volver al Listado
+    </a>
+</div>
+
+<div class="factura-card" style="background: white; border-radius: 8px; padding: 30px; margin-bottom: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); animation: slideUp 0.5s ease-out;">
+    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 25px; border-bottom: 2px solid #e0e0e0; padding-bottom: 20px;">
+        <div>
+            <h2 style="margin: 0 0 10px 0; color: #2c3e50;">Factura Pedido #{{ pedido.id }}</h2>
+            <p style="margin: 5px 0; color: #666;"><strong>Estado:</strong> 
+                <span class="badge badge-estado-{{ pedido.estado.lower()|replace(' ', '-') }}">{{ pedido.estado }}</span>
+            </p>
+            <p style="margin: 5px 0; color: #666;"><strong>Tipo:</strong> {{ pedido.tipo_pedido }}</p>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 30px;">
+        <!-- Datos del Cliente -->
+        <div class="datos-cliente" style="background: #f8f9fa; padding: 20px; border-radius: 6px; border: 1px solid #e9ecef;">
+            <h3 style="margin: 0 0 15px 0; color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; font-size: 1.2rem;">Datos del Cliente</h3>
+            <p style="margin: 8px 0;"><strong>Nombre:</strong> {{ pedido.cliente.nombre if pedido.cliente else 'N/A' }}</p>
+            {% if pedido.cliente.direccion %}
+            <p style="margin: 8px 0;"><strong>Dirección:</strong> {{ pedido.cliente.direccion }}</p>
+            {% endif %}
+            {% if pedido.cliente.telefono %}
+            <p style="margin: 8px 0;"><strong>Teléfono:</strong> {{ pedido.cliente.telefono }}</p>
+            {% endif %}
+            {% if pedido.cliente.email %}
+            <p style="margin: 8px 0;"><strong>Email:</strong> {{ pedido.cliente.email }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Información adicional del pedido -->
+        <div class="info-pedido" style="background: #f8f9fa; padding: 20px; border-radius: 6px; border: 1px solid #e9ecef;">
+            <h3 style="margin: 0 0 15px 0; color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; font-size: 1.2rem;">Información del Pedido</h3>
+            {% if pedido.fecha_aceptacion %}
+            <p style="margin: 8px 0;"><strong>Fecha Aceptación:</strong> {{ pedido.fecha_aceptacion.strftime('%d/%m/%Y') }}</p>
+            {% endif %}
+            {% if pedido.forma_pago %}
+            <p style="margin: 8px 0;"><strong>Forma de Pago:</strong> {{ pedido.forma_pago }}</p>
+            {% endif %}
+            {% if pedido.comercial %}
+            <p style="margin: 8px 0;"><strong>Comercial:</strong> {{ pedido.comercial.nombre }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Líneas de la factura -->
+    <div class="lineas-factura" style="margin-top: 30px;">
+        <h3 style="margin: 0 0 20px 0; color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 12px; font-size: 1.3rem;">Líneas de Factura</h3>
+        
+        {% if pedido.lineas %}
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; background: white;">
+                <thead>
+                    <tr style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-bottom: 2px solid #dee2e6;">
+                        <th style="padding: 15px; text-align: left; color: #2c3e50; font-weight: 600;">Prenda</th>
+                        <th style="padding: 15px; text-align: left; color: #2c3e50; font-weight: 600;">Nombre</th>
+                        <th style="padding: 15px; text-align: center; color: #2c3e50; font-weight: 600;">Cantidad</th>
+                        <th style="padding: 15px; text-align: right; color: #2c3e50; font-weight: 600;">Importe Unitario (€)</th>
+                        <th style="padding: 15px; text-align: right; color: #2c3e50; font-weight: 600;">Total (€)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linea in pedido.lineas %}
+                    <tr class="linea-factura" style="border-bottom: 1px solid #e9ecef; transition: background 0.2s;">
+                        <td style="padding: 15px; color: #495057;">{{ linea.prenda.nombre if linea.prenda else 'N/A' }}</td>
+                        <td style="padding: 15px; color: #495057;">{{ linea.nombre }}</td>
+                        <td style="padding: 15px; text-align: center; color: #495057; font-weight: 500;">{{ linea.cantidad }}</td>
+                        <td style="padding: 15px; text-align: right;">
+                            <input type="number" 
+                                   step="0.01" 
+                                   min="0" 
+                                   class="importe-unitario" 
+                                   data-linea-id="{{ linea.id }}"
+                                   data-cantidad="{{ linea.cantidad }}"
+                                   data-pedido-id="{{ pedido.id }}"
+                                   style="width: 140px; padding: 10px; border: 2px solid #ddd; border-radius: 6px; text-align: right; font-size: 1rem; transition: all 0.3s ease;"
+                                   placeholder="0.00">
+                        </td>
+                        <td style="padding: 15px; text-align: right;">
+                            <span class="total-linea" data-linea-id="{{ linea.id }}" style="font-weight: bold; color: #2c3e50; font-size: 1.1rem;">0.00</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr style="border-top: 3px solid #2c3e50; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+                        <td colspan="3" style="padding: 20px 15px; text-align: right; font-weight: bold; color: #2c3e50; font-size: 1.1rem;">Total Factura (€):</td>
+                        <td colspan="2" style="padding: 20px 15px; text-align: right;">
+                            <span class="total-factura" data-pedido-id="{{ pedido.id }}" style="font-weight: bold; font-size: 1.5em; color: #27ae60;">0.00</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div style="padding: 30px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef; text-align: center;">
+            <p style="color: #999; font-style: italic; margin: 0; font-size: 1.1rem;">Este pedido no tiene líneas.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Botón para formalizar factura -->
+    {% if pedido.lineas %}
+    <div style="text-align: right; margin-top: 30px; padding-top: 25px; border-top: 2px solid #e0e0e0;">
+        <button type="button" 
+                class="btn btn-success formalizar-factura" 
+                data-pedido-id="{{ pedido.id }}"
+                style="padding: 15px 40px; font-size: 1.1rem; font-weight: 600;">
+            Formalizar Factura
+        </button>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Función para calcular el total de una línea
+    function calcularTotalLinea(input) {
+        const lineaId = input.dataset.lineaId;
+        const cantidad = parseFloat(input.dataset.cantidad) || 0;
+        const importe = parseFloat(input.value) || 0;
+        const total = cantidad * importe;
+        
+        const totalLineaSpan = document.querySelector(`.total-linea[data-linea-id="${lineaId}"]`);
+        if (totalLineaSpan) {
+            totalLineaSpan.textContent = total.toFixed(2);
+        }
+        
+        // Recalcular total de la factura
+        calcularTotalFactura(input.dataset.pedidoId);
+    }
+    
+    // Función para calcular el total de una factura
+    function calcularTotalFactura(pedidoId) {
+        const inputs = document.querySelectorAll(`.importe-unitario[data-pedido-id="${pedidoId}"]`);
+        let totalFactura = 0;
+        
+        inputs.forEach(input => {
+            const cantidad = parseFloat(input.dataset.cantidad) || 0;
+            const importe = parseFloat(input.value) || 0;
+            totalFactura += cantidad * importe;
+        });
+        
+        const totalFacturaSpan = document.querySelector(`.total-factura[data-pedido-id="${pedidoId}"]`);
+        if (totalFacturaSpan) {
+            totalFacturaSpan.textContent = totalFactura.toFixed(2);
+        }
+    }
+    
+    // Event listeners para inputs de importe unitario
+    document.querySelectorAll('.importe-unitario').forEach(input => {
+        input.addEventListener('input', function() {
+            calcularTotalLinea(this);
+        });
+        
+        input.addEventListener('focus', function() {
+            this.style.borderColor = '#3498db';
+            this.style.boxShadow = '0 0 0 3px rgba(52, 152, 219, 0.1)';
+        });
+        
+        input.addEventListener('blur', function() {
+            if (this.value && parseFloat(this.value) >= 0) {
+                this.value = parseFloat(this.value).toFixed(2);
+            }
+            this.style.borderColor = '#ddd';
+            this.style.boxShadow = 'none';
+        });
+    });
+    
+    // Event listeners para botones de formalizar factura
+    document.querySelectorAll('.formalizar-factura').forEach(button => {
+        button.addEventListener('click', function() {
+            const pedidoId = this.dataset.pedidoId;
+            const totalFacturaSpan = document.querySelector(`.total-factura[data-pedido-id="${pedidoId}"]`);
+            const totalFactura = parseFloat(totalFacturaSpan.textContent) || 0;
+            
+            // Verificar que haya al menos un importe introducido
+            const inputs = document.querySelectorAll(`.importe-unitario[data-pedido-id="${pedidoId}"]`);
+            let hayImportes = false;
+            inputs.forEach(input => {
+                if (input.value && parseFloat(input.value) > 0) {
+                    hayImportes = true;
+                }
+            });
+            
+            if (!hayImportes) {
+                alert('Por favor, introduzca al menos un importe unitario antes de formalizar la factura.');
+                return;
+            }
+            
+            if (totalFactura === 0) {
+                alert('El total de la factura es 0.00€. Por favor, verifique los importes.');
+                return;
+            }
+            
+            // Confirmar formalización
+            if (confirm(`¿Está seguro de que desea formalizar la factura del pedido #${pedidoId} por un total de ${totalFactura.toFixed(2)}€?`)) {
+                // Aquí se implementará la llamada a verifactu más adelante
+                alert('La funcionalidad de formalización de factura se implementará próximamente con la integración de verifactu.');
+                // TODO: Implementar llamada a verifactu
+            }
+        });
+    });
+    
+    // Efecto hover en las filas de la tabla
+    document.querySelectorAll('.linea-factura').forEach(row => {
+        row.addEventListener('mouseenter', function() {
+            this.style.background = '#f8f9fa';
+        });
+        row.addEventListener('mouseleave', function() {
+            this.style.background = '';
+        });
+    });
+});
+</script>
+
+<style>
+.btn-primary {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+    font-weight: 500;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #2980b9 0%, #21618c 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+    color: white;
+    text-decoration: none;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3);
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #229954 0%, #1e8449 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(39, 174, 96, 0.4);
+}
+
+.btn-success:active {
+    transform: translateY(0);
+}
+
+input.importe-unitario:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+</style>
+{% endblock %}
+
+
+
+

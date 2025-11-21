@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo Pedido - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<h2>Nuevo Pedido</h2>
+
+<form method="POST" enctype="multipart/form-data">
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="comercial_id">Comercial *</label>
+            <select name="comercial_id" id="comercial_id" required>
+                <option value="">Seleccione un comercial</option>
+                {% for comercial in comerciales %}
+                <option value="{{ comercial.id }}">{{ comercial.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="cliente_id">Cliente *</label>
+            <select name="cliente_id" id="cliente_id" required>
+                <option value="">Seleccione un cliente</option>
+                {% for cliente in clientes %}
+                <option value="{{ cliente.id }}">{{ cliente.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="tipo_pedido">Tipo *</label>
+            <select name="tipo_pedido" id="tipo_pedido" required>
+                <option value="confeccion">Confección</option>
+                <option value="bordado">Bordado</option>
+                <option value="serigrafia">Serigrafía</option>
+                <option value="sublimacion">Sublimación</option>
+                <option value="varios">Varios</option>
+            </select>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="estado">Estado *</label>
+            <select name="estado" id="estado" required>
+                <option value="Pendiente" selected>Pendiente</option>
+                <option value="En preparación">En preparación</option>
+                <option value="Todo listo">Todo listo</option>
+                <option value="Enviado">Enviado</option>
+                <option value="Entregado al cliente">Entregado al cliente</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="forma_pago">Forma de Pago</label>
+            <input type="text" name="forma_pago" id="forma_pago" placeholder="Ej: Transferencia, Efectivo, etc.">
+        </div>
+
+        <div class="form-group-compact">
+            <label for="fecha_aceptacion">Fecha Aceptación</label>
+            <input type="date" name="fecha_aceptacion" id="fecha_aceptacion">
+        </div>
+
+        <div class="form-group-compact">
+            <label for="fecha_objetivo">Fecha Objetivo</label>
+            <input type="date" name="fecha_objetivo" id="fecha_objetivo">
+        </div>
+
+        <div class="form-group-compact">
+            <label for="imagen_diseno">Imagen Diseño</label>
+            <input type="file" name="imagen_diseno" id="imagen_diseno" accept="image/*">
+        </div>
+    </div>
+    <small style="color: #666; font-size: 11px; display: block; margin-top: -10px; margin-bottom: 15px;">La fecha objetivo se calcula automáticamente (20 días desde aceptación) si se deja vacía</small>
+
+    <h3>Prendas del Pedido</h3>
+    <div id="prendas-container">
+        <div class="linea-pedido-row">
+            <div class="linea-pedido-numero">#1</div>
+            <div class="linea-pedido-campos">
+                <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo de Prenda">
+                    <option value="">Modelo *</option>
+                    {% for prenda in prendas %}
+                    <option value="{{ prenda.id }}">{{ prenda.nombre }}</option>
+                    {% endfor %}
+                </select>
+                <input type="text" name="nombre[]" class="linea-campo-compact" required placeholder="Nombre *" title="Nombre">
+                <input type="text" name="cargo[]" class="linea-campo-compact" placeholder="Cargo" title="Cargo">
+                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="1" min="1" required placeholder="Cant *" title="Cantidad">
+                <input type="text" name="color[]" class="linea-campo-compact" placeholder="Color" title="Color">
+                <input type="text" name="forma[]" class="linea-campo-compact" placeholder="Forma" title="Forma">
+                <select name="tipo_manda[]" class="linea-campo-compact" title="Tipo de Manga">
+                    <option value="">Manga</option>
+                    <option value="M/C">M/C</option>
+                    <option value="M/F">M/F</option>
+                    <option value="M/L">M/L</option>
+                </select>
+                <select name="sexo[]" class="linea-campo-compact" title="Sexo">
+                    <option value="">Sexo</option>
+                    <option value="Masculino">M</option>
+                    <option value="Femenino">F</option>
+                    <option value="Unisex">U</option>
+                </select>
+                <input type="text" name="talla[]" class="linea-campo-compact" placeholder="Talla" title="Talla">
+                <select name="tejido[]" class="linea-campo-compact" title="Tejido">
+                    <option value="">Tejido</option>
+                    <option value="SARGA">SARGA</option>
+                    <option value="MICRO">MICRO</option>
+                    <option value="NUEVO T.POLO">NUEVO T.POLO</option>
+                    <option value="T.CAMISETA">T.CAMISETA</option>
+                    <option value="T.SHOFT">T.SHOFT</option>
+                </select>
+                <select name="estado_linea[]" class="linea-campo-compact" required title="Estado">
+                    <option value="pendiente" selected>Pendiente</option>
+                    <option value="en confección">En confección</option>
+                    <option value="en bordado">En bordado</option>
+                    <option value="listo">Listo</option>
+                </select>
+            </div>
+            <button type="button" class="btn-remove-linea-inline" onclick="eliminarLinea(this)">×</button>
+        </div>
+    </div>
+
+    <button type="button" class="btn btn-primary" onclick="agregarLinea()">Agregar Prenda</button>
+
+    <div class="actions">
+        <button type="submit" class="btn btn-success">Guardar Pedido</button>
+        <a href="{{ url_for('index') }}" class="btn btn-danger">Cancelar</a>
+    </div>
+</form>
+
+<script>
+let contadorPrendas = 1;
+
+// Función para calcular automáticamente la fecha objetivo
+function calcularFechaObjetivo() {
+    const fechaAceptacion = document.getElementById('fecha_aceptacion').value;
+    const fechaObjetivo = document.getElementById('fecha_objetivo');
+    
+    if (fechaAceptacion && !fechaObjetivo.value) {
+        const fecha = new Date(fechaAceptacion);
+        fecha.setDate(fecha.getDate() + 20);
+        const year = fecha.getFullYear();
+        const month = String(fecha.getMonth() + 1).padStart(2, '0');
+        const day = String(fecha.getDate()).padStart(2, '0');
+        fechaObjetivo.value = `${year}-${month}-${day}`;
+    }
+}
+
+document.getElementById('fecha_aceptacion').addEventListener('change', calcularFechaObjetivo);
+
+function agregarLinea() {
+    contadorPrendas++;
+    const container = document.getElementById('prendas-container');
+    const primeraLinea = container.querySelector('.linea-pedido-row');
+    const nuevaLinea = primeraLinea.cloneNode(true);
+    
+    // Limpiar valores
+    nuevaLinea.querySelectorAll('input').forEach(input => {
+        if (input.type !== 'button' && input.type !== 'submit') {
+            if (input.type === 'number') {
+                input.value = '1';
+            } else {
+                input.value = '';
+            }
+        }
+    });
+    nuevaLinea.querySelectorAll('select').forEach(select => {
+        if (select.name === 'estado_linea[]') {
+            select.value = 'pendiente';
+        } else {
+            select.selectedIndex = 0;
+        }
+    });
+    
+    // Actualizar número
+    renumerarPrendas();
+    
+    container.appendChild(nuevaLinea);
+}
+
+function renumerarPrendas() {
+    const todasLineas = document.querySelectorAll('.linea-pedido-row');
+    todasLineas.forEach((linea, index) => {
+        const numero = linea.querySelector('.linea-pedido-numero');
+        if (numero) {
+            numero.textContent = `#${index + 1}`;
+        }
+    });
+}
+
+function eliminarLinea(btn) {
+    const lineas = document.querySelectorAll('.linea-pedido-row');
+    if (lineas.length > 1) {
+        btn.closest('.linea-pedido-row').remove();
+        renumerarPrendas();
+    } else {
+        alert('Debe haber al menos una prenda en el pedido');
+    }
+}
+</script>
+{% endblock %}
+

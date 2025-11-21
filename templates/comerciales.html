@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Comerciales - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<h2>Gestión de Comerciales</h2>
+
+<div style="margin-bottom: 30px;">
+    <h3>Crear Nuevo Comercial</h3>
+    <form method="POST" style="max-width: 500px;">
+        <div class="form-group">
+            <label for="nombre">Nombre del Comercial *</label>
+            <input type="text" name="nombre" id="nombre" required placeholder="Nombre completo">
+        </div>
+        <button type="submit" class="btn btn-success">Crear Comercial</button>
+    </form>
+</div>
+
+<h3>Lista de Comerciales</h3>
+{% if comerciales %}
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for comercial in comerciales %}
+        <tr>
+            <td>{{ comercial.id }}</td>
+            <td>{{ comercial.nombre }}</td>
+            <td>
+                <form method="POST" action="{{ url_for('eliminar_comercial', id=comercial.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar este comercial?');">
+                    <button type="submit" class="btn btn-danger">Eliminar</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No hay comerciales registrados.</p>
+{% endif %}
+{% endblock %}
+

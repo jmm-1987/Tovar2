@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}Facturación - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<h2>Facturación</h2>
+<p style="color: #666; margin-bottom: 30px;">Lista de facturas pendientes de formalizar. Haga clic en una factura para introducir los importes.</p>
+
+{% if pedidos %}
+<div class="table-container" style="background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); border-bottom: 2px solid #1a252f;">
+                <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">ID</th>
+                <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Cliente</th>
+                <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Tipo</th>
+                <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Estado</th>
+                <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Fecha Aceptación</th>
+                <th style="padding: 15px; text-align: center; color: #ffffff; font-weight: 600;">Líneas</th>
+                <th style="padding: 15px; text-align: center; color: #ffffff; font-weight: 600;">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pedido in pedidos %}
+            <tr class="pedido-row" style="border-bottom: 1px solid #e9ecef; transition: all 0.3s ease;">
+                <td style="padding: 15px; color: #212529; font-weight: 600;">#{{ pedido.id }}</td>
+                <td style="padding: 15px; color: #212529; font-weight: 500;">
+                    {{ pedido.cliente.nombre if pedido.cliente else 'N/A' }}
+                </td>
+                <td style="padding: 15px; color: #212529;">{{ pedido.tipo_pedido }}</td>
+                <td style="padding: 15px;">
+                    <span class="badge badge-estado-{{ pedido.estado.lower()|replace(' ', '-')|replace('ó', 'o')|replace('í', 'i')|replace('é', 'e') }}">
+                        {{ pedido.estado }}
+                    </span>
+                </td>
+                <td style="padding: 15px; color: #212529;">
+                    {% if pedido.fecha_aceptacion %}
+                        {{ pedido.fecha_aceptacion.strftime('%d/%m/%Y') }}
+                    {% else %}
+                        <span style="color: #999;">-</span>
+                    {% endif %}
+                </td>
+                <td style="padding: 15px; text-align: center; color: #212529;">
+                    {{ pedido.lineas|length }} línea{{ 's' if pedido.lineas|length != 1 else '' }}
+                </td>
+                <td style="padding: 15px; text-align: center;">
+                    <a href="{{ url_for('ver_factura', pedido_id=pedido.id) }}" 
+                       class="btn btn-info" 
+                       style="padding: 8px 20px; font-size: 0.9rem; text-decoration: none; display: inline-block;">
+                        Abrir Factura
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div style="background: white; border-radius: 8px; padding: 40px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+    <p style="color: #999; font-size: 1.1rem; margin: 0;">No hay pedidos disponibles para facturar.</p>
+</div>
+{% endif %}
+
+<style>
+.pedido-row:hover {
+    background-color: #f8f9fa;
+    transform: translateX(2px);
+    box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+}
+
+.btn-info {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+    font-weight: 500;
+}
+
+.btn-info:hover {
+    background: linear-gradient(135deg, #2980b9 0%, #21618c 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+    color: white;
+    text-decoration: none;
+}
+
+.btn-info:active {
+    transform: translateY(0);
+}
+
+.table-container {
+    animation: slideUp 0.5s ease-out;
+}
+</style>
+{% endblock %}

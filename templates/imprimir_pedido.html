@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedido #{{ pedido.id }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        @media print {
+            body { margin: 0; padding: 0; }
+            .no-print { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-container">
+        <div class="print-header">
+            <h1>PEDIDO #{{ pedido.id }}</h1>
+            <p><strong>Estado:</strong> {{ pedido.estado }}</p>
+            <p><strong>Tipo:</strong> {{ pedido.tipo_pedido }}</p>
+        </div>
+
+        <div class="print-content-wrapper">
+            <div class="print-left-column">
+                <div class="print-section">
+                    <h3>Datos del Cliente</h3>
+                    <p><strong>Nombre:</strong> {{ pedido.cliente.nombre if pedido.cliente else 'N/A' }}</p>
+                    {% if pedido.cliente.direccion %}
+                    <p><strong>Dirección:</strong> {{ pedido.cliente.direccion }}</p>
+                    {% endif %}
+                    {% if pedido.cliente.telefono %}
+                    <p><strong>Teléfono:</strong> {{ pedido.cliente.telefono }}</p>
+                    {% endif %}
+                    {% if pedido.cliente.email %}
+                    <p><strong>Email:</strong> {{ pedido.cliente.email }}</p>
+                    {% endif %}
+                </div>
+
+                <div class="print-section">
+                    <h3>Información del Pedido</h3>
+                    <p><strong>Comercial:</strong> {{ pedido.comercial.nombre if pedido.comercial else 'N/A' }}</p>
+                    {% if pedido.forma_pago %}
+                    <p><strong>Forma de Pago:</strong> {{ pedido.forma_pago }}</p>
+                    {% endif %}
+                    {% if pedido.fecha_aceptacion %}
+                    <p><strong>Fecha de Aceptación:</strong> {{ pedido.fecha_aceptacion.strftime('%d/%m/%Y') }}</p>
+                    {% endif %}
+                    {% if pedido.fecha_entrega_trabajo %}
+                    <p><strong>Fecha Entrega Weark:</strong> {{ pedido.fecha_entrega_trabajo.strftime('%d/%m/%Y') }}</p>
+                    {% endif %}
+                    {% if pedido.fecha_envio_taller %}
+                    <p><strong>Fecha Envío Taller:</strong> {{ pedido.fecha_envio_taller.strftime('%d/%m/%Y') }}</p>
+                    {% endif %}
+                    {% if pedido.fecha_entrega_bordados %}
+                    <p><strong>Fecha Entrega Bordados:</strong> {{ pedido.fecha_entrega_bordados.strftime('%d/%m/%Y') }}</p>
+                    {% endif %}
+                    {% if pedido.fecha_entrega_cliente %}
+                    <p><strong>Fecha Entrega Cliente:</strong> {{ pedido.fecha_entrega_cliente.strftime('%d/%m/%Y') }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if pedido.imagen_diseno %}
+            <div class="print-right-column">
+                <div class="print-section">
+                    <h3>Diseño</h3>
+                    <img src="{{ url_for('static', filename='uploads/' + pedido.imagen_diseno) }}" alt="Diseño del pedido" class="print-image">
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="print-section">
+            <h3>Prendas del Pedido</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Modelo</th>
+                        <th>Nombre</th>
+                        <th>Cantidad</th>
+                        <th>Cargo</th>
+                        <th>Color</th>
+                        <th>Forma</th>
+                        <th>Tipo Manga</th>
+                        <th>Sexo</th>
+                        <th>Talla</th>
+                        <th>Tejido</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linea in pedido.lineas %}
+                    <tr>
+                        <td>{{ linea.prenda.nombre if linea.prenda else 'N/A' }} ({{ linea.prenda.tipo if linea.prenda else 'N/A' }})</td>
+                        <td>{{ linea.nombre }}</td>
+                        <td>{{ linea.cantidad }}</td>
+                        <td>{{ linea.cargo or '-' }}</td>
+                        <td>{{ linea.color or '-' }}</td>
+                        <td>{{ linea.forma or '-' }}</td>
+                        <td>{{ linea.tipo_manda or '-' }}</td>
+                        <td>{{ linea.sexo or '-' }}</td>
+                        <td>{{ linea.talla or '-' }}</td>
+                        <td>{{ linea.tejido or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="no-print" style="text-align: center; margin-top: 20px;">
+        <button onclick="window.print()" class="btn btn-primary">Imprimir</button>
+        <a href="{{ url_for('index') }}" class="btn btn-danger">Volver</a>
+    </div>
+</body>
+</html>
+

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Gestión de Pedidos{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <div class="container header-wrapper">
+            <a href="{{ url_for('index') }}" style="text-decoration: none; display: flex; align-items: center;">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="header-logo">
+            </a>
+            <nav>
+                <a href="{{ url_for('index') }}">PANEL DE CONTROL</a>
+                <a href="{{ url_for('listado_presupuestos') }}">Presupuestos</a>
+                <a href="{{ url_for('listado_pedidos') }}">Pedidos</a>
+                <a href="{{ url_for('facturacion') }}">Facturación</a>
+                <a href="{{ url_for('gestion_comerciales') }}">Comerciales</a>
+                <a href="{{ url_for('gestion_clientes') }}">Clientes</a>
+                <a href="{{ url_for('gestion_prendas') }}">Prendas</a>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

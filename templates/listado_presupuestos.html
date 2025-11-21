@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Listado de Presupuestos - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<h2>Listado de Presupuestos</h2>
+
+<div style="margin-bottom: 20px;">
+    <a href="{{ url_for('nuevo_presupuesto') }}" class="btn btn-success">Nuevo Presupuesto</a>
+</div>
+
+{% if presupuestos %}
+<table class="table-compact">
+    <thead>
+        <tr>
+            <th style="width: 50px;">ID</th>
+            <th style="width: 150px;">Cliente</th>
+            <th style="width: 120px;">Comercial</th>
+            <th style="width: 100px;">Tipo</th>
+            <th style="width: 140px;">Estado</th>
+            <th style="width: 110px;">F. Envío</th>
+            <th style="width: 110px;">F. Respuesta</th>
+            <th style="width: 140px;">Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for presupuesto in presupuestos %}
+        <tr>
+            <td>#{{ presupuesto.id }}</td>
+            <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ presupuesto.cliente.nombre if presupuesto.cliente else 'N/A' }}">{{ presupuesto.cliente.nombre if presupuesto.cliente else 'N/A' }}</td>
+            <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ presupuesto.comercial.nombre if presupuesto.comercial else 'N/A' }}">{{ presupuesto.comercial.nombre if presupuesto.comercial else 'N/A' }}</td>
+            <td>{{ presupuesto.tipo_pedido }}</td>
+            <td>
+                <span class="badge badge-estado-{{ presupuesto.estado.lower()|replace(' ', '-')|replace('ó', 'o')|replace('í', 'i')|replace('é', 'e')|replace('de', 'de') }}">
+                    {{ presupuesto.estado }}
+                </span>
+            </td>
+            <td>
+                {% if presupuesto.fecha_envio %}
+                    {{ presupuesto.fecha_envio.strftime('%d/%m/%Y') }}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+            <td>
+                {% if presupuesto.fecha_respuesta %}
+                    {{ presupuesto.fecha_respuesta.strftime('%d/%m/%Y') }}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+            <td>
+                <div style="display: flex; gap: 4px; align-items: center; flex-wrap: nowrap;">
+                    <a href="{{ url_for('ver_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-info" style="padding: 4px 8px; font-size: 0.75rem;">Ver</a>
+                    <a href="{{ url_for('editar_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-primary" style="padding: 4px 8px; font-size: 0.75rem;">Editar</a>
+                    <form method="POST" action="{{ url_for('eliminar_presupuesto', presupuesto_id=presupuesto.id) }}" style="display: inline;" onsubmit="return confirm('¿Estás seguro de que deseas eliminar el presupuesto #{{ presupuesto.id }}? Esta acción no se puede deshacer.');">
+                        <button type="submit" class="btn-eliminar-lista" title="Eliminar presupuesto">×</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No hay presupuestos registrados. <a href="{{ url_for('nuevo_presupuesto') }}">Crear primer presupuesto</a></p>
+{% endif %}
+{% endblock %}
+

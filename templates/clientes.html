@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Clientes - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<h2>Gestión de Clientes</h2>
+
+<div style="margin-bottom: 30px;">
+    <h3>Crear Nuevo Cliente</h3>
+    <form method="POST" style="max-width: 500px;">
+        <div class="form-group">
+            <label for="nombre">Nombre del Cliente *</label>
+            <input type="text" name="nombre" id="nombre" required placeholder="Nombre o razón social">
+        </div>
+        <div class="form-group">
+            <label for="direccion">Dirección</label>
+            <textarea name="direccion" id="direccion" rows="3" placeholder="Dirección completa"></textarea>
+        </div>
+        <div class="form-group">
+            <label for="telefono">Teléfono</label>
+            <input type="text" name="telefono" id="telefono" placeholder="Teléfono de contacto">
+        </div>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" name="email" id="email" placeholder="email@ejemplo.com">
+        </div>
+        <button type="submit" class="btn btn-success">Crear Cliente</button>
+    </form>
+</div>
+
+<h3>Lista de Clientes</h3>
+{% if clientes %}
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Dirección</th>
+            <th>Teléfono</th>
+            <th>Email</th>
+            <th>Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for cliente in clientes %}
+        <tr>
+            <td>{{ cliente.id }}</td>
+            <td>{{ cliente.nombre }}</td>
+            <td>{{ cliente.direccion or '-' }}</td>
+            <td>{{ cliente.telefono or '-' }}</td>
+            <td>{{ cliente.email or '-' }}</td>
+            <td>
+                <form method="POST" action="{{ url_for('eliminar_cliente', id=cliente.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar este cliente?');">
+                    <button type="submit" class="btn btn-danger">Eliminar</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No hay clientes registrados.</p>
+{% endif %}
+{% endblock %}
+
