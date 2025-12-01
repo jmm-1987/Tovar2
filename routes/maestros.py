@@ -18,3 +18,6 @@ def maestros():
                          total_clientes=total_clientes,
                          total_prendas=total_prendas)
 
+
+
+

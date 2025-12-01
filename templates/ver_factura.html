@@ -81,6 +81,7 @@
                                    data-linea-id="{{ linea.id }}"
                                    data-cantidad="{{ linea.cantidad }}"
                                    data-pedido-id="{{ pedido.id }}"
+                                   value="{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '' }}"
                                    style="width: 140px; padding: 10px; border: 2px solid #ddd; border-radius: 6px; text-align: right; font-size: 1rem; transition: all 0.3s ease;"
                                    placeholder="0.00">
                         </td>
@@ -89,6 +90,18 @@
                         </td>
                     </tr>
                     {% endfor %}
+                    <tr style="border-top: 2px solid #2c3e50; background: #f8f9fa;">
+                        <td colspan="3" style="padding: 15px; text-align: right; font-weight: bold; color: #2c3e50;">Base Imponible (€):</td>
+                        <td colspan="2" style="padding: 15px; text-align: right;">
+                            <span class="base-imponible" data-pedido-id="{{ pedido.id }}" style="font-weight: bold; color: #2c3e50;">0.00</span>
+                        </td>
+                    </tr>
+                    <tr style="background: #f8f9fa;">
+                        <td colspan="3" style="padding: 15px; text-align: right; font-weight: bold; color: #2c3e50;">IVA (21%) (€):</td>
+                        <td colspan="2" style="padding: 15px; text-align: right;">
+                            <span class="iva-total" data-pedido-id="{{ pedido.id }}" style="font-weight: bold; color: #2c3e50;">0.00</span>
+                        </td>
+                    </tr>
                     <tr style="border-top: 3px solid #2c3e50; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
                         <td colspan="3" style="padding: 20px 15px; text-align: right; font-weight: bold; color: #2c3e50; font-size: 1.1rem;">Total Factura (€):</td>
                         <td colspan="2" style="padding: 20px 15px; text-align: right;">
@@ -148,6 +161,13 @@ document.addEventListener('DOMContentLoaded', function() {
     if (fechaExpedicionInput && !fechaExpedicionInput.value) {
         fechaExpedicionInput.value = today;
     }
+    
+    // Calcular totales iniciales si hay precios predefinidos
+    const pedidoId = document.querySelector('.importe-unitario')?.dataset.pedidoId;
+    if (pedidoId) {
+        setTimeout(() => calcularTotalFactura(pedidoId), 100);
+    }
+    
     // Función para calcular el total de una línea
     function calcularTotalLinea(input) {
         const lineaId = input.dataset.lineaId;
@@ -160,21 +180,47 @@ document.addEventListener('DOMContentLoaded', function() {
             totalLineaSpan.textContent = total.toFixed(2);
         }
         
-        // Recalcular total de la factura
+        // Recalcular total de la factura (con IVA)
         calcularTotalFactura(input.dataset.pedidoId);
     }
     
-    // Función para calcular el total de una factura
+    // Calcular totales iniciales si hay precios predefinidos
+    document.addEventListener('DOMContentLoaded', function() {
+        const pedidoId = document.querySelector('.importe-unitario')?.dataset.pedidoId;
+        if (pedidoId) {
+            calcularTotalFactura(pedidoId);
+        }
+    });
+    
+    // Función para calcular el total de una factura con IVA
     function calcularTotalFactura(pedidoId) {
         const inputs = document.querySelectorAll(`.importe-unitario[data-pedido-id="${pedidoId}"]`);
-        let totalFactura = 0;
+        let baseImponible = 0;
+        const tipoIva = 21; // IVA al 21%
         
         inputs.forEach(input => {
             const cantidad = parseFloat(input.dataset.cantidad) || 0;
             const importe = parseFloat(input.value) || 0;
-            totalFactura += cantidad * importe;
+            baseImponible += cantidad * importe;
         });
         
+        // Calcular IVA
+        const ivaTotal = baseImponible * (tipoIva / 100);
+        const totalFactura = baseImponible + ivaTotal;
+        
+        // Actualizar base imponible
+        const baseImponibleSpan = document.querySelector(`.base-imponible[data-pedido-id="${pedidoId}"]`);
+        if (baseImponibleSpan) {
+            baseImponibleSpan.textContent = baseImponible.toFixed(2);
+        }
+        
+        // Actualizar IVA
+        const ivaTotalSpan = document.querySelector(`.iva-total[data-pedido-id="${pedidoId}"]`);
+        if (ivaTotalSpan) {
+            ivaTotalSpan.textContent = ivaTotal.toFixed(2);
+        }
+        
+        // Actualizar total
         const totalFacturaSpan = document.querySelector(`.total-factura[data-pedido-id="${pedidoId}"]`);
         if (totalFacturaSpan) {
             totalFacturaSpan.textContent = totalFactura.toFixed(2);
@@ -236,14 +282,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
+            // Obtener base imponible e IVA
+            const baseImponibleSpan = document.querySelector(`.base-imponible[data-pedido-id="${pedidoId}"]`);
+            const ivaTotalSpan = document.querySelector(`.iva-total[data-pedido-id="${pedidoId}"]`);
+            const baseImponible = parseFloat(baseImponibleSpan.textContent) || 0;
+            const ivaTotal = parseFloat(ivaTotalSpan.textContent) || 0;
+            
             // Confirmar formalización
-            if (confirm(`¿Está seguro de que desea formalizar la factura del pedido #${pedidoId} por un total de ${totalFactura.toFixed(2)}€?\n\nEl número de factura se generará automáticamente.`)) {
-                // Preparar datos de las líneas
+            if (confirm(`¿Está seguro de que desea formalizar la factura del pedido #${pedidoId}?\n\nBase Imponible: ${baseImponible.toFixed(2)}€\nIVA (21%): ${ivaTotal.toFixed(2)}€\nTotal: ${totalFactura.toFixed(2)}€\n\nEl número de factura se generará automáticamente.`)) {
+                // Preparar datos de las líneas (el importe incluye IVA)
                 const lineas = [];
                 inputs.forEach(input => {
                     const lineaId = input.dataset.lineaId;
                     const cantidad = parseFloat(input.dataset.cantidad) || 0;
                     const precioUnitario = parseFloat(input.value) || 0;
+                    // El importe total de la línea incluye IVA
                     const importe = cantidad * precioUnitario;
                     
                     if (importe > 0) {
@@ -256,7 +309,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             descripcion: descripcionLinea,
                             cantidad: cantidad,
                             precio_unitario: precioUnitario,
-                            importe: importe
+                            importe: importe  // Este importe incluye IVA
                         });
                     }
                 });

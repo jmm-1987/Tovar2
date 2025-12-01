@@ -102,6 +102,20 @@
                         <td style="padding: 15px; text-align: right; color: #495057; font-weight: bold;">{{ "%.2f"|format(linea.importe) }}</td>
                     </tr>
                     {% endfor %}
+                    <tr style="border-top: 2px solid #2c3e50; background: #f8f9fa;">
+                        <td colspan="3" style="padding: 15px; text-align: right; font-weight: bold; color: #2c3e50;">Base Imponible (€):</td>
+                        <td style="padding: 15px; text-align: right;">
+                            {% set base_imponible = (ticket.importe_total|float / 1.21)|round(2) %}
+                            <span style="font-weight: bold; color: #2c3e50;">{{ "%.2f"|format(base_imponible) }}</span>
+                        </td>
+                    </tr>
+                    <tr style="background: #f8f9fa;">
+                        <td colspan="3" style="padding: 15px; text-align: right; font-weight: bold; color: #2c3e50;">IVA (21%) (€):</td>
+                        <td style="padding: 15px; text-align: right;">
+                            {% set iva_total = ((ticket.importe_total|float) - base_imponible)|round(2) %}
+                            <span style="font-weight: bold; color: #2c3e50;">{{ "%.2f"|format(iva_total) }}</span>
+                        </td>
+                    </tr>
                     <tr style="border-top: 3px solid #2c3e50; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
                         <td colspan="3" style="padding: 20px 15px; text-align: right; font-weight: bold; color: #2c3e50; font-size: 1.1rem;">Total (€):</td>
                         <td style="padding: 20px 15px; text-align: right;">
@@ -158,4 +172,7 @@
 }
 </style>
 {% endblock %}
+
+
+
 

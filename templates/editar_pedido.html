@@ -98,29 +98,21 @@
         <div class="linea-pedido-row">
             <div class="linea-pedido-numero">#{{ loop.index }}</div>
             <div class="linea-pedido-campos">
+                <!-- Campos ocultos para compatibilidad (nombre y cargo) -->
+                <input type="hidden" name="nombre[]" value="{{ linea.nombre or '' }}">
+                <input type="hidden" name="cargo[]" value="{{ linea.cargo or '' }}">
+                
+                <!-- Orden: nombre_mostrar, cantidad, modelo, color, forma, talla, tejido, precio -->
+                <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" value="{{ linea.nombre_mostrar or '' }}" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 2;">
+                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="{{ linea.cantidad }}" min="1" required placeholder="Cant *" title="Cantidad">
                 <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo de Prenda">
                     <option value="">Modelo *</option>
                     {% for prenda in prendas %}
                     <option value="{{ prenda.id }}" {% if linea.prenda_id == prenda.id %}selected{% endif %}>{{ prenda.nombre }}</option>
                     {% endfor %}
                 </select>
-                <input type="text" name="nombre[]" class="linea-campo-compact" value="{{ linea.nombre }}" required placeholder="Nombre *" title="Nombre">
-                <input type="text" name="cargo[]" class="linea-campo-compact" value="{{ linea.cargo or '' }}" placeholder="Cargo" title="Cargo">
-                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="{{ linea.cantidad }}" min="1" required placeholder="Cant *" title="Cantidad">
                 <input type="text" name="color[]" class="linea-campo-compact" value="{{ linea.color or '' }}" placeholder="Color" title="Color">
                 <input type="text" name="forma[]" class="linea-campo-compact" value="{{ linea.forma or '' }}" placeholder="Forma" title="Forma">
-                <select name="tipo_manda[]" class="linea-campo-compact" title="Tipo de Manga">
-                    <option value="">Manga</option>
-                    <option value="M/C" {% if linea.tipo_manda == 'M/C' %}selected{% endif %}>M/C</option>
-                    <option value="M/F" {% if linea.tipo_manda == 'M/F' %}selected{% endif %}>M/F</option>
-                    <option value="M/L" {% if linea.tipo_manda == 'M/L' %}selected{% endif %}>M/L</option>
-                </select>
-                <select name="sexo[]" class="linea-campo-compact" title="Sexo">
-                    <option value="">Sexo</option>
-                    <option value="Masculino" {% if linea.sexo == 'Masculino' %}selected{% endif %}>M</option>
-                    <option value="Femenino" {% if linea.sexo == 'Femenino' %}selected{% endif %}>F</option>
-                    <option value="Unisex" {% if linea.sexo == 'Unisex' %}selected{% endif %}>U</option>
-                </select>
                 <input type="text" name="talla[]" class="linea-campo-compact" value="{{ linea.talla or '' }}" placeholder="Talla" title="Talla">
                 <select name="tejido[]" class="linea-campo-compact" title="Tejido">
                     <option value="">Tejido</option>
@@ -130,6 +122,7 @@
                     <option value="T.CAMISETA" {% if linea.tejido == 'T.CAMISETA' %}selected{% endif %}>T.CAMISETA</option>
                     <option value="T.SHOFT" {% if linea.tejido == 'T.SHOFT' %}selected{% endif %}>T.SHOFT</option>
                 </select>
+                <input type="number" name="precio_unitario[]" class="linea-campo-compact" step="0.01" min="0" value="{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '' }}" placeholder="Precio €" title="Precio Unitario">
                 <select name="estado_linea[]" class="linea-campo-compact" required title="Estado">
                     <option value="pendiente" {% if (linea.estado or 'pendiente') == 'pendiente' %}selected{% endif %}>Pendiente</option>
                     <option value="en confección" {% if (linea.estado or 'pendiente') == 'en confección' %}selected{% endif %}>En confección</option>

@@ -86,8 +86,9 @@ def nuevo_pedido():
             
             # Crear líneas de pedido
             prenda_ids = request.form.getlist('prenda_id[]')
-            nombres = request.form.getlist('nombre[]')
-            cargos = request.form.getlist('cargo[]')
+            nombres = request.form.getlist('nombre[]')  # Mantenido para compatibilidad
+            cargos = request.form.getlist('cargo[]')  # Mantenido para compatibilidad
+            nombres_mostrar = request.form.getlist('nombre_mostrar[]')
             cantidades = request.form.getlist('cantidad[]')
             colores = request.form.getlist('color[]')
             formas = request.form.getlist('forma[]')
@@ -95,15 +96,28 @@ def nuevo_pedido():
             sexos = request.form.getlist('sexo[]')
             tallas = request.form.getlist('talla[]')
             tejidos = request.form.getlist('tejido[]')
+            precios_unitarios = request.form.getlist('precio_unitario[]')
             estados_lineas = request.form.getlist('estado_linea[]')
             
             for i in range(len(prenda_ids)):
-                if prenda_ids[i] and nombres[i]:
+                if prenda_ids[i] and (nombres_mostrar[i] if i < len(nombres_mostrar) else nombres[i] if i < len(nombres) else ''):
+                    from decimal import Decimal
+                    precio_unitario = None
+                    if i < len(precios_unitarios) and precios_unitarios[i]:
+                        try:
+                            precio_unitario = Decimal(str(precios_unitarios[i]))
+                        except:
+                            precio_unitario = None
+                    
+                    # Usar nombre_mostrar si existe, sino usar nombre (compatibilidad)
+                    nombre_mostrar_val = nombres_mostrar[i] if i < len(nombres_mostrar) and nombres_mostrar[i] else (nombres[i] if i < len(nombres) else '')
+                    
                     linea = LineaPedido(
                         pedido_id=pedido.id,
                         prenda_id=prenda_ids[i],
-                        nombre=nombres[i],
-                        cargo=cargos[i] if i < len(cargos) else '',
+                        nombre=nombres[i] if i < len(nombres) else '',  # Mantenido para compatibilidad
+                        cargo=cargos[i] if i < len(cargos) else '',  # Mantenido para compatibilidad
+                        nombre_mostrar=nombre_mostrar_val,
                         cantidad=int(cantidades[i]) if cantidades[i] else 1,
                         color=colores[i] if i < len(colores) else '',
                         forma=formas[i] if i < len(formas) else '',
@@ -111,6 +125,7 @@ def nuevo_pedido():
                         sexo=sexos[i] if i < len(sexos) else '',
                         talla=tallas[i] if i < len(tallas) else '',
                         tejido=tejidos[i] if i < len(tejidos) else '',
+                        precio_unitario=precio_unitario,
                         estado=estados_lineas[i] if i < len(estados_lineas) and estados_lineas[i] else 'pendiente'
                     )
                     db.session.add(linea)
@@ -182,8 +197,9 @@ def editar_pedido(pedido_id):
             
             # Crear nuevas líneas
             prenda_ids = request.form.getlist('prenda_id[]')
-            nombres = request.form.getlist('nombre[]')
-            cargos = request.form.getlist('cargo[]')
+            nombres = request.form.getlist('nombre[]')  # Mantenido para compatibilidad
+            cargos = request.form.getlist('cargo[]')  # Mantenido para compatibilidad
+            nombres_mostrar = request.form.getlist('nombre_mostrar[]')
             cantidades = request.form.getlist('cantidad[]')
             colores = request.form.getlist('color[]')
             formas = request.form.getlist('forma[]')
@@ -191,15 +207,28 @@ def editar_pedido(pedido_id):
             sexos = request.form.getlist('sexo[]')
             tallas = request.form.getlist('talla[]')
             tejidos = request.form.getlist('tejido[]')
+            precios_unitarios = request.form.getlist('precio_unitario[]')
             estados_lineas = request.form.getlist('estado_linea[]')
             
             for i in range(len(prenda_ids)):
-                if prenda_ids[i] and nombres[i]:
+                if prenda_ids[i] and (nombres_mostrar[i] if i < len(nombres_mostrar) else nombres[i] if i < len(nombres) else ''):
+                    from decimal import Decimal
+                    precio_unitario = None
+                    if i < len(precios_unitarios) and precios_unitarios[i]:
+                        try:
+                            precio_unitario = Decimal(str(precios_unitarios[i]))
+                        except:
+                            precio_unitario = None
+                    
+                    # Usar nombre_mostrar si existe, sino usar nombre (compatibilidad)
+                    nombre_mostrar_val = nombres_mostrar[i] if i < len(nombres_mostrar) and nombres_mostrar[i] else (nombres[i] if i < len(nombres) else '')
+                    
                     linea = LineaPedido(
                         pedido_id=pedido.id,
                         prenda_id=prenda_ids[i],
-                        nombre=nombres[i],
-                        cargo=cargos[i] if i < len(cargos) else '',
+                        nombre=nombres[i] if i < len(nombres) else '',  # Mantenido para compatibilidad
+                        cargo=cargos[i] if i < len(cargos) else '',  # Mantenido para compatibilidad
+                        nombre_mostrar=nombre_mostrar_val,
                         cantidad=int(cantidades[i]) if cantidades[i] else 1,
                         color=colores[i] if i < len(colores) else '',
                         forma=formas[i] if i < len(formas) else '',
@@ -207,6 +236,7 @@ def editar_pedido(pedido_id):
                         sexo=sexos[i] if i < len(sexos) else '',
                         talla=tallas[i] if i < len(tallas) else '',
                         tejido=tejidos[i] if i < len(tejidos) else '',
+                        precio_unitario=precio_unitario,
                         estado=estados_lineas[i] if i < len(estados_lineas) and estados_lineas[i] else 'pendiente'
                     )
                     db.session.add(linea)

@@ -5,6 +5,7 @@ from decimal import Decimal
 import os
 import requests
 import json
+from sqlalchemy import not_
 from extensions import db
 from models import Pedido, LineaPedido, Factura, LineaFactura
 from utils.numeracion import obtener_siguiente_numero_factura
@@ -13,11 +14,18 @@ facturacion_bp = Blueprint('facturacion', __name__)
 
 @facturacion_bp.route('/facturacion')
 def facturacion():
-    """Página de facturación con facturas pendientes de formalizar"""
-    # Obtener todos los pedidos
-    pedidos = Pedido.query.order_by(Pedido.id.desc()).all()
+    """Página de facturación con prefacturas (pendientes) y facturas (formalizadas)"""
+    # Obtener prefacturas: pedidos que aún no tienen factura formalizada
+    pedidos_con_factura_ids = [f.pedido_id for f in Factura.query.with_entities(Factura.pedido_id).all()]
+    if pedidos_con_factura_ids:
+        prefacturas = Pedido.query.filter(not_(Pedido.id.in_(pedidos_con_factura_ids))).order_by(Pedido.id.desc()).all()
+    else:
+        prefacturas = Pedido.query.order_by(Pedido.id.desc()).all()
     
-    return render_template('facturacion.html', pedidos=pedidos)
+    # Obtener facturas ya formalizadas
+    facturas = Factura.query.order_by(Factura.fecha_creacion.desc()).all()
+    
+    return render_template('facturacion.html', prefacturas=prefacturas, facturas=facturas)
 
 @facturacion_bp.route('/facturacion/<int:pedido_id>')
 def ver_factura(pedido_id):
@@ -206,4 +214,34 @@ def formalizar_factura(pedido_id):
             'success': False,
             'error': f'Error al formalizar la factura: {str(e)}'
         }), 500
+
+@facturacion_bp.route('/facturacion/factura/<int:factura_id>/imprimir')
+def imprimir_factura(factura_id):
+    """Vista de impresión de una factura formalizada"""
+    from decimal import Decimal
+    
+    factura = Factura.query.get_or_404(factura_id)
+    pedido = factura.pedido
+    
+    # Calcular totales
+    tipo_iva = 21
+    base_imponible = Decimal('0.00')
+    
+    for linea in factura.lineas:
+        importe = Decimal(str(linea.importe))
+        # Si el importe incluye IVA, calcular base imponible
+        base_linea = importe / (Decimal('1') + Decimal(str(tipo_iva)) / Decimal('100'))
+        base_imponible += base_linea.quantize(Decimal('0.01'))
+    
+    iva_total = base_imponible * Decimal(str(tipo_iva)) / Decimal('100')
+    iva_total = iva_total.quantize(Decimal('0.01'))
+    total_con_iva = base_imponible + iva_total
+    
+    return render_template('imprimir_factura.html', 
+                         factura=factura,
+                         pedido=pedido,
+                         base_imponible=base_imponible,
+                         iva_total=iva_total,
+                         total_con_iva=total_con_iva,
+                         tipo_iva=tipo_iva)
 

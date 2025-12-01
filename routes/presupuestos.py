@@ -45,8 +45,9 @@ def nuevo_presupuesto():
             
             # Crear líneas de presupuesto
             prenda_ids = request.form.getlist('prenda_id[]')
-            nombres = request.form.getlist('nombre[]')
-            cargos = request.form.getlist('cargo[]')
+            nombres = request.form.getlist('nombre[]')  # Mantenido para compatibilidad
+            cargos = request.form.getlist('cargo[]')  # Mantenido para compatibilidad
+            nombres_mostrar = request.form.getlist('nombre_mostrar[]')
             cantidades = request.form.getlist('cantidad[]')
             colores = request.form.getlist('color[]')
             formas = request.form.getlist('forma[]')
@@ -54,21 +55,35 @@ def nuevo_presupuesto():
             sexos = request.form.getlist('sexo[]')
             tallas = request.form.getlist('talla[]')
             tejidos = request.form.getlist('tejido[]')
+            precios_unitarios = request.form.getlist('precio_unitario[]')
             
             for i in range(len(prenda_ids)):
-                if prenda_ids[i] and nombres[i]:
+                if prenda_ids[i] and (nombres_mostrar[i] if i < len(nombres_mostrar) else nombres[i] if i < len(nombres) else ''):
+                    from decimal import Decimal
+                    precio_unitario = None
+                    if i < len(precios_unitarios) and precios_unitarios[i]:
+                        try:
+                            precio_unitario = Decimal(str(precios_unitarios[i]))
+                        except:
+                            precio_unitario = None
+                    
+                    # Usar nombre_mostrar si existe, sino usar nombre (compatibilidad)
+                    nombre_mostrar_val = nombres_mostrar[i] if i < len(nombres_mostrar) and nombres_mostrar[i] else (nombres[i] if i < len(nombres) else '')
+                    
                     linea = LineaPresupuesto(
                         presupuesto_id=presupuesto.id,
                         prenda_id=prenda_ids[i],
-                        nombre=nombres[i],
-                        cargo=cargos[i] if i < len(cargos) else '',
+                        nombre=nombres[i] if i < len(nombres) else '',  # Mantenido para compatibilidad
+                        cargo=cargos[i] if i < len(cargos) else '',  # Mantenido para compatibilidad
+                        nombre_mostrar=nombre_mostrar_val,
                         cantidad=int(cantidades[i]) if cantidades[i] else 1,
                         color=colores[i] if i < len(colores) else '',
                         forma=formas[i] if i < len(formas) else '',
                         tipo_manda=tipos_manda[i] if i < len(tipos_manda) else '',
                         sexo=sexos[i] if i < len(sexos) else '',
                         talla=tallas[i] if i < len(tallas) else '',
-                        tejido=tejidos[i] if i < len(tejidos) else ''
+                        tejido=tejidos[i] if i < len(tejidos) else '',
+                        precio_unitario=precio_unitario
                     )
                     db.session.add(linea)
             
@@ -92,6 +107,33 @@ def ver_presupuesto(presupuesto_id):
     """Vista detallada del presupuesto"""
     presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
     return render_template('ver_presupuesto.html', presupuesto=presupuesto)
+
+@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/imprimir')
+def imprimir_presupuesto(presupuesto_id):
+    """Vista de impresión del presupuesto (HTML para imprimir desde navegador)"""
+    from decimal import Decimal
+    
+    presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+    
+    # Calcular totales
+    tipo_iva = 21
+    base_imponible = Decimal('0.00')
+    
+    for linea in presupuesto.lineas:
+        precio_unit = Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0.00')
+        cantidad = Decimal(str(linea.cantidad))
+        total_linea = precio_unit * cantidad
+        base_imponible += total_linea
+    
+    iva_total = base_imponible * Decimal(str(tipo_iva)) / Decimal('100')
+    total_con_iva = base_imponible + iva_total
+    
+    return render_template('imprimir_presupuesto.html', 
+                         presupuesto=presupuesto,
+                         base_imponible=base_imponible,
+                         iva_total=iva_total,
+                         total_con_iva=total_con_iva,
+                         tipo_iva=tipo_iva)
 
 @presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/editar', methods=['GET', 'POST'])
 def editar_presupuesto(presupuesto_id):
@@ -140,8 +182,9 @@ def editar_presupuesto(presupuesto_id):
             
             # Crear nuevas líneas
             prenda_ids = request.form.getlist('prenda_id[]')
-            nombres = request.form.getlist('nombre[]')
-            cargos = request.form.getlist('cargo[]')
+            nombres = request.form.getlist('nombre[]')  # Mantenido para compatibilidad
+            cargos = request.form.getlist('cargo[]')  # Mantenido para compatibilidad
+            nombres_mostrar = request.form.getlist('nombre_mostrar[]')
             cantidades = request.form.getlist('cantidad[]')
             colores = request.form.getlist('color[]')
             formas = request.form.getlist('forma[]')
@@ -149,21 +192,35 @@ def editar_presupuesto(presupuesto_id):
             sexos = request.form.getlist('sexo[]')
             tallas = request.form.getlist('talla[]')
             tejidos = request.form.getlist('tejido[]')
+            precios_unitarios = request.form.getlist('precio_unitario[]')
             
             for i in range(len(prenda_ids)):
-                if prenda_ids[i] and nombres[i]:
+                if prenda_ids[i] and (nombres_mostrar[i] if i < len(nombres_mostrar) else nombres[i] if i < len(nombres) else ''):
+                    from decimal import Decimal
+                    precio_unitario = None
+                    if i < len(precios_unitarios) and precios_unitarios[i]:
+                        try:
+                            precio_unitario = Decimal(str(precios_unitarios[i]))
+                        except:
+                            precio_unitario = None
+                    
+                    # Usar nombre_mostrar si existe, sino usar nombre (compatibilidad)
+                    nombre_mostrar_val = nombres_mostrar[i] if i < len(nombres_mostrar) and nombres_mostrar[i] else (nombres[i] if i < len(nombres) else '')
+                    
                     linea = LineaPresupuesto(
                         presupuesto_id=presupuesto.id,
                         prenda_id=prenda_ids[i],
-                        nombre=nombres[i],
-                        cargo=cargos[i] if i < len(cargos) else '',
+                        nombre=nombres[i] if i < len(nombres) else '',  # Mantenido para compatibilidad
+                        cargo=cargos[i] if i < len(cargos) else '',  # Mantenido para compatibilidad
+                        nombre_mostrar=nombre_mostrar_val,
                         cantidad=int(cantidades[i]) if cantidades[i] else 1,
                         color=colores[i] if i < len(colores) else '',
                         forma=formas[i] if i < len(formas) else '',
                         tipo_manda=tipos_manda[i] if i < len(tipos_manda) else '',
                         sexo=sexos[i] if i < len(sexos) else '',
                         talla=tallas[i] if i < len(tallas) else '',
-                        tejido=tejidos[i] if i < len(tejidos) else ''
+                        tejido=tejidos[i] if i < len(tejidos) else '',
+                        precio_unitario=precio_unitario
                     )
                     db.session.add(linea)
             
@@ -250,8 +307,9 @@ def cambiar_estado_presupuesto(presupuesto_id):
                         linea_pedido = LineaPedido(
                             pedido_id=pedido.id,
                             prenda_id=linea_presupuesto.prenda_id,
-                            nombre=linea_presupuesto.nombre,
-                            cargo=linea_presupuesto.cargo or '',
+                            nombre=linea_presupuesto.nombre or '',  # Mantenido para compatibilidad
+                            cargo=linea_presupuesto.cargo or '',  # Mantenido para compatibilidad
+                            nombre_mostrar=linea_presupuesto.nombre_mostrar or '',  # Copiar nombre para mostrar
                             cantidad=linea_presupuesto.cantidad,
                             color=linea_presupuesto.color or '',
                             forma=linea_presupuesto.forma or '',
@@ -259,6 +317,7 @@ def cambiar_estado_presupuesto(presupuesto_id):
                             sexo=linea_presupuesto.sexo or '',
                             talla=linea_presupuesto.talla or '',
                             tejido=linea_presupuesto.tejido or '',
+                            precio_unitario=linea_presupuesto.precio_unitario,  # Copiar precio del presupuesto
                             estado='pendiente'
                         )
                         db.session.add(linea_pedido)

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Factura {{ factura.serie }}-{{ factura.numero }}</title>
+    <style type="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .factura-container {
+            max-width: 210mm;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .no-print {
+            text-align: center;
+            margin-top: 20px;
+            padding: 20px;
+        }
+        
+        .no-print .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 0 10px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .no-print .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .no-print .btn:hover {
+            opacity: 0.9;
+        }
+        
+        .factura-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #2c3e50;
+        }
+        
+        .logo-section {
+            flex: 1;
+        }
+        
+        .logo-section img {
+            max-width: 150px;
+            height: auto;
+        }
+        
+        .factura-info {
+            text-align: right;
+            flex: 1;
+        }
+        
+        .factura-info h1 {
+            font-size: 2.5em;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .factura-info p {
+            margin: 5px 0;
+            color: #666;
+            font-size: 0.95em;
+        }
+        
+        .datos-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .datos-box {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .datos-box h3 {
+            color: #2c3e50;
+            border-bottom: 2px solid #2c3e50;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+        
+        .datos-box p {
+            margin: 8px 0;
+            color: #495057;
+        }
+        
+        .lineas-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .lineas-table thead {
+            background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+            color: white;
+        }
+        
+        .lineas-table th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border: 1px solid #1a252f;
+        }
+        
+        .lineas-table td {
+            padding: 12px;
+            border: 1px solid #e9ecef;
+            color: #495057;
+        }
+        
+        .lineas-table tbody tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .lineas-table tbody tr:hover {
+            background: #e9ecef;
+        }
+        
+        .totales-section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #2c3e50;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            font-size: 1.1em;
+        }
+        
+        .total-row.base {
+            color: #495057;
+        }
+        
+        .total-row.iva {
+            color: #495057;
+        }
+        
+        .total-row.final {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #27ae60;
+            border-top: 2px solid #2c3e50;
+            padding-top: 15px;
+            margin-top: 10px;
+        }
+        
+        .total-label {
+            font-weight: 600;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .no-print {
+                display: none;
+            }
+            
+            .factura-container {
+                box-shadow: none;
+                padding: 20px;
+            }
+            
+            .lineas-table tbody tr {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="factura-container">
+        <div class="factura-header">
+            <div class="logo-section">
+                <img src="{{ url_for('static', filename='logo.png', _external=True) }}" alt="Logo" style="max-width: 150px; height: auto;">
+            </div>
+            <div class="factura-info">
+                <h1>FACTURA</h1>
+                <p><strong>Número:</strong> {{ factura.serie }}-{{ factura.numero }}</p>
+                <p><strong>Fecha:</strong> {{ factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else 'N/A' }}</p>
+                <p><strong>Estado:</strong> {{ factura.estado }}</p>
+            </div>
+        </div>
+
+        <div class="datos-section">
+            <div class="datos-box">
+                <h3>Datos del Cliente</h3>
+                <p><strong>Nombre:</strong> {{ factura.nombre }}</p>
+                {% if factura.nif %}
+                <p><strong>NIF:</strong> {{ factura.nif }}</p>
+                {% endif %}
+                {% if pedido and pedido.cliente and pedido.cliente.direccion %}
+                <p><strong>Dirección:</strong> {{ pedido.cliente.direccion }}</p>
+                {% endif %}
+                {% if pedido and pedido.cliente and pedido.cliente.telefono %}
+                <p><strong>Teléfono:</strong> {{ pedido.cliente.telefono }}</p>
+                {% endif %}
+                {% if pedido and pedido.cliente and pedido.cliente.email %}
+                <p><strong>Email:</strong> {{ pedido.cliente.email }}</p>
+                {% endif %}
+            </div>
+
+            <div class="datos-box">
+                <h3>Información de la Factura</h3>
+                <p><strong>Pedido:</strong> #{{ factura.pedido_id }}</p>
+                {% if factura.descripcion %}
+                <p><strong>Descripción:</strong> {{ factura.descripcion }}</p>
+                {% endif %}
+                {% if pedido and pedido.comercial %}
+                <p><strong>Comercial:</strong> {{ pedido.comercial.nombre }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <h3 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-bottom: 20px; font-size: 1.3rem;">Líneas de la Factura</h3>
+        
+        {% if factura.lineas %}
+        <table class="lineas-table">
+            <thead>
+                <tr>
+                    <th>Descripción</th>
+                    <th style="text-align: center;">Cantidad</th>
+                    <th style="text-align: right;">Precio Unit.</th>
+                    <th style="text-align: right;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linea in factura.lineas %}
+                <tr>
+                    <td>{{ linea.descripcion }}</td>
+                    <td style="text-align: center;">{{ linea.cantidad }}</td>
+                    <td style="text-align: right;">{{ "%.2f"|format(linea.precio_unitario|float) }} €</td>
+                    <td style="text-align: right; font-weight: bold;">{{ "%.2f"|format(linea.importe|float) }} €</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="totales-section">
+            <div class="total-row base">
+                <span class="total-label">Base Imponible:</span>
+                <span>{{ "%.2f"|format(base_imponible|float) }} €</span>
+            </div>
+            <div class="total-row iva">
+                <span class="total-label">IVA ({{ tipo_iva }}%):</span>
+                <span>{{ "%.2f"|format(iva_total|float) }} €</span>
+            </div>
+            <div class="total-row final">
+                <span class="total-label">TOTAL:</span>
+                <span>{{ "%.2f"|format(total_con_iva|float) }} €</span>
+            </div>
+        </div>
+        {% else %}
+        <p style="padding: 30px; background: #f8f9fa; border-radius: 6px; text-align: center; color: #999;">
+            Esta factura no tiene líneas registradas.
+        </p>
+        {% endif %}
+    </div>
+
+    <div class="no-print">
+        <button onclick="window.print()" class="btn btn-primary">Imprimir</button>
+        <a href="{{ url_for('facturacion.facturacion') }}" class="btn btn-secondary">Volver</a>
+    </div>
+</body>
+</html>
+
+

@@ -4,10 +4,13 @@
 
 {% block content %}
 <h2>Facturación</h2>
-<p style="color: #666; margin-bottom: 30px;">Lista de facturas pendientes de formalizar. Haga clic en una factura para introducir los importes.</p>
 
-{% if pedidos %}
-<div class="table-container" style="background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
+<!-- SECCIÓN DE PREFACTURAS (Pendientes de formalizar) -->
+<h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #3498db;">Prefacturas (Pendientes de formalizar)</h3>
+<p style="color: #666; margin-bottom: 20px;">Lista de pedidos pendientes de facturar. Haga clic en "Hacer Factura" para introducir los importes y formalizar.</p>
+
+{% if prefacturas %}
+<div class="table-container" style="background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; margin-bottom: 40px;">
     <table style="width: 100%; border-collapse: collapse;">
         <thead>
             <tr style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); border-bottom: 2px solid #1a252f;">
@@ -21,7 +24,7 @@
             </tr>
         </thead>
         <tbody>
-            {% for pedido in pedidos %}
+            {% for pedido in prefacturas %}
             <tr class="pedido-row" style="border-bottom: 1px solid #e9ecef; transition: all 0.3s ease;">
                 <td style="padding: 15px; color: #212529; font-weight: 600;">#{{ pedido.id }}</td>
                 <td style="padding: 15px; color: #212529; font-weight: 500;">
@@ -47,7 +50,70 @@
                     <a href="{{ url_for('facturacion.ver_factura', pedido_id=pedido.id) }}" 
                        class="btn btn-info" 
                        style="padding: 8px 20px; font-size: 0.9rem; text-decoration: none; display: inline-block;">
-                        Abrir Factura
+                        Hacer Factura
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div style="background: white; border-radius: 8px; padding: 40px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 40px;">
+    <p style="color: #999; font-size: 1.1rem; margin: 0;">No hay prefacturas pendientes.</p>
+</div>
+{% endif %}
+
+<!-- SECCIÓN DE FACTURAS (Ya formalizadas) -->
+<h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #27ae60;">Facturas (Ya formalizadas)</h3>
+<p style="color: #666; margin-bottom: 20px;">Lista de facturas ya formalizadas. Puede ver los detalles e imprimir.</p>
+
+{% if facturas %}
+<div class="table-container" style="background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background: linear-gradient(135deg, #27ae60 0%, #229954 100%); border-bottom: 2px solid #1e8449;">
+                <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Serie-Nº</th>
+                <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Cliente</th>
+                <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Fecha Expedición</th>
+                <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Importe Total</th>
+                <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Estado</th>
+                <th style="padding: 15px; text-align: center; color: #ffffff; font-weight: 600;">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for factura in facturas %}
+            <tr class="factura-row" style="border-bottom: 1px solid #e9ecef; transition: all 0.3s ease;">
+                <td style="padding: 15px; color: #212529; font-weight: 600;">{{ factura.serie }}-{{ factura.numero }}</td>
+                <td style="padding: 15px; color: #212529; font-weight: 500;">
+                    {{ factura.nombre }}
+                </td>
+                <td style="padding: 15px; color: #212529;">
+                    {% if factura.fecha_expedicion %}
+                        {{ factura.fecha_expedicion.strftime('%d/%m/%Y') }}
+                    {% else %}
+                        <span style="color: #999;">-</span>
+                    {% endif %}
+                </td>
+                <td style="padding: 15px; color: #212529; font-weight: 600;">
+                    {{ "%.2f"|format(factura.importe_total|float) }} €
+                </td>
+                <td style="padding: 15px;">
+                    <span class="badge badge-estado-{{ factura.estado.lower()|replace(' ', '-')|replace('ó', 'o')|replace('í', 'i')|replace('é', 'e') }}">
+                        {{ factura.estado }}
+                    </span>
+                </td>
+                <td style="padding: 15px; text-align: center;">
+                    <a href="{{ url_for('facturacion.ver_factura', pedido_id=factura.pedido_id) }}" 
+                       class="btn btn-secondary" 
+                       style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block; margin-right: 5px;">
+                        Ver
+                    </a>
+                    <a href="{{ url_for('facturacion.imprimir_factura', factura_id=factura.id) }}" 
+                       class="btn btn-success" 
+                       style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block;"
+                       target="_blank">
+                        🖨️ Imprimir
                     </a>
                 </td>
             </tr>
@@ -57,12 +123,12 @@
 </div>
 {% else %}
 <div style="background: white; border-radius: 8px; padding: 40px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-    <p style="color: #999; font-size: 1.1rem; margin: 0;">No hay pedidos disponibles para facturar.</p>
+    <p style="color: #999; font-size: 1.1rem; margin: 0;">No hay facturas formalizadas aún.</p>
 </div>
 {% endif %}
 
 <style>
-.pedido-row:hover {
+.pedido-row:hover, .factura-row:hover {
     background-color: #f8f9fa;
     transform: translateX(2px);
     box-shadow: 2px 0 8px rgba(0,0,0,0.05);
@@ -87,8 +153,40 @@
     text-decoration: none;
 }
 
-.btn-info:active {
-    transform: translateY(0);
+.btn-secondary {
+    background: #95a5a6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.btn-secondary:hover {
+    background: #7f8c8d;
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3);
+    font-weight: 500;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #229954 0%, #1e8449 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(39, 174, 96, 0.4);
+    color: white;
+    text-decoration: none;
 }
 
 .table-container {

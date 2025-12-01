@@ -75,29 +75,21 @@
         <div class="linea-pedido-row">
             <div class="linea-pedido-numero">#1</div>
             <div class="linea-pedido-campos">
+                <!-- Campos ocultos para compatibilidad (nombre y cargo) -->
+                <input type="hidden" name="nombre[]" value="">
+                <input type="hidden" name="cargo[]" value="">
+                
+                <!-- Orden: nombre_mostrar, cantidad, modelo, color, forma, talla, tejido, precio -->
+                <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 2;">
+                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="1" min="1" required placeholder="Cant *" title="Cantidad">
                 <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo de Prenda">
                     <option value="">Modelo *</option>
                     {% for prenda in prendas %}
                     <option value="{{ prenda.id }}">{{ prenda.nombre }}</option>
                     {% endfor %}
                 </select>
-                <input type="text" name="nombre[]" class="linea-campo-compact" required placeholder="Nombre *" title="Nombre">
-                <input type="text" name="cargo[]" class="linea-campo-compact" placeholder="Cargo" title="Cargo">
-                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="1" min="1" required placeholder="Cant *" title="Cantidad">
                 <input type="text" name="color[]" class="linea-campo-compact" placeholder="Color" title="Color">
                 <input type="text" name="forma[]" class="linea-campo-compact" placeholder="Forma" title="Forma">
-                <select name="tipo_manda[]" class="linea-campo-compact" title="Tipo de Manga">
-                    <option value="">Manga</option>
-                    <option value="M/C">M/C</option>
-                    <option value="M/F">M/F</option>
-                    <option value="M/L">M/L</option>
-                </select>
-                <select name="sexo[]" class="linea-campo-compact" title="Sexo">
-                    <option value="">Sexo</option>
-                    <option value="Masculino">M</option>
-                    <option value="Femenino">F</option>
-                    <option value="Unisex">U</option>
-                </select>
                 <input type="text" name="talla[]" class="linea-campo-compact" placeholder="Talla" title="Talla">
                 <select name="tejido[]" class="linea-campo-compact" title="Tejido">
                     <option value="">Tejido</option>
@@ -107,6 +99,7 @@
                     <option value="T.CAMISETA">T.CAMISETA</option>
                     <option value="T.SHOFT">T.SHOFT</option>
                 </select>
+                <input type="number" name="precio_unitario[]" class="linea-campo-compact" step="0.01" min="0" placeholder="Precio €" title="Precio Unitario">
                 <select name="estado_linea[]" class="linea-campo-compact" required title="Estado">
                     <option value="pendiente" selected>Pendiente</option>
                     <option value="en confección">En confección</option>

@@ -111,10 +111,11 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Calcular importe de línea y total
+    // Calcular importe de línea y total con IVA
     function calcularImporte() {
         const rows = document.querySelectorAll('.linea-ticket-row');
-        let total = 0;
+        let baseImponible = 0;
+        const tipoIva = 21; // IVA al 21%
 
         rows.forEach(row => {
             const cantidadInput = row.querySelector('input[name="cantidad[]"]');
@@ -124,13 +125,21 @@ document.addEventListener('DOMContentLoaded', function() {
             if (cantidadInput && precioInput && importeSpan) {
                 const cantidad = parseFloat(cantidadInput.value) || 0;
                 const precio = parseFloat(precioInput.value) || 0;
+                // El precio unitario ya incluye IVA, así que el importe también incluye IVA
                 const importe = cantidad * precio;
                 importeSpan.textContent = importe.toFixed(2) + ' €';
-                total += importe;
+                baseImponible += importe;
             }
         });
 
-        document.getElementById('importe-total').textContent = total.toFixed(2);
+        // Calcular base imponible (sin IVA) y IVA
+        // Si el total incluye IVA, calcular base: total / 1.21
+        const baseSinIva = baseImponible / (1 + tipoIva / 100);
+        const ivaTotal = baseImponible - baseSinIva;
+
+        document.getElementById('base-imponible').textContent = baseSinIva.toFixed(2);
+        document.getElementById('iva-total').textContent = ivaTotal.toFixed(2);
+        document.getElementById('importe-total').textContent = baseImponible.toFixed(2);
     }
 
     function calcularTotal() {

@@ -89,16 +89,22 @@ def nuevo_ticket():
                 for linea in ticket.lineas:
                     # Si el importe incluye IVA, calcular base imponible
                     importe_con_iva = Decimal(str(linea.importe))
-                    base_imponible = importe_con_iva / Decimal('1.21')  # Dividir por 1.21 para obtener base sin IVA
-                    cuota_repercutida = importe_con_iva - base_imponible
+                    # Calcular base imponible: importe / (1 + tipo_impositivo/100)
+                    base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
+                    # Calcular cuota repercutida: base_imponible * (tipo_impositivo/100)
+                    cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
+                    
+                    # Redondear a 2 decimales
+                    base_imponible = base_imponible.quantize(Decimal('0.01'))
+                    cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
                     
                     total_base_imponible += base_imponible
                     total_cuota_repercutida += cuota_repercutida
                     
                     lineas_payload.append({
-                        'base_imponible': str(round(base_imponible, 2)),
+                        'base_imponible': str(base_imponible),
                         'tipo_impositivo': str(tipo_impositivo),
-                        'cuota_repercutida': str(round(cuota_repercutida, 2))
+                        'cuota_repercutida': str(cuota_repercutida)
                     })
                 
                 # Para facturas simplificadas (F2) no se envían nombre, nif ni id_otro
@@ -203,16 +209,22 @@ def reenviar_ticket(ticket_id):
         for linea in ticket.lineas:
             # Si el importe incluye IVA, calcular base imponible
             importe_con_iva = Decimal(str(linea.importe))
-            base_imponible = importe_con_iva / Decimal('1.21')  # Dividir por 1.21 para obtener base sin IVA
-            cuota_repercutida = importe_con_iva - base_imponible
+            # Calcular base imponible: importe / (1 + tipo_impositivo/100)
+            base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
+            # Calcular cuota repercutida: base_imponible * (tipo_impositivo/100)
+            cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
+            
+            # Redondear a 2 decimales
+            base_imponible = base_imponible.quantize(Decimal('0.01'))
+            cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
             
             total_base_imponible += base_imponible
             total_cuota_repercutida += cuota_repercutida
             
             lineas_payload.append({
-                'base_imponible': str(round(base_imponible, 2)),
+                'base_imponible': str(base_imponible),
                 'tipo_impositivo': str(tipo_impositivo),
-                'cuota_repercutida': str(round(cuota_repercutida, 2))
+                'cuota_repercutida': str(cuota_repercutida)
             })
         
         # Para facturas simplificadas (F2) no se envían nombre, nif ni id_otro

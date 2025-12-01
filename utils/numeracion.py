@@ -93,3 +93,6 @@ def obtener_siguiente_numero_ticket(fecha_expedicion=None):
     
     return numero_completo
 
+
+
+

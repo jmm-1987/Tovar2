@@ -53,7 +53,7 @@ class Prenda(db.Model):
     
     def __repr__(self):
         return f'<Prenda {self.nombre} ({self.tipo})>'
-
+    
 class Pedido(db.Model):
     """Pedidos del sistema"""
     __tablename__ = 'pedidos'
@@ -104,8 +104,9 @@ class LineaPedido(db.Model):
     prenda_id = db.Column(db.Integer, db.ForeignKey('prendas.id'), nullable=False)
     
     # Campos específicos de la línea
-    nombre = db.Column(db.String(200), nullable=False)
-    cargo = db.Column(db.String(100))
+    nombre = db.Column(db.String(200), nullable=False)  # Mantenido para compatibilidad, no se usa en la UI
+    cargo = db.Column(db.String(100))  # Mantenido para compatibilidad, no se usa en la UI
+    nombre_mostrar = db.Column(db.String(200), nullable=True)  # Nombre para mostrar al cliente
     cantidad = db.Column(db.Integer, nullable=False, default=1)
     color = db.Column(db.String(50))
     forma = db.Column(db.String(100))
@@ -113,13 +114,14 @@ class LineaPedido(db.Model):
     sexo = db.Column(db.String(20))  # Masculino, Femenino, Unisex
     talla = db.Column(db.String(20))
     tejido = db.Column(db.String(100))
+    precio_unitario = db.Column(db.Numeric(10, 2), nullable=True)  # Precio unitario de la línea (copiado del presupuesto)
     
     # Estado de la línea
     estado = db.Column(db.String(50), nullable=False, default='pendiente')  # pendiente, en confección, en bordado, listo
     
     def __repr__(self):
         return f'<LineaPedido {self.id} - {self.nombre} x{self.cantidad}>'
-
+    
 class Presupuesto(db.Model):
     """Presupuestos del sistema (pedidos en estado anterior)"""
     __tablename__ = 'presupuestos'
@@ -169,8 +171,9 @@ class LineaPresupuesto(db.Model):
     prenda_id = db.Column(db.Integer, db.ForeignKey('prendas.id'), nullable=False)
     
     # Campos específicos de la línea
-    nombre = db.Column(db.String(200), nullable=False)
-    cargo = db.Column(db.String(100))
+    nombre = db.Column(db.String(200), nullable=False)  # Mantenido para compatibilidad, no se usa en la UI
+    cargo = db.Column(db.String(100))  # Mantenido para compatibilidad, no se usa en la UI
+    nombre_mostrar = db.Column(db.String(200), nullable=True)  # Nombre para mostrar al cliente
     cantidad = db.Column(db.Integer, nullable=False, default=1)
     color = db.Column(db.String(50))
     forma = db.Column(db.String(100))
@@ -178,6 +181,7 @@ class LineaPresupuesto(db.Model):
     sexo = db.Column(db.String(20))  # Masculino, Femenino, Unisex
     talla = db.Column(db.String(20))
     tejido = db.Column(db.String(100))
+    precio_unitario = db.Column(db.Numeric(10, 2), nullable=True)  # Precio unitario de la línea
     
     def __repr__(self):
         return f'<LineaPresupuesto {self.id} - {self.nombre} x{self.cantidad}>'
@@ -242,6 +246,7 @@ class Factura(db.Model):
     
     # Relación con pedido
     pedido_id = db.Column(db.Integer, db.ForeignKey('pedidos.id'), nullable=False)
+    pedido = db.relationship('Pedido', backref='facturas', lazy=True)
     
     # Datos de la factura
     serie = db.Column(db.String(10), nullable=False, default='A')

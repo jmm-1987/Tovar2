@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presupuesto #{{ presupuesto.id }}</title>
+    <style type="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .presupuesto-container {
+            max-width: 210mm;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .no-print {
+            text-align: center;
+            margin-top: 20px;
+            padding: 20px;
+        }
+        
+        .no-print .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 0 10px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .no-print .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .no-print .btn:hover {
+            opacity: 0.9;
+        }
+        
+        .presupuesto-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #2c3e50;
+        }
+        
+        .logo-section {
+            flex: 1;
+        }
+        
+        .logo-section img {
+            max-width: 150px;
+            height: auto;
+        }
+        
+        .presupuesto-info {
+            text-align: right;
+            flex: 1;
+        }
+        
+        .presupuesto-info h1 {
+            font-size: 2.5em;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .presupuesto-info p {
+            margin: 5px 0;
+            color: #666;
+            font-size: 0.95em;
+        }
+        
+        .datos-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        .datos-box {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .datos-box h3 {
+            color: #2c3e50;
+            border-bottom: 2px solid #2c3e50;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+        
+        .datos-box p {
+            margin: 8px 0;
+            color: #495057;
+        }
+        
+        .lineas-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .lineas-table thead {
+            background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+            color: white;
+        }
+        
+        .lineas-table th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border: 1px solid #1a252f;
+        }
+        
+        .lineas-table td {
+            padding: 12px;
+            border: 1px solid #e9ecef;
+            color: #495057;
+        }
+        
+        .lineas-table tbody tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .lineas-table tbody tr:hover {
+            background: #e9ecef;
+        }
+        
+        .totales-section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px solid #2c3e50;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            font-size: 1.1em;
+        }
+        
+        .total-row.base {
+            color: #495057;
+        }
+        
+        .total-row.iva {
+            color: #495057;
+        }
+        
+        .total-row.final {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #27ae60;
+            border-top: 2px solid #2c3e50;
+            padding-top: 15px;
+            margin-top: 10px;
+        }
+        
+        .total-label {
+            font-weight: 600;
+        }
+        
+        .no-print {
+            text-align: center;
+            margin-top: 30px;
+            padding: 20px;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            margin: 0 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1em;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2980b9 0%, #21618c 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #95a5a6;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #7f8c8d;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .no-print {
+                display: none;
+            }
+            
+            .presupuesto-container {
+                box-shadow: none;
+                padding: 20px;
+            }
+            
+            .lineas-table tbody tr {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="presupuesto-container">
+        <div class="presupuesto-header">
+            <div class="logo-section">
+                <img src="{{ url_for('static', filename='logo.png', _external=True) }}" alt="Logo" style="max-width: 150px; height: auto;">
+            </div>
+            <div class="presupuesto-info">
+                <h1>PRESUPUESTO</h1>
+                <p><strong>Número:</strong> #{{ presupuesto.id }}</p>
+                <p><strong>Fecha:</strong> {{ presupuesto.fecha_creacion.strftime('%d/%m/%Y') if presupuesto.fecha_creacion else 'N/A' }}</p>
+                <p><strong>Estado:</strong> {{ presupuesto.estado }}</p>
+            </div>
+        </div>
+
+        <div class="datos-section">
+            <div class="datos-box">
+                <h3>Datos del Cliente</h3>
+                <p><strong>Nombre:</strong> {{ presupuesto.cliente.nombre if presupuesto.cliente else 'N/A' }}</p>
+                {% if presupuesto.cliente and presupuesto.cliente.nif %}
+                <p><strong>NIF:</strong> {{ presupuesto.cliente.nif }}</p>
+                {% endif %}
+                {% if presupuesto.cliente and presupuesto.cliente.direccion %}
+                <p><strong>Dirección:</strong> {{ presupuesto.cliente.direccion }}</p>
+                {% endif %}
+                {% if presupuesto.cliente and presupuesto.cliente.telefono %}
+                <p><strong>Teléfono:</strong> {{ presupuesto.cliente.telefono }}</p>
+                {% endif %}
+                {% if presupuesto.cliente and presupuesto.cliente.email %}
+                <p><strong>Email:</strong> {{ presupuesto.cliente.email }}</p>
+                {% endif %}
+            </div>
+
+            <div class="datos-box">
+                <h3>Información del Presupuesto</h3>
+                <p><strong>Tipo:</strong> {{ presupuesto.tipo_pedido }}</p>
+                <p><strong>Comercial:</strong> {{ presupuesto.comercial.nombre if presupuesto.comercial else 'N/A' }}</p>
+                {% if presupuesto.forma_pago %}
+                <p><strong>Forma de Pago:</strong> {{ presupuesto.forma_pago }}</p>
+                {% endif %}
+                {% if presupuesto.fecha_envio %}
+                <p><strong>Fecha Envío:</strong> {{ presupuesto.fecha_envio.strftime('%d/%m/%Y') }}</p>
+                {% endif %}
+                {% if presupuesto.fecha_respuesta %}
+                <p><strong>Fecha Respuesta:</strong> {{ presupuesto.fecha_respuesta.strftime('%d/%m/%Y') }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if presupuesto.imagen_diseno %}
+        <div class="datos-box" style="margin-bottom: 30px;">
+            <h3>Diseño</h3>
+            <img src="{{ url_for('static', filename='uploads/' + presupuesto.imagen_diseno, _external=True) }}" alt="Diseño" style="max-width: 100%; height: auto; border-radius: 6px;">
+        </div>
+        {% endif %}
+
+        <h3 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-bottom: 20px; font-size: 1.3rem;">Líneas del Presupuesto</h3>
+        
+        {% if presupuesto.lineas %}
+        <table class="lineas-table">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Cantidad</th>
+                    <th>Modelo</th>
+                    <th>Color</th>
+                    <th>Forma</th>
+                    <th>Talla</th>
+                    <th>Tejido</th>
+                    <th style="text-align: right;">Precio Unit.</th>
+                    <th style="text-align: right;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linea in presupuesto.lineas %}
+                {% set precio_unit = linea.precio_unitario|float if linea.precio_unitario else 0 %}
+                {% set cantidad = linea.cantidad|int %}
+                {% set total_linea = precio_unit * cantidad %}
+                <tr>
+                    <td>{{ linea.nombre_mostrar or linea.nombre or 'N/A' }}</td>
+                    <td>{{ cantidad }}</td>
+                    <td>{{ linea.prenda.nombre if linea.prenda else 'N/A' }}</td>
+                    <td>{{ linea.color or '-' }}</td>
+                    <td>{{ linea.forma or '-' }}</td>
+                    <td>{{ linea.talla or '-' }}</td>
+                    <td>{{ linea.tejido or '-' }}</td>
+                    <td style="text-align: right;">{{ "%.2f"|format(precio_unit) }} €</td>
+                    <td style="text-align: right; font-weight: bold;">{{ "%.2f"|format(total_linea) }} €</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="totales-section">
+            <div class="total-row base">
+                <span class="total-label">Base Imponible:</span>
+                <span>{{ "%.2f"|format(base_imponible|float) }} €</span>
+            </div>
+            <div class="total-row iva">
+                <span class="total-label">IVA ({{ tipo_iva }}%):</span>
+                <span>{{ "%.2f"|format(iva_total|float) }} €</span>
+            </div>
+            <div class="total-row final">
+                <span class="total-label">TOTAL:</span>
+                <span>{{ "%.2f"|format(total_con_iva|float) }} €</span>
+            </div>
+        </div>
+        {% else %}
+        <p style="padding: 30px; background: #f8f9fa; border-radius: 6px; text-align: center; color: #999;">
+            Este presupuesto no tiene líneas registradas.
+        </p>
+        {% endif %}
+    </div>
+
+    <div class="no-print">
+        <button onclick="window.print()" class="btn btn-primary">Imprimir</button>
+        <a href="{{ url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-secondary">Volver</a>
+    </div>
+</body>
+</html>
+

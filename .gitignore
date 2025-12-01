@@ -14,3 +14,4 @@ env/
 .venv
 static/uploads/
 *.log
+.vscode/launch.json

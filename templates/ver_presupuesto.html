@@ -6,6 +6,7 @@
 <div style="margin-bottom: 20px;">
     <a href="{{ url_for('presupuestos.listado_presupuestos') }}" class="btn btn-primary">← Volver a la lista</a>
     <a href="{{ url_for('presupuestos.editar_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-warning">Editar</a>
+    <a href="{{ url_for('presupuestos.imprimir_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-secondary" target="_blank">🖨️ Imprimir</a>
 </div>
 
 <h2>Presupuesto #{{ presupuesto.id }}</h2>
@@ -180,6 +181,8 @@
                 {% if linea.talla %}<div><strong>Talla:</strong> {{ linea.talla }}</div>{% endif %}
                 
                 {% if linea.tejido %}<div><strong>Tejido:</strong> {{ linea.tejido }}</div>{% endif %}
+                
+                {% if linea.precio_unitario %}<div><strong>Precio Unitario:</strong> {{ "%.2f"|format(linea.precio_unitario) }} €</div>{% endif %}
             </div>
         </div>
         {% endfor %}
