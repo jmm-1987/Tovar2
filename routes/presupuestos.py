@@ -1,0 +1,329 @@
+"""Rutas para gestión de presupuestos"""
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from datetime import datetime, timedelta
+from werkzeug.utils import secure_filename
+import os
+from extensions import db
+from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto
+
+presupuestos_bp = Blueprint('presupuestos', __name__)
+
+@presupuestos_bp.route('/presupuestos')
+def listado_presupuestos():
+    """Listado de presupuestos"""
+    presupuestos = Presupuesto.query.order_by(Presupuesto.id.desc()).all()
+    return render_template('listado_presupuestos.html', presupuestos=presupuestos)
+
+@presupuestos_bp.route('/presupuestos/nuevo', methods=['GET', 'POST'])
+def nuevo_presupuesto():
+    """Crear nuevo presupuesto"""
+    if request.method == 'POST':
+        try:
+            # Crear presupuesto
+            presupuesto = Presupuesto(
+                comercial_id=request.form.get('comercial_id'),
+                cliente_id=request.form.get('cliente_id'),
+                tipo_pedido=request.form.get('tipo_pedido'),
+                estado=request.form.get('estado', 'Pendiente de enviar'),
+                forma_pago=request.form.get('forma_pago', ''),
+                seguimiento=request.form.get('seguimiento', '')
+            )
+            
+            # Manejar imagen de diseño
+            if 'imagen_diseno' in request.files:
+                file = request.files['imagen_diseno']
+                if file and file.filename:
+                    filename = secure_filename(file.filename)
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                    filename = timestamp + filename
+                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+                    file.save(filepath)
+                    presupuesto.imagen_diseno = filename
+            
+            db.session.add(presupuesto)
+            db.session.flush()  # Para obtener el ID del presupuesto
+            
+            # Crear líneas de presupuesto
+            prenda_ids = request.form.getlist('prenda_id[]')
+            nombres = request.form.getlist('nombre[]')
+            cargos = request.form.getlist('cargo[]')
+            cantidades = request.form.getlist('cantidad[]')
+            colores = request.form.getlist('color[]')
+            formas = request.form.getlist('forma[]')
+            tipos_manda = request.form.getlist('tipo_manda[]')
+            sexos = request.form.getlist('sexo[]')
+            tallas = request.form.getlist('talla[]')
+            tejidos = request.form.getlist('tejido[]')
+            
+            for i in range(len(prenda_ids)):
+                if prenda_ids[i] and nombres[i]:
+                    linea = LineaPresupuesto(
+                        presupuesto_id=presupuesto.id,
+                        prenda_id=prenda_ids[i],
+                        nombre=nombres[i],
+                        cargo=cargos[i] if i < len(cargos) else '',
+                        cantidad=int(cantidades[i]) if cantidades[i] else 1,
+                        color=colores[i] if i < len(colores) else '',
+                        forma=formas[i] if i < len(formas) else '',
+                        tipo_manda=tipos_manda[i] if i < len(tipos_manda) else '',
+                        sexo=sexos[i] if i < len(sexos) else '',
+                        talla=tallas[i] if i < len(tallas) else '',
+                        tejido=tejidos[i] if i < len(tejidos) else ''
+                    )
+                    db.session.add(linea)
+            
+            db.session.commit()
+            flash('Presupuesto creado correctamente', 'success')
+            return redirect(url_for('presupuestos.listado_presupuestos'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al crear presupuesto: {str(e)}', 'error')
+    
+    comerciales = Comercial.query.all()
+    clientes = Cliente.query.all()
+    prendas = Prenda.query.all()
+    return render_template('nuevo_presupuesto.html', 
+                         comerciales=comerciales, 
+                         clientes=clientes, 
+                         prendas=prendas)
+
+@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>')
+def ver_presupuesto(presupuesto_id):
+    """Vista detallada del presupuesto"""
+    presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+    return render_template('ver_presupuesto.html', presupuesto=presupuesto)
+
+@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/editar', methods=['GET', 'POST'])
+def editar_presupuesto(presupuesto_id):
+    """Editar presupuesto existente"""
+    presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+    
+    if request.method == 'POST':
+        try:
+            presupuesto.comercial_id = request.form.get('comercial_id')
+            presupuesto.cliente_id = request.form.get('cliente_id')
+            presupuesto.tipo_pedido = request.form.get('tipo_pedido')
+            presupuesto.estado = request.form.get('estado')
+            presupuesto.forma_pago = request.form.get('forma_pago', '')
+            presupuesto.seguimiento = request.form.get('seguimiento', '')
+            
+            # Fechas
+            if request.form.get('fecha_envio'):
+                presupuesto.fecha_envio = datetime.strptime(request.form.get('fecha_envio'), '%Y-%m-%d').date()
+            if request.form.get('fecha_respuesta'):
+                presupuesto.fecha_respuesta = datetime.strptime(request.form.get('fecha_respuesta'), '%Y-%m-%d').date()
+            
+            # Manejar nueva imagen de diseño
+            if 'imagen_diseno' in request.files:
+                file = request.files['imagen_diseno']
+                if file and file.filename:
+                    # Eliminar imagen anterior si existe
+                    if presupuesto.imagen_diseno:
+                        old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], presupuesto.imagen_diseno)
+                        if os.path.exists(old_path):
+                            os.remove(old_path)
+                    
+                    filename = secure_filename(file.filename)
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                    filename = timestamp + filename
+                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+                    file.save(filepath)
+                    presupuesto.imagen_diseno = filename
+            
+            # Eliminar líneas existentes (dentro de la misma transacción)
+            try:
+                LineaPresupuesto.query.filter_by(presupuesto_id=presupuesto.id).delete()
+            except Exception as e:
+                db.session.rollback()
+                flash(f'Error al eliminar líneas anteriores: {str(e)}', 'error')
+                return redirect(url_for('presupuestos.editar_presupuesto', presupuesto_id=presupuesto.id))
+            
+            # Crear nuevas líneas
+            prenda_ids = request.form.getlist('prenda_id[]')
+            nombres = request.form.getlist('nombre[]')
+            cargos = request.form.getlist('cargo[]')
+            cantidades = request.form.getlist('cantidad[]')
+            colores = request.form.getlist('color[]')
+            formas = request.form.getlist('forma[]')
+            tipos_manda = request.form.getlist('tipo_manda[]')
+            sexos = request.form.getlist('sexo[]')
+            tallas = request.form.getlist('talla[]')
+            tejidos = request.form.getlist('tejido[]')
+            
+            for i in range(len(prenda_ids)):
+                if prenda_ids[i] and nombres[i]:
+                    linea = LineaPresupuesto(
+                        presupuesto_id=presupuesto.id,
+                        prenda_id=prenda_ids[i],
+                        nombre=nombres[i],
+                        cargo=cargos[i] if i < len(cargos) else '',
+                        cantidad=int(cantidades[i]) if cantidades[i] else 1,
+                        color=colores[i] if i < len(colores) else '',
+                        forma=formas[i] if i < len(formas) else '',
+                        tipo_manda=tipos_manda[i] if i < len(tipos_manda) else '',
+                        sexo=sexos[i] if i < len(sexos) else '',
+                        talla=tallas[i] if i < len(tallas) else '',
+                        tejido=tejidos[i] if i < len(tejidos) else ''
+                    )
+                    db.session.add(linea)
+            
+            db.session.commit()
+            flash('Presupuesto actualizado correctamente', 'success')
+            return redirect(url_for('presupuestos.listado_presupuestos'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al actualizar presupuesto: {str(e)}', 'error')
+    
+    comerciales = Comercial.query.all()
+    clientes = Cliente.query.all()
+    prendas = Prenda.query.all()
+    return render_template('editar_presupuesto.html', 
+                         presupuesto=presupuesto,
+                         comerciales=comerciales, 
+                         clientes=clientes, 
+                         prendas=prendas)
+
+@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/cambiar-estado', methods=['POST'])
+def cambiar_estado_presupuesto(presupuesto_id):
+    """Cambiar el estado del presupuesto y actualizar la fecha correspondiente"""
+    presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+    nuevo_estado = request.form.get('estado')
+    hoy = datetime.now().date()
+    
+    print(f"DEBUG: cambiar_estado_presupuesto llamado - presupuesto_id: {presupuesto_id}, nuevo_estado: {nuevo_estado}")
+    
+    try:
+        # Guardar el estado anterior antes de actualizarlo
+        estado_anterior = presupuesto.estado
+        print(f"DEBUG: estado_anterior: {estado_anterior}")
+        
+        # Mapeo de estados a fechas
+        estados_fechas = {
+            'Pendiente de enviar': (None, 'Pendiente de enviar'),
+            'Enviado': ('fecha_envio', 'Enviado'),
+            'Aceptado': ('fecha_respuesta', 'Aceptado'),
+            'Rechazado': ('fecha_respuesta', 'Rechazado')
+        }
+        
+        if nuevo_estado in estados_fechas:
+            fecha_campo, estado_nombre = estados_fechas[nuevo_estado]
+            
+            # Actualizar el estado
+            presupuesto.estado = estado_nombre
+            
+            # Si tiene fecha asociada, actualizar la fecha a hoy
+            if fecha_campo:
+                setattr(presupuesto, fecha_campo, hoy)
+            
+            # Si el presupuesto se acepta, crear un pedido automáticamente
+            if nuevo_estado == 'Aceptado' and estado_anterior != 'Aceptado':
+                print(f"DEBUG: Condición cumplida - nuevo_estado es 'Aceptado' y estado_anterior no es 'Aceptado'")
+                # Solo crear pedido si el presupuesto no estaba ya aceptado
+                # Asegurarse de que las líneas estén cargadas
+                lineas_presupuesto = LineaPresupuesto.query.filter_by(presupuesto_id=presupuesto.id).all()
+                print(f"DEBUG: Líneas encontradas: {len(lineas_presupuesto)}")
+                
+                if not lineas_presupuesto:
+                    db.session.commit()
+                    flash('Presupuesto aceptado, pero no se pudo crear el pedido porque no tiene prendas asociadas', 'error')
+                    return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
+                
+                try:
+                    print(f"DEBUG: Creando pedido para presupuesto {presupuesto.id}")
+                    # Crear nuevo pedido basado en el presupuesto
+                    pedido = Pedido(
+                        comercial_id=presupuesto.comercial_id,
+                        cliente_id=presupuesto.cliente_id,
+                        tipo_pedido=presupuesto.tipo_pedido,
+                        estado='Pendiente',
+                        forma_pago=presupuesto.forma_pago or '',
+                        imagen_diseno=presupuesto.imagen_diseno,
+                        fecha_aceptacion=hoy,
+                        fecha_objetivo=hoy + timedelta(days=20)  # 20 días desde aceptación
+                    )
+                    db.session.add(pedido)
+                    db.session.flush()  # Para obtener el ID del pedido
+                    print(f"DEBUG: Pedido creado con ID: {pedido.id}")
+                    
+                    # Copiar las líneas del presupuesto al pedido
+                    for linea_presupuesto in lineas_presupuesto:
+                        linea_pedido = LineaPedido(
+                            pedido_id=pedido.id,
+                            prenda_id=linea_presupuesto.prenda_id,
+                            nombre=linea_presupuesto.nombre,
+                            cargo=linea_presupuesto.cargo or '',
+                            cantidad=linea_presupuesto.cantidad,
+                            color=linea_presupuesto.color or '',
+                            forma=linea_presupuesto.forma or '',
+                            tipo_manda=linea_presupuesto.tipo_manda or '',
+                            sexo=linea_presupuesto.sexo or '',
+                            talla=linea_presupuesto.talla or '',
+                            tejido=linea_presupuesto.tejido or '',
+                            estado='pendiente'
+                        )
+                        db.session.add(linea_pedido)
+                    
+                    print(f"DEBUG: Líneas agregadas, haciendo commit...")
+                    db.session.commit()
+                    print(f"DEBUG: Commit exitoso. Pedido #{pedido.id} creado")
+                    flash(f'Presupuesto aceptado. Se ha creado el pedido #{pedido.id} en estado Pendiente', 'success')
+                except Exception as e_inner:
+                    db.session.rollback()
+                    import traceback
+                    print(f"ERROR al crear pedido: {traceback.format_exc()}")
+                    flash(f'Error al crear el pedido: {str(e_inner)}', 'error')
+            else:
+                print(f"DEBUG: No se cumple la condición para crear pedido - nuevo_estado: {nuevo_estado}, estado_anterior: {estado_anterior}")
+                db.session.commit()
+                if nuevo_estado == 'Aceptado' and estado_anterior == 'Aceptado':
+                    flash(f'El presupuesto ya estaba aceptado. Estado actualizado.', 'success')
+                else:
+                    flash(f'Estado del presupuesto cambiado a "{estado_nombre}"', 'success')
+        else:
+            flash(f'Estado no válido: {nuevo_estado}', 'error')
+            
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        error_msg = f'Error al cambiar el estado: {str(e)}'
+        print(f"Error completo: {traceback.format_exc()}")
+        flash(error_msg, 'error')
+    
+    return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
+
+@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/actualizar-seguimiento', methods=['POST'])
+def actualizar_seguimiento(presupuesto_id):
+    """Actualizar el campo de seguimiento del presupuesto"""
+    presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+    nuevo_seguimiento = request.form.get('seguimiento', '')
+    
+    try:
+        presupuesto.seguimiento = nuevo_seguimiento
+        db.session.commit()
+        flash('Seguimiento actualizado correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al actualizar seguimiento: {str(e)}', 'error')
+    
+    return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
+
+@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/eliminar', methods=['POST'])
+def eliminar_presupuesto(presupuesto_id):
+    """Eliminar presupuesto"""
+    presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+    try:
+        # Eliminar imagen si existe
+        if presupuesto.imagen_diseno:
+            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], presupuesto.imagen_diseno)
+            if os.path.exists(filepath):
+                os.remove(filepath)
+        
+        db.session.delete(presupuesto)
+        db.session.commit()
+        flash('Presupuesto eliminado correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al eliminar presupuesto: {str(e)}', 'error')
+    
+    return redirect(url_for('presupuestos.listado_presupuestos'))
+

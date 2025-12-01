@@ -6,7 +6,7 @@
 <h2>Listado de Pedidos</h2>
 
 <div style="margin-bottom: 20px;">
-    <a href="{{ url_for('nuevo_pedido') }}" class="btn btn-success">Nuevo Pedido</a>
+    <a href="{{ url_for('pedidos.nuevo_pedido') }}" class="btn btn-success">Nuevo Pedido</a>
 </div>
 
 {% if pedidos %}
@@ -53,10 +53,10 @@
             </td>
             <td>
                 <div style="display: flex; gap: 4px; align-items: center; flex-wrap: nowrap;">
-                    <a href="{{ url_for('ver_pedido', pedido_id=pedido.id) }}" class="btn btn-info" style="padding: 4px 8px; font-size: 0.75rem;">Ver</a>
-                    <a href="{{ url_for('editar_pedido', pedido_id=pedido.id) }}" class="btn btn-primary" style="padding: 4px 8px; font-size: 0.75rem;">Editar</a>
-                    <a href="{{ url_for('imprimir_pedido', pedido_id=pedido.id) }}" class="btn btn-warning" target="_blank" style="padding: 4px 8px; font-size: 0.75rem;">Impr</a>
-                    <form method="POST" action="{{ url_for('eliminar_pedido', pedido_id=pedido.id) }}" style="display: inline;" onsubmit="return confirm('¿Estás seguro de que deseas eliminar el pedido #{{ pedido.id }}? Esta acción no se puede deshacer.');">
+                    <a href="{{ url_for('pedidos.ver_pedido', pedido_id=pedido.id) }}" class="btn btn-info" style="padding: 4px 8px; font-size: 0.75rem;">Ver</a>
+                    <a href="{{ url_for('pedidos.editar_pedido', pedido_id=pedido.id) }}" class="btn btn-primary" style="padding: 4px 8px; font-size: 0.75rem;">Editar</a>
+                    <a href="{{ url_for('pedidos.imprimir_pedido', pedido_id=pedido.id) }}" class="btn btn-warning" target="_blank" style="padding: 4px 8px; font-size: 0.75rem;">Impr</a>
+                    <form method="POST" action="{{ url_for('pedidos.eliminar_pedido', pedido_id=pedido.id) }}" style="display: inline;" onsubmit="return confirm('¿Estás seguro de que deseas eliminar el pedido #{{ pedido.id }}? Esta acción no se puede deshacer.');">
                         <button type="submit" class="btn-eliminar-lista" title="Eliminar pedido">×</button>
                     </form>
                 </div>
@@ -66,7 +66,7 @@
     </tbody>
 </table>
 {% else %}
-<p>No hay pedidos registrados. <a href="{{ url_for('nuevo_pedido') }}">Crear primer pedido</a></p>
+<p>No hay pedidos registrados. <a href="{{ url_for('pedidos.nuevo_pedido') }}">Crear primer pedido</a></p>
 {% endif %}
 {% endblock %}
 

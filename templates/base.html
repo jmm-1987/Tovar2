@@ -9,17 +9,18 @@
 <body>
     <header>
         <div class="container header-wrapper">
-            <a href="{{ url_for('index') }}" style="text-decoration: none; display: flex; align-items: center;">
+            <a href="{{ url_for('index.index') }}" style="text-decoration: none; display: flex; align-items: center;">
                 <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="header-logo">
             </a>
             <nav>
-                <a href="{{ url_for('index') }}">PANEL DE CONTROL</a>
-                <a href="{{ url_for('listado_presupuestos') }}">Presupuestos</a>
-                <a href="{{ url_for('listado_pedidos') }}">Pedidos</a>
-                <a href="{{ url_for('facturacion') }}">Facturación</a>
-                <a href="{{ url_for('gestion_comerciales') }}">Comerciales</a>
-                <a href="{{ url_for('gestion_clientes') }}">Clientes</a>
-                <a href="{{ url_for('gestion_prendas') }}">Prendas</a>
+                <a href="{{ url_for('index.index') }}">PANEL DE CONTROL</a>
+                <a href="{{ url_for('presupuestos.listado_presupuestos') }}">Presupuestos</a>
+                <a href="{{ url_for('pedidos.listado_pedidos') }}">Pedidos</a>
+                <a href="{{ url_for('facturacion.facturacion') }}">Facturación</a>
+                <a href="{{ url_for('tickets.listado_tickets') }}">Tickets Tienda</a>
+                <a href="{{ url_for('comerciales.gestion_comerciales') }}">Comerciales</a>
+                <a href="{{ url_for('clientes.gestion_clientes') }}">Clientes</a>
+                <a href="{{ url_for('prendas.gestion_prendas') }}">Prendas</a>
             </nav>
         </div>
     </header>

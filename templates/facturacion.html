@@ -44,7 +44,7 @@
                     {{ pedido.lineas|length }} línea{{ 's' if pedido.lineas|length != 1 else '' }}
                 </td>
                 <td style="padding: 15px; text-align: center;">
-                    <a href="{{ url_for('ver_factura', pedido_id=pedido.id) }}" 
+                    <a href="{{ url_for('facturacion.ver_factura', pedido_id=pedido.id) }}" 
                        class="btn btn-info" 
                        style="padding: 8px 20px; font-size: 0.9rem; text-decoration: none; display: inline-block;">
                         Abrir Factura

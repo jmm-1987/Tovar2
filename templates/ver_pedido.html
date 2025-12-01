@@ -4,9 +4,9 @@
 
 {% block content %}
 <div style="margin-bottom: 20px;">
-    <a href="{{ url_for('index') }}" class="btn btn-primary">← Volver a la lista</a>
-    <a href="{{ url_for('editar_pedido', pedido_id=pedido.id) }}" class="btn btn-warning">Editar</a>
-    <a href="{{ url_for('imprimir_pedido', pedido_id=pedido.id) }}" class="btn btn-info" target="_blank">Imprimir</a>
+    <a href="{{ url_for('index.index') }}" class="btn btn-primary">← Volver a la lista</a>
+    <a href="{{ url_for('pedidos.editar_pedido', pedido_id=pedido.id) }}" class="btn btn-warning">Editar</a>
+    <a href="{{ url_for('pedidos.imprimir_pedido', pedido_id=pedido.id) }}" class="btn btn-info" target="_blank">Imprimir</a>
 </div>
 
 <h2>Pedido #{{ pedido.id }}</h2>
@@ -104,7 +104,7 @@
     
     <div style="display: flex; flex-wrap: wrap; gap: 15px;">
         <div style="display: flex; flex-direction: column; align-items: center;">
-            <form method="POST" action="{{ url_for('cambiar_estado_pedido', pedido_id=pedido.id) }}" style="display: inline;">
+            <form method="POST" action="{{ url_for('pedidos.cambiar_estado_pedido', pedido_id=pedido.id) }}" style="display: inline;">
                 <input type="hidden" name="estado" value="Pendiente">
                 <button type="submit" class="btn" style="background-color: {% if pedido.estado == 'Pendiente' %}#95a5a6{% else %}#bdc3c7{% endif %}; color: white;" 
                         onclick="return confirm('¿Marcar como Pendiente?')">
@@ -115,7 +115,7 @@
         </div>
         
         <div style="display: flex; flex-direction: column; align-items: center;">
-            <form method="POST" action="{{ url_for('cambiar_estado_pedido', pedido_id=pedido.id) }}" style="display: inline;">
+            <form method="POST" action="{{ url_for('pedidos.cambiar_estado_pedido', pedido_id=pedido.id) }}" style="display: inline;">
                 <input type="hidden" name="estado" value="En preparación">
                 <button type="submit" class="btn" style="background-color: {% if pedido.estado == 'En preparación' %}#3498db{% else %}#95a5a6{% endif %}; color: white;" 
                         onclick="return confirm('¿Marcar como En preparación?')">
@@ -130,7 +130,7 @@
         </div>
         
         <div style="display: flex; flex-direction: column; align-items: center;">
-            <form method="POST" action="{{ url_for('cambiar_estado_pedido', pedido_id=pedido.id) }}" style="display: inline;">
+            <form method="POST" action="{{ url_for('pedidos.cambiar_estado_pedido', pedido_id=pedido.id) }}" style="display: inline;">
                 <input type="hidden" name="estado" value="Todo listo">
                 <button type="submit" class="btn" style="background-color: {% if pedido.estado == 'Todo listo' %}#f39c12{% else %}#95a5a6{% endif %}; color: white;" 
                         onclick="return confirm('¿Marcar como Todo listo?')">
@@ -141,7 +141,7 @@
         </div>
         
         <div style="display: flex; flex-direction: column; align-items: center;">
-            <form method="POST" action="{{ url_for('cambiar_estado_pedido', pedido_id=pedido.id) }}" style="display: inline;">
+            <form method="POST" action="{{ url_for('pedidos.cambiar_estado_pedido', pedido_id=pedido.id) }}" style="display: inline;">
                 <input type="hidden" name="estado" value="Enviado">
                 <button type="submit" class="btn" style="background-color: {% if pedido.estado == 'Enviado' %}#27ae60{% else %}#95a5a6{% endif %}; color: white;" 
                         onclick="return confirm('¿Marcar como Enviado?')">
@@ -152,7 +152,7 @@
         </div>
         
         <div style="display: flex; flex-direction: column; align-items: center;">
-            <form method="POST" action="{{ url_for('cambiar_estado_pedido', pedido_id=pedido.id) }}" style="display: inline;">
+            <form method="POST" action="{{ url_for('pedidos.cambiar_estado_pedido', pedido_id=pedido.id) }}" style="display: inline;">
                 <input type="hidden" name="estado" value="Entregado al cliente">
                 <button type="submit" class="btn" style="background-color: {% if pedido.estado == 'Entregado al cliente' %}#16a085{% else %}#95a5a6{% endif %}; color: white;" 
                         onclick="return confirm('¿Marcar como Entregado al cliente?')">
@@ -207,7 +207,7 @@
                             {{ linea.estado }}
                         </span>
                     </div>
-                    <form method="POST" action="{{ url_for('cambiar_estado_linea', pedido_id=pedido.id, linea_id=linea.id) }}" style="display: inline-block;">
+                    <form method="POST" action="{{ url_for('pedidos.cambiar_estado_linea', pedido_id=pedido.id, linea_id=linea.id) }}" style="display: inline-block;">
                         <select name="estado" onchange="this.form.submit()" style="padding: 6px 12px; border-radius: 4px; border: 1px solid #ddd; font-size: 14px; width: 100%;">
                             <option value="pendiente" {% if (linea.estado or 'pendiente') == 'pendiente' %}selected{% endif %}>Pendiente</option>
                             <option value="en confección" {% if (linea.estado or 'pendiente') == 'en confección' %}selected{% endif %}>En confección</option>

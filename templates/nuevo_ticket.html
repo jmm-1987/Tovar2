@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo Ticket - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<h2>Nuevo Ticket (Factura Simplificada)</h2>
+
+<form method="POST" id="ticket-form">
+    <div style="margin-bottom: 20px; padding: 15px; background: #e7f3ff; border-radius: 6px; border: 1px solid #b3d9ff;">
+        <p style="margin: 0; color: #2c3e50; font-weight: 600;">ℹ️ El número de ticket se generará automáticamente con el formato: <strong>T + año + contador</strong> (ejemplo: T251, T252...)</p>
+    </div>
+
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="fecha_expedicion">Fecha Expedición *</label>
+            <input type="date" name="fecha_expedicion" id="fecha_expedicion" required>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="tipo_factura">Tipo Factura *</label>
+            <select name="tipo_factura" id="tipo_factura" required>
+                <option value="F2" selected>F2 - Factura Simplificada</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-row-compact">
+        <div class="form-group-compact" style="flex: 1 1 100%;">
+            <label for="descripcion">Descripción</label>
+            <input type="text" name="descripcion" id="descripcion" placeholder="Descripcion de la operacion">
+        </div>
+    </div>
+
+    <h3>Datos del Cliente</h3>
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="nombre">Nombre *</label>
+            <input type="text" name="nombre" id="nombre" required>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="nif">NIF</label>
+            <input type="text" name="nif" id="nif" placeholder="A15022510">
+        </div>
+    </div>
+
+    <h3>Líneas del Ticket</h3>
+    <div id="lineas-container">
+        <div class="linea-ticket-row">
+            <div class="linea-ticket-numero">#1</div>
+            <div class="linea-ticket-campos">
+                <input type="text" name="descripcion_linea[]" placeholder="Descripción del producto" required style="flex: 2;">
+                <input type="number" name="cantidad[]" placeholder="Cantidad" step="0.01" min="0" required style="flex: 1;">
+                <input type="number" name="precio_unitario[]" placeholder="Precio unitario" step="0.01" min="0" required style="flex: 1;" class="precio-unitario">
+                <span class="importe-linea" style="flex: 1; padding: 8px; text-align: right; font-weight: bold;">0.00 €</span>
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-top: 15px;">
+        <button type="button" id="agregar-linea" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">+ Agregar Línea</button>
+    </div>
+
+    <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 6px; text-align: right;">
+        <strong style="font-size: 1.2rem;">Total: <span id="importe-total">0.00</span> €</strong>
+    </div>
+
+    <div style="margin-top: 30px; display: flex; gap: 10px;">
+        <button type="submit" class="btn btn-success" style="padding: 10px 20px;">Crear Ticket</button>
+        <a href="{{ url_for('tickets.listado_tickets') }}" class="btn btn-secondary" style="padding: 10px 20px; text-decoration: none;">Cancelar</a>
+    </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const lineasContainer = document.getElementById('lineas-container');
+    let lineaCount = 1;
+
+    // Establecer fecha de hoy por defecto
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('fecha_expedicion').value = today;
+
+    // Agregar nueva línea
+    document.getElementById('agregar-linea').addEventListener('click', function() {
+        lineaCount++;
+        const nuevaLinea = document.createElement('div');
+        nuevaLinea.className = 'linea-ticket-row';
+        nuevaLinea.innerHTML = `
+            <div class="linea-ticket-numero">#${lineaCount}</div>
+            <div class="linea-ticket-campos">
+                <input type="text" name="descripcion_linea[]" placeholder="Descripción del producto" required style="flex: 2;">
+                <input type="number" name="cantidad[]" placeholder="Cantidad" step="0.01" min="0" required style="flex: 1;" class="linea-cantidad">
+                <input type="number" name="precio_unitario[]" placeholder="Precio unitario" step="0.01" min="0" required style="flex: 1;" class="precio-unitario">
+                <span class="importe-linea" style="flex: 1; padding: 8px; text-align: right; font-weight: bold;">0.00 €</span>
+                <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>
+            </div>
+        `;
+        lineasContainer.appendChild(nuevaLinea);
+        
+        // Agregar event listeners a los nuevos campos
+        const cantidadInput = nuevaLinea.querySelector('.linea-cantidad');
+        const precioInput = nuevaLinea.querySelector('.precio-unitario');
+        const importeSpan = nuevaLinea.querySelector('.importe-linea');
+        
+        cantidadInput.addEventListener('input', calcularImporte);
+        precioInput.addEventListener('input', calcularImporte);
+        
+        nuevaLinea.querySelector('.btn-eliminar-linea').addEventListener('click', function() {
+            nuevaLinea.remove();
+            calcularTotal();
+        });
+    });
+
+    // Calcular importe de línea y total
+    function calcularImporte() {
+        const rows = document.querySelectorAll('.linea-ticket-row');
+        let total = 0;
+
+        rows.forEach(row => {
+            const cantidadInput = row.querySelector('input[name="cantidad[]"]');
+            const precioInput = row.querySelector('input[name="precio_unitario[]"]');
+            const importeSpan = row.querySelector('.importe-linea');
+
+            if (cantidadInput && precioInput && importeSpan) {
+                const cantidad = parseFloat(cantidadInput.value) || 0;
+                const precio = parseFloat(precioInput.value) || 0;
+                const importe = cantidad * precio;
+                importeSpan.textContent = importe.toFixed(2) + ' €';
+                total += importe;
+            }
+        });
+
+        document.getElementById('importe-total').textContent = total.toFixed(2);
+    }
+
+    function calcularTotal() {
+        calcularImporte();
+    }
+
+    // Event listeners para calcular automáticamente
+    document.addEventListener('input', function(e) {
+        if (e.target.matches('input[name="cantidad[]"], input[name="precio_unitario[]"]')) {
+            calcularImporte();
+        }
+    });
+
+    // Eliminar línea
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('btn-eliminar-linea')) {
+            e.target.closest('.linea-ticket-row').remove();
+            calcularTotal();
+        }
+    });
+});
+</script>
+
+<style>
+.linea-ticket-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.linea-ticket-numero {
+    font-weight: bold;
+    color: #2c3e50;
+    min-width: 40px;
+}
+
+.linea-ticket-campos {
+    display: flex;
+    gap: 10px;
+    flex: 1;
+    align-items: center;
+}
+
+.linea-ticket-campos input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+</style>
+{% endblock %}
+

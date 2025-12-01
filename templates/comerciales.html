@@ -32,7 +32,7 @@
             <td>{{ comercial.id }}</td>
             <td>{{ comercial.nombre }}</td>
             <td>
-                <form method="POST" action="{{ url_for('eliminar_comercial', id=comercial.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar este comercial?');">
+                <form method="POST" action="{{ url_for('comerciales.eliminar_comercial', id=comercial.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar este comercial?');">
                     <button type="submit" class="btn btn-danger">Eliminar</button>
                 </form>
             </td>

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Listado de Tickets - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<h2>Listado de Tickets</h2>
+
+<div style="margin-bottom: 20px;">
+    <a href="{{ url_for('tickets.nuevo_ticket') }}" class="btn btn-success">Nuevo Ticket</a>
+</div>
+
+{% if tickets %}
+<table class="table-compact">
+    <thead>
+        <tr>
+            <th style="width: 80px;">Serie-Nº</th>
+            <th style="width: 150px;">Cliente</th>
+            <th style="width: 100px;">NIF</th>
+            <th style="width: 100px;">Fecha</th>
+            <th style="width: 100px;">Importe</th>
+            <th style="width: 100px;">Estado</th>
+            <th style="width: 180px;">Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ticket in tickets %}
+        <tr>
+            <td>{{ ticket.serie }}-{{ ticket.numero }}</td>
+            <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ ticket.nombre }}">{{ ticket.nombre }}</td>
+            <td>{{ ticket.nif or '-' }}</td>
+            <td>{{ ticket.fecha_expedicion.strftime('%d/%m/%Y') }}</td>
+            <td>{{ "%.2f"|format(ticket.importe_total) }} €</td>
+            <td>
+                <span class="badge badge-estado-{{ ticket.estado }}">
+                    {% if ticket.estado == 'pendiente' %}
+                        Pendiente
+                    {% elif ticket.estado == 'enviado' %}
+                        Enviado
+                    {% elif ticket.estado == 'confirmado' %}
+                        Confirmado
+                    {% elif ticket.estado == 'error' %}
+                        Error
+                    {% else %}
+                        {{ ticket.estado }}
+                    {% endif %}
+                </span>
+            </td>
+            <td>
+                <div style="display: flex; gap: 4px; align-items: center; flex-wrap: nowrap;">
+                    <a href="{{ url_for('tickets.ver_ticket', ticket_id=ticket.id) }}" class="btn btn-info" style="padding: 4px 8px; font-size: 0.75rem;">Ver</a>
+                    <form method="POST" action="{{ url_for('tickets.eliminar_ticket', ticket_id=ticket.id) }}" style="display: inline;" onsubmit="return confirm('¿Estás seguro de que deseas eliminar el ticket {{ ticket.serie }}-{{ ticket.numero }}? Esta acción no se puede deshacer.');">
+                        <button type="submit" class="btn-eliminar-lista" title="Eliminar ticket">×</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p style="color: #666; padding: 20px; background: #f8f9fa; border-radius: 8px;">No hay tickets registrados. <a href="{{ url_for('tickets.nuevo_ticket') }}">Crear el primero</a></p>
+{% endif %}
+
+<style>
+.badge-estado-pendiente {
+    background-color: #ffc107;
+    color: #000;
+}
+.badge-estado-enviado {
+    background-color: #17a2b8;
+    color: #fff;
+}
+.badge-estado-confirmado {
+    background-color: #28a745;
+    color: #fff;
+}
+.badge-estado-error {
+    background-color: #dc3545;
+    color: #fff;
+}
+</style>
+{% endblock %}
+

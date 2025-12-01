@@ -50,7 +50,7 @@
             <td>{{ cliente.telefono or '-' }}</td>
             <td>{{ cliente.email or '-' }}</td>
             <td>
-                <form method="POST" action="{{ url_for('eliminar_cliente', id=cliente.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar este cliente?');">
+                <form method="POST" action="{{ url_for('clientes.eliminar_cliente', id=cliente.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar este cliente?');">
                     <button type="submit" class="btn btn-danger">Eliminar</button>
                 </form>
             </td>

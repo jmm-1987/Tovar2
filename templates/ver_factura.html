@@ -4,7 +4,7 @@
 
 {% block content %}
 <div style="margin-bottom: 20px;">
-    <a href="{{ url_for('facturacion') }}" class="btn btn-primary" style="padding: 10px 20px; text-decoration: none; display: inline-block;">
+    <a href="{{ url_for('facturacion.facturacion') }}" class="btn btn-primary" style="padding: 10px 20px; text-decoration: none; display: inline-block;">
         ← Volver al Listado
     </a>
 </div>
@@ -71,7 +71,7 @@
                     {% for linea in pedido.lineas %}
                     <tr class="linea-factura" style="border-bottom: 1px solid #e9ecef; transition: background 0.2s;">
                         <td style="padding: 15px; color: #495057;">{{ linea.prenda.nombre if linea.prenda else 'N/A' }}</td>
-                        <td style="padding: 15px; color: #495057;">{{ linea.nombre }}</td>
+                        <td style="padding: 15px; color: #495057;" class="descripcion-linea">{{ linea.nombre }}</td>
                         <td style="padding: 15px; text-align: center; color: #495057; font-weight: 500;">{{ linea.cantidad }}</td>
                         <td style="padding: 15px; text-align: right;">
                             <input type="number" 
@@ -107,19 +107,47 @@
 
     <!-- Botón para formalizar factura -->
     {% if pedido.lineas %}
-    <div style="text-align: right; margin-top: 30px; padding-top: 25px; border-top: 2px solid #e0e0e0;">
-        <button type="button" 
-                class="btn btn-success formalizar-factura" 
-                data-pedido-id="{{ pedido.id }}"
-                style="padding: 15px 40px; font-size: 1.1rem; font-weight: 600;">
-            Formalizar Factura
-        </button>
+    {% if not factura_existente %}
+    <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;">
+        <h3 style="margin: 0 0 15px 0; color: #2c3e50; font-size: 1.2rem;">Datos de la Factura</h3>
+        <div style="margin-bottom: 20px; padding: 15px; background: #e7f3ff; border-radius: 6px; border: 1px solid #b3d9ff;">
+            <p style="margin: 0; color: #2c3e50; font-weight: 600;">ℹ️ El número de factura se generará automáticamente con el formato: <strong>F + año + contador</strong> (ejemplo: F251, F252...)</p>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 20px;">
+            <div>
+                <label for="fecha-expedicion" style="display: block; margin-bottom: 5px; font-weight: 600; color: #2c3e50;">Fecha Expedición *</label>
+                <input type="date" id="fecha-expedicion" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+        <div style="margin-bottom: 20px;">
+            <label for="descripcion-factura" style="display: block; margin-bottom: 5px; font-weight: 600; color: #2c3e50;">Descripción</label>
+            <input type="text" id="descripcion-factura" placeholder="Descripcion de la operacion" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+        <div style="text-align: right; padding-top: 15px; border-top: 2px solid #e0e0e0;">
+            <button type="button" 
+                    class="btn btn-success formalizar-factura" 
+                    data-pedido-id="{{ pedido.id }}"
+                    style="padding: 15px 40px; font-size: 1.1rem; font-weight: 600;">
+                Formalizar Factura
+            </button>
+        </div>
     </div>
+    {% else %}
+    <div style="margin-top: 30px; padding: 20px; background: #d4edda; border-radius: 6px; border: 1px solid #c3e6cb;">
+        <p style="margin: 0; color: #155724; font-weight: 600;">✓ Este pedido ya tiene una factura formalizada ({{ factura_existente.serie }}-{{ factura_existente.numero }})</p>
+    </div>
+    {% endif %}
     {% endif %}
 </div>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Establecer fecha de hoy por defecto
+    const today = new Date().toISOString().split('T')[0];
+    const fechaExpedicionInput = document.getElementById('fecha-expedicion');
+    if (fechaExpedicionInput && !fechaExpedicionInput.value) {
+        fechaExpedicionInput.value = today;
+    }
     // Función para calcular el total de una línea
     function calcularTotalLinea(input) {
         const lineaId = input.dataset.lineaId;
@@ -199,11 +227,74 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
+            // Obtener datos de la factura
+            const fechaExpedicion = document.getElementById('fecha-expedicion').value;
+            const descripcion = document.getElementById('descripcion-factura').value;
+            
+            if (!fechaExpedicion) {
+                alert('Por favor, complete la fecha de expedición.');
+                return;
+            }
+            
             // Confirmar formalización
-            if (confirm(`¿Está seguro de que desea formalizar la factura del pedido #${pedidoId} por un total de ${totalFactura.toFixed(2)}€?`)) {
-                // Aquí se implementará la llamada a verifactu más adelante
-                alert('La funcionalidad de formalización de factura se implementará próximamente con la integración de verifactu.');
-                // TODO: Implementar llamada a verifactu
+            if (confirm(`¿Está seguro de que desea formalizar la factura del pedido #${pedidoId} por un total de ${totalFactura.toFixed(2)}€?\n\nEl número de factura se generará automáticamente.`)) {
+                // Preparar datos de las líneas
+                const lineas = [];
+                inputs.forEach(input => {
+                    const lineaId = input.dataset.lineaId;
+                    const cantidad = parseFloat(input.dataset.cantidad) || 0;
+                    const precioUnitario = parseFloat(input.value) || 0;
+                    const importe = cantidad * precioUnitario;
+                    
+                    if (importe > 0) {
+                        const lineaRow = input.closest('tr');
+                        const descripcionTd = lineaRow.querySelector('.descripcion-linea');
+                        const descripcionLinea = descripcionTd ? descripcionTd.textContent.trim() : 'Producto';
+                        
+                        lineas.push({
+                            linea_pedido_id: lineaId,
+                            descripcion: descripcionLinea,
+                            cantidad: cantidad,
+                            precio_unitario: precioUnitario,
+                            importe: importe
+                        });
+                    }
+                });
+                
+                // Deshabilitar botón durante el proceso
+                const button = document.querySelector('.formalizar-factura');
+                button.disabled = true;
+                button.textContent = 'Procesando...';
+                
+                // Enviar datos al servidor
+                fetch(`/facturacion/${pedidoId}/formalizar`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        fecha_expedicion: fechaExpedicion,
+                        descripcion: descripcion,
+                        lineas: lineas
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        window.location.reload();
+                    } else {
+                        alert('Error: ' + data.error);
+                        button.disabled = false;
+                        button.textContent = 'Formalizar Factura';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error al formalizar la factura: ' + error.message);
+                    button.disabled = false;
+                    button.textContent = 'Formalizar Factura';
+                });
             }
         });
     });

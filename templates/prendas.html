@@ -48,7 +48,7 @@
             <td>{{ prenda.nombre }}</td>
             <td>{{ prenda.tipo }}</td>
             <td>
-                <form method="POST" action="{{ url_for('eliminar_prenda', id=prenda.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar esta prenda?');">
+                <form method="POST" action="{{ url_for('prendas.eliminar_prenda', id=prenda.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar esta prenda?');">
                     <button type="submit" class="btn btn-danger">Eliminar</button>
                 </form>
             </td>
