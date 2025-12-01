@@ -101,17 +101,19 @@ def nuevo_ticket():
                         'cuota_repercutida': str(round(cuota_repercutida, 2))
                     })
                 
+                # Para facturas simplificadas (F2) no se envían nombre, nif ni id_otro
                 payload = {
                     'serie': ticket.serie,
                     'numero': ticket.numero,
                     'fecha_expedicion': ticket.fecha_expedicion.strftime('%d-%m-%Y'),
                     'tipo_factura': ticket.tipo_factura,
                     'descripcion': ticket.descripcion or 'Descripcion de la operacion',
-                    'nif': ticket.nif or '',
-                    'nombre': ticket.nombre,
                     'lineas': lineas_payload,
                     'importe_total': str(ticket.importe_total)
                 }
+                
+                # Solo agregar nombre y nif si NO es factura simplificada (aunque para F2 no debería ser necesario)
+                # Pero por seguridad, no los incluimos para F2
                 
                 headers = {
                     'Content-Type': 'application/json',
@@ -213,17 +215,19 @@ def reenviar_ticket(ticket_id):
                 'cuota_repercutida': str(round(cuota_repercutida, 2))
             })
         
+        # Para facturas simplificadas (F2) no se envían nombre, nif ni id_otro
         payload = {
             'serie': ticket.serie,
             'numero': ticket.numero,
             'fecha_expedicion': ticket.fecha_expedicion.strftime('%d-%m-%Y'),
             'tipo_factura': ticket.tipo_factura,
             'descripcion': ticket.descripcion or 'Descripcion de la operacion',
-            'nif': ticket.nif or '',
-            'nombre': ticket.nombre,
             'lineas': lineas_payload,
             'importe_total': str(ticket.importe_total)
         }
+        
+        # Solo agregar nombre y nif si NO es factura simplificada (aunque para F2 no debería ser necesario)
+        # Pero por seguridad, no los incluimos para F2
         
         headers = {
             'Content-Type': 'application/json',

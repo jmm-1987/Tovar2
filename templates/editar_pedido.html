@@ -30,11 +30,8 @@
         <div class="form-group-compact">
             <label for="tipo_pedido">Tipo *</label>
             <select name="tipo_pedido" id="tipo_pedido" required>
-                <option value="confeccion" {% if pedido.tipo_pedido == 'confeccion' %}selected{% endif %}>Confección</option>
-                <option value="bordado" {% if pedido.tipo_pedido == 'bordado' %}selected{% endif %}>Bordado</option>
-                <option value="serigrafia" {% if pedido.tipo_pedido == 'serigrafia' %}selected{% endif %}>Serigrafía</option>
-                <option value="sublimacion" {% if pedido.tipo_pedido == 'sublimacion' %}selected{% endif %}>Sublimación</option>
-                <option value="varios" {% if pedido.tipo_pedido == 'varios' %}selected{% endif %}>Varios</option>
+                <option value="fabricacion" {% if pedido.tipo_pedido == 'fabricacion' %}selected{% endif %}>Fabricación</option>
+                <option value="no fabricacion" {% if pedido.tipo_pedido == 'no fabricacion' %}selected{% endif %}>No Fabricación</option>
             </select>
         </div>
 

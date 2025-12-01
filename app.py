@@ -105,6 +105,7 @@ from routes.comerciales import comerciales_bp
 from routes.prendas import prendas_bp
 from routes.facturacion import facturacion_bp
 from routes.tickets import tickets_bp
+from routes.maestros import maestros_bp
 
 # Registrar blueprints
 app.register_blueprint(index_bp)
@@ -115,6 +116,7 @@ app.register_blueprint(comerciales_bp)
 app.register_blueprint(prendas_bp)
 app.register_blueprint(facturacion_bp)
 app.register_blueprint(tickets_bp)
+app.register_blueprint(maestros_bp)
 
 def migrate_database():
     """Migrar la base de datos agregando columnas faltantes"""
@@ -178,6 +180,21 @@ def migrate_database():
             if tablas_faltantes:
                 print(f"⚠ Creando tablas faltantes: {tablas_faltantes}")
                 db.create_all()
+            
+            # Verificar si existe la columna nif en clientes
+            if 'clientes' in table_names:
+                columns_clientes = [col['name'] for col in inspector.get_columns('clientes')]
+                if 'nif' not in columns_clientes:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE clientes ADD COLUMN nif VARCHAR(20)'))
+                            conn.commit()
+                        print("✓ Columna nif agregada a clientes correctamente")
+                    except Exception as e:
+                        print(f"⚠ No se pudo agregar columna nif (puede que ya exista): {e}")
+                else:
+                    print("✓ La columna nif ya existe en clientes")
+            
             print("✓ Verificación de tablas completada")
         except Exception as e:
             print(f"Error en migración: {e}")

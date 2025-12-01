@@ -17,10 +17,15 @@
                 <a href="{{ url_for('presupuestos.listado_presupuestos') }}">Presupuestos</a>
                 <a href="{{ url_for('pedidos.listado_pedidos') }}">Pedidos</a>
                 <a href="{{ url_for('facturacion.facturacion') }}">Facturación</a>
-                <a href="{{ url_for('tickets.listado_tickets') }}">Tickets Tienda</a>
-                <a href="{{ url_for('comerciales.gestion_comerciales') }}">Comerciales</a>
-                <a href="{{ url_for('clientes.gestion_clientes') }}">Clientes</a>
-                <a href="{{ url_for('prendas.gestion_prendas') }}">Prendas</a>
+                <a href="{{ url_for('tickets.listado_tickets') }}">🛒 Tickets Tienda</a>
+                <div class="dropdown">
+                    <a href="#" class="dropdown-toggle">Maestros <span class="dropdown-arrow">▼</span></a>
+                    <div class="dropdown-menu">
+                        <a href="{{ url_for('comerciales.gestion_comerciales') }}">Comerciales</a>
+                        <a href="{{ url_for('clientes.gestion_clientes') }}">Clientes</a>
+                        <a href="{{ url_for('prendas.gestion_prendas') }}">Prendas</a>
+                    </div>
+                </div>
             </nav>
         </div>
     </header>

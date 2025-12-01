@@ -13,6 +13,10 @@
             <input type="text" name="nombre" id="nombre" required placeholder="Nombre o razón social">
         </div>
         <div class="form-group">
+            <label for="nif">NIF/CIF</label>
+            <input type="text" name="nif" id="nif" placeholder="A15022510" maxlength="20">
+        </div>
+        <div class="form-group">
             <label for="direccion">Dirección</label>
             <textarea name="direccion" id="direccion" rows="3" placeholder="Dirección completa"></textarea>
         </div>
@@ -35,6 +39,7 @@
         <tr>
             <th>ID</th>
             <th>Nombre</th>
+            <th>NIF/CIF</th>
             <th>Dirección</th>
             <th>Teléfono</th>
             <th>Email</th>
@@ -46,6 +51,7 @@
         <tr>
             <td>{{ cliente.id }}</td>
             <td>{{ cliente.nombre }}</td>
+            <td>{{ cliente.nif or '-' }}</td>
             <td>{{ cliente.direccion or '-' }}</td>
             <td>{{ cliente.telefono or '-' }}</td>
             <td>{{ cliente.email or '-' }}</td>

@@ -11,6 +11,7 @@ def gestion_clientes():
         try:
             cliente = Cliente(
                 nombre=request.form.get('nombre'),
+                nif=request.form.get('nif', ''),
                 direccion=request.form.get('direccion', ''),
                 telefono=request.form.get('telefono', ''),
                 email=request.form.get('email', '')

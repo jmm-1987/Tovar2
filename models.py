@@ -25,6 +25,7 @@ class Cliente(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(200), nullable=False)
+    nif = db.Column(db.String(20))  # NIF/CIF del cliente
     direccion = db.Column(db.Text)
     telefono = db.Column(db.String(50))
     email = db.Column(db.String(100))
@@ -64,7 +65,7 @@ class Pedido(db.Model):
     cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False)
     
     # Tipo de pedido
-    tipo_pedido = db.Column(db.String(50), nullable=False)  # confeccion, bordado, serigrafia, sublimacion, varios
+    tipo_pedido = db.Column(db.String(50), nullable=False)  # fabricacion, no fabricacion
     
     # Estado del pedido
     estado = db.Column(db.String(50), nullable=False, default='Pendiente')  # Pendiente, En preparación, Todo listo, Enviado, Entregado al cliente
