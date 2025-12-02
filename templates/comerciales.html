@@ -5,15 +5,9 @@
 {% block content %}
 <h2>Gestión de Comerciales</h2>
 
-<div style="margin-bottom: 30px;">
-    <h3>Crear Nuevo Comercial</h3>
-    <form method="POST" style="max-width: 500px;">
-        <div class="form-group">
-            <label for="nombre">Nombre del Comercial *</label>
-            <input type="text" name="nombre" id="nombre" required placeholder="Nombre completo">
-        </div>
-        <button type="submit" class="btn btn-success">Crear Comercial</button>
-    </form>
+<div class="info-box" style="background: #e3f2fd; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+    <p><strong>ℹ️ Información:</strong> Los comerciales se crean automáticamente cuando se crea un usuario con rol "Comercial" o "Administración". 
+    Para crear un nuevo comercial, ve a <a href="{{ url_for('configuracion.gestion_usuarios') }}">Configuración → Gestión de Usuarios</a>.</p>
 </div>
 
 <h3>Lista de Comerciales</h3>
@@ -22,26 +16,43 @@
     <thead>
         <tr>
             <th>ID</th>
-            <th>Nombre</th>
-            <th>Acciones</th>
+            <th>Usuario</th>
+            <th>Correo</th>
+            <th>Teléfono</th>
+            <th>Rol</th>
         </tr>
     </thead>
     <tbody>
         {% for comercial in comerciales %}
         <tr>
             <td>{{ comercial.id }}</td>
-            <td>{{ comercial.nombre }}</td>
+            <td>{{ comercial.usuario.usuario }}</td>
+            <td>{{ comercial.usuario.correo }}</td>
+            <td>{{ comercial.usuario.telefono or '-' }}</td>
             <td>
-                <form method="POST" action="{{ url_for('comerciales.eliminar_comercial', id=comercial.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar este comercial?');">
-                    <button type="submit" class="btn btn-danger">Eliminar</button>
-                </form>
+                <span class="rol-badge rol-{{ comercial.usuario.rol }}">
+                    {{ comercial.usuario.rol }}
+                </span>
             </td>
         </tr>
         {% endfor %}
     </tbody>
 </table>
 {% else %}
-<p>No hay comerciales registrados.</p>
+<p>No hay comerciales registrados. Los comerciales se crean automáticamente al crear usuarios con rol "Comercial" o "Administración".</p>
 {% endif %}
+
+<style>
+.rol-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.rol-comercial { background: #3498db; color: white; }
+.rol-administracion { background: #9b59b6; color: white; }
+</style>
 {% endblock %}
 

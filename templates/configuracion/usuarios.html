@@ -1,0 +1,243 @@
+{% extends "base.html" %}
+
+{% block title %}Gestión de Usuarios{% endblock %}
+
+{% block content %}
+<div class="usuarios-container">
+    <h1>👥 Gestión de Usuarios</h1>
+    
+    <div class="usuarios-section">
+        <h2>Crear Nuevo Usuario</h2>
+        <form method="POST" class="usuario-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Usuario *</label>
+                    <input type="text" name="usuario" required>
+                </div>
+                <div class="form-group">
+                    <label>Contraseña *</label>
+                    <input type="password" name="password" required>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Correo *</label>
+                    <input type="email" name="correo" required>
+                </div>
+                <div class="form-group">
+                    <label>Teléfono</label>
+                    <input type="text" name="telefono">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Rol *</label>
+                    <select name="rol" required>
+                        <option value="">Seleccionar...</option>
+                        <option value="comercial">Comercial</option>
+                        <option value="administracion">Administración</option>
+                        <option value="supervisor">Supervisor</option>
+                        <option value="usuario">Usuario</option>
+                    </select>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Crear Usuario</button>
+        </form>
+    </div>
+    
+    <div class="usuarios-section">
+        <h2>Lista de Usuarios</h2>
+        <table class="usuarios-table">
+            <thead>
+                <tr>
+                    <th>Usuario</th>
+                    <th>Correo</th>
+                    <th>Teléfono</th>
+                    <th>Rol</th>
+                    <th>Estado</th>
+                    <th>Último Acceso</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for usuario in usuarios %}
+                <tr>
+                    <td>{{ usuario.usuario }}</td>
+                    <td>{{ usuario.correo }}</td>
+                    <td>{{ usuario.telefono or '-' }}</td>
+                    <td>
+                        <span class="rol-badge rol-{{ usuario.rol }}">{{ usuario.rol }}</span>
+                    </td>
+                    <td>
+                        {% if usuario.activo %}
+                            <span class="badge badge-success">Activo</span>
+                        {% else %}
+                            <span class="badge badge-danger">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if usuario.ultimo_acceso %}
+                            {{ usuario.ultimo_acceso.strftime('%d/%m/%Y %H:%M') }}
+                        {% else %}
+                            Nunca
+                        {% endif %}
+                    </td>
+                    <td>
+                        <button onclick="editarUsuario({{ usuario.id }})" class="btn btn-sm btn-primary">Editar</button>
+                        {% if usuario.id != current_user.id %}
+                            <form method="POST" action="{{ url_for('configuracion.eliminar_usuario', id=usuario.id) }}" style="display:inline;">
+                                <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('¿Desactivar este usuario?')">Desactivar</button>
+                            </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal para editar usuario -->
+<div id="modalEditar" class="modal" style="display:none;">
+    <div class="modal-content">
+        <span class="close" onclick="cerrarModal()">&times;</span>
+        <h2>Editar Usuario</h2>
+        <form method="POST" id="formEditar">
+            <div class="form-group">
+                <label>Correo *</label>
+                <input type="email" name="correo" id="edit_correo" required>
+            </div>
+            <div class="form-group">
+                <label>Teléfono</label>
+                <input type="text" name="telefono" id="edit_telefono">
+            </div>
+            <div class="form-group">
+                <label>Rol *</label>
+                <select name="rol" id="edit_rol" required>
+                    <option value="comercial">Comercial</option>
+                    <option value="administracion">Administración</option>
+                    <option value="supervisor">Supervisor</option>
+                    <option value="usuario">Usuario</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Nueva Contraseña (dejar vacío para mantener la actual)</label>
+                <input type="password" name="password" id="edit_password">
+            </div>
+            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+            <button type="button" class="btn btn-secondary" onclick="cerrarModal()">Cancelar</button>
+        </form>
+    </div>
+</div>
+
+<script>
+function editarUsuario(id) {
+    // Aquí deberías hacer una petición AJAX para obtener los datos del usuario
+    // Por simplicidad, usaremos un formulario directo
+    const form = document.getElementById('formEditar');
+    form.action = `/configuracion/usuarios/${id}/editar`;
+    document.getElementById('modalEditar').style.display = 'block';
+}
+
+function cerrarModal() {
+    document.getElementById('modalEditar').style.display = 'none';
+}
+</script>
+
+<style>
+.usuarios-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.usuarios-section {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 30px;
+}
+
+.usuario-form {
+    margin-top: 20px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.usuarios-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.usuarios-table th,
+.usuarios-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.usuarios-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+}
+
+.rol-badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.rol-comercial { background: #3498db; color: white; }
+.rol-administracion { background: #9b59b6; color: white; }
+.rol-supervisor { background: #e74c3c; color: white; }
+.rol-usuario { background: #95a5a6; color: white; }
+
+.badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.badge-success { background: #27ae60; color: white; }
+.badge-danger { background: #e74c3c; color: white; }
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background: white;
+    margin: 5% auto;
+    padding: 30px;
+    border-radius: 10px;
+    max-width: 500px;
+    position: relative;
+}
+
+.close {
+    position: absolute;
+    right: 20px;
+    top: 20px;
+    font-size: 28px;
+    cursor: pointer;
+}
+</style>
+{% endblock %}
+

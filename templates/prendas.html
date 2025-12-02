@@ -26,6 +26,14 @@
                 <option value="otro">Otro</option>
             </select>
         </div>
+        <div class="form-group">
+            <label for="precio_coste">Precio de Coste (€)</label>
+            <input type="number" name="precio_coste" id="precio_coste" step="0.01" min="0" value="0" placeholder="0.00">
+        </div>
+        <div class="form-group">
+            <label for="precio_venta">Precio de Venta (€)</label>
+            <input type="number" name="precio_venta" id="precio_venta" step="0.01" min="0" value="0" placeholder="0.00">
+        </div>
         <button type="submit" class="btn btn-success">Crear Prenda</button>
     </form>
 </div>
@@ -38,6 +46,8 @@
             <th>ID</th>
             <th>Nombre</th>
             <th>Tipo</th>
+            <th>Precio Coste (€)</th>
+            <th>Precio Venta (€)</th>
             <th>Acciones</th>
         </tr>
     </thead>
@@ -47,7 +57,10 @@
             <td>{{ prenda.id }}</td>
             <td>{{ prenda.nombre }}</td>
             <td>{{ prenda.tipo }}</td>
+            <td>{{ "%.2f"|format(prenda.precio_coste|float) if prenda.precio_coste else "0.00" }}</td>
+            <td>{{ "%.2f"|format(prenda.precio_venta|float) if prenda.precio_venta else "0.00" }}</td>
             <td>
+                <button onclick="abrirModalEditar({{ prenda.id }}, '{{ prenda.nombre }}', '{{ prenda.tipo }}', {{ "%.2f"|format(prenda.precio_coste|float) if prenda.precio_coste else 0 }}, {{ "%.2f"|format(prenda.precio_venta|float) if prenda.precio_venta else 0 }})" class="btn btn-primary" style="margin-right: 5px;">Editar</button>
                 <form method="POST" action="{{ url_for('prendas.eliminar_prenda', id=prenda.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar esta prenda?');">
                     <button type="submit" class="btn btn-danger">Eliminar</button>
                 </form>
@@ -59,5 +72,183 @@
 {% else %}
 <p>No hay prendas registradas.</p>
 {% endif %}
+
+<!-- Modal para editar prenda -->
+<div id="modalEditarPrenda" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Editar Prenda</h3>
+            <span class="close" onclick="cerrarModalEditar()">&times;</span>
+        </div>
+        <form method="POST" id="formEditarPrenda" class="modal-form" action="">
+            <input type="hidden" name="prenda_id" id="prenda_id">
+            <div class="form-group">
+                <label for="edit_nombre">Nombre del Modelo *</label>
+                <input type="text" name="nombre" id="edit_nombre" required placeholder="Ej: Camiseta Básica">
+            </div>
+            <div class="form-group">
+                <label for="edit_tipo">Tipo de Prenda *</label>
+                <select name="tipo" id="edit_tipo" required>
+                    <option value="">Seleccione un tipo</option>
+                    <option value="pantalon">Pantalón</option>
+                    <option value="camisa">Camisa</option>
+                    <option value="camiseta">Camiseta</option>
+                    <option value="zapato">Zapato</option>
+                    <option value="chaqueta">Chaqueta</option>
+                    <option value="vestido">Vestido</option>
+                    <option value="falda">Falda</option>
+                    <option value="otro">Otro</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="edit_precio_coste">Precio de Coste (€)</label>
+                <input type="number" name="precio_coste" id="edit_precio_coste" step="0.01" min="0" value="0" placeholder="0.00">
+            </div>
+            <div class="form-group">
+                <label for="edit_precio_venta">Precio de Venta (€)</label>
+                <input type="number" name="precio_venta" id="edit_precio_venta" step="0.01" min="0" value="0" placeholder="0.00">
+            </div>
+            <div class="modal-actions">
+                <button type="button" onclick="cerrarModalEditar()" class="btn btn-secondary">Cancelar</button>
+                <button type="submit" class="btn btn-success">Guardar Cambios</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 0;
+    border: none;
+    width: 90%;
+    max-width: 600px;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 30px;
+    border-bottom: 2px solid #e0e0e0;
+    background: #f8f9fa;
+    border-radius: 10px 10px 0 0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.close {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
+}
+
+.modal-form {
+    padding: 30px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #555;
+    font-size: 14px;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 2px solid #e0e0e0;
+}
+</style>
+
+<script>
+function abrirModalEditar(id, nombre, tipo, precio_coste, precio_venta) {
+    document.getElementById('prenda_id').value = id;
+    document.getElementById('edit_nombre').value = nombre;
+    document.getElementById('edit_tipo').value = tipo;
+    document.getElementById('edit_precio_coste').value = parseFloat(precio_coste || 0).toFixed(2);
+    document.getElementById('edit_precio_venta').value = parseFloat(precio_venta || 0).toFixed(2);
+    
+    // Actualizar la acción del formulario
+    const form = document.getElementById('formEditarPrenda');
+    form.action = '/prendas/' + id + '/editar';
+    
+    document.getElementById('modalEditarPrenda').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalEditar() {
+    document.getElementById('modalEditarPrenda').style.display = 'none';
+    document.body.style.overflow = 'auto';
+    // Limpiar formulario
+    document.getElementById('formEditarPrenda').reset();
+}
+
+// Cerrar modal al hacer clic fuera de él
+window.onclick = function(event) {
+    const modal = document.getElementById('modalEditarPrenda');
+    if (event.target == modal) {
+        cerrarModalEditar();
+    }
+}
+
+// Cerrar modal con ESC
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        cerrarModalEditar();
+    }
+});
+</script>
 {% endblock %}
 

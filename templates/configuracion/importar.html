@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Importar Base de Datos{% endblock %}
+
+{% block content %}
+<div class="importar-container">
+    <h1>📥 Importar Base de Datos</h1>
+    
+    <div class="info-section">
+        <div class="alert alert-warning">
+            <strong>⚠️ Advertencia:</strong> La funcionalidad de importación está en desarrollo. 
+            Por favor, utiliza la exportación para crear backups de seguridad.
+        </div>
+    </div>
+    
+    <div class="info-section">
+        <h2>Instrucciones</h2>
+        <ol>
+            <li>Selecciona el formato del archivo (Excel o TXT)</li>
+            <li>Selecciona el archivo a importar</li>
+            <li>Haz clic en "Importar"</li>
+        </ol>
+        
+        <p><strong>Nota:</strong> Asegúrate de que el archivo tenga el formato correcto antes de importar.</p>
+    </div>
+    
+    <div class="info-section">
+        <form method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>Formato del archivo *</label>
+                <select name="formato" required>
+                    <option value="excel">Excel (.xlsx)</option>
+                    <option value="txt">Texto (.txt)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Archivo *</label>
+                <input type="file" name="archivo" accept=".xlsx,.txt" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Importar</button>
+            <a href="{{ url_for('configuracion.index') }}" class="btn btn-secondary">Cancelar</a>
+        </form>
+    </div>
+</div>
+
+<style>
+.importar-container {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.info-section {
+    background: white;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.alert {
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.alert-warning {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    color: #856404;
+}
+
+.info-section ol {
+    margin-left: 20px;
+    line-height: 1.8;
+}
+
+.info-section li {
+    margin-bottom: 8px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.form-group select,
+.form-group input[type="file"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+</style>
+{% endblock %}
+

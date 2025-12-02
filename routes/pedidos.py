@@ -1,14 +1,16 @@
 """Rutas para gestión de pedidos"""
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask_login import login_required
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import os
 from extensions import db
-from models import Comercial, Cliente, Prenda, Pedido, LineaPedido
+from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Usuario
 
 pedidos_bp = Blueprint('pedidos', __name__)
 
 @pedidos_bp.route('/pedidos')
+@login_required
 def listado_pedidos():
     """Listado de pedidos con opciones de editar y eliminar"""
     # Obtener todos los pedidos
@@ -42,6 +44,7 @@ def listado_pedidos():
     return render_template('listado_pedidos.html', pedidos=pedidos)
 
 @pedidos_bp.route('/pedidos/nuevo', methods=['GET', 'POST'])
+@login_required
 def nuevo_pedido():
     """Crear nuevo pedido"""
     if request.method == 'POST':
@@ -137,7 +140,10 @@ def nuevo_pedido():
             db.session.rollback()
             flash(f'Error al crear pedido: {str(e)}', 'error')
     
-    comerciales = Comercial.query.all()
+    comerciales = Comercial.query.join(Usuario).filter(
+        Usuario.activo == True,
+        Usuario.rol.in_(['comercial', 'administracion'])
+    ).all()
     clientes = Cliente.query.all()
     prendas = Prenda.query.all()
     return render_template('nuevo_pedido.html', 
@@ -146,6 +152,7 @@ def nuevo_pedido():
                          prendas=prendas)
 
 @pedidos_bp.route('/pedidos/<int:pedido_id>/editar', methods=['GET', 'POST'])
+@login_required
 def editar_pedido(pedido_id):
     """Editar pedido existente"""
     pedido = Pedido.query.get_or_404(pedido_id)
@@ -248,7 +255,10 @@ def editar_pedido(pedido_id):
             db.session.rollback()
             flash(f'Error al actualizar pedido: {str(e)}', 'error')
     
-    comerciales = Comercial.query.all()
+    comerciales = Comercial.query.join(Usuario).filter(
+        Usuario.activo == True,
+        Usuario.rol.in_(['comercial', 'administracion'])
+    ).all()
     clientes = Cliente.query.all()
     prendas = Prenda.query.all()
     return render_template('editar_pedido.html', 
@@ -258,6 +268,7 @@ def editar_pedido(pedido_id):
                          prendas=prendas)
 
 @pedidos_bp.route('/pedidos/<int:pedido_id>')
+@login_required
 def ver_pedido(pedido_id):
     """Vista detallada del pedido"""
     pedido = Pedido.query.get_or_404(pedido_id)
@@ -297,6 +308,7 @@ def ver_pedido(pedido_id):
                          fecha_class=fecha_class)
 
 @pedidos_bp.route('/pedidos/<int:pedido_id>/cambiar-estado', methods=['POST'])
+@login_required
 def cambiar_estado_pedido(pedido_id):
     """Cambiar el estado del pedido y actualizar la fecha correspondiente"""
     pedido = Pedido.query.get_or_404(pedido_id)
@@ -335,6 +347,7 @@ def cambiar_estado_pedido(pedido_id):
     return redirect(url_for('pedidos.ver_pedido', pedido_id=pedido_id))
 
 @pedidos_bp.route('/pedidos/<int:pedido_id>/lineas/<int:linea_id>/cambiar-estado', methods=['POST'])
+@login_required
 def cambiar_estado_linea(pedido_id, linea_id):
     """Cambiar el estado de una línea de pedido"""
     linea = LineaPedido.query.get_or_404(linea_id)
@@ -362,12 +375,14 @@ def cambiar_estado_linea(pedido_id, linea_id):
     return redirect(url_for('pedidos.ver_pedido', pedido_id=pedido_id))
 
 @pedidos_bp.route('/pedidos/<int:pedido_id>/imprimir')
+@login_required
 def imprimir_pedido(pedido_id):
     """Vista de impresión del pedido"""
     pedido = Pedido.query.get_or_404(pedido_id)
     return render_template('imprimir_pedido.html', pedido=pedido)
 
 @pedidos_bp.route('/pedidos/<int:pedido_id>/eliminar', methods=['POST'])
+@login_required
 def eliminar_pedido(pedido_id):
     """Eliminar pedido"""
     pedido = Pedido.query.get_or_404(pedido_id)

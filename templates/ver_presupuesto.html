@@ -7,6 +7,8 @@
     <a href="{{ url_for('presupuestos.listado_presupuestos') }}" class="btn btn-primary">← Volver a la lista</a>
     <a href="{{ url_for('presupuestos.editar_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-warning">Editar</a>
     <a href="{{ url_for('presupuestos.imprimir_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-secondary" target="_blank">🖨️ Imprimir</a>
+    <a href="{{ url_for('presupuestos.descargar_pdf_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-success">📄 Descargar PDF</a>
+    <button onclick="enviarPorCorreo({{ presupuesto.id }})" class="btn btn-info">📧 Enviar por Correo</button>
 </div>
 
 <h2>Presupuesto #{{ presupuesto.id }}</h2>
@@ -191,5 +193,15 @@
     <p>No hay prendas registradas en este presupuesto.</p>
     {% endif %}
 </div>
+
+<script>
+function enviarPorCorreo(presupuestoId) {
+    // Función pendiente de implementar
+    // El PDF se puede descargar desde: /presupuestos/{presupuestoId}/descargar-pdf
+    // Este PDF será el que se enviará por correo
+    alert('Función de envío por correo pendiente de implementar para el presupuesto #' + presupuestoId + '\n\nEl PDF está disponible para descargar desde el botón "Descargar PDF".');
+    // TODO: Implementar funcionalidad de envío por correo usando el PDF generado
+}
+</script>
 {% endblock %}
 

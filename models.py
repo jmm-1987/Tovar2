@@ -1,20 +1,30 @@
 from datetime import datetime
 from extensions import db
+from flask_login import UserMixin
+from werkzeug.security import generate_password_hash, check_password_hash
 
 # Crear todos los modelos directamente
 # Esto se ejecuta una sola vez cuando se importa el módulo
 
 class Comercial(db.Model):
-    """Comerciales que pueden crear pedidos"""
+    """Comerciales que pueden crear pedidos (vinculados a usuarios)"""
     __tablename__ = 'comerciales'
     
     id = db.Column(db.Integer, primary_key=True)
-    nombre = db.Column(db.String(100), nullable=False, unique=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False, unique=True)
+    
+    # Relación con usuario
+    usuario = db.relationship('Usuario', backref='comercial', lazy=True)
     
     # Relación con pedidos
     pedidos = db.relationship('Pedido', backref='comercial', lazy=True)
     # Relación con presupuestos
     presupuestos = db.relationship('Presupuesto', backref='comercial', lazy=True)
+    
+    @property
+    def nombre(self):
+        """Obtener el nombre del usuario asociado"""
+        return self.usuario.usuario if self.usuario else ''
     
     def __repr__(self):
         return f'<Comercial {self.nombre}>'
@@ -25,10 +35,17 @@ class Cliente(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(200), nullable=False)
+    alias = db.Column(db.String(200))  # Alias o nombre alternativo
     nif = db.Column(db.String(20))  # NIF/CIF del cliente
     direccion = db.Column(db.Text)
+    poblacion = db.Column(db.String(100))  # Población
+    provincia = db.Column(db.String(100))  # Provincia
+    codigo_postal = db.Column(db.String(10))  # Código Postal
+    pais = db.Column(db.String(100), default='España')  # País
     telefono = db.Column(db.String(50))
     email = db.Column(db.String(100))
+    personas_contacto = db.Column(db.Text)  # Personas de contacto
+    anotaciones = db.Column(db.Text)  # Anotaciones adicionales
     
     # Relación con pedidos
     pedidos = db.relationship('Pedido', backref='cliente', lazy=True)
@@ -45,6 +62,8 @@ class Prenda(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(200), nullable=False)
     tipo = db.Column(db.String(50), nullable=False)  # pantalon, camisa, zapato, camiseta, etc.
+    precio_coste = db.Column(db.Numeric(10, 2), nullable=False, default=0)  # Precio de coste
+    precio_venta = db.Column(db.Numeric(10, 2), nullable=False, default=0)  # Precio de venta
     
     # Relación con líneas de pedido
     lineas_pedido = db.relationship('LineaPedido', backref='prenda', lazy=True)
@@ -296,3 +315,34 @@ class LineaFactura(db.Model):
     
     def __repr__(self):
         return f'<LineaFactura {self.id} - {self.descripcion} x{self.cantidad}>'
+
+class Usuario(db.Model, UserMixin):
+    """Usuarios del sistema con autenticación"""
+    __tablename__ = 'usuarios'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    usuario = db.Column(db.String(80), nullable=False, unique=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+    correo = db.Column(db.String(100), nullable=False)
+    telefono = db.Column(db.String(50))
+    rol = db.Column(db.String(50), nullable=False)  # comercial, administracion, supervisor, usuario
+    
+    # Timestamps
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    ultimo_acceso = db.Column(db.DateTime)
+    activo = db.Column(db.Boolean, default=True, nullable=False)
+    
+    def set_password(self, password):
+        """Establecer contraseña con hash"""
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Verificar contraseña"""
+        return check_password_hash(self.password_hash, password)
+    
+    def is_supervisor(self):
+        """Verificar si el usuario es supervisor"""
+        return self.rol == 'supervisor'
+    
+    def __repr__(self):
+        return f'<Usuario {self.usuario} ({self.rol})>'

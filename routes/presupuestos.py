@@ -1,14 +1,17 @@
 """Rutas para gestión de presupuestos"""
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, make_response
+from flask_login import login_required
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import os
+from io import BytesIO
 from extensions import db
-from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto
+from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Usuario
 
 presupuestos_bp = Blueprint('presupuestos', __name__)
 
 @presupuestos_bp.route('/presupuestos')
+@login_required
 def listado_presupuestos():
     """Listado de presupuestos"""
     presupuestos = Presupuesto.query.order_by(Presupuesto.id.desc()).all()
@@ -94,7 +97,10 @@ def nuevo_presupuesto():
             db.session.rollback()
             flash(f'Error al crear presupuesto: {str(e)}', 'error')
     
-    comerciales = Comercial.query.all()
+    comerciales = Comercial.query.join(Usuario).filter(
+        Usuario.activo == True,
+        Usuario.rol.in_(['comercial', 'administracion'])
+    ).all()
     clientes = Cliente.query.all()
     prendas = Prenda.query.all()
     return render_template('nuevo_presupuesto.html', 
@@ -103,12 +109,14 @@ def nuevo_presupuesto():
                          prendas=prendas)
 
 @presupuestos_bp.route('/presupuestos/<int:presupuesto_id>')
+@login_required
 def ver_presupuesto(presupuesto_id):
     """Vista detallada del presupuesto"""
     presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
     return render_template('ver_presupuesto.html', presupuesto=presupuesto)
 
 @presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/imprimir')
+@login_required
 def imprimir_presupuesto(presupuesto_id):
     """Vista de impresión del presupuesto (HTML para imprimir desde navegador)"""
     from decimal import Decimal
@@ -135,7 +143,78 @@ def imprimir_presupuesto(presupuesto_id):
                          total_con_iva=total_con_iva,
                          tipo_iva=tipo_iva)
 
+@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/descargar-pdf')
+@login_required
+def descargar_pdf_presupuesto(presupuesto_id):
+    """Generar y descargar PDF del presupuesto"""
+    try:
+        from decimal import Decimal
+        from xhtml2pdf import pisa
+        from flask import url_for
+        
+        presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+        
+        # Calcular totales
+        tipo_iva = 21
+        base_imponible = Decimal('0.00')
+        
+        for linea in presupuesto.lineas:
+            precio_unit = Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0.00')
+            cantidad = Decimal(str(linea.cantidad))
+            total_linea = precio_unit * cantidad
+            base_imponible += total_linea
+        
+        iva_total = base_imponible * Decimal(str(tipo_iva)) / Decimal('100')
+        total_con_iva = base_imponible + iva_total
+        
+        # Obtener URL base para recursos estáticos
+        base_url = request.url_root.rstrip('/')
+        
+        # Renderizar template HTML con URLs absolutas
+        html = render_template('imprimir_presupuesto.html', 
+                             presupuesto=presupuesto,
+                             base_imponible=base_imponible,
+                             iva_total=iva_total,
+                             total_con_iva=total_con_iva,
+                             tipo_iva=tipo_iva,
+                             base_url=base_url)
+        
+        # Generar PDF
+        result = BytesIO()
+        
+        # Función para manejar enlaces e imágenes
+        def link_callback(uri, rel):
+            # Convertir URIs relativas a absolutas
+            if uri.startswith('/'):
+                return base_url + uri
+            return uri
+        
+        pdf = pisa.pisaDocument(
+            BytesIO(html.encode("UTF-8")), 
+            result,
+            link_callback=link_callback
+        )
+        
+        if not pdf.err:
+            response = make_response(result.getvalue())
+            response.headers['Content-Type'] = 'application/pdf'
+            response.headers['Content-Disposition'] = f'attachment; filename=presupuesto_{presupuesto_id}.pdf'
+            return response
+        else:
+            flash(f'Error al generar PDF: {pdf.err}', 'error')
+            return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
+            
+    except ImportError:
+        flash('La librería xhtml2pdf no está instalada. Por favor, ejecuta: pip install xhtml2pdf', 'error')
+        return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
+    except Exception as e:
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        import traceback
+        print(f"Error en descargar_pdf_presupuesto: {traceback.format_exc()}")
+        return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
+
 @presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/editar', methods=['GET', 'POST'])
+@login_required
 def editar_presupuesto(presupuesto_id):
     """Editar presupuesto existente"""
     presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
@@ -231,7 +310,10 @@ def editar_presupuesto(presupuesto_id):
             db.session.rollback()
             flash(f'Error al actualizar presupuesto: {str(e)}', 'error')
     
-    comerciales = Comercial.query.all()
+    comerciales = Comercial.query.join(Usuario).filter(
+        Usuario.activo == True,
+        Usuario.rol.in_(['comercial', 'administracion'])
+    ).all()
     clientes = Cliente.query.all()
     prendas = Prenda.query.all()
     return render_template('editar_presupuesto.html', 
@@ -241,6 +323,7 @@ def editar_presupuesto(presupuesto_id):
                          prendas=prendas)
 
 @presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/cambiar-estado', methods=['POST'])
+@login_required
 def cambiar_estado_presupuesto(presupuesto_id):
     """Cambiar el estado del presupuesto y actualizar la fecha correspondiente"""
     presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
@@ -351,6 +434,7 @@ def cambiar_estado_presupuesto(presupuesto_id):
     return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
 
 @presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/actualizar-seguimiento', methods=['POST'])
+@login_required
 def actualizar_seguimiento(presupuesto_id):
     """Actualizar el campo de seguimiento del presupuesto"""
     presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
@@ -367,6 +451,7 @@ def actualizar_seguimiento(presupuesto_id):
     return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
 
 @presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/eliminar', methods=['POST'])
+@login_required
 def eliminar_presupuesto(presupuesto_id):
     """Eliminar presupuesto"""
     presupuesto = Presupuesto.query.get_or_404(presupuesto_id)

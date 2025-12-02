@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Configuración{% endblock %}
+
+{% block content %}
+<div class="config-container">
+    <h1>⚙️ Configuración del Sistema</h1>
+    
+    <div class="config-menu">
+        <a href="{{ url_for('configuracion.gestion_usuarios') }}" class="config-card">
+            <div class="config-icon">👥</div>
+            <h3>Gestión de Usuarios</h3>
+            <p>Crear, editar y gestionar usuarios del sistema</p>
+        </a>
+        
+        <a href="{{ url_for('configuracion.verifactu_info') }}" class="config-card">
+            <div class="config-icon">🔐</div>
+            <h3>API Verifactu</h3>
+            <p>Información y configuración de la API Verifactu</p>
+        </a>
+        
+        <a href="{{ url_for('configuracion.exportar_bd', formato='excel') }}" class="config-card">
+            <div class="config-icon">📊</div>
+            <h3>Exportar BD (Excel)</h3>
+            <p>Exportar toda la base de datos a formato Excel</p>
+        </a>
+        
+        <a href="{{ url_for('configuracion.exportar_bd', formato='txt') }}" class="config-card">
+            <div class="config-icon">📄</div>
+            <h3>Exportar BD (TXT)</h3>
+            <p>Exportar toda la base de datos a formato texto</p>
+        </a>
+        
+        <a href="{{ url_for('configuracion.importar_bd') }}" class="config-card">
+            <div class="config-icon">📥</div>
+            <h3>Importar BD</h3>
+            <p>Importar datos desde archivo Excel o TXT</p>
+        </a>
+    </div>
+</div>
+
+<style>
+.config-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.config-menu {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    margin-top: 30px;
+}
+
+.config-card {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    text-decoration: none;
+    color: #333;
+    transition: transform 0.3s, box-shadow 0.3s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.config-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 12px rgba(0,0,0,0.15);
+}
+
+.config-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+}
+
+.config-card h3 {
+    margin: 10px 0;
+    color: #2c3e50;
+}
+
+.config-card p {
+    color: #666;
+    font-size: 14px;
+    margin: 0;
+}
+</style>
+{% endblock %}
+

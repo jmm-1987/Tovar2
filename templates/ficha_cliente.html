@@ -1,0 +1,344 @@
+{% extends "base.html" %}
+
+{% block title %}Ficha Cliente - {{ cliente.nombre }}{% endblock %}
+
+{% block content %}
+<div class="ficha-cliente-container">
+    <div class="ficha-header">
+        <h2>📋 Ficha del Cliente: {{ cliente.nombre }}</h2>
+        <div class="ficha-actions">
+            <a href="{{ url_for('clientes.editar_cliente', id=cliente.id) }}" class="btn btn-primary">✏️ Editar Cliente</a>
+            <a href="{{ url_for('clientes.gestion_clientes') }}" class="btn btn-secondary">← Volver a Lista</a>
+        </div>
+    </div>
+
+    <div class="ficha-grid">
+        <!-- Información Principal -->
+        <div class="ficha-section">
+            <h3>Información Principal</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <strong>Nombre:</strong>
+                    <span>{{ cliente.nombre }}</span>
+                </div>
+                {% if cliente.alias %}
+                <div class="info-item">
+                    <strong>Alias:</strong>
+                    <span>{{ cliente.alias }}</span>
+                </div>
+                {% endif %}
+                <div class="info-item">
+                    <strong>NIF/CIF:</strong>
+                    <span>{{ cliente.nif or '-' }}</span>
+                </div>
+                <div class="info-item">
+                    <strong>Teléfono:</strong>
+                    <span>{{ cliente.telefono or '-' }}</span>
+                </div>
+                <div class="info-item">
+                    <strong>Email:</strong>
+                    <span>{{ cliente.email or '-' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dirección -->
+        <div class="ficha-section">
+            <h3>Dirección</h3>
+            <div class="info-grid">
+                <div class="info-item full-width">
+                    <strong>Dirección:</strong>
+                    <span>{{ cliente.direccion or '-' }}</span>
+                </div>
+                <div class="info-item">
+                    <strong>Población:</strong>
+                    <span>{{ cliente.poblacion or '-' }}</span>
+                </div>
+                <div class="info-item">
+                    <strong>Provincia:</strong>
+                    <span>{{ cliente.provincia or '-' }}</span>
+                </div>
+                <div class="info-item">
+                    <strong>Código Postal:</strong>
+                    <span>{{ cliente.codigo_postal or '-' }}</span>
+                </div>
+                <div class="info-item">
+                    <strong>País:</strong>
+                    <span>{{ cliente.pais or 'España' }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Personas de Contacto -->
+        {% if cliente.personas_contacto %}
+        <div class="ficha-section">
+            <h3>Personas de Contacto</h3>
+            <div class="info-text">
+                {{ cliente.personas_contacto | nl2br }}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Anotaciones -->
+        {% if cliente.anotaciones %}
+        <div class="ficha-section">
+            <h3>Anotaciones</h3>
+            <div class="info-text">
+                {{ cliente.anotaciones | nl2br }}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Historial -->
+    <div class="historial-section">
+        <h3>📊 Historial</h3>
+        
+        <!-- Presupuestos -->
+        <div class="historial-subsection">
+            <h4>Presupuestos ({{ presupuestos|length }})</h4>
+            {% if presupuestos %}
+            <table class="historial-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Tipo</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for presupuesto in presupuestos %}
+                    <tr>
+                        <td>{{ presupuesto.id }}</td>
+                        <td>{{ presupuesto.fecha_creacion.strftime('%d/%m/%Y') if presupuesto.fecha_creacion else '-' }}</td>
+                        <td><span class="badge badge-{{ presupuesto.estado|lower|replace(' ', '-') }}">{{ presupuesto.estado }}</span></td>
+                        <td>{{ presupuesto.tipo_pedido }}</td>
+                        <td>
+                            <a href="{{ url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-sm btn-primary">Ver</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="no-data">No hay presupuestos registrados.</p>
+            {% endif %}
+        </div>
+
+        <!-- Pedidos -->
+        <div class="historial-subsection">
+            <h4>Pedidos ({{ pedidos|length }})</h4>
+            {% if pedidos %}
+            <table class="historial-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Tipo</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for pedido in pedidos %}
+                    <tr>
+                        <td>{{ pedido.id }}</td>
+                        <td>{{ pedido.fecha_creacion.strftime('%d/%m/%Y') if pedido.fecha_creacion else '-' }}</td>
+                        <td><span class="badge badge-{{ pedido.estado|lower|replace(' ', '-') }}">{{ pedido.estado }}</span></td>
+                        <td>{{ pedido.tipo_pedido }}</td>
+                        <td>
+                            <a href="{{ url_for('pedidos.ver_pedido', pedido_id=pedido.id) }}" class="btn btn-sm btn-primary">Ver</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="no-data">No hay pedidos registrados.</p>
+            {% endif %}
+        </div>
+
+        <!-- Facturas -->
+        <div class="historial-subsection">
+            <h4>Facturas ({{ facturas|length }})</h4>
+            {% if facturas %}
+            <table class="historial-table">
+                <thead>
+                    <tr>
+                        <th>Número</th>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Importe</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for factura in facturas %}
+                    <tr>
+                        <td>{{ factura.serie }}-{{ factura.numero }}</td>
+                        <td>{{ factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else '-' }}</td>
+                        <td><span class="badge badge-{{ factura.estado|lower }}">{{ factura.estado }}</span></td>
+                        <td>{{ "%.2f"|format(factura.importe_total) }} €</td>
+                        <td>
+                            <a href="{{ url_for('facturacion.imprimir_factura', factura_id=factura.id) }}" class="btn btn-sm btn-primary">Ver</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="no-data">No hay facturas registradas.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.ficha-cliente-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.ficha-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.ficha-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.ficha-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-bottom: 40px;
+}
+
+.ficha-section {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.ficha-section h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #2c3e50;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 10px;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.info-item.full-width {
+    grid-column: 1 / -1;
+}
+
+.info-item strong {
+    color: #555;
+    font-size: 14px;
+}
+
+.info-item span {
+    color: #333;
+    font-size: 16px;
+}
+
+.info-text {
+    color: #333;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.historial-section {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.historial-section h3 {
+    margin-top: 0;
+    margin-bottom: 25px;
+    color: #2c3e50;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 10px;
+}
+
+.historial-subsection {
+    margin-bottom: 30px;
+}
+
+.historial-subsection h4 {
+    color: #555;
+    margin-bottom: 15px;
+}
+
+.historial-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.historial-table th,
+.historial-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.historial-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #555;
+}
+
+.badge {
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.badge-pendiente { background: #ffc107; color: #000; }
+.badge-enviado { background: #17a2b8; color: white; }
+.badge-aceptado { background: #28a745; color: white; }
+.badge-rechazado { background: #dc3545; color: white; }
+.badge-confirmado { background: #28a745; color: white; }
+.badge-enviado { background: #17a2b8; color: white; }
+
+.no-data {
+    color: #999;
+    font-style: italic;
+    padding: 20px;
+    text-align: center;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 14px;
+}
+</style>
+{% endblock %}
+

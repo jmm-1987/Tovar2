@@ -1,5 +1,6 @@
 """Rutas para facturación"""
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask_login import login_required
 from datetime import datetime
 from decimal import Decimal
 import os
@@ -13,6 +14,7 @@ from utils.numeracion import obtener_siguiente_numero_factura
 facturacion_bp = Blueprint('facturacion', __name__)
 
 @facturacion_bp.route('/facturacion')
+@login_required
 def facturacion():
     """Página de facturación con prefacturas (pendientes) y facturas (formalizadas)"""
     # Obtener prefacturas: pedidos que aún no tienen factura formalizada
@@ -28,6 +30,7 @@ def facturacion():
     return render_template('facturacion.html', prefacturas=prefacturas, facturas=facturas)
 
 @facturacion_bp.route('/facturacion/<int:pedido_id>')
+@login_required
 def ver_factura(pedido_id):
     """Vista detallada de una factura para introducir importes"""
     pedido = Pedido.query.get_or_404(pedido_id)
@@ -38,6 +41,7 @@ def ver_factura(pedido_id):
     return render_template('ver_factura.html', pedido=pedido, factura_existente=factura_existente)
 
 @facturacion_bp.route('/facturacion/<int:pedido_id>/formalizar', methods=['POST'])
+@login_required
 def formalizar_factura(pedido_id):
     """Formalizar una factura y enviarla a Verifactu"""
     try:
@@ -216,6 +220,7 @@ def formalizar_factura(pedido_id):
         }), 500
 
 @facturacion_bp.route('/facturacion/factura/<int:factura_id>/imprimir')
+@login_required
 def imprimir_factura(factura_id):
     """Vista de impresión de una factura formalizada"""
     from decimal import Decimal

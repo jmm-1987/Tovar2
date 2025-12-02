@@ -13,19 +13,28 @@
                 <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="header-logo">
             </a>
             <nav>
-                <a href="{{ url_for('index.index') }}">PANEL DE CONTROL</a>
-                <a href="{{ url_for('presupuestos.listado_presupuestos') }}">Presupuestos</a>
-                <a href="{{ url_for('pedidos.listado_pedidos') }}">Pedidos</a>
-                <a href="{{ url_for('facturacion.facturacion') }}">Facturación</a>
-                <a href="{{ url_for('tickets.listado_tickets') }}">🛒 Tickets Tienda</a>
-                <div class="dropdown">
-                    <a href="#" class="dropdown-toggle">Maestros <span class="dropdown-arrow">▼</span></a>
-                    <div class="dropdown-menu">
-                        <a href="{{ url_for('comerciales.gestion_comerciales') }}">Comerciales</a>
-                        <a href="{{ url_for('clientes.gestion_clientes') }}">Clientes</a>
-                        <a href="{{ url_for('prendas.gestion_prendas') }}">Prendas</a>
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('index.index') }}">PANEL DE CONTROL</a>
+                    <a href="{{ url_for('presupuestos.listado_presupuestos') }}">Presupuestos</a>
+                    <a href="{{ url_for('pedidos.listado_pedidos') }}">Pedidos</a>
+                    <a href="{{ url_for('facturacion.facturacion') }}">Facturación</a>
+                    <a href="{{ url_for('tickets.listado_tickets') }}">🛒 Tickets Tienda</a>
+                    <div class="dropdown">
+                        <a href="#" class="dropdown-toggle">Maestros <span class="dropdown-arrow">▼</span></a>
+                        <div class="dropdown-menu">
+                            <a href="{{ url_for('comerciales.gestion_comerciales') }}">Comerciales</a>
+                            <a href="{{ url_for('clientes.gestion_clientes') }}">Clientes</a>
+                            <a href="{{ url_for('prendas.gestion_prendas') }}">Prendas</a>
+                        </div>
                     </div>
-                </div>
+                    {% if current_user.is_supervisor() %}
+                        <a href="{{ url_for('configuracion.index') }}">⚙️ Configuración</a>
+                    {% endif %}
+                    <div class="user-menu">
+                        <span class="user-name">{{ current_user.usuario }}</span>
+                        <a href="{{ url_for('auth.logout') }}" class="logout-btn">Cerrar Sesión</a>
+                    </div>
+                {% endif %}
             </nav>
         </div>
     </header>

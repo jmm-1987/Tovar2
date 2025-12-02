@@ -1,5 +1,6 @@
 """Rutas para gestión de tickets de tienda (Facturas simplificadas)"""
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask_login import login_required
 from datetime import datetime
 from decimal import Decimal
 import os
@@ -12,6 +13,7 @@ from utils.numeracion import obtener_siguiente_numero_ticket
 tickets_bp = Blueprint('tickets', __name__)
 
 @tickets_bp.route('/tickets')
+@login_required
 def listado_tickets():
     """Listado de tickets con opciones de ver y eliminar"""
     # Obtener todos los tickets
@@ -20,6 +22,7 @@ def listado_tickets():
     return render_template('listado_tickets.html', tickets=tickets)
 
 @tickets_bp.route('/tickets/nuevo', methods=['GET', 'POST'])
+@login_required
 def nuevo_ticket():
     """Crear nuevo ticket (factura simplificada)"""
     if request.method == 'POST':
@@ -166,12 +169,14 @@ def nuevo_ticket():
     return render_template('nuevo_ticket.html')
 
 @tickets_bp.route('/tickets/<int:ticket_id>')
+@login_required
 def ver_ticket(ticket_id):
     """Ver detalles de un ticket"""
     ticket = Ticket.query.get_or_404(ticket_id)
     return render_template('ver_ticket.html', ticket=ticket)
 
 @tickets_bp.route('/tickets/<int:ticket_id>/eliminar', methods=['POST'])
+@login_required
 def eliminar_ticket(ticket_id):
     """Eliminar un ticket"""
     try:
@@ -186,6 +191,7 @@ def eliminar_ticket(ticket_id):
     return redirect(url_for('tickets.listado_tickets'))
 
 @tickets_bp.route('/tickets/<int:ticket_id>/reenviar', methods=['POST'])
+@login_required
 def reenviar_ticket(ticket_id):
     """Reenviar un ticket a Verifactu"""
     try:

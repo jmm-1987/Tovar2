@@ -3,69 +3,367 @@
 {% block title %}Clientes - Gestión de Pedidos{% endblock %}
 
 {% block content %}
-<h2>Gestión de Clientes</h2>
+<div class="clientes-container">
+    <div class="clientes-header">
+        <h2>Gestión de Clientes</h2>
+        <button onclick="abrirModalCrear()" class="btn btn-success">➕ Crear Cliente</button>
+    </div>
 
-<div style="margin-bottom: 30px;">
-    <h3>Crear Nuevo Cliente</h3>
-    <form method="POST" style="max-width: 500px;">
-        <div class="form-group">
-            <label for="nombre">Nombre del Cliente *</label>
-            <input type="text" name="nombre" id="nombre" required placeholder="Nombre o razón social">
-        </div>
-        <div class="form-group">
-            <label for="nif">NIF/CIF</label>
-            <input type="text" name="nif" id="nif" placeholder="A15022510" maxlength="20">
-        </div>
-        <div class="form-group">
-            <label for="direccion">Dirección</label>
-            <textarea name="direccion" id="direccion" rows="3" placeholder="Dirección completa"></textarea>
-        </div>
-        <div class="form-group">
-            <label for="telefono">Teléfono</label>
-            <input type="text" name="telefono" id="telefono" placeholder="Teléfono de contacto">
-        </div>
-        <div class="form-group">
-            <label for="email">Email</label>
-            <input type="email" name="email" id="email" placeholder="email@ejemplo.com">
-        </div>
-        <button type="submit" class="btn btn-success">Crear Cliente</button>
-    </form>
+    {% if clientes %}
+    <div class="table-container">
+        <table class="clientes-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Alias</th>
+                    <th>NIF/CIF</th>
+                    <th>Población</th>
+                    <th>Teléfono</th>
+                    <th>Email</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cliente in clientes %}
+                <tr>
+                    <td>{{ cliente.id }}</td>
+                    <td>{{ cliente.nombre }}</td>
+                    <td>{{ cliente.alias or '-' }}</td>
+                    <td>{{ cliente.nif or '-' }}</td>
+                    <td>{{ cliente.poblacion or '-' }}</td>
+                    <td>{{ cliente.telefono or '-' }}</td>
+                    <td>{{ cliente.email or '-' }}</td>
+                    <td class="acciones-cell">
+                        <a href="{{ url_for('clientes.ficha_cliente', id=cliente.id) }}" class="btn btn-sm btn-primary">Ver Ficha</a>
+                        <form method="POST" action="{{ url_for('clientes.eliminar_cliente', id=cliente.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar este cliente?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="no-data">
+        <p>No hay clientes registrados.</p>
+        <button onclick="abrirModalCrear()" class="btn btn-success">Crear Primer Cliente</button>
+    </div>
+    {% endif %}
 </div>
 
-<h3>Lista de Clientes</h3>
-{% if clientes %}
-<table>
-    <thead>
-        <tr>
-            <th>ID</th>
-            <th>Nombre</th>
-            <th>NIF/CIF</th>
-            <th>Dirección</th>
-            <th>Teléfono</th>
-            <th>Email</th>
-            <th>Acciones</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for cliente in clientes %}
-        <tr>
-            <td>{{ cliente.id }}</td>
-            <td>{{ cliente.nombre }}</td>
-            <td>{{ cliente.nif or '-' }}</td>
-            <td>{{ cliente.direccion or '-' }}</td>
-            <td>{{ cliente.telefono or '-' }}</td>
-            <td>{{ cliente.email or '-' }}</td>
-            <td>
-                <form method="POST" action="{{ url_for('clientes.eliminar_cliente', id=cliente.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar este cliente?');">
-                    <button type="submit" class="btn btn-danger">Eliminar</button>
-                </form>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<p>No hay clientes registrados.</p>
-{% endif %}
+<!-- Modal para crear cliente -->
+<div id="modalCrearCliente" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Crear Nuevo Cliente</h3>
+            <span class="close" onclick="cerrarModalCrear()">&times;</span>
+        </div>
+        <form method="POST" id="formCrearCliente" class="modal-form">
+            <div class="form-section">
+                <h4>Información Principal</h4>
+                <div class="form-group">
+                    <label for="nombre">Nombre del Cliente *</label>
+                    <input type="text" name="nombre" id="nombre" required placeholder="Nombre o razón social">
+                </div>
+                <div class="form-group">
+                    <label for="alias">Alias</label>
+                    <input type="text" name="alias" id="alias" placeholder="Nombre alternativo o alias">
+                </div>
+                <div class="form-group">
+                    <label for="nif">NIF/CIF</label>
+                    <input type="text" name="nif" id="nif" placeholder="A15022510" maxlength="20">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Contacto</h4>
+                <div class="form-group">
+                    <label for="telefono">Teléfono</label>
+                    <input type="text" name="telefono" id="telefono" placeholder="Teléfono de contacto">
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" name="email" id="email" placeholder="email@ejemplo.com">
+                </div>
+                <div class="form-group">
+                    <label for="personas_contacto">Personas de Contacto</label>
+                    <textarea name="personas_contacto" id="personas_contacto" rows="3" placeholder="Nombre, teléfono, email de personas de contacto"></textarea>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Dirección</h4>
+                <div class="form-group">
+                    <label for="direccion">Dirección</label>
+                    <textarea name="direccion" id="direccion" rows="3" placeholder="Dirección completa"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="poblacion">Población</label>
+                        <input type="text" name="poblacion" id="poblacion" placeholder="Ciudad">
+                    </div>
+                    <div class="form-group">
+                        <label for="provincia">Provincia</label>
+                        <input type="text" name="provincia" id="provincia" placeholder="Provincia">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="codigo_postal">Código Postal</label>
+                        <input type="text" name="codigo_postal" id="codigo_postal" placeholder="28001" maxlength="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="pais">País</label>
+                        <input type="text" name="pais" id="pais" placeholder="España" value="España">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Anotaciones</h4>
+                <div class="form-group">
+                    <label for="anotaciones">Anotaciones</label>
+                    <textarea name="anotaciones" id="anotaciones" rows="4" placeholder="Notas adicionales sobre el cliente"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Crear Cliente</button>
+                <button type="button" class="btn btn-secondary" onclick="cerrarModalCrear()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.clientes-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.clientes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.table-container {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow-x: auto;
+}
+
+.clientes-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.clientes-table th,
+.clientes-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.clientes-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #555;
+    position: sticky;
+    top: 0;
+}
+
+.clientes-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.acciones-cell {
+    white-space: nowrap;
+}
+
+.acciones-cell .btn {
+    margin-right: 5px;
+}
+
+.no-data {
+    text-align: center;
+    padding: 60px 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.no-data p {
+    font-size: 18px;
+    color: #999;
+    margin-bottom: 20px;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    overflow-y: auto;
+}
+
+.modal-content {
+    background-color: white;
+    margin: 2% auto;
+    padding: 0;
+    border-radius: 10px;
+    max-width: 800px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 30px;
+    border-bottom: 2px solid #e0e0e0;
+    background: #f8f9fa;
+    border-radius: 10px 10px 0 0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.close {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
+}
+
+.modal-form {
+    padding: 30px;
+}
+
+.form-section {
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.form-section:last-of-type {
+    border-bottom: none;
+}
+
+.form-section h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #2c3e50;
+    font-size: 16px;
+    border-bottom: 1px solid #667eea;
+    padding-bottom: 8px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #555;
+    font-size: 14px;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 2px solid #e0e0e0;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 14px;
+}
+</style>
+
+<script>
+function abrirModalCrear() {
+    document.getElementById('modalCrearCliente').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+}
+
+function cerrarModalCrear() {
+    document.getElementById('modalCrearCliente').style.display = 'none';
+    document.body.style.overflow = 'auto';
+    // Limpiar formulario
+    document.getElementById('formCrearCliente').reset();
+}
+
+// Cerrar modal al hacer clic fuera de él
+window.onclick = function(event) {
+    const modal = document.getElementById('modalCrearCliente');
+    if (event.target == modal) {
+        cerrarModalCrear();
+    }
+}
+
+// Cerrar modal con ESC
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        cerrarModalCrear();
+    }
+});
+</script>
 {% endblock %}
 

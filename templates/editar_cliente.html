@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Cliente - {{ cliente.nombre }}{% endblock %}
+
+{% block content %}
+<div class="editar-cliente-container">
+    <h2>✏️ Editar Cliente: {{ cliente.nombre }}</h2>
+    
+    <form method="POST" class="cliente-form">
+        <div class="form-section">
+            <h3>Información Principal</h3>
+            <div class="form-group">
+                <label for="nombre">Nombre del Cliente *</label>
+                <input type="text" name="nombre" id="nombre" value="{{ cliente.nombre }}" required>
+            </div>
+            <div class="form-group">
+                <label for="alias">Alias</label>
+                <input type="text" name="alias" id="alias" value="{{ cliente.alias or '' }}" placeholder="Nombre alternativo o alias">
+            </div>
+            <div class="form-group">
+                <label for="nif">NIF/CIF</label>
+                <input type="text" name="nif" id="nif" value="{{ cliente.nif or '' }}" maxlength="20">
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Contacto</h3>
+            <div class="form-group">
+                <label for="telefono">Teléfono</label>
+                <input type="text" name="telefono" id="telefono" value="{{ cliente.telefono or '' }}">
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" name="email" id="email" value="{{ cliente.email or '' }}">
+            </div>
+            <div class="form-group">
+                <label for="personas_contacto">Personas de Contacto</label>
+                <textarea name="personas_contacto" id="personas_contacto" rows="3">{{ cliente.personas_contacto or '' }}</textarea>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Dirección</h3>
+            <div class="form-group">
+                <label for="direccion">Dirección</label>
+                <textarea name="direccion" id="direccion" rows="3">{{ cliente.direccion or '' }}</textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="poblacion">Población</label>
+                    <input type="text" name="poblacion" id="poblacion" value="{{ cliente.poblacion or '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="provincia">Provincia</label>
+                    <input type="text" name="provincia" id="provincia" value="{{ cliente.provincia or '' }}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="codigo_postal">Código Postal</label>
+                    <input type="text" name="codigo_postal" id="codigo_postal" value="{{ cliente.codigo_postal or '' }}" maxlength="10">
+                </div>
+                <div class="form-group">
+                    <label for="pais">País</label>
+                    <input type="text" name="pais" id="pais" value="{{ cliente.pais or 'España' }}">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Anotaciones</h3>
+            <div class="form-group">
+                <label for="anotaciones">Anotaciones</label>
+                <textarea name="anotaciones" id="anotaciones" rows="5">{{ cliente.anotaciones or '' }}</textarea>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+            <a href="{{ url_for('clientes.ficha_cliente', id=cliente.id) }}" class="btn btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<style>
+.editar-cliente-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.cliente-form {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.form-section {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.form-section:last-of-type {
+    border-bottom: none;
+}
+
+.form-section h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #2c3e50;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 10px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #555;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 2px solid #e0e0e0;
+}
+</style>
+{% endblock %}
+

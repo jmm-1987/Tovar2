@@ -1,11 +1,13 @@
 """Rutas para el panel de control (index)"""
 from flask import Blueprint, render_template, flash
+from flask_login import login_required
 from datetime import datetime, timedelta
 from models import Pedido
 
 index_bp = Blueprint('index', __name__)
 
 @index_bp.route('/')
+@login_required
 def index():
     """Página principal con lista de pedidos"""
     try:

@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}API Verifactu{% endblock %}
+
+{% block content %}
+<div class="verifactu-container">
+    <h1>🔐 Información sobre API Verifactu</h1>
+    
+    <div class="info-section">
+        <h2>¿Qué es Verifactu?</h2>
+        <p>Verifactu es una plataforma que permite la comunicación de facturas electrónicas con la Agencia Tributaria española, cumpliendo con la normativa de facturación electrónica.</p>
+    </div>
+    
+    <div class="info-section">
+        <h2>Configuración</h2>
+        <p>La configuración de la API Verifactu se realiza mediante la variable de entorno <code>VERIFACTU_TOKEN</code> en el archivo <code>.env</code> o en las variables de entorno del servidor.</p>
+        
+        <div class="code-block">
+            <pre>VERIFACTU_TOKEN=tu_token_aqui</pre>
+        </div>
+    </div>
+    
+    <div class="info-section">
+        <h2>Tipos de Factura</h2>
+        <ul>
+            <li><strong>F1 - Factura Completa:</strong> Se utiliza para facturas formales. Requiere NIF y nombre del cliente.</li>
+            <li><strong>F2 - Factura Simplificada:</strong> Se utiliza para tickets de tienda. No requiere NIF ni nombre del cliente.</li>
+        </ul>
+    </div>
+    
+    <div class="info-section">
+        <h2>Endpoint de la API</h2>
+        <p>La aplicación utiliza el siguiente endpoint para comunicar las facturas:</p>
+        <div class="code-block">
+            <pre>https://api.verifacti.com/verifactu/create</pre>
+        </div>
+    </div>
+    
+    <div class="info-section">
+        <h2>Campos Requeridos</h2>
+        <h3>Para Facturas F1:</h3>
+        <ul>
+            <li>Serie y número</li>
+            <li>Fecha de expedición</li>
+            <li>Tipo de factura (F1)</li>
+            <li>NIF del cliente</li>
+            <li>Nombre del cliente</li>
+            <li>Líneas con base imponible, tipo impositivo e IVA</li>
+            <li>Importe total</li>
+        </ul>
+        
+        <h3>Para Facturas F2 (Tickets):</h3>
+        <ul>
+            <li>Serie y número</li>
+            <li>Fecha de expedición</li>
+            <li>Tipo de factura (F2)</li>
+            <li>Líneas con base imponible, tipo impositivo e IVA</li>
+            <li>Importe total</li>
+            <li><strong>NO se incluyen NIF ni nombre del cliente</strong></li>
+        </ul>
+    </div>
+    
+    <div class="info-section">
+        <h2>Estado de las Facturas</h2>
+        <ul>
+            <li><strong>pendiente:</strong> Factura creada pero aún no comunicada</li>
+            <li><strong>enviado:</strong> Factura comunicada a Verifactu</li>
+            <li><strong>confirmado:</strong> Factura confirmada por Verifactu</li>
+            <li><strong>error:</strong> Error en la comunicación</li>
+        </ul>
+    </div>
+    
+    <div class="info-section">
+        <a href="{{ url_for('configuracion.index') }}" class="btn btn-secondary">Volver a Configuración</a>
+    </div>
+</div>
+
+<style>
+.verifactu-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.info-section {
+    background: white;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.info-section h2 {
+    color: #2c3e50;
+    margin-bottom: 15px;
+}
+
+.info-section h3 {
+    color: #34495e;
+    margin-top: 20px;
+    margin-bottom: 10px;
+}
+
+.info-section ul {
+    margin-left: 20px;
+    line-height: 1.8;
+}
+
+.info-section li {
+    margin-bottom: 8px;
+}
+
+.code-block {
+    background: #f8f9fa;
+    border-left: 4px solid #667eea;
+    padding: 15px;
+    margin: 15px 0;
+    border-radius: 5px;
+}
+
+.code-block pre {
+    margin: 0;
+    font-family: 'Courier New', monospace;
+    color: #2c3e50;
+}
+
+code {
+    background: #f8f9fa;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    color: #e74c3c;
+}
+</style>
+{% endblock %}
+
