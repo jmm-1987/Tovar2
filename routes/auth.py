@@ -51,3 +51,4 @@ def logout():
     flash('Has cerrado sesión correctamente', 'info')
     return redirect(url_for('auth.login'))
 
+

@@ -150,7 +150,7 @@ def descargar_pdf_presupuesto(presupuesto_id):
     try:
         from decimal import Decimal
         from xhtml2pdf import pisa
-        from flask import url_for
+        import base64
         
         presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
         
@@ -167,32 +167,60 @@ def descargar_pdf_presupuesto(presupuesto_id):
         iva_total = base_imponible * Decimal(str(tipo_iva)) / Decimal('100')
         total_con_iva = base_imponible + iva_total
         
-        # Obtener URL base para recursos estáticos
-        base_url = request.url_root.rstrip('/')
+        # Convertir imágenes a base64 para evitar problemas con URLs en producción
+        logo_base64 = None
+        imagen_diseno_base64 = None
         
-        # Renderizar template HTML con URLs absolutas
+        # Convertir logo a base64
+        logo_path = os.path.join(current_app.static_folder, 'logo.png')
+        if os.path.exists(logo_path):
+            try:
+                with open(logo_path, 'rb') as f:
+                    logo_data = f.read()
+                    logo_base64 = base64.b64encode(logo_data).decode('utf-8')
+                    # Detectar tipo MIME
+                    if logo_path.lower().endswith('.png'):
+                        logo_base64 = f'data:image/png;base64,{logo_base64}'
+                    elif logo_path.lower().endswith(('.jpg', '.jpeg')):
+                        logo_base64 = f'data:image/jpeg;base64,{logo_base64}'
+            except Exception as e:
+                print(f"Error al leer logo: {e}")
+        
+        # Convertir imagen de diseño a base64 si existe
+        if presupuesto.imagen_diseno:
+            imagen_path = os.path.join(current_app.config['UPLOAD_FOLDER'], presupuesto.imagen_diseno)
+            if os.path.exists(imagen_path):
+                try:
+                    with open(imagen_path, 'rb') as f:
+                        imagen_data = f.read()
+                        imagen_base64 = base64.b64encode(imagen_data).decode('utf-8')
+                        # Detectar tipo MIME
+                        if imagen_path.lower().endswith('.png'):
+                            imagen_diseno_base64 = f'data:image/png;base64,{imagen_base64}'
+                        elif imagen_path.lower().endswith(('.jpg', '.jpeg')):
+                            imagen_diseno_base64 = f'data:image/jpeg;base64,{imagen_base64}'
+                        elif imagen_path.lower().endswith('.gif'):
+                            imagen_diseno_base64 = f'data:image/gif;base64,{imagen_base64}'
+                except Exception as e:
+                    print(f"Error al leer imagen de diseño: {e}")
+        
+        # Renderizar template HTML con imágenes en base64
         html = render_template('imprimir_presupuesto.html', 
                              presupuesto=presupuesto,
                              base_imponible=base_imponible,
                              iva_total=iva_total,
                              total_con_iva=total_con_iva,
                              tipo_iva=tipo_iva,
-                             base_url=base_url)
+                             logo_base64=logo_base64,
+                             imagen_diseno_base64=imagen_diseno_base64,
+                             use_base64=True)
         
         # Generar PDF
         result = BytesIO()
         
-        # Función para manejar enlaces e imágenes
-        def link_callback(uri, rel):
-            # Convertir URIs relativas a absolutas
-            if uri.startswith('/'):
-                return base_url + uri
-            return uri
-        
         pdf = pisa.pisaDocument(
             BytesIO(html.encode("UTF-8")), 
-            result,
-            link_callback=link_callback
+            result
         )
         
         if not pdf.err:

@@ -26,3 +26,4 @@ def login_required_custom(f):
         return f(*args, **kwargs)
     return decorated_function
 
+

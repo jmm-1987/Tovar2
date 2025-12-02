@@ -258,7 +258,9 @@
     <div class="presupuesto-container">
         <div class="presupuesto-header">
             <div class="logo-section">
-                {% if base_url is defined and base_url %}
+                {% if use_base64 is defined and use_base64 and logo_base64 %}
+                <img src="{{ logo_base64 }}" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;">
+                {% elif base_url is defined and base_url %}
                 <img src="{{ base_url }}{{ url_for('static', filename='logo.png') }}" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;">
                 {% else %}
                 <img src="{{ url_for('static', filename='logo.png', _external=True) }}" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;">
@@ -294,7 +296,9 @@
         {% if presupuesto.imagen_diseno %}
         <div class="datos-box" style="margin-bottom: 15px;">
             <h3>Diseño</h3>
-            {% if base_url is defined and base_url %}
+            {% if use_base64 is defined and use_base64 and imagen_diseno_base64 %}
+            <img src="{{ imagen_diseno_base64 }}" alt="Diseño" style="width: 400px; height: 300px; object-fit: contain; border-radius: 4px;">
+            {% elif base_url is defined and base_url %}
             <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + presupuesto.imagen_diseno) }}" alt="Diseño" style="width: 400px; height: 300px; object-fit: contain; border-radius: 4px;">
             {% else %}
             <img src="{{ url_for('static', filename='uploads/' + presupuesto.imagen_diseno, _external=True) }}" alt="Diseño" style="width: 400px; height: 300px; object-fit: contain; border-radius: 4px;">
