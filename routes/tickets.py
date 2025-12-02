@@ -43,6 +43,8 @@ def nuevo_ticket():
                 descripcion=request.form.get('descripcion', ''),
                 nif=request.form.get('nif', ''),
                 nombre=request.form.get('nombre'),
+                forma_pago=request.form.get('forma_pago', ''),
+                tipo_calculo_iva=request.form.get('tipo_calculo_iva', 'desglosar'),
                 importe_total=Decimal('0.00'),
                 estado='pendiente'
             )
@@ -55,13 +57,25 @@ def nuevo_ticket():
             cantidades = request.form.getlist('cantidad[]')
             precios_unitarios = request.form.getlist('precio_unitario[]')
             
+            tipo_calculo_iva = request.form.get('tipo_calculo_iva', 'desglosar')
+            tipo_iva = Decimal('21')  # IVA al 21%
+            
             importe_total = Decimal('0.00')
             
             for i in range(len(descripciones)):
                 if descripciones[i] and cantidades[i] and precios_unitarios[i]:
                     cantidad = Decimal(cantidades[i])
                     precio_unitario = Decimal(precios_unitarios[i])
-                    importe = cantidad * precio_unitario
+                    
+                    # Calcular importe según el tipo de cálculo de IVA
+                    if tipo_calculo_iva == 'incrementar':
+                        # Precio unitario es sin IVA, calcular con IVA
+                        precio_con_iva = precio_unitario * (Decimal('1') + tipo_iva / Decimal('100'))
+                        importe = cantidad * precio_con_iva
+                    else:  # desglosar
+                        # Precio unitario ya incluye IVA
+                        importe = cantidad * precio_unitario
+                    
                     importe_total += importe
                     
                     linea = LineaTicket(

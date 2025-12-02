@@ -207,6 +207,22 @@ def migrate_database():
                             conn.commit()
                     except Exception:
                         pass
+            
+            # Verificar y agregar columnas nuevas en tickets
+            if 'tickets' in table_names:
+                columns_tickets = [col['name'] for col in inspector.get_columns('tickets')]
+                nuevas_columnas_tickets = {
+                    'forma_pago': 'VARCHAR(100)',
+                    'tipo_calculo_iva': 'VARCHAR(20) DEFAULT \'desglosar\''
+                }
+                for columna, tipo in nuevas_columnas_tickets.items():
+                    if columna not in columns_tickets:
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(text(f'ALTER TABLE tickets ADD COLUMN {columna} {tipo}'))
+                                conn.commit()
+                        except Exception:
+                            pass
         except Exception:
             # Si hay error, intentar crear todas las tablas
             try:

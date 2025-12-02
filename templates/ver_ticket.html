@@ -74,6 +74,9 @@
             {% if ticket.descripcion %}
             <p style="margin: 8px 0;"><strong>Descripción:</strong> {{ ticket.descripcion }}</p>
             {% endif %}
+            {% if ticket.forma_pago %}
+            <p style="margin: 8px 0;"><strong>Forma de Pago:</strong> {{ ticket.forma_pago }}</p>
+            {% endif %}
             <p style="margin: 8px 0;"><strong>Fecha de creación:</strong> {{ ticket.fecha_creacion.strftime('%d/%m/%Y %H:%M:%S') }}</p>
         </div>
     </div>
@@ -86,11 +89,11 @@
         <div style="overflow-x: auto;">
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; background: white;">
                 <thead>
-                    <tr style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-bottom: 2px solid #dee2e6;">
-                        <th style="padding: 15px; text-align: left; color: #2c3e50; font-weight: 600;">Descripción</th>
-                        <th style="padding: 15px; text-align: center; color: #2c3e50; font-weight: 600;">Cantidad</th>
-                        <th style="padding: 15px; text-align: right; color: #2c3e50; font-weight: 600;">Precio Unitario (€)</th>
-                        <th style="padding: 15px; text-align: right; color: #2c3e50; font-weight: 600;">Total (€)</th>
+                    <tr style="background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); border-bottom: 2px solid #dee2e6;">
+                        <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Descripción</th>
+                        <th style="padding: 15px; text-align: center; color: #ffffff; font-weight: 600;">Cantidad</th>
+                        <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Precio Unitario (€)</th>
+                        <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Total (€)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -105,7 +108,13 @@
                     <tr style="border-top: 2px solid #2c3e50; background: #f8f9fa;">
                         <td colspan="3" style="padding: 15px; text-align: right; font-weight: bold; color: #2c3e50;">Base Imponible (€):</td>
                         <td style="padding: 15px; text-align: right;">
-                            {% set base_imponible = (ticket.importe_total|float / 1.21)|round(2) %}
+                            {% if ticket.tipo_calculo_iva == 'incrementar' %}
+                                {# Si es incrementar, el importe_total ya incluye IVA, calcular base #}
+                                {% set base_imponible = (ticket.importe_total|float / 1.21)|round(2) %}
+                            {% else %}
+                                {# Si es desglosar, el importe_total ya incluye IVA, calcular base #}
+                                {% set base_imponible = (ticket.importe_total|float / 1.21)|round(2) %}
+                            {% endif %}
                             <span style="font-weight: bold; color: #2c3e50;">{{ "%.2f"|format(base_imponible) }}</span>
                         </td>
                     </tr>

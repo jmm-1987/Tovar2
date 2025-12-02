@@ -22,6 +22,19 @@
                 <option value="F2" selected>F2 - Factura Simplificada</option>
             </select>
         </div>
+        
+        <div class="form-group-compact">
+            <label for="tipo_calculo_iva">Tipo de Cálculo de IVA *</label>
+            <select name="tipo_calculo_iva" id="tipo_calculo_iva" required>
+                <option value="desglosar" selected>Desglosar (precio incluye IVA)</option>
+                <option value="incrementar">Incrementar (precio base + IVA)</option>
+            </select>
+        </div>
+        
+        <div class="form-group-compact">
+            <label for="forma_pago">Forma de Pago</label>
+            <input type="text" name="forma_pago" id="forma_pago" placeholder="Efectivo, Tarjeta, etc.">
+        </div>
     </div>
 
     <div class="form-row-compact">
@@ -61,8 +74,19 @@
         <button type="button" id="agregar-linea" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">+ Agregar Línea</button>
     </div>
 
-    <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 6px; text-align: right;">
-        <strong style="font-size: 1.2rem;">Total: <span id="importe-total">0.00</span> €</strong>
+    <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <strong>Base Imponible:</strong>
+            <span id="base-imponible">0.00</span> €
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <strong>IVA (21%):</strong>
+            <span id="iva-total">0.00</span> €
+        </div>
+        <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #dee2e6;">
+            <strong style="font-size: 1.2rem;">Total:</strong>
+            <strong style="font-size: 1.2rem;"><span id="importe-total">0.00</span> €</strong>
+        </div>
     </div>
 
     <div style="margin-top: 30px; display: flex; gap: 10px;">
@@ -114,8 +138,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Calcular importe de línea y total con IVA
     function calcularImporte() {
         const rows = document.querySelectorAll('.linea-ticket-row');
-        let baseImponible = 0;
         const tipoIva = 21; // IVA al 21%
+        const tipoCalculo = document.getElementById('tipo_calculo_iva').value;
+        
+        let baseImponible = 0;
+        let totalConIva = 0;
 
         rows.forEach(row => {
             const cantidadInput = row.querySelector('input[name="cantidad[]"]');
@@ -125,21 +152,32 @@ document.addEventListener('DOMContentLoaded', function() {
             if (cantidadInput && precioInput && importeSpan) {
                 const cantidad = parseFloat(cantidadInput.value) || 0;
                 const precio = parseFloat(precioInput.value) || 0;
-                // El precio unitario ya incluye IVA, así que el importe también incluye IVA
-                const importe = cantidad * precio;
+                
+                let importe = 0;
+                let baseLinea = 0;
+                
+                if (tipoCalculo === 'incrementar') {
+                    // Precio unitario es sin IVA, calcular con IVA
+                    baseLinea = cantidad * precio;
+                    importe = baseLinea * (1 + tipoIva / 100);
+                } else {
+                    // Precio unitario ya incluye IVA (desglosar)
+                    importe = cantidad * precio;
+                    baseLinea = importe / (1 + tipoIva / 100);
+                }
+                
                 importeSpan.textContent = importe.toFixed(2) + ' €';
-                baseImponible += importe;
+                baseImponible += baseLinea;
+                totalConIva += importe;
             }
         });
 
-        // Calcular base imponible (sin IVA) y IVA
-        // Si el total incluye IVA, calcular base: total / 1.21
-        const baseSinIva = baseImponible / (1 + tipoIva / 100);
-        const ivaTotal = baseImponible - baseSinIva;
+        // Calcular IVA total
+        const ivaTotal = totalConIva - baseImponible;
 
-        document.getElementById('base-imponible').textContent = baseSinIva.toFixed(2);
+        document.getElementById('base-imponible').textContent = baseImponible.toFixed(2);
         document.getElementById('iva-total').textContent = ivaTotal.toFixed(2);
-        document.getElementById('importe-total').textContent = baseImponible.toFixed(2);
+        document.getElementById('importe-total').textContent = totalConIva.toFixed(2);
     }
 
     function calcularTotal() {
@@ -151,6 +189,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (e.target.matches('input[name="cantidad[]"], input[name="precio_unitario[]"]')) {
             calcularImporte();
         }
+    });
+    
+    // Recalcular cuando cambia el tipo de cálculo de IVA
+    document.getElementById('tipo_calculo_iva').addEventListener('change', function() {
+        calcularImporte();
     });
 
     // Eliminar línea

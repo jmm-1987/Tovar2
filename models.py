@@ -222,8 +222,14 @@ class Ticket(db.Model):
     nif = db.Column(db.String(20))
     nombre = db.Column(db.String(200), nullable=False)
     
+    # Forma de pago
+    forma_pago = db.Column(db.String(100))
+    
     # Importe total
     importe_total = db.Column(db.Numeric(10, 2), nullable=False)
+    
+    # Tipo de cálculo de IVA: 'incrementar' (precio base + IVA) o 'desglosar' (precio total incluye IVA)
+    tipo_calculo_iva = db.Column(db.String(20), default='desglosar')
     
     # Estado y huella de Verifactu
     estado = db.Column(db.String(50), nullable=False, default='pendiente')  # pendiente, enviado, confirmado, error
