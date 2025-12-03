@@ -54,7 +54,6 @@
                     <a href="{{ url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-info" style="padding: 4px 8px; font-size: 0.75rem;">Ver</a>
                     <a href="{{ url_for('presupuestos.editar_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-primary" style="padding: 4px 8px; font-size: 0.75rem;">Editar</a>
                     <a href="{{ url_for('presupuestos.descargar_pdf_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-success" style="padding: 4px 8px; font-size: 0.75rem;" title="Descargar PDF">📄</a>
-                    <button onclick="enviarPorCorreo({{ presupuesto.id }})" class="btn btn-info" style="padding: 4px 8px; font-size: 0.75rem;" title="Enviar por correo">📧</button>
                     <form method="POST" action="{{ url_for('presupuestos.eliminar_presupuesto', presupuesto_id=presupuesto.id) }}" style="display: inline;" onsubmit="return confirm('¿Estás seguro de que deseas eliminar el presupuesto #{{ presupuesto.id }}? Esta acción no se puede deshacer.');">
                         <button type="submit" class="btn-eliminar-lista" title="Eliminar presupuesto">×</button>
                     </form>
@@ -67,13 +66,5 @@
 {% else %}
 <p>No hay presupuestos registrados. <a href="{{ url_for('presupuestos.nuevo_presupuesto') }}">Crear primer presupuesto</a></p>
 {% endif %}
-
-<script>
-function enviarPorCorreo(presupuestoId) {
-    // Función pendiente de implementar
-    alert('Función de envío por correo pendiente de implementar para el presupuesto #' + presupuestoId);
-    // TODO: Implementar funcionalidad de envío por correo
-}
-</script>
 {% endblock %}
 

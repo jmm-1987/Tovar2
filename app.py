@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import os
 from sqlalchemy import inspect, text
-from extensions import db, login_manager
+from extensions import db, login_manager, mail
 from dotenv import load_dotenv
 from markupsafe import Markup
 
@@ -51,11 +51,23 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
+# Configuración de email
+app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
+app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True').lower() == 'true'
+app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL', 'False').lower() == 'true'
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', '')
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', '')
+app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', os.environ.get('MAIL_USERNAME', ''))
+
 # Crear carpeta de uploads si no existe
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 # Inicializar db con la aplicación
 db.init_app(app)
+
+# Inicializar Mail con la aplicación
+mail.init_app(app)
 
 # Configurar Flask-Login
 login_manager.init_app(app)
@@ -65,12 +77,23 @@ login_manager.login_message_category = 'info'
 
 @login_manager.user_loader
 def load_user(user_id):
-    """Cargar usuario desde la sesión"""
-    from models import Usuario
-    return Usuario.query.get(int(user_id))
+    """Cargar usuario o cliente desde la sesión"""
+    from models import Usuario, Cliente
+    
+    # Si el ID empieza con 'cliente_', es un cliente
+    if user_id.startswith('cliente_'):
+        cliente_id = int(user_id.replace('cliente_', ''))
+        cliente = Cliente.query.get(cliente_id)
+        # Verificar que el cliente tenga acceso web configurado
+        if cliente and cliente.tiene_acceso_web():
+            return cliente
+        return None
+    else:
+        # Es un usuario del sistema
+        return Usuario.query.get(int(user_id))
 
 # Importar modelos (se crean automáticamente al importar models.py)
-from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, Usuario
+from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, Usuario, PlantillaEmail
 
 # Importar y registrar blueprints
 from routes.index import index_bp
@@ -84,6 +107,7 @@ from routes.facturacion import facturacion_bp
 from routes.tickets import tickets_bp
 from routes.maestros import maestros_bp
 from routes.configuracion import configuracion_bp
+from routes.cliente_web import cliente_web_bp
 
 # Registrar blueprints
 app.register_blueprint(index_bp)
@@ -97,6 +121,7 @@ app.register_blueprint(facturacion_bp)
 app.register_blueprint(tickets_bp)
 app.register_blueprint(maestros_bp)
 app.register_blueprint(configuracion_bp)
+app.register_blueprint(cliente_web_bp)
 
 def migrate_database():
     """Migrar la base de datos agregando columnas faltantes"""
@@ -144,10 +169,70 @@ def migrate_database():
                         pass
             
             # Verificar que todas las tablas necesarias existan
-            tablas_requeridas = ['comerciales', 'clientes', 'prendas', 'pedidos', 'lineas_pedido', 'presupuestos', 'lineas_presupuesto', 'tickets', 'lineas_ticket', 'facturas', 'lineas_factura', 'usuarios']
+            tablas_requeridas = ['comerciales', 'clientes', 'prendas', 'pedidos', 'lineas_pedido', 'presupuestos', 'lineas_presupuesto', 'tickets', 'lineas_ticket', 'facturas', 'lineas_factura', 'usuarios', 'plantillas_email']
             tablas_faltantes = [t for t in tablas_requeridas if t not in table_names]
             if tablas_faltantes:
                 db.create_all()
+            
+            # Verificar y crear tabla plantillas_email si no existe
+            if 'plantillas_email' not in table_names:
+                db.create_all()
+            
+            # Inicializar plantillas por defecto si no existen
+            from models import PlantillaEmail
+            plantillas_por_defecto = [
+                {
+                    'tipo': 'presupuesto',
+                    'asunto': 'Presupuesto #{presupuesto_id} - {cliente_nombre}',
+                    'cuerpo': '''Estimado/a {cliente_nombre},
+
+Adjuntamos el presupuesto #{presupuesto_id} solicitado.
+
+Detalles del presupuesto:
+- Tipo: {tipo_pedido}
+- Fecha: {fecha_creacion}
+- Total: {total_con_iva} €
+
+Quedamos a su disposición para cualquier consulta.
+
+Saludos cordiales,
+{empresa_nombre}'''
+                },
+                {
+                    'tipo': 'cambio_estado_pedido',
+                    'asunto': 'Actualización del pedido #{pedido_id} - Estado: {nuevo_estado}',
+                    'cuerpo': '''Estimado/a {cliente_nombre},
+
+Le informamos que el estado de su pedido #{pedido_id} ha cambiado.
+
+Nuevo estado: {nuevo_estado}
+Fecha de actualización: {fecha_actualizacion}
+
+Detalles del pedido:
+- Tipo: {tipo_pedido}
+- Fecha de aceptación: {fecha_aceptacion}
+- Fecha objetivo de entrega: {fecha_objetivo}
+
+Quedamos a su disposición para cualquier consulta.
+
+Saludos cordiales,
+{empresa_nombre}'''
+                }
+            ]
+            
+            for plantilla_data in plantillas_por_defecto:
+                plantilla_existente = PlantillaEmail.query.filter_by(tipo=plantilla_data['tipo']).first()
+                if not plantilla_existente:
+                    nueva_plantilla = PlantillaEmail(
+                        tipo=plantilla_data['tipo'],
+                        asunto=plantilla_data['asunto'],
+                        cuerpo=plantilla_data['cuerpo']
+                    )
+                    db.session.add(nueva_plantilla)
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
             
             # Verificar y agregar columnas nuevas en clientes
             if 'clientes' in table_names:
@@ -160,13 +245,20 @@ def migrate_database():
                     'codigo_postal': 'VARCHAR(10)',
                     'pais': 'VARCHAR(100)',
                     'personas_contacto': 'TEXT',
-                    'anotaciones': 'TEXT'
+                    'anotaciones': 'TEXT',
+                    'usuario_web': 'VARCHAR(80)',
+                    'password_hash': 'VARCHAR(255)',
+                    'fecha_creacion': 'TIMESTAMP',
+                    'ultimo_acceso': 'TIMESTAMP'
                 }
                 for columna, tipo in nuevas_columnas.items():
                     if columna not in columns_clientes:
                         try:
                             with db.engine.connect() as conn:
-                                conn.execute(text(f'ALTER TABLE clientes ADD COLUMN {columna} {tipo}'))
+                                if columna == 'usuario_web':
+                                    conn.execute(text(f'ALTER TABLE clientes ADD COLUMN {columna} {tipo} UNIQUE'))
+                                else:
+                                    conn.execute(text(f'ALTER TABLE clientes ADD COLUMN {columna} {tipo}'))
                                 conn.commit()
                         except Exception:
                             pass

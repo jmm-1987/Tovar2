@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Plantillas de Email{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>📧 Plantillas de Email</h1>
+    
+    <div class="info-box" style="margin-bottom: 20px;">
+        <p><strong>Variables disponibles para usar en las plantillas:</strong></p>
+        <ul>
+            <li><strong>Para presupuestos:</strong> {presupuesto_id}, {cliente_nombre}, {tipo_pedido}, {fecha_creacion}, {total_con_iva}, {empresa_nombre}</li>
+            <li><strong>Para cambios de estado de pedidos:</strong> {pedido_id}, {cliente_nombre}, {nuevo_estado}, {estado_anterior}, {fecha_actualizacion}, {tipo_pedido}, {fecha_aceptacion}, {fecha_objetivo}, {empresa_nombre}</li>
+        </ul>
+    </div>
+    
+    {% if plantillas %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Tipo</th>
+                <th>Asunto</th>
+                <th>Última actualización</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for plantilla in plantillas %}
+            <tr>
+                <td>
+                    {% if plantilla.tipo == 'presupuesto' %}
+                        📄 Presupuesto
+                    {% elif plantilla.tipo == 'cambio_estado_pedido' %}
+                        📦 Cambio de Estado de Pedido
+                    {% else %}
+                        {{ plantilla.tipo }}
+                    {% endif %}
+                </td>
+                <td>{{ plantilla.asunto[:50] }}{% if plantilla.asunto|length > 50 %}...{% endif %}</td>
+                <td>{{ plantilla.fecha_actualizacion.strftime('%d/%m/%Y %H:%M') if plantilla.fecha_actualizacion else 'N/A' }}</td>
+                <td>
+                    <a href="{{ url_for('configuracion.editar_plantilla_email', id=plantilla.id) }}" class="btn btn-primary">Editar</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No hay plantillas configuradas. Se crearán automáticamente al iniciar la aplicación.</p>
+    {% endif %}
+</div>
+
+<style>
+.info-box {
+    background: #e3f2fd;
+    border-left: 4px solid #2196f3;
+    padding: 15px;
+    border-radius: 4px;
+}
+
+.info-box ul {
+    margin: 10px 0 0 20px;
+}
+
+.info-box li {
+    margin: 5px 0;
+}
+</style>
+{% endblock %}
+

@@ -1,0 +1,42 @@
+{% extends "cliente_web/base.html" %}
+
+{% block title %}Mis Facturas - Área Cliente{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>🧾 Mis Facturas</h2>
+    {% if facturas %}
+    <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+        <thead>
+            <tr style="border-bottom: 2px solid #e0e0e0; background: #f8f9fa;">
+                <th style="text-align: left; padding: 12px;">Número</th>
+                <th style="text-align: left; padding: 12px;">Fecha</th>
+                <th style="text-align: left; padding: 12px;">Estado</th>
+                <th style="text-align: right; padding: 12px;">Importe</th>
+                <th style="text-align: right; padding: 12px;">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for factura in facturas %}
+            <tr style="border-bottom: 1px solid #f0f0f0;">
+                <td style="padding: 12px;">{{ factura.serie }}-{{ factura.numero }}</td>
+                <td style="padding: 12px; color: #666;">{{ factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else 'N/A' }}</td>
+                <td style="padding: 12px;">
+                    <span style="padding: 5px 12px; border-radius: 5px; background: #d4edda; color: #155724; font-size: 12px; font-weight: 600;">
+                        {{ factura.estado }}
+                    </span>
+                </td>
+                <td style="padding: 12px; text-align: right; font-weight: 600;">{{ "%.2f"|format(factura.importe_total) }} €</td>
+                <td style="padding: 12px; text-align: right;">
+                    <a href="{{ url_for('cliente_web.ver_factura', factura_id=factura.id) }}" class="btn btn-info" style="padding: 8px 15px;">Ver Detalle</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: #666; margin-top: 20px; text-align: center; padding: 40px;">No tienes facturas registradas.</p>
+    {% endif %}
+</div>
+{% endblock %}
+

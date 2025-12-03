@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Área Cliente{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        body {
+            background-image: url("{{ url_for('static', filename='portwada1.png') }}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            position: relative;
+        }
+        .container {
+            position: relative;
+            z-index: 1;
+        }
+    </style>
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <header>
+        <div class="container header-wrapper">
+            <a href="{{ url_for('cliente_web.dashboard') }}" style="text-decoration: none; display: flex; align-items: center;">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="header-logo">
+            </a>
+            <nav>
+                <a href="{{ url_for('cliente_web.dashboard') }}" class="{% if request.endpoint == 'cliente_web.dashboard' %}active{% endif %}">PANEL DE CONTROL</a>
+                <a href="{{ url_for('cliente_web.ver_pedidos') }}" class="{% if request.endpoint == 'cliente_web.ver_pedidos' or request.endpoint == 'cliente_web.ver_pedido' %}active{% endif %}">Mis Pedidos</a>
+                <a href="{{ url_for('cliente_web.ver_facturas') }}" class="{% if request.endpoint == 'cliente_web.ver_facturas' or request.endpoint == 'cliente_web.ver_factura' %}active{% endif %}">Mis Facturas</a>
+                <a href="{{ url_for('cliente_web.nuevo_pedido') }}" class="{% if request.endpoint == 'cliente_web.nuevo_pedido' %}active{% endif %}">Nuevo Pedido</a>
+                <div class="user-menu">
+                    <span class="user-name">{{ current_user.nombre }}</span>
+                    <a href="{{ url_for('cliente_web.logout') }}" class="logout-btn">Cerrar Sesión</a>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
+

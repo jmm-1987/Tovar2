@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, jsonify
 from flask_login import login_required, current_user
 from extensions import db
-from models import Usuario, Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura
+from models import Usuario, Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, PlantillaEmail
 from utils.auth import supervisor_required
 from datetime import datetime
 import io
@@ -333,4 +333,34 @@ def importar_bd():
         return redirect(url_for('configuracion.importar_bd'))
     
     return render_template('configuracion/importar.html')
+
+@configuracion_bp.route('/configuracion/plantillas-email')
+@login_required
+@supervisor_required
+def plantillas_email():
+    """Gestión de plantillas de email"""
+    plantillas = PlantillaEmail.query.all()
+    return render_template('configuracion/plantillas_email.html', plantillas=plantillas)
+
+@configuracion_bp.route('/configuracion/plantillas-email/<int:id>/editar', methods=['GET', 'POST'])
+@login_required
+@supervisor_required
+def editar_plantilla_email(id):
+    """Editar plantilla de email"""
+    plantilla = PlantillaEmail.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        try:
+            plantilla.asunto = request.form.get('asunto', '')
+            plantilla.cuerpo = request.form.get('cuerpo', '')
+            plantilla.fecha_actualizacion = datetime.utcnow()
+            
+            db.session.commit()
+            flash('Plantilla actualizada correctamente', 'success')
+            return redirect(url_for('configuracion.plantillas_email'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al actualizar plantilla: {str(e)}', 'error')
+    
+    return render_template('configuracion/editar_plantilla_email.html', plantilla=plantilla)
 

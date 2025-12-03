@@ -1,0 +1,113 @@
+{% extends "cliente_web/base.html" %}
+
+{% block title %}Nuevo Pedido - Área Cliente{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>➕ Nuevo Pedido</h2>
+    <p style="color: #666; margin-bottom: 20px;">Completa el formulario para crear un nuevo pedido. Nuestro equipo lo revisará y te contactará.</p>
+    
+    <form method="POST" enctype="multipart/form-data">
+        <div style="margin-bottom: 20px;">
+            <div>
+                <label for="tipo_pedido" style="display: block; margin-bottom: 8px; font-weight: 500;">Tipo de Pedido *</label>
+                <select name="tipo_pedido" id="tipo_pedido" required disabled style="width: 100%; max-width: 300px; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #f5f5f5; cursor: not-allowed;">
+                    <option value="cliente web" selected>Cliente Web</option>
+                </select>
+                <input type="hidden" name="tipo_pedido" value="cliente web">
+                <small style="color: #666; font-size: 12px; display: block; margin-top: 5px;">Los pedidos creados desde el área cliente son automáticamente de tipo "Cliente Web"</small>
+            </div>
+        </div>
+
+        <h3 style="margin-top: 30px; margin-bottom: 15px; color: #667eea;">Prendas del Pedido</h3>
+        <div id="prendas-container">
+            <div class="linea-pedido-row" style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 12px; background: #f8f9fa; border-radius: 8px;">
+                <div style="font-weight: 600; color: #667eea; min-width: 25px; font-size: 13px;">#1</div>
+                <div style="flex: 1; display: grid; grid-template-columns: 1.8fr 0.5fr 1.2fr 0.7fr 0.7fr 0.6fr 0.9fr 0.7fr; gap: 6px;">
+                    <input type="hidden" name="nombre[]" value="">
+                    <input type="hidden" name="cargo[]" value="">
+                    <input type="text" name="nombre_mostrar[]" placeholder="Nombre *" required style="padding: 5px 7px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                    <input type="number" name="cantidad[]" value="1" min="1" required placeholder="Cant *" style="padding: 5px 7px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                    <select name="prenda_id[]" required style="padding: 5px 7px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                        <option value="">Modelo *</option>
+                        {% for prenda in prendas %}
+                        <option value="{{ prenda.id }}">{{ prenda.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" name="color[]" placeholder="Color" style="padding: 5px 7px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                    <input type="text" name="forma[]" placeholder="Forma" style="padding: 5px 7px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                    <input type="text" name="talla[]" placeholder="Talla" style="padding: 5px 7px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                    <select name="tejido[]" style="padding: 5px 7px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                        <option value="">Tejido</option>
+                        <option value="SARGA">SARGA</option>
+                        <option value="MICRO">MICRO</option>
+                        <option value="NUEVO T.POLO">NUEVO T.POLO</option>
+                        <option value="T.CAMISETA">T.CAMISETA</option>
+                        <option value="T.SHOFT">T.SHOFT</option>
+                    </select>
+                    <input type="number" name="precio_unitario[]" step="0.01" min="0" placeholder="Precio €" style="padding: 5px 7px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px;">
+                </div>
+                <button type="button" onclick="eliminarLinea(this)" style="background: #dc3545; color: white; border: none; border-radius: 4px; width: 28px; height: 28px; cursor: pointer; font-size: 16px; flex-shrink: 0;">×</button>
+            </div>
+        </div>
+
+        <button type="button" onclick="agregarLinea()" class="btn btn-primary" style="margin-top: 15px;">➕ Agregar Prenda</button>
+
+        <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #e0e0e0;">
+            <button type="submit" class="btn btn-success">Crear Pedido</button>
+            <a href="{{ url_for('cliente_web.ver_pedidos') }}" class="btn btn-secondary" style="margin-left: 10px;">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<script>
+let contadorPrendas = 1;
+
+function agregarLinea() {
+    contadorPrendas++;
+    const container = document.getElementById('prendas-container');
+    const primeraLinea = container.querySelector('.linea-pedido-row');
+    const nuevaLinea = primeraLinea.cloneNode(true);
+    
+    // Limpiar valores
+    nuevaLinea.querySelectorAll('input').forEach(input => {
+        if (input.type !== 'button' && input.type !== 'submit') {
+            if (input.type === 'number') {
+                input.value = input.name.includes('cantidad') ? '1' : '';
+            } else {
+                input.value = '';
+            }
+        }
+    });
+    nuevaLinea.querySelectorAll('select').forEach(select => {
+        select.selectedIndex = 0;
+    });
+    
+    // Actualizar número
+    renumerarPrendas();
+    
+    container.appendChild(nuevaLinea);
+}
+
+function renumerarPrendas() {
+    const todasLineas = document.querySelectorAll('.linea-pedido-row');
+    todasLineas.forEach((linea, index) => {
+        const numero = linea.querySelector('div:first-child');
+        if (numero) {
+            numero.textContent = `#${index + 1}`;
+        }
+    });
+}
+
+function eliminarLinea(btn) {
+    const lineas = document.querySelectorAll('.linea-pedido-row');
+    if (lineas.length > 1) {
+        btn.closest('.linea-pedido-row').remove();
+        renumerarPrendas();
+    } else {
+        alert('Debe haber al menos una prenda en el pedido');
+    }
+}
+</script>
+{% endblock %}
+

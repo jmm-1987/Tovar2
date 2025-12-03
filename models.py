@@ -2,6 +2,7 @@ from datetime import datetime
 from extensions import db
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
+import hashlib
 
 # Crear todos los modelos directamente
 # Esto se ejecuta una sola vez cuando se importa el módulo
@@ -29,8 +30,8 @@ class Comercial(db.Model):
     def __repr__(self):
         return f'<Comercial {self.nombre}>'
 
-class Cliente(db.Model):
-    """Clientes del sistema"""
+class Cliente(db.Model, UserMixin):
+    """Clientes del sistema con acceso web"""
     __tablename__ = 'clientes'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -47,10 +48,36 @@ class Cliente(db.Model):
     personas_contacto = db.Column(db.Text)  # Personas de contacto
     anotaciones = db.Column(db.Text)  # Anotaciones adicionales
     
+    # Campos de autenticación web
+    usuario_web = db.Column(db.String(80), unique=True, nullable=True)  # Usuario para acceso web
+    password_hash = db.Column(db.String(255), nullable=True)  # Contraseña hash
+    
+    # Timestamps
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    ultimo_acceso = db.Column(db.DateTime)
+    
     # Relación con pedidos
     pedidos = db.relationship('Pedido', backref='cliente', lazy=True)
     # Relación con presupuestos
     presupuestos = db.relationship('Presupuesto', backref='cliente', lazy=True)
+    
+    def set_password(self, password):
+        """Establecer contraseña con hash"""
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Verificar contraseña"""
+        if not self.password_hash:
+            return False
+        return check_password_hash(self.password_hash, password)
+    
+    def tiene_acceso_web(self):
+        """Verificar si el cliente tiene acceso web configurado"""
+        return self.usuario_web is not None and self.usuario_web != '' and self.password_hash is not None
+    
+    def get_id(self):
+        """Obtener ID para Flask-Login (prefijo 'cliente_' para distinguir de usuarios)"""
+        return f'cliente_{self.id}'
     
     def __repr__(self):
         return f'<Cliente {self.nombre}>'
@@ -84,7 +111,7 @@ class Pedido(db.Model):
     cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False)
     
     # Tipo de pedido
-    tipo_pedido = db.Column(db.String(50), nullable=False)  # fabricacion, no fabricacion
+    tipo_pedido = db.Column(db.String(50), nullable=False)  # fabricacion, no fabricacion, cliente web
     
     # Estado del pedido
     estado = db.Column(db.String(50), nullable=False, default='Pendiente')  # Pendiente, En preparación, Todo listo, Enviado, Entregado al cliente
@@ -352,3 +379,19 @@ class Usuario(db.Model, UserMixin):
     
     def __repr__(self):
         return f'<Usuario {self.usuario} ({self.rol})>'
+
+class PlantillaEmail(db.Model):
+    """Plantillas de email configurables por el supervisor"""
+    __tablename__ = 'plantillas_email'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    tipo = db.Column(db.String(50), nullable=False, unique=True)  # 'presupuesto', 'cambio_estado_pedido'
+    asunto = db.Column(db.String(200), nullable=False)
+    cuerpo = db.Column(db.Text, nullable=False)
+    
+    # Timestamps
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_actualizacion = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<PlantillaEmail {self.tipo}>'

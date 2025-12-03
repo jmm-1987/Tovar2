@@ -316,6 +316,9 @@ def cambiar_estado_pedido(pedido_id):
     hoy = datetime.now().date()
     
     try:
+        # Guardar el estado anterior
+        estado_anterior = pedido.estado
+        
         # Mapeo de estados a fechas y nombres de estado
         estados_fechas = {
             'Pendiente': (None, 'Pendiente'),
@@ -336,7 +339,20 @@ def cambiar_estado_pedido(pedido_id):
                 setattr(pedido, fecha_campo, hoy)
             
             db.session.commit()
-            flash(f'Estado del pedido cambiado a "{estado_nombre}"', 'success')
+            
+            # Enviar email al cliente si el estado cambió
+            if estado_anterior != estado_nombre:
+                try:
+                    from utils.email import enviar_email_cambio_estado_pedido
+                    exito, mensaje = enviar_email_cambio_estado_pedido(pedido, estado_nombre, estado_anterior)
+                    if exito:
+                        flash(f'Estado del pedido cambiado a "{estado_nombre}". Email enviado al cliente.', 'success')
+                    else:
+                        flash(f'Estado del pedido cambiado a "{estado_nombre}". Error al enviar email: {mensaje}', 'warning')
+                except Exception as e:
+                    flash(f'Estado del pedido cambiado a "{estado_nombre}". Error al enviar email: {str(e)}', 'warning')
+            else:
+                flash(f'Estado del pedido cambiado a "{estado_nombre}"', 'success')
         else:
             flash('Estado no válido', 'error')
             

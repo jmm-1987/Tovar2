@@ -1,0 +1,42 @@
+{% extends "cliente_web/base.html" %}
+
+{% block title %}Mis Pedidos - Área Cliente{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>📦 Mis Pedidos</h2>
+    {% if pedidos %}
+    <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+        <thead>
+            <tr style="border-bottom: 2px solid #e0e0e0; background: #f8f9fa;">
+                <th style="text-align: left; padding: 12px;">ID</th>
+                <th style="text-align: left; padding: 12px;">Estado</th>
+                <th style="text-align: left; padding: 12px;">Tipo</th>
+                <th style="text-align: left; padding: 12px;">Fecha Creación</th>
+                <th style="text-align: right; padding: 12px;">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for pedido in pedidos %}
+            <tr style="border-bottom: 1px solid #f0f0f0;">
+                <td style="padding: 12px;">#{{ pedido.id }}</td>
+                <td style="padding: 12px;">
+                    <span style="padding: 5px 12px; border-radius: 5px; background: #e3f2fd; color: #1976d2; font-size: 12px; font-weight: 600;">
+                        {{ pedido.estado }}
+                    </span>
+                </td>
+                <td style="padding: 12px; color: #666;">{{ pedido.tipo_pedido }}</td>
+                <td style="padding: 12px; color: #666;">{{ pedido.fecha_creacion.strftime('%d/%m/%Y') if pedido.fecha_creacion else 'N/A' }}</td>
+                <td style="padding: 12px; text-align: right;">
+                    <a href="{{ url_for('cliente_web.ver_pedido', pedido_id=pedido.id) }}" class="btn btn-info" style="padding: 8px 15px;">Ver Detalle</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: #666; margin-top: 20px; text-align: center; padding: 40px;">No tienes pedidos registrados.</p>
+    {% endif %}
+</div>
+{% endblock %}
+

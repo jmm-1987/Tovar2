@@ -39,6 +39,16 @@
                     <strong>Email:</strong>
                     <span>{{ cliente.email or '-' }}</span>
                 </div>
+                <div class="info-item">
+                    <strong>Acceso Web:</strong>
+                    <span>
+                        {% if cliente.tiene_acceso_web() %}
+                            <span style="color: #28a745; font-weight: 600;">✓ Configurado</span> (Usuario: {{ cliente.usuario_web }})
+                        {% else %}
+                            <span style="color: #dc3545;">✗ No configurado</span>
+                        {% endif %}
+                    </span>
+                </div>
             </div>
         </div>
 

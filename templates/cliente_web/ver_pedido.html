@@ -1,0 +1,74 @@
+{% extends "cliente_web/base.html" %}
+
+{% block title %}Pedido #{{ pedido.id }} - Área Cliente{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="{{ url_for('cliente_web.ver_pedidos') }}" class="btn btn-secondary">← Volver a Mis Pedidos</a>
+</div>
+
+<div class="card">
+    <h2>Pedido #{{ pedido.id }}</h2>
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
+        <div>
+            <h3 style="color: #667eea; margin-bottom: 15px; font-size: 18px;">Estado del Pedido</h3>
+            <p><strong>Estado:</strong> 
+                <span style="padding: 5px 12px; border-radius: 5px; background: #e3f2fd; color: #1976d2; font-size: 14px; font-weight: 600;">
+                    {{ pedido.estado }}
+                </span>
+            </p>
+            <p style="margin-top: 10px;"><strong>Tipo:</strong> {{ pedido.tipo_pedido }}</p>
+            {% if pedido.fecha_aceptacion %}
+            <p><strong>Fecha de Aceptación:</strong> {{ pedido.fecha_aceptacion.strftime('%d/%m/%Y') }}</p>
+            {% endif %}
+            {% if pedido.fecha_objetivo %}
+            <p><strong>Fecha Objetivo:</strong> {{ pedido.fecha_objetivo.strftime('%d/%m/%Y') }}</p>
+            {% endif %}
+        </div>
+        
+        <div>
+            <h3 style="color: #667eea; margin-bottom: 15px; font-size: 18px;">Información</h3>
+            {% if pedido.forma_pago %}
+            <p><strong>Forma de Pago:</strong> {{ pedido.forma_pago }}</p>
+            {% endif %}
+            <p><strong>Fecha de Creación:</strong> {{ pedido.fecha_creacion.strftime('%d/%m/%Y %H:%M') if pedido.fecha_creacion else 'N/A' }}</p>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Prendas del Pedido</h2>
+    {% if pedido.lineas %}
+    <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+        <thead>
+            <tr style="border-bottom: 2px solid #e0e0e0; background: #f8f9fa;">
+                <th style="text-align: left; padding: 12px;">Nombre</th>
+                <th style="text-align: center; padding: 12px;">Cantidad</th>
+                <th style="text-align: left; padding: 12px;">Color</th>
+                <th style="text-align: left; padding: 12px;">Talla</th>
+                <th style="text-align: left; padding: 12px;">Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for linea in pedido.lineas %}
+            <tr style="border-bottom: 1px solid #f0f0f0;">
+                <td style="padding: 12px;">{{ linea.nombre_mostrar or linea.nombre }}</td>
+                <td style="padding: 12px; text-align: center;">{{ linea.cantidad }}</td>
+                <td style="padding: 12px;">{{ linea.color or '-' }}</td>
+                <td style="padding: 12px;">{{ linea.talla or '-' }}</td>
+                <td style="padding: 12px;">
+                    <span style="padding: 4px 10px; border-radius: 5px; background: #f0f0f0; color: #666; font-size: 12px;">
+                        {{ linea.estado }}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color: #666; margin-top: 20px;">No hay prendas en este pedido.</p>
+    {% endif %}
+</div>
+{% endblock %}
+

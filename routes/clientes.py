@@ -24,8 +24,15 @@ def gestion_clientes():
                 telefono=request.form.get('telefono', ''),
                 email=request.form.get('email', ''),
                 personas_contacto=request.form.get('personas_contacto', ''),
-                anotaciones=request.form.get('anotaciones', '')
+                anotaciones=request.form.get('anotaciones', ''),
+                usuario_web=request.form.get('usuario_web', '').strip() or None
             )
+            
+            # Si se proporciona usuario web, también establecer contraseña si se proporciona
+            password_web = request.form.get('password_web', '').strip()
+            if cliente.usuario_web and password_web:
+                cliente.set_password(password_web)
+            
             db.session.add(cliente)
             db.session.commit()
             flash('Cliente creado correctamente', 'success')
@@ -78,6 +85,20 @@ def editar_cliente(id):
             cliente.email = request.form.get('email', '')
             cliente.personas_contacto = request.form.get('personas_contacto', '')
             cliente.anotaciones = request.form.get('anotaciones', '')
+            
+            # Manejar acceso web
+            usuario_web = request.form.get('usuario_web', '').strip()
+            password_web = request.form.get('password_web', '').strip()
+            
+            if usuario_web:
+                cliente.usuario_web = usuario_web
+                # Solo actualizar contraseña si se proporciona una nueva
+                if password_web:
+                    cliente.set_password(password_web)
+            else:
+                # Si se elimina el usuario, también eliminar la contraseña
+                cliente.usuario_web = None
+                cliente.password_hash = None
             
             db.session.commit()
             flash('Cliente actualizado correctamente', 'success')

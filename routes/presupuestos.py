@@ -143,10 +143,8 @@ def imprimir_presupuesto(presupuesto_id):
                          total_con_iva=total_con_iva,
                          tipo_iva=tipo_iva)
 
-@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/descargar-pdf')
-@login_required
-def descargar_pdf_presupuesto(presupuesto_id):
-    """Generar y descargar PDF del presupuesto"""
+def generar_pdf_presupuesto(presupuesto_id):
+    """Generar PDF del presupuesto y retornar los datos del PDF"""
     try:
         from decimal import Decimal
         from xhtml2pdf import pisa
@@ -224,22 +222,64 @@ def descargar_pdf_presupuesto(presupuesto_id):
         )
         
         if not pdf.err:
-            response = make_response(result.getvalue())
-            response.headers['Content-Type'] = 'application/pdf'
-            response.headers['Content-Disposition'] = f'attachment; filename=presupuesto_{presupuesto_id}.pdf'
-            return response
+            return result.getvalue()
         else:
-            flash(f'Error al generar PDF: {pdf.err}', 'error')
-            return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
+            raise Exception(f'Error al generar PDF: {pdf.err}')
             
+    except Exception as e:
+        import traceback
+        print(f"Error en generar_pdf_presupuesto: {traceback.format_exc()}")
+        raise
+
+@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/descargar-pdf')
+@login_required
+def descargar_pdf_presupuesto(presupuesto_id):
+    """Generar y descargar PDF del presupuesto"""
+    try:
+        pdf_data = generar_pdf_presupuesto(presupuesto_id)
+        response = make_response(pdf_data)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=presupuesto_{presupuesto_id}.pdf'
+        return response
     except ImportError:
         flash('La librería xhtml2pdf no está instalada. Por favor, ejecuta: pip install xhtml2pdf', 'error')
         return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
     except Exception as e:
         flash(f'Error al generar PDF: {str(e)}', 'error')
-        import traceback
-        print(f"Error en descargar_pdf_presupuesto: {traceback.format_exc()}")
         return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
+
+@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/enviar-email', methods=['POST'])
+@login_required
+def enviar_presupuesto_email(presupuesto_id):
+    """Enviar presupuesto por email al cliente"""
+    try:
+        presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+        
+        # Verificar que el cliente tenga email
+        if not presupuesto.cliente or not presupuesto.cliente.email:
+            flash('El cliente no tiene email configurado', 'error')
+            return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
+        
+        # Generar PDF
+        try:
+            pdf_data = generar_pdf_presupuesto(presupuesto_id)
+        except Exception as e:
+            flash(f'Error al generar PDF: {str(e)}', 'error')
+            return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
+        
+        # Enviar email
+        from utils.email import enviar_email_presupuesto
+        exito, mensaje = enviar_email_presupuesto(presupuesto, pdf_data)
+        
+        if exito:
+            flash(f'Presupuesto enviado por email a {presupuesto.cliente.email}', 'success')
+        else:
+            flash(f'Error al enviar email: {mensaje}', 'error')
+        
+    except Exception as e:
+        flash(f'Error al enviar presupuesto por email: {str(e)}', 'error')
+    
+    return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
 
 @presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/editar', methods=['GET', 'POST'])
 @login_required
