@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Nóminas - Informes{% endblock %}
+
+{% block content %}
+<div class="informes-container">
+    <h2>Informe de Nóminas</h2>
+    
+    <!-- Filtros -->
+    <div class="filtros-box">
+        <form method="GET" class="filtros-form">
+            <div class="filtro-group">
+                <label for="empleado_id">Empleado:</label>
+                <select name="empleado_id" id="empleado_id">
+                    <option value="">Todos los empleados</option>
+                    {% for empleado in empleados %}
+                    <option value="{{ empleado.id }}" {% if empleado_id == empleado.id %}selected{% endif %}>{{ empleado.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="filtro-group">
+                <label for="año">Año:</label>
+                <input type="number" name="año" id="año" value="{{ año }}" min="2000" max="2100" required>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+        </form>
+    </div>
+    
+    <!-- Resumen Global -->
+    <div class="resumen-box">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0;">Resumen Global - Año {{ año }}</h3>
+            <a href="{{ url_for('informes.nominas_detalle', empleado_id=empleado_id, año=año) }}" class="btn btn-light" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">Ver Detalle</a>
+        </div>
+        <div class="resumen-grid">
+            <div class="resumen-item">
+                <span class="resumen-label">Total Global:</span>
+                <span class="resumen-value">{{ "%.2f"|format(total_global) }} €</span>
+            </div>
+            <div class="resumen-item">
+                <span class="resumen-label">Número de Nóminas:</span>
+                <span class="resumen-value">{{ nominas|length }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Totales por Empleado -->
+    {% if totales_por_empleado %}
+    <div class="resumen-box" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+        <h3>Totales por Empleado</h3>
+        <div class="resumen-grid">
+            {% for empleado_nombre, total in totales_por_empleado.items() %}
+            <div class="resumen-item">
+                <span class="resumen-label">{{ empleado_nombre }}:</span>
+                <span class="resumen-value">{{ "%.2f"|format(total) }} €</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Tabla de nóminas -->
+    {% if nominas %}
+    <div class="table-container">
+        <table class="clientes-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Empleado</th>
+                    <th>Mes</th>
+                    <th>Año</th>
+                    <th>Total Devengado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for nomina in nominas %}
+                <tr>
+                    <td>{{ nomina.id }}</td>
+                    <td>{{ nomina.empleado.nombre if nomina.empleado else 'N/A' }}</td>
+                    <td>
+                        {% set meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] %}
+                        {{ meses[nomina.mes] }}
+                    </td>
+                    <td>{{ nomina.año }}</td>
+                    <td><strong>{{ "%.2f"|format(nomina.total_devengado) }} €</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="no-data">
+        <p>No hay nóminas para el período seleccionado.</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.informes-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.filtros-box {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.filtros-form {
+    display: flex;
+    gap: 15px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.filtro-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.filtro-group label {
+    font-weight: 500;
+    color: #555;
+    font-size: 0.9em;
+}
+
+.filtro-group select,
+.filtro-group input {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.resumen-box {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 25px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.resumen-box h3 {
+    margin: 0 0 20px 0;
+    font-size: 1.5em;
+}
+
+.resumen-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.resumen-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.resumen-label {
+    font-size: 0.9em;
+    opacity: 0.9;
+}
+
+.resumen-value {
+    font-size: 1.5em;
+    font-weight: bold;
+}
+</style>
+{% endblock %}
+

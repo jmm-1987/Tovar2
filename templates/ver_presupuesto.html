@@ -104,6 +104,17 @@
         
         <div style="display: flex; flex-direction: column; align-items: center;">
             <form method="POST" action="{{ url_for('presupuestos.cambiar_estado_presupuesto', presupuesto_id=presupuesto.id) }}" style="display: inline;">
+                <input type="hidden" name="estado" value="Diseño">
+                <button type="submit" class="btn" style="background-color: {% if presupuesto.estado == 'Diseño' %}#9b59b6{% else %}#95a5a6{% endif %}; color: white;" 
+                        onclick="return confirm('¿Marcar como Diseño?')">
+                    Diseño
+                </button>
+            </form>
+            <p style="margin-top: 5px; font-size: 12px; color: #999; margin-bottom: 0;">-</p>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <form method="POST" action="{{ url_for('presupuestos.cambiar_estado_presupuesto', presupuesto_id=presupuesto.id) }}" style="display: inline;">
                 <input type="hidden" name="estado" value="Enviado">
                 <button type="submit" class="btn" style="background-color: {% if presupuesto.estado == 'Enviado' %}#3498db{% else %}#95a5a6{% endif %}; color: white;" 
                         onclick="return confirm('¿Marcar como Enviado?')">

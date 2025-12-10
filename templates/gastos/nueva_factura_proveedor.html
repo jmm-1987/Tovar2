@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+
+{% block title %}Nueva Factura de Proveedor - Gastos{% endblock %}
+
+{% block content %}
+<h2>Nueva Factura de Proveedor</h2>
+
+<form method="POST">
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="proveedor_id">Proveedor *</label>
+            <select name="proveedor_id" id="proveedor_id" required>
+                <option value="">Seleccione un proveedor</option>
+                {% for proveedor in proveedores %}
+                <option value="{{ proveedor.id }}">{{ proveedor.nombre }}</option>
+                {% endfor %}
+            </select>
+            <small style="color: #666; font-size: 0.85em; display: block; margin-top: 5px;">¿No encuentra el proveedor? <a href="#" onclick="abrirModalProveedor(); return false;" style="cursor: pointer; color: #667eea; text-decoration: underline;">Crear nuevo proveedor</a></small>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="numero_factura">Número de Factura *</label>
+            <input type="text" name="numero_factura" id="numero_factura" required placeholder="Número de factura del proveedor">
+        </div>
+    </div>
+
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="fecha_factura">Fecha Factura *</label>
+            <input type="date" name="fecha_factura" id="fecha_factura" required>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="fecha_vencimiento">Fecha Vencimiento</label>
+            <input type="date" name="fecha_vencimiento" id="fecha_vencimiento">
+        </div>
+    </div>
+
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="base_imponible">Base Imponible *</label>
+            <input type="number" name="base_imponible" id="base_imponible" step="0.01" min="0" required placeholder="0.00">
+        </div>
+
+        <div class="form-group-compact">
+            <label for="tipo_iva">Tipo IVA (%) *</label>
+            <input type="number" name="tipo_iva" id="tipo_iva" step="0.01" min="0" max="100" value="21" required placeholder="21">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="observaciones">Observaciones</label>
+        <textarea name="observaciones" id="observaciones" rows="3" placeholder="Observaciones adicionales..."></textarea>
+    </div>
+
+    <div class="actions">
+        <button type="submit" class="btn btn-success">Guardar Factura</button>
+        <a href="{{ url_for('gastos.listado_facturas_proveedor') }}" class="btn btn-danger">Cancelar</a>
+    </div>
+</form>
+
+<script>
+document.getElementById('base_imponible').addEventListener('input', calcularTotal);
+document.getElementById('tipo_iva').addEventListener('input', calcularTotal);
+
+function calcularTotal() {
+    const baseImponible = parseFloat(document.getElementById('base_imponible').value) || 0;
+    const tipoIva = parseFloat(document.getElementById('tipo_iva').value) || 0;
+    const importeIva = baseImponible * tipoIva / 100;
+    const total = baseImponible + importeIva;
+    
+    // Mostrar cálculo (opcional, puedes agregar un elemento para mostrarlo)
+    console.log('Base:', baseImponible, 'IVA:', importeIva, 'Total:', total);
+}
+</script>
+
+<!-- Modal para crear nuevo proveedor -->
+<div id="modalNuevoProveedor" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Nuevo Proveedor</h3>
+            <span class="close" onclick="cerrarModalProveedor()">&times;</span>
+        </div>
+        <form id="formNuevoProveedor" class="modal-form">
+            <div class="form-group">
+                <label for="modal_nombre">Nombre *</label>
+                <input type="text" name="nombre" id="modal_nombre" required placeholder="Nombre del proveedor">
+            </div>
+
+            <div class="form-group">
+                <label for="modal_cif">CIF</label>
+                <input type="text" name="cif" id="modal_cif" placeholder="CIF del proveedor">
+            </div>
+
+            <div class="form-group">
+                <label for="modal_telefono">Teléfono</label>
+                <input type="text" name="telefono" id="modal_telefono" placeholder="Teléfono de contacto">
+            </div>
+
+            <div class="form-group">
+                <label for="modal_correo">Correo Electrónico</label>
+                <input type="email" name="correo" id="modal_correo" placeholder="correo@ejemplo.com">
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" onclick="cerrarModalProveedor()" class="btn btn-secondary">Cancelar</button>
+                <button type="submit" class="btn btn-success">Guardar Proveedor</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 0;
+    border: none;
+    width: 90%;
+    max-width: 600px;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 30px;
+    border-bottom: 2px solid #e0e0e0;
+    background: #f8f9fa;
+    border-radius: 10px 10px 0 0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.close {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
+}
+
+.modal-form {
+    padding: 30px;
+}
+
+.modal-form .form-group {
+    margin-bottom: 15px;
+}
+
+.modal-form .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #555;
+    font-size: 14px;
+}
+
+.modal-form .form-group input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.modal-form .form-group input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 2px solid #e0e0e0;
+}
+</style>
+
+<script>
+function abrirModalProveedor() {
+    document.getElementById('modalNuevoProveedor').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    // Limpiar formulario
+    document.getElementById('formNuevoProveedor').reset();
+}
+
+function cerrarModalProveedor() {
+    document.getElementById('modalNuevoProveedor').style.display = 'none';
+    document.body.style.overflow = 'auto';
+    // Limpiar formulario
+    document.getElementById('formNuevoProveedor').reset();
+}
+
+// Cerrar modal al hacer clic fuera de él
+window.onclick = function(event) {
+    const modal = document.getElementById('modalNuevoProveedor');
+    if (event.target == modal) {
+        cerrarModalProveedor();
+    }
+}
+
+// Manejar envío del formulario del modal
+document.getElementById('formNuevoProveedor').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const submitButton = this.querySelector('button[type="submit"]');
+    const originalText = submitButton.textContent;
+    
+    // Deshabilitar botón durante el envío
+    submitButton.disabled = true;
+    submitButton.textContent = 'Guardando...';
+    
+    try {
+        const response = await fetch('{{ url_for("gastos.nuevo_proveedor") }}', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Agregar el nuevo proveedor al select
+            const select = document.getElementById('proveedor_id');
+            const option = document.createElement('option');
+            option.value = data.proveedor.id;
+            option.textContent = data.proveedor.nombre;
+            option.selected = true;
+            select.appendChild(option);
+            
+            // Cerrar modal
+            cerrarModalProveedor();
+            
+            // Mostrar mensaje de éxito
+            alert('Proveedor creado correctamente');
+        } else {
+            alert('Error: ' + data.message);
+            submitButton.disabled = false;
+            submitButton.textContent = originalText;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al crear el proveedor. Por favor, intente nuevamente.');
+        submitButton.disabled = false;
+        submitButton.textContent = originalText;
+    }
+});
+</script>
+{% endblock %}
+

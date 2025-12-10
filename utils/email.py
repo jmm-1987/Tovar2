@@ -119,6 +119,51 @@ def enviar_email_presupuesto(presupuesto, pdf_data=None):
     except Exception as e:
         return False, f'Error al enviar email: {str(e)}'
 
+def enviar_email_pedido(pedido, pdf_data=None):
+    """Enviar pedido por email al cliente"""
+    try:
+        cliente = pedido.cliente
+        if not cliente or not cliente.email:
+            return False, 'El cliente no tiene email configurado'
+        
+        # Preparar asunto y cuerpo
+        asunto = f"Pedido #{pedido.id} - {cliente.nombre}"
+        cuerpo = f"""Estimado/a {cliente.nombre},
+
+Adjuntamos el pedido #{pedido.id} solicitado.
+
+Detalles del pedido:
+- Tipo: {pedido.tipo_pedido}
+- Estado: {pedido.estado}
+- Fecha de aceptación: {pedido.fecha_aceptacion.strftime('%d/%m/%Y') if pedido.fecha_aceptacion else 'N/A'}
+
+Quedamos a su disposición para cualquier consulta.
+
+Saludos cordiales,
+{current_app.config.get('MAIL_DEFAULT_SENDER', 'Nuestra Empresa')}"""
+        
+        # Crear mensaje
+        msg = Message(
+            subject=asunto,
+            recipients=[cliente.email],
+            body=cuerpo
+        )
+        
+        # Adjuntar PDF si está disponible
+        if pdf_data:
+            msg.attach(
+                f'pedido_{pedido.id}.pdf',
+                'application/pdf',
+                pdf_data
+            )
+        
+        # Enviar email
+        mail.send(msg)
+        return True, 'Email enviado correctamente'
+        
+    except Exception as e:
+        return False, f'Error al enviar email: {str(e)}'
+
 def enviar_email_cambio_estado_pedido(pedido, nuevo_estado, estado_anterior=None):
     """Enviar email al cliente cuando cambia el estado de un pedido"""
     try:
@@ -159,4 +204,7 @@ def enviar_email_cambio_estado_pedido(pedido, nuevo_estado, estado_anterior=None
         
     except Exception as e:
         return False, f'Error al enviar email: {str(e)}'
+
+
+
 

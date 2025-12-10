@@ -32,16 +32,28 @@ def nuevo_presupuesto():
                 seguimiento=request.form.get('seguimiento', '')
             )
             
-            # Manejar imagen de diseño
-            if 'imagen_diseno' in request.files:
-                file = request.files['imagen_diseno']
-                if file and file.filename:
-                    filename = secure_filename(file.filename)
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                    filename = timestamp + filename
-                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-                    file.save(filepath)
-                    presupuesto.imagen_diseno = filename
+            # Función auxiliar para guardar imagen
+            def guardar_imagen(campo_file, campo_db):
+                """Guardar imagen del formulario"""
+                if campo_file in request.files:
+                    file = request.files[campo_file]
+                    if file and file.filename:
+                        filename = secure_filename(file.filename)
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                        filename = timestamp + filename
+                        filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+                        file.save(filepath)
+                        setattr(presupuesto, campo_db, filename)
+            
+            # Manejar imágenes
+            guardar_imagen('imagen_diseno', 'imagen_diseno')
+            guardar_imagen('imagen_portada', 'imagen_portada')
+            guardar_imagen('imagen_adicional_1', 'imagen_adicional_1')
+            guardar_imagen('imagen_adicional_2', 'imagen_adicional_2')
+            guardar_imagen('imagen_adicional_3', 'imagen_adicional_3')
+            guardar_imagen('imagen_adicional_4', 'imagen_adicional_4')
+            guardar_imagen('imagen_adicional_5', 'imagen_adicional_5')
+            guardar_imagen('imagen_adicional_6', 'imagen_adicional_6')
             
             db.session.add(presupuesto)
             db.session.flush()  # Para obtener el ID del presupuesto
@@ -120,6 +132,7 @@ def ver_presupuesto(presupuesto_id):
 def imprimir_presupuesto(presupuesto_id):
     """Vista de impresión del presupuesto (HTML para imprimir desde navegador)"""
     from decimal import Decimal
+    import base64
     
     presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
     
@@ -136,12 +149,70 @@ def imprimir_presupuesto(presupuesto_id):
     iva_total = base_imponible * Decimal(str(tipo_iva)) / Decimal('100')
     total_con_iva = base_imponible + iva_total
     
+    # Función auxiliar para convertir imagen a base64
+    def convertir_imagen_a_base64(ruta_imagen):
+        """Convertir imagen a base64"""
+        if not ruta_imagen or not os.path.exists(ruta_imagen):
+            return None
+        try:
+            with open(ruta_imagen, 'rb') as f:
+                imagen_data = f.read()
+                imagen_base64 = base64.b64encode(imagen_data).decode('utf-8')
+                # Detectar tipo MIME
+                if ruta_imagen.lower().endswith('.png'):
+                    return f'data:image/png;base64,{imagen_base64}'
+                elif ruta_imagen.lower().endswith(('.jpg', '.jpeg')):
+                    return f'data:image/jpeg;base64,{imagen_base64}'
+                elif ruta_imagen.lower().endswith('.gif'):
+                    return f'data:image/gif;base64,{imagen_base64}'
+                else:
+                    return f'data:image/png;base64,{imagen_base64}'  # Por defecto PNG
+        except Exception as e:
+            print(f"Error al leer imagen {ruta_imagen}: {e}")
+            return None
+    
+    # Convertir imágenes a base64
+    logo_base64 = None
+    imagen_diseno_base64 = None
+    imagen_portada_base64 = None
+    imagenes_adicionales_base64 = []
+    
+    # Convertir logo a base64
+    logo_path = os.path.join(current_app.static_folder, 'logo.png')
+    logo_base64 = convertir_imagen_a_base64(logo_path)
+    
+    # Convertir imagen de diseño a base64 si existe
+    if presupuesto.imagen_diseno:
+        imagen_path = os.path.join(current_app.config['UPLOAD_FOLDER'], presupuesto.imagen_diseno)
+        imagen_diseno_base64 = convertir_imagen_a_base64(imagen_path)
+    
+    # Convertir imagen de portada a base64 si existe
+    if presupuesto.imagen_portada:
+        imagen_path = os.path.join(current_app.config['UPLOAD_FOLDER'], presupuesto.imagen_portada)
+        imagen_portada_base64 = convertir_imagen_a_base64(imagen_path)
+    
+    # Convertir imágenes adicionales a base64
+    for i in range(1, 7):
+        campo_imagen = f'imagen_adicional_{i}'
+        if hasattr(presupuesto, campo_imagen) and getattr(presupuesto, campo_imagen):
+            imagen_nombre = getattr(presupuesto, campo_imagen)
+            imagen_path = os.path.join(current_app.config['UPLOAD_FOLDER'], imagen_nombre)
+            imagen_base64 = convertir_imagen_a_base64(imagen_path)
+            imagenes_adicionales_base64.append(imagen_base64)
+        else:
+            imagenes_adicionales_base64.append(None)
+    
     return render_template('imprimir_presupuesto.html', 
                          presupuesto=presupuesto,
                          base_imponible=base_imponible,
                          iva_total=iva_total,
                          total_con_iva=total_con_iva,
-                         tipo_iva=tipo_iva)
+                         tipo_iva=tipo_iva,
+                         logo_base64=logo_base64,
+                         imagen_diseno_base64=imagen_diseno_base64,
+                         imagen_portada_base64=imagen_portada_base64,
+                         imagenes_adicionales_base64=imagenes_adicionales_base64,
+                         use_base64=True)
 
 def generar_pdf_presupuesto(presupuesto_id):
     """Generar PDF del presupuesto y retornar los datos del PDF"""
@@ -165,42 +236,63 @@ def generar_pdf_presupuesto(presupuesto_id):
         iva_total = base_imponible * Decimal(str(tipo_iva)) / Decimal('100')
         total_con_iva = base_imponible + iva_total
         
+        # Función auxiliar para convertir imagen a base64
+        def convertir_imagen_a_base64(ruta_imagen):
+            """Convertir imagen a base64"""
+            if not ruta_imagen or not os.path.exists(ruta_imagen):
+                return None
+            try:
+                with open(ruta_imagen, 'rb') as f:
+                    imagen_data = f.read()
+                    imagen_base64 = base64.b64encode(imagen_data).decode('utf-8')
+                    # Detectar tipo MIME
+                    if ruta_imagen.lower().endswith('.png'):
+                        return f'data:image/png;base64,{imagen_base64}'
+                    elif ruta_imagen.lower().endswith(('.jpg', '.jpeg')):
+                        return f'data:image/jpeg;base64,{imagen_base64}'
+                    elif ruta_imagen.lower().endswith('.gif'):
+                        return f'data:image/gif;base64,{imagen_base64}'
+                    else:
+                        return f'data:image/png;base64,{imagen_base64}'  # Por defecto PNG
+            except Exception as e:
+                print(f"Error al leer imagen {ruta_imagen}: {e}")
+                return None
+        
         # Convertir imágenes a base64 para evitar problemas con URLs en producción
         logo_base64 = None
         imagen_diseno_base64 = None
+        imagen_portada_base64 = None
+        imagenes_adicionales_base64 = {}
         
         # Convertir logo a base64
         logo_path = os.path.join(current_app.static_folder, 'logo.png')
-        if os.path.exists(logo_path):
-            try:
-                with open(logo_path, 'rb') as f:
-                    logo_data = f.read()
-                    logo_base64 = base64.b64encode(logo_data).decode('utf-8')
-                    # Detectar tipo MIME
-                    if logo_path.lower().endswith('.png'):
-                        logo_base64 = f'data:image/png;base64,{logo_base64}'
-                    elif logo_path.lower().endswith(('.jpg', '.jpeg')):
-                        logo_base64 = f'data:image/jpeg;base64,{logo_base64}'
-            except Exception as e:
-                print(f"Error al leer logo: {e}")
+        logo_base64 = convertir_imagen_a_base64(logo_path)
         
         # Convertir imagen de diseño a base64 si existe
         if presupuesto.imagen_diseno:
             imagen_path = os.path.join(current_app.config['UPLOAD_FOLDER'], presupuesto.imagen_diseno)
-            if os.path.exists(imagen_path):
-                try:
-                    with open(imagen_path, 'rb') as f:
-                        imagen_data = f.read()
-                        imagen_base64 = base64.b64encode(imagen_data).decode('utf-8')
-                        # Detectar tipo MIME
-                        if imagen_path.lower().endswith('.png'):
-                            imagen_diseno_base64 = f'data:image/png;base64,{imagen_base64}'
-                        elif imagen_path.lower().endswith(('.jpg', '.jpeg')):
-                            imagen_diseno_base64 = f'data:image/jpeg;base64,{imagen_base64}'
-                        elif imagen_path.lower().endswith('.gif'):
-                            imagen_diseno_base64 = f'data:image/gif;base64,{imagen_base64}'
-                except Exception as e:
-                    print(f"Error al leer imagen de diseño: {e}")
+            imagen_diseno_base64 = convertir_imagen_a_base64(imagen_path)
+        
+        # Convertir imagen de portada a base64 si existe
+        if presupuesto.imagen_portada:
+            imagen_path = os.path.join(current_app.config['UPLOAD_FOLDER'], presupuesto.imagen_portada)
+            imagen_portada_base64 = convertir_imagen_a_base64(imagen_path)
+        
+        # Convertir imágenes adicionales a base64
+        imagenes_adicionales_base64 = []
+        for i in range(1, 7):
+            campo_imagen = f'imagen_adicional_{i}'
+            if hasattr(presupuesto, campo_imagen) and getattr(presupuesto, campo_imagen):
+                imagen_nombre = getattr(presupuesto, campo_imagen)
+                imagen_path = os.path.join(current_app.config['UPLOAD_FOLDER'], imagen_nombre)
+                if os.path.exists(imagen_path):
+                    imagen_base64 = convertir_imagen_a_base64(imagen_path)
+                    imagenes_adicionales_base64.append(imagen_base64)
+                else:
+                    print(f"ADVERTENCIA: No se encontró la imagen {imagen_path}")
+                    imagenes_adicionales_base64.append(None)
+            else:
+                imagenes_adicionales_base64.append(None)
         
         # Renderizar template HTML con imágenes en base64
         html = render_template('imprimir_presupuesto.html', 
@@ -211,6 +303,8 @@ def generar_pdf_presupuesto(presupuesto_id):
                              tipo_iva=tipo_iva,
                              logo_base64=logo_base64,
                              imagen_diseno_base64=imagen_diseno_base64,
+                             imagen_portada_base64=imagen_portada_base64,
+                             imagenes_adicionales_base64=imagenes_adicionales_base64,
                              use_base64=True)
         
         # Generar PDF
@@ -281,6 +375,89 @@ def enviar_presupuesto_email(presupuesto_id):
     
     return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
 
+@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/enviar-whatsapp')
+@login_required
+def enviar_presupuesto_whatsapp(presupuesto_id):
+    """Generar PDF y preparar para enviar por WhatsApp"""
+    try:
+        presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+        
+        # Verificar que el cliente tenga teléfono
+        if not presupuesto.cliente or not presupuesto.cliente.telefono:
+            flash('El cliente no tiene teléfono configurado', 'error')
+            return redirect(url_for('presupuestos.listado_presupuestos'))
+        
+        # Generar PDF
+        try:
+            pdf_data = generar_pdf_presupuesto(presupuesto_id)
+        except Exception as e:
+            flash(f'Error al generar PDF: {str(e)}', 'error')
+            return redirect(url_for('presupuestos.listado_presupuestos'))
+        
+        # Guardar PDF temporalmente
+        import tempfile
+        import base64
+        temp_dir = current_app.config.get('UPLOAD_FOLDER', 'static/uploads')
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        pdf_filename = f'presupuesto_{presupuesto_id}.pdf'
+        pdf_path = os.path.join(temp_dir, pdf_filename)
+        
+        with open(pdf_path, 'wb') as f:
+            f.write(pdf_data)
+        
+        # Preparar mensaje para WhatsApp
+        from urllib.parse import urlencode
+        telefono = presupuesto.cliente.telefono.replace(' ', '').replace('-', '').replace('+', '')
+        mensaje = f"Hola {presupuesto.cliente.nombre}, te envío el presupuesto #{presupuesto_id}."
+        mensaje_encoded = urlencode({'text': mensaje})
+        
+        # Retornar template con JavaScript para abrir WhatsApp
+        return render_template('enviar_whatsapp.html', 
+                             pdf_path=pdf_path,
+                             pdf_filename=pdf_filename,
+                             telefono=telefono,
+                             mensaje_encoded=mensaje_encoded,
+                             tipo='presupuesto',
+                             id_documento=presupuesto_id)
+        
+    except Exception as e:
+        flash(f'Error al preparar envío por WhatsApp: {str(e)}', 'error')
+        return redirect(url_for('presupuestos.listado_presupuestos'))
+
+@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/enviar-email-cliente')
+@login_required
+def enviar_presupuesto_email_cliente(presupuesto_id):
+    """Generar PDF y enviar por email directamente al cliente"""
+    try:
+        presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+        
+        # Verificar que el cliente tenga email
+        if not presupuesto.cliente or not presupuesto.cliente.email:
+            flash('El cliente no tiene email configurado', 'error')
+            return redirect(url_for('presupuestos.listado_presupuestos'))
+        
+        # Generar PDF
+        try:
+            pdf_data = generar_pdf_presupuesto(presupuesto_id)
+        except Exception as e:
+            flash(f'Error al generar PDF: {str(e)}', 'error')
+            return redirect(url_for('presupuestos.listado_presupuestos'))
+        
+        # Enviar email usando Flask-Mail
+        from utils.email import enviar_email_presupuesto
+        exito, mensaje = enviar_email_presupuesto(presupuesto, pdf_data)
+        
+        if exito:
+            flash(f'Presupuesto enviado por email a {presupuesto.cliente.email}', 'success')
+        else:
+            flash(f'Error al enviar email: {mensaje}', 'error')
+        
+    except Exception as e:
+        flash(f'Error al enviar presupuesto por email: {str(e)}', 'error')
+    
+    return redirect(url_for('presupuestos.listado_presupuestos'))
+
 @presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/editar', methods=['GET', 'POST'])
 @login_required
 def editar_presupuesto(presupuesto_id):
@@ -302,22 +479,38 @@ def editar_presupuesto(presupuesto_id):
             if request.form.get('fecha_respuesta'):
                 presupuesto.fecha_respuesta = datetime.strptime(request.form.get('fecha_respuesta'), '%Y-%m-%d').date()
             
-            # Manejar nueva imagen de diseño
-            if 'imagen_diseno' in request.files:
-                file = request.files['imagen_diseno']
-                if file and file.filename:
-                    # Eliminar imagen anterior si existe
-                    if presupuesto.imagen_diseno:
-                        old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], presupuesto.imagen_diseno)
-                        if os.path.exists(old_path):
-                            os.remove(old_path)
-                    
-                    filename = secure_filename(file.filename)
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                    filename = timestamp + filename
-                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-                    file.save(filepath)
-                    presupuesto.imagen_diseno = filename
+            # Función auxiliar para actualizar imagen
+            def actualizar_imagen(campo_file, campo_db):
+                """Actualizar imagen del formulario, eliminando la anterior si existe"""
+                if campo_file in request.files:
+                    file = request.files[campo_file]
+                    if file and file.filename:
+                        # Eliminar imagen anterior si existe
+                        imagen_anterior = getattr(presupuesto, campo_db, None)
+                        if imagen_anterior:
+                            old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], imagen_anterior)
+                            if os.path.exists(old_path):
+                                try:
+                                    os.remove(old_path)
+                                except Exception as e:
+                                    print(f"Error al eliminar imagen anterior {imagen_anterior}: {e}")
+                        
+                        filename = secure_filename(file.filename)
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                        filename = timestamp + filename
+                        filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+                        file.save(filepath)
+                        setattr(presupuesto, campo_db, filename)
+            
+            # Manejar actualización de imágenes
+            actualizar_imagen('imagen_diseno', 'imagen_diseno')
+            actualizar_imagen('imagen_portada', 'imagen_portada')
+            actualizar_imagen('imagen_adicional_1', 'imagen_adicional_1')
+            actualizar_imagen('imagen_adicional_2', 'imagen_adicional_2')
+            actualizar_imagen('imagen_adicional_3', 'imagen_adicional_3')
+            actualizar_imagen('imagen_adicional_4', 'imagen_adicional_4')
+            actualizar_imagen('imagen_adicional_5', 'imagen_adicional_5')
+            actualizar_imagen('imagen_adicional_6', 'imagen_adicional_6')
             
             # Eliminar líneas existentes (dentro de la misma transacción)
             try:
@@ -408,6 +601,7 @@ def cambiar_estado_presupuesto(presupuesto_id):
         # Mapeo de estados a fechas
         estados_fechas = {
             'Pendiente de enviar': (None, 'Pendiente de enviar'),
+            'Diseño': (None, 'Diseño'),
             'Enviado': ('fecha_envio', 'Enviado'),
             'Aceptado': ('fecha_respuesta', 'Aceptado'),
             'Rechazado': ('fecha_respuesta', 'Rechazado')

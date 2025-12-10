@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Facturación Soportada - Informes{% endblock %}
+
+{% block content %}
+<div class="informes-container">
+    <h2>Facturación Soportada</h2>
+    
+    <!-- Filtros -->
+    <div class="filtros-box">
+        <form method="GET" class="filtros-form">
+            <div class="filtro-group">
+                <label for="tipo">Tipo de Filtro:</label>
+                <select name="tipo" id="tipo" onchange="actualizarFiltros()">
+                    <option value="mes" {% if tipo_filtro == 'mes' %}selected{% endif %}>Por Mes</option>
+                    <option value="trimestre" {% if tipo_filtro == 'trimestre' %}selected{% endif %}>Por Trimestre</option>
+                </select>
+            </div>
+            
+            <div class="filtro-group">
+                <label for="año">Año:</label>
+                <input type="number" name="año" id="año" value="{{ año }}" min="2000" max="2100" required>
+            </div>
+            
+            <div class="filtro-group" id="periodo-group">
+                {% if tipo_filtro == 'mes' %}
+                <label for="periodo">Mes:</label>
+                <select name="periodo" id="periodo">
+                    <option value="">Todos los meses</option>
+                    {% for i in range(1, 13) %}
+                    <option value="{{ i }}" {% if periodo == i %}selected{% endif %}>
+                        {{ ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][i] }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% else %}
+                <label for="periodo">Trimestre:</label>
+                <select name="periodo" id="periodo">
+                    <option value="">Todos los trimestres</option>
+                    <option value="1" {% if periodo == 1 %}selected{% endif %}>Primer Trimestre</option>
+                    <option value="2" {% if periodo == 2 %}selected{% endif %}>Segundo Trimestre</option>
+                    <option value="3" {% if periodo == 3 %}selected{% endif %}>Tercer Trimestre</option>
+                    <option value="4" {% if periodo == 4 %}selected{% endif %}>Cuarto Trimestre</option>
+                </select>
+                {% endif %}
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+        </form>
+    </div>
+    
+    <!-- Resumen -->
+    <div class="resumen-box">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0;">Resumen - {{ periodo_label }}</h3>
+            <a href="{{ url_for('informes.facturacion_soportada_detalle', tipo=tipo_filtro, año=año, periodo=periodo) }}" class="btn btn-light" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">Ver Detalle</a>
+        </div>
+        <div class="resumen-grid">
+            <div class="resumen-item">
+                <span class="resumen-label">Total Facturación:</span>
+                <span class="resumen-value">{{ "%.2f"|format(total_facturacion) }} €</span>
+            </div>
+            <div class="resumen-item">
+                <span class="resumen-label">Base Imponible:</span>
+                <span class="resumen-value">{{ "%.2f"|format(total_base_imponible) }} €</span>
+            </div>
+            <div class="resumen-item">
+                <span class="resumen-label">IVA Soportado:</span>
+                <span class="resumen-value">{{ "%.2f"|format(total_iva_soportado) }} €</span>
+            </div>
+            <div class="resumen-item">
+                <span class="resumen-label">Número de Facturas:</span>
+                <span class="resumen-value">{{ facturas|length }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tabla de facturas -->
+    {% if facturas %}
+    <div class="table-container">
+        <table class="clientes-table">
+            <thead>
+                <tr>
+                    <th>Número</th>
+                    <th>Fecha</th>
+                    <th>Proveedor</th>
+                    <th>Base Imponible</th>
+                    <th>IVA</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for factura in facturas %}
+                <tr>
+                    <td>{{ factura.numero_factura }}</td>
+                    <td>{{ factura.fecha_factura.strftime('%d/%m/%Y') if factura.fecha_factura else '-' }}</td>
+                    <td>{{ factura.proveedor.nombre if factura.proveedor else 'N/A' }}</td>
+                    <td>{{ "%.2f"|format(factura.base_imponible) }} €</td>
+                    <td>{{ "%.2f"|format(factura.importe_iva) }} € ({{ "%.0f"|format(factura.tipo_iva) }}%)</td>
+                    <td><strong>{{ "%.2f"|format(factura.total) }} €</strong></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="no-data">
+        <p>No hay facturas de proveedor para el período seleccionado.</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.informes-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.filtros-box {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.filtros-form {
+    display: flex;
+    gap: 15px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.filtro-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.filtro-group label {
+    font-weight: 500;
+    color: #555;
+    font-size: 0.9em;
+}
+
+.filtro-group select,
+.filtro-group input {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.resumen-box {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    padding: 25px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.resumen-box h3 {
+    margin: 0 0 20px 0;
+    font-size: 1.5em;
+}
+
+.resumen-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.resumen-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.resumen-label {
+    font-size: 0.9em;
+    opacity: 0.9;
+}
+
+.resumen-value {
+    font-size: 1.5em;
+    font-weight: bold;
+}
+</style>
+
+<script>
+function actualizarFiltros() {
+    const tipo = document.getElementById('tipo').value;
+    const periodoGroup = document.getElementById('periodo-group');
+    
+    if (tipo === 'mes') {
+        periodoGroup.innerHTML = `
+            <label for="periodo">Mes:</label>
+            <select name="periodo" id="periodo">
+                <option value="">Todos los meses</option>
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3">Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+            </select>
+        `;
+    } else {
+        periodoGroup.innerHTML = `
+            <label for="periodo">Trimestre:</label>
+            <select name="periodo" id="periodo">
+                <option value="">Todos los trimestres</option>
+                <option value="1">Primer Trimestre</option>
+                <option value="2">Segundo Trimestre</option>
+                <option value="3">Tercer Trimestre</option>
+                <option value="4">Cuarto Trimestre</option>
+            </select>
+        `;
+    }
+}
+</script>
+{% endblock %}
+

@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle Facturación Emitida - Informes{% endblock %}
+
+{% block content %}
+<div class="informes-container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>Detalle Facturación Emitida - {{ periodo_label }}</h2>
+        <a href="{{ url_for('informes.facturacion_emitida', tipo=tipo_filtro, año=año, periodo=periodo) }}" class="btn btn-secondary">← Volver al Resumen</a>
+    </div>
+    
+    {% if facturas %}
+    <div class="table-container">
+        <table class="clientes-table">
+            <thead>
+                <tr>
+                    <th>Número</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>NIF</th>
+                    <th>Importe Total</th>
+                    <th>Base Imponible</th>
+                    <th>IVA</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for factura in facturas %}
+                <tr>
+                    <td>{{ factura.serie }}-{{ factura.numero }}</td>
+                    <td>{{ factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else '-' }}</td>
+                    <td>{{ factura.nombre }}</td>
+                    <td>{{ factura.nif or '-' }}</td>
+                    <td><strong>{{ "%.2f"|format(factura.importe_total) }} €</strong></td>
+                    <td>
+                        {% set tipo_iva = 21.0 %}
+                        {% set base_total = 0.0 %}
+                        {% for linea in factura.lineas %}
+                            {% set importe_con_iva = linea.importe|float %}
+                            {% set base_imponible = importe_con_iva / (1.0 + tipo_iva / 100.0) %}
+                            {% set base_total = base_total + base_imponible %}
+                        {% endfor %}
+                        {{ "%.2f"|format(base_total) }} €
+                    </td>
+                    <td>
+                        {% set tipo_iva = 21.0 %}
+                        {% set iva_factura = 0.0 %}
+                        {% for linea in factura.lineas %}
+                            {% set importe_con_iva = linea.importe|float %}
+                            {% set base_imponible = importe_con_iva / (1.0 + tipo_iva / 100.0) %}
+                            {% set iva_linea = base_imponible * tipo_iva / 100.0 %}
+                            {% set iva_factura = iva_factura + iva_linea %}
+                        {% endfor %}
+                        {{ "%.2f"|format(iva_factura) }} €
+                    </td>
+                    <td>
+                        <a href="{{ url_for('facturacion.imprimir_factura', factura_id=factura.id) }}" class="btn btn-sm btn-primary" target="_blank">Ver Factura</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="background: #f8f9fa; font-weight: bold;">
+                    <td colspan="4" style="text-align: right;">TOTALES:</td>
+                    <td>
+                        {% set total_facturacion = facturas|sum(attribute='importe_total') %}
+                        {{ "%.2f"|format(total_facturacion) }} €
+                    </td>
+                    <td>
+                        {% set tipo_iva = 21.0 %}
+                        {% set total_base = 0.0 %}
+                        {% for factura in facturas %}
+                            {% for linea in factura.lineas %}
+                                {% set importe_con_iva = linea.importe|float %}
+                                {% set base_imponible = importe_con_iva / (1.0 + tipo_iva / 100.0) %}
+                                {% set total_base = total_base + base_imponible %}
+                            {% endfor %}
+                        {% endfor %}
+                        {{ "%.2f"|format(total_base) }} €
+                    </td>
+                    <td>
+                        {% set tipo_iva = 21.0 %}
+                        {% set total_iva = 0.0 %}
+                        {% for factura in facturas %}
+                            {% for linea in factura.lineas %}
+                                {% set importe_con_iva = linea.importe|float %}
+                                {% set base_imponible = importe_con_iva / (1.0 + tipo_iva / 100.0) %}
+                                {% set iva_linea = base_imponible * tipo_iva / 100.0 %}
+                                {% set total_iva = total_iva + iva_linea %}
+                            {% endfor %}
+                        {% endfor %}
+                        {{ "%.2f"|format(total_iva) }} €
+                    </td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% else %}
+    <div class="no-data">
+        <p>No hay facturas para el período seleccionado.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

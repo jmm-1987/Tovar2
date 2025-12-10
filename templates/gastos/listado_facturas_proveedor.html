@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Facturas de Proveedor - Gastos{% endblock %}
+
+{% block content %}
+<div class="clientes-container">
+    <div class="clientes-header">
+        <h2>Facturas de Proveedor</h2>
+        <a href="{{ url_for('gastos.nueva_factura_proveedor') }}" class="btn btn-success">➕ Nueva Factura</a>
+    </div>
+
+    {% if facturas %}
+    <div class="table-container">
+        <table class="clientes-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Proveedor</th>
+                    <th>Número Factura</th>
+                    <th>Fecha</th>
+                    <th>Base Imponible</th>
+                    <th>IVA</th>
+                    <th>Total</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for factura in facturas %}
+                <tr>
+                    <td>{{ factura.id }}</td>
+                    <td>{{ factura.proveedor.nombre if factura.proveedor else 'N/A' }}</td>
+                    <td>{{ factura.numero_factura }}</td>
+                    <td>{{ factura.fecha_factura.strftime('%d/%m/%Y') if factura.fecha_factura else '-' }}</td>
+                    <td>{{ "%.2f"|format(factura.base_imponible) }} €</td>
+                    <td>{{ "%.2f"|format(factura.importe_iva) }} € ({{ "%.0f"|format(factura.tipo_iva) }}%)</td>
+                    <td><strong>{{ "%.2f"|format(factura.total) }} €</strong></td>
+                    <td>
+                        <span class="badge badge-{{ 'success' if factura.estado == 'pagada' else 'warning' if factura.estado == 'pendiente' else 'danger' }}">
+                            {{ factura.estado|title }}
+                        </span>
+                    </td>
+                    <td class="acciones-cell">
+                        <a href="{{ url_for('gastos.editar_factura_proveedor', factura_id=factura.id) }}" class="btn btn-sm btn-primary">Editar</a>
+                        <form method="POST" action="{{ url_for('gastos.eliminar_factura_proveedor', factura_id=factura.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar esta factura?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="no-data">
+        <p>No hay facturas de proveedor registradas.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

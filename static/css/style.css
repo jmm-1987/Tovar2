@@ -184,13 +184,29 @@ nav a {
     box-shadow: 0 8px 24px rgba(0,0,0,0.15);
     border-radius: 8px;
     padding: 8px 0;
-    margin-top: 4px;
+    margin-top: 8px;
     z-index: 1000;
-    animation: slideDown 0.3s ease-out;
     border: 1px solid #e0e0e0;
 }
 
+/* Crear un área invisible arriba del menú para facilitar el movimiento del mouse */
+.dropdown-menu::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 0;
+    right: 0;
+    height: 8px;
+    background: transparent;
+}
+
+/* Mostrar el menú cuando el mouse está sobre el dropdown */
 .dropdown:hover .dropdown-menu {
+    display: block;
+}
+
+/* Mantener el menú visible cuando el mouse está sobre el menú mismo */
+.dropdown-menu:hover {
     display: block;
 }
 
@@ -679,6 +695,21 @@ table tbody tr:last-child td {
     flex-wrap: wrap;
 }
 
+.badge-success {
+    background-color: #28a745;
+    color: white;
+}
+
+.badge-warning {
+    background-color: #ffc107;
+    color: #333;
+}
+
+.badge-danger {
+    background-color: #dc3545;
+    color: white;
+}
+
 .badge {
     display: inline-block;
     padding: 4px 10px;
@@ -704,6 +735,12 @@ table tbody tr:last-child td {
 .badge:hover {
     transform: scale(1.1);
     box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+
+.badge-estado-diseño,
+.badge-estado-diseno {
+    background-color: #9b59b6;
+    color: white;
 }
 
 .badge-estado-aceptado {
@@ -1329,6 +1366,63 @@ input.linea-campo-compact[type="text"] {
     flex: 1;
     max-width: 120px;
 }
+
+.linea-acciones {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+
+.btn-duplicar {
+    background: #16a085;
+    color: white;
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    opacity: 0.9;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-duplicar:hover {
+    background: #138d75;
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.btn-personalizar {
+    background: #95a5a6;
+    color: white;
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-personalizar:hover {
+    background: #3498db;
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.btn-personalizar.active {
+    background: #3498db;
+    opacity: 1;
+}
+
+/* Los campos personalizados se controlan mediante JavaScript */
 
 .btn-remove-linea-inline {
     background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);

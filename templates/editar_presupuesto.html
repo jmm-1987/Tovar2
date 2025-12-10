@@ -39,6 +39,7 @@
             <label for="estado">Estado *</label>
             <select name="estado" id="estado" required>
                 <option value="Pendiente de enviar" {% if presupuesto.estado == 'Pendiente de enviar' %}selected{% endif %}>Pendiente de enviar</option>
+                <option value="Diseño" {% if presupuesto.estado == 'Diseño' %}selected{% endif %}>Diseño</option>
                 <option value="Enviado" {% if presupuesto.estado == 'Enviado' %}selected{% endif %}>Enviado</option>
                 <option value="Aceptado" {% if presupuesto.estado == 'Aceptado' %}selected{% endif %}>Aceptado</option>
                 <option value="Rechazado" {% if presupuesto.estado == 'Rechazado' %}selected{% endif %}>Rechazado</option>
@@ -71,6 +72,43 @@
     <p style="font-size: 0.8rem; color: #666; margin-top: -10px; margin-bottom: 15px;">Imagen actual: <a href="{{ url_for('static', filename='uploads/' + presupuesto.imagen_diseno) }}" target="_blank">{{ presupuesto.imagen_diseno }}</a></p>
     {% endif %}
 
+    <h3>Imágenes para el PDF del Presupuesto</h3>
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="imagen_portada">Imagen de Portada (Página 1)</label>
+            <input type="file" name="imagen_portada" id="imagen_portada" accept="image/*">
+            {% if presupuesto.imagen_portada %}
+            <p style="font-size: 0.8rem; color: #666; margin-top: 5px;">Actual: <a href="{{ url_for('static', filename='uploads/' + presupuesto.imagen_portada) }}" target="_blank">{{ presupuesto.imagen_portada }}</a></p>
+            {% else %}
+            <small style="color: #666; font-size: 0.85em;">Se mostrará en la primera página del PDF</small>
+            {% endif %}
+        </div>
+        <div class="form-group-compact">
+            <label>Imágenes Adicionales (Página 2)</label>
+            <button type="button" class="btn btn-secondary" onclick="abrirModalImagenes()" style="width: 100%; padding: 8px;">
+                Gestionar 6 Imágenes Adicionales
+            </button>
+            <small style="color: #666; font-size: 0.85em;" id="contador-imagenes">
+                {% set contador = 0 %}
+                {% if presupuesto.imagen_adicional_1 %}{% set contador = contador + 1 %}{% endif %}
+                {% if presupuesto.imagen_adicional_2 %}{% set contador = contador + 1 %}{% endif %}
+                {% if presupuesto.imagen_adicional_3 %}{% set contador = contador + 1 %}{% endif %}
+                {% if presupuesto.imagen_adicional_4 %}{% set contador = contador + 1 %}{% endif %}
+                {% if presupuesto.imagen_adicional_5 %}{% set contador = contador + 1 %}{% endif %}
+                {% if presupuesto.imagen_adicional_6 %}{% set contador = contador + 1 %}{% endif %}
+                {{ contador }}/6 imágenes seleccionadas
+            </small>
+        </div>
+    </div>
+
+    <!-- Campos ocultos para las imágenes adicionales (se actualizan desde el modal) -->
+    <input type="file" name="imagen_adicional_1" id="imagen_adicional_1" accept="image/*" style="display: none;">
+    <input type="file" name="imagen_adicional_2" id="imagen_adicional_2" accept="image/*" style="display: none;">
+    <input type="file" name="imagen_adicional_3" id="imagen_adicional_3" accept="image/*" style="display: none;">
+    <input type="file" name="imagen_adicional_4" id="imagen_adicional_4" accept="image/*" style="display: none;">
+    <input type="file" name="imagen_adicional_5" id="imagen_adicional_5" accept="image/*" style="display: none;">
+    <input type="file" name="imagen_adicional_6" id="imagen_adicional_6" accept="image/*" style="display: none;">
+
     <div class="form-group">
         <label for="seguimiento">Seguimiento</label>
         <textarea name="seguimiento" id="seguimiento" rows="3" placeholder="Escribe aquí las actualizaciones y seguimiento del presupuesto...">{{ presupuesto.seguimiento or '' }}</textarea>
@@ -82,14 +120,10 @@
         <div class="linea-pedido-row">
             <div class="linea-pedido-numero">#{{ loop.index }}</div>
             <div class="linea-pedido-campos">
-                <!-- Campos ocultos para compatibilidad (nombre y cargo) -->
-                <input type="hidden" name="nombre[]" value="{{ linea.nombre or '' }}">
-                <input type="hidden" name="cargo[]" value="{{ linea.cargo or '' }}">
-                
-                <!-- Orden: nombre_mostrar, cantidad, modelo, color, forma, talla, tejido, precio -->
-                <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" value="{{ linea.nombre_mostrar or '' }}" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 2;">
-                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="{{ linea.cantidad }}" min="1" required placeholder="Cant *" title="Cantidad">
-                <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo de Prenda">
+                <!-- Orden: nombre_mostrar, unidades, modelo, color, forma, sexo, talla, tejido, precio -->
+                <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" value="{{ linea.nombre_mostrar or '' }}" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 3.5;">
+                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="{{ linea.cantidad }}" min="1" required placeholder="Unidades *" title="Unidades">
+                <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo">
                     <option value="">Modelo *</option>
                     {% for prenda in prendas %}
                     <option value="{{ prenda.id }}" {% if linea.prenda_id == prenda.id %}selected{% endif %}>{{ prenda.nombre }}</option>
@@ -97,6 +131,12 @@
                 </select>
                 <input type="text" name="color[]" class="linea-campo-compact" value="{{ linea.color or '' }}" placeholder="Color" title="Color">
                 <input type="text" name="forma[]" class="linea-campo-compact" value="{{ linea.forma or '' }}" placeholder="Forma" title="Forma">
+                <select name="sexo[]" class="linea-campo-compact" title="Sexo">
+                    <option value="">Sexo</option>
+                    <option value="cro" {% if linea.sexo == 'cro' %}selected{% endif %}>Cro</option>
+                    <option value="sra" {% if linea.sexo == 'sra' %}selected{% endif %}>Sra</option>
+                    <option value="unisex" {% if linea.sexo == 'unisex' %}selected{% endif %}>Unisex</option>
+                </select>
                 <input type="text" name="talla[]" class="linea-campo-compact" value="{{ linea.talla or '' }}" placeholder="Talla" title="Talla">
                 <select name="tejido[]" class="linea-campo-compact" title="Tejido">
                     <option value="">Tejido</option>
@@ -106,9 +146,22 @@
                     <option value="T.CAMISETA" {% if linea.tejido == 'T.CAMISETA' %}selected{% endif %}>T.CAMISETA</option>
                     <option value="T.SHOFT" {% if linea.tejido == 'T.SHOFT' %}selected{% endif %}>T.SHOFT</option>
                 </select>
-                <input type="number" name="precio_unitario[]" class="linea-campo-compact" step="0.01" min="0" value="{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '' }}" placeholder="Precio €" title="Precio Unitario">
+                <input type="number" name="precio_unitario[]" class="linea-campo-compact" step="0.01" min="0" value="{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '' }}" placeholder="Precio €" title="Precio" style="flex: 0.5;">
+                
+                <!-- Campos personalizados (nombre y cargo) - se muestran al final si tienen valor o si se activa personalización -->
+                {% set mostrarPersonalizados = linea.nombre or linea.cargo %}
+                <input type="text" name="nombre[]" class="linea-campo-compact campo-personalizado" value="{{ linea.nombre or '' }}" placeholder="Nombre personalizado" title="Nombre personalizado" style="display: {% if mostrarPersonalizados %}block{% else %}none{% endif %}; flex: 2.5;">
+                <input type="text" name="cargo[]" class="linea-campo-compact campo-personalizado" value="{{ linea.cargo or '' }}" placeholder="Cargo" title="Cargo" style="display: {% if mostrarPersonalizados %}block{% else %}none{% endif %};">
             </div>
-            <button type="button" class="btn-remove-linea-inline" onclick="eliminarLinea(this)">×</button>
+            <div class="linea-acciones">
+                <button type="button" class="btn-duplicar" onclick="duplicarLinea(this)" title="Duplicar línea (mantiene todo excepto talla y unidades)">
+                    📋
+                </button>
+                <button type="button" class="btn-personalizar {% if mostrarPersonalizados %}active{% endif %}" onclick="togglePersonalizar(this)" title="Personalizar nombre y cargo" style="{% if mostrarPersonalizados %}background: #3498db; opacity: 1;{% endif %}">
+                    ✏️
+                </button>
+                <button type="button" class="btn-remove-linea-inline" onclick="eliminarLinea(this)">×</button>
+            </div>
         </div>
         {% endfor %}
     </div>
@@ -121,7 +174,178 @@
     </div>
 </form>
 
+<!-- Modal para gestionar imágenes adicionales -->
+<div id="modalImagenes" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div style="background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 800px; border-radius: 8px; max-height: 90vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0;">Gestionar Imágenes Adicionales (Página 2 del PDF)</h2>
+            <span style="color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer;" onclick="cerrarModalImagenes()">&times;</span>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
+            {% for i in range(1, 7) %}
+            <div style="border: 1px solid #ddd; padding: 15px; border-radius: 4px; background: #f9f9f9;">
+                <label for="modal_imagen_adicional_{{ i }}" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                    Imagen {{ i }}
+                </label>
+                <input type="file" id="modal_imagen_adicional_{{ i }}" accept="image/*" onchange="actualizarImagen({{ i }}, this)" style="width: 100%; margin-bottom: 8px;">
+                <div id="preview_imagen_{{ i }}" style="margin-top: 10px; text-align: center;">
+                    {% if i == 1 and presupuesto.imagen_adicional_1 %}
+                    <img id="img_preview_1" src="{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_1) }}" alt="Preview" style="max-width: 100%; max-height: 150px; border: 1px solid #ddd; border-radius: 4px;">
+                    <p id="nombre_imagen_1" style="font-size: 0.85em; color: #666; margin-top: 5px;">{{ presupuesto.imagen_adicional_1 }}</p>
+                    {% elif i == 2 and presupuesto.imagen_adicional_2 %}
+                    <img id="img_preview_2" src="{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_2) }}" alt="Preview" style="max-width: 100%; max-height: 150px; border: 1px solid #ddd; border-radius: 4px;">
+                    <p id="nombre_imagen_2" style="font-size: 0.85em; color: #666; margin-top: 5px;">{{ presupuesto.imagen_adicional_2 }}</p>
+                    {% elif i == 3 and presupuesto.imagen_adicional_3 %}
+                    <img id="img_preview_3" src="{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_3) }}" alt="Preview" style="max-width: 100%; max-height: 150px; border: 1px solid #ddd; border-radius: 4px;">
+                    <p id="nombre_imagen_3" style="font-size: 0.85em; color: #666; margin-top: 5px;">{{ presupuesto.imagen_adicional_3 }}</p>
+                    {% elif i == 4 and presupuesto.imagen_adicional_4 %}
+                    <img id="img_preview_4" src="{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_4) }}" alt="Preview" style="max-width: 100%; max-height: 150px; border: 1px solid #ddd; border-radius: 4px;">
+                    <p id="nombre_imagen_4" style="font-size: 0.85em; color: #666; margin-top: 5px;">{{ presupuesto.imagen_adicional_4 }}</p>
+                    {% elif i == 5 and presupuesto.imagen_adicional_5 %}
+                    <img id="img_preview_5" src="{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_5) }}" alt="Preview" style="max-width: 100%; max-height: 150px; border: 1px solid #ddd; border-radius: 4px;">
+                    <p id="nombre_imagen_5" style="font-size: 0.85em; color: #666; margin-top: 5px;">{{ presupuesto.imagen_adicional_5 }}</p>
+                    {% elif i == 6 and presupuesto.imagen_adicional_6 %}
+                    <img id="img_preview_6" src="{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_6) }}" alt="Preview" style="max-width: 100%; max-height: 150px; border: 1px solid #ddd; border-radius: 4px;">
+                    <p id="nombre_imagen_6" style="font-size: 0.85em; color: #666; margin-top: 5px;">{{ presupuesto.imagen_adicional_6 }}</p>
+                    {% else %}
+                    <img id="img_preview_{{ i }}" src="" alt="Preview" style="max-width: 100%; max-height: 150px; display: none; border: 1px solid #ddd; border-radius: 4px;">
+                    <p id="nombre_imagen_{{ i }}" style="font-size: 0.85em; color: #666; margin-top: 5px; display: none;"></p>
+                    {% endif %}
+                </div>
+                <button type="button" onclick="eliminarImagen({{ i }})" style="margin-top: 8px; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; {% if (i == 1 and not presupuesto.imagen_adicional_1) or (i == 2 and not presupuesto.imagen_adicional_2) or (i == 3 and not presupuesto.imagen_adicional_3) or (i == 4 and not presupuesto.imagen_adicional_4) or (i == 5 and not presupuesto.imagen_adicional_5) or (i == 6 and not presupuesto.imagen_adicional_6) %}display: none;{% endif %}" id="btn_eliminar_{{ i }}">Eliminar</button>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div style="text-align: right; margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+            <button type="button" onclick="cerrarModalImagenes()" class="btn btn-secondary" style="margin-right: 10px;">Cerrar</button>
+        </div>
+    </div>
+</div>
+
+<style>
+#modalImagenes {
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+</style>
+
 <script>
+let imagenesSeleccionadas = {};
+const imagenesExistentes = {
+    1: {% if presupuesto.imagen_adicional_1 %}'{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_1) }}'{% else %}null{% endif %},
+    2: {% if presupuesto.imagen_adicional_2 %}'{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_2) }}'{% else %}null{% endif %},
+    3: {% if presupuesto.imagen_adicional_3 %}'{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_3) }}'{% else %}null{% endif %},
+    4: {% if presupuesto.imagen_adicional_4 %}'{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_4) }}'{% else %}null{% endif %},
+    5: {% if presupuesto.imagen_adicional_5 %}'{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_5) }}'{% else %}null{% endif %},
+    6: {% if presupuesto.imagen_adicional_6 %}'{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_6) }}'{% else %}null{% endif %}
+};
+
+function abrirModalImagenes() {
+    document.getElementById('modalImagenes').style.display = 'block';
+    // Mostrar imágenes existentes
+    for (let i = 1; i <= 6; i++) {
+        if (imagenesExistentes[i]) {
+            const imgPreview = document.getElementById('img_preview_' + i);
+            const nombreImagen = document.getElementById('nombre_imagen_' + i);
+            const btnEliminar = document.getElementById('btn_eliminar_' + i);
+            if (imgPreview && !imgPreview.src.includes('data:')) {
+                imgPreview.style.display = 'block';
+                nombreImagen.style.display = 'block';
+                btnEliminar.style.display = 'block';
+            }
+        }
+    }
+    actualizarContador();
+}
+
+function cerrarModalImagenes() {
+    document.getElementById('modalImagenes').style.display = 'none';
+}
+
+function actualizarImagen(numero, input) {
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        // Actualizar el input oculto del formulario
+        const inputOculto = document.getElementById('imagen_adicional_' + numero);
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        inputOculto.files = dataTransfer.files;
+        
+        mostrarPreview(numero, file);
+        imagenesSeleccionadas[numero] = file;
+        actualizarContador();
+    }
+}
+
+function mostrarPreview(numero, file) {
+    const imgPreview = document.getElementById('img_preview_' + numero);
+    const nombreImagen = document.getElementById('nombre_imagen_' + numero);
+    const btnEliminar = document.getElementById('btn_eliminar_' + numero);
+    
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            imgPreview.src = e.target.result;
+            imgPreview.style.display = 'block';
+            nombreImagen.textContent = file.name;
+            nombreImagen.style.display = 'block';
+            btnEliminar.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function eliminarImagen(numero) {
+    // Limpiar el input oculto
+    const inputOculto = document.getElementById('imagen_adicional_' + numero);
+    inputOculto.value = '';
+    
+    // Limpiar el input del modal
+    const inputModal = document.getElementById('modal_imagen_adicional_' + numero);
+    inputModal.value = '';
+    
+    // Ocultar preview
+    const imgPreview = document.getElementById('img_preview_' + numero);
+    const nombreImagen = document.getElementById('nombre_imagen_' + numero);
+    const btnEliminar = document.getElementById('btn_eliminar_' + numero);
+    
+    imgPreview.style.display = 'none';
+    imgPreview.src = '';
+    nombreImagen.style.display = 'none';
+    nombreImagen.textContent = '';
+    btnEliminar.style.display = 'none';
+    
+    delete imagenesSeleccionadas[numero];
+    delete imagenesExistentes[numero];
+    actualizarContador();
+}
+
+function actualizarContador() {
+    let contador = 0;
+    for (let i = 1; i <= 6; i++) {
+        const inputOculto = document.getElementById('imagen_adicional_' + i);
+        const imgPreview = document.getElementById('img_preview_' + i);
+        if ((inputOculto && inputOculto.files.length > 0) || (imgPreview && imgPreview.src && imgPreview.style.display !== 'none')) {
+            contador++;
+        }
+    }
+    document.getElementById('contador-imagenes').textContent = contador + '/6 imágenes seleccionadas';
+}
+
+// Cerrar modal al hacer clic fuera de él
+window.onclick = function(event) {
+    const modal = document.getElementById('modalImagenes');
+    if (event.target == modal) {
+        cerrarModalImagenes();
+    }
+}
+
 let contadorPrendas = {{ presupuesto.lineas|length }};
 
 function agregarLinea() {
@@ -143,6 +367,19 @@ function agregarLinea() {
     nuevaLinea.querySelectorAll('select').forEach(select => {
         select.selectedIndex = 0;
     });
+    
+    // Ocultar campos personalizados por defecto
+    nuevaLinea.querySelectorAll('.campo-personalizado').forEach(campo => {
+        campo.style.display = 'none';
+    });
+    
+    // Resetear botón de personalizar
+    const btnPersonalizar = nuevaLinea.querySelector('.btn-personalizar');
+    if (btnPersonalizar) {
+        btnPersonalizar.style.background = '#95a5a6';
+        btnPersonalizar.style.opacity = '0.7';
+        btnPersonalizar.classList.remove('active');
+    }
     
     // Actualizar número
     renumerarPrendas();
@@ -168,6 +405,88 @@ function eliminarLinea(btn) {
     } else {
         alert('Debe haber al menos una prenda en el presupuesto');
     }
+}
+
+function togglePersonalizar(btn) {
+    const lineaRow = btn.closest('.linea-pedido-row');
+    const camposPersonalizados = lineaRow.querySelectorAll('.campo-personalizado');
+    
+    if (camposPersonalizados.length === 0) {
+        return;
+    }
+    
+    // Verificar si los campos están visibles
+    const primerCampo = camposPersonalizados[0];
+    const estaActivo = primerCampo.style.display !== 'none' && 
+                       window.getComputedStyle(primerCampo).display !== 'none';
+    
+    camposPersonalizados.forEach(campo => {
+        if (estaActivo) {
+            campo.style.display = 'none';
+        } else {
+            campo.style.display = 'block';
+        }
+    });
+    
+    // Actualizar estado visual del botón
+    if (estaActivo) {
+        btn.style.background = '#95a5a6';
+        btn.style.opacity = '0.7';
+        btn.classList.remove('active');
+    } else {
+        btn.style.background = '#3498db';
+        btn.style.opacity = '1';
+        btn.classList.add('active');
+    }
+}
+
+function duplicarLinea(btn) {
+    const lineaRow = btn.closest('.linea-pedido-row');
+    const nuevaLinea = lineaRow.cloneNode(true);
+    const container = document.getElementById('prendas-container');
+    
+    // Limpiar talla y unidades
+    const tallaInput = nuevaLinea.querySelector('input[name="talla[]"]');
+    const unidadesInput = nuevaLinea.querySelector('input[name="cantidad[]"]');
+    
+    if (tallaInput) {
+        tallaInput.value = '';
+    }
+    if (unidadesInput) {
+        unidadesInput.value = '1';
+    }
+    
+    // Mantener el estado de los campos personalizados
+    const camposPersonalizados = nuevaLinea.querySelectorAll('.campo-personalizado');
+    const btnPersonalizar = nuevaLinea.querySelector('.btn-personalizar');
+    const estaActivo = camposPersonalizados[0] && camposPersonalizados[0].style.display !== 'none';
+    
+    if (estaActivo && camposPersonalizados.length > 0) {
+        camposPersonalizados.forEach(campo => {
+            campo.style.display = 'block';
+        });
+        if (btnPersonalizar) {
+            btnPersonalizar.style.background = '#3498db';
+            btnPersonalizar.style.opacity = '1';
+            btnPersonalizar.classList.add('active');
+        }
+    } else {
+        camposPersonalizados.forEach(campo => {
+            campo.style.display = 'none';
+        });
+        if (btnPersonalizar) {
+            btnPersonalizar.style.background = '#95a5a6';
+            btnPersonalizar.style.opacity = '0.7';
+            btnPersonalizar.classList.remove('active');
+        }
+    }
+    
+    // Actualizar número
+    renumerarPrendas();
+    
+    // Insertar después de la línea actual
+    lineaRow.parentNode.insertBefore(nuevaLinea, lineaRow.nextSibling);
+    renumerarPrendas();
 }
 </script>
 {% endblock %}

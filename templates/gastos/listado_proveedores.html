@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Proveedores - Gastos{% endblock %}
+
+{% block content %}
+<div class="clientes-container">
+    <div class="clientes-header">
+        <h2>Gestión de Proveedores</h2>
+        <a href="{{ url_for('gastos.nuevo_proveedor') }}" class="btn btn-success">➕ Crear Proveedor</a>
+    </div>
+
+    {% if proveedores %}
+    <div class="table-container">
+        <table class="clientes-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>CIF</th>
+                    <th>Teléfono</th>
+                    <th>Correo</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for proveedor in proveedores %}
+                <tr>
+                    <td>{{ proveedor.id }}</td>
+                    <td>{{ proveedor.nombre }}</td>
+                    <td>{{ proveedor.cif or '-' }}</td>
+                    <td>{{ proveedor.telefono or '-' }}</td>
+                    <td>{{ proveedor.correo or '-' }}</td>
+                    <td class="acciones-cell">
+                        <a href="{{ url_for('gastos.editar_proveedor', proveedor_id=proveedor.id) }}" class="btn btn-sm btn-primary">Editar</a>
+                        <form method="POST" action="{{ url_for('gastos.eliminar_proveedor', proveedor_id=proveedor.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar este proveedor?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="no-data">
+        <p>No hay proveedores registrados.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

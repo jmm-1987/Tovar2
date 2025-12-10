@@ -114,7 +114,7 @@ class Pedido(db.Model):
     tipo_pedido = db.Column(db.String(50), nullable=False)  # fabricacion, no fabricacion, cliente web
     
     # Estado del pedido
-    estado = db.Column(db.String(50), nullable=False, default='Pendiente')  # Pendiente, En preparación, Todo listo, Enviado, Entregado al cliente
+    estado = db.Column(db.String(50), nullable=False, default='Pendiente')  # Pendiente, Diseño, En preparación, Todo listo, Enviado, Entregado al cliente
     
     # Forma de pago
     forma_pago = db.Column(db.Text)
@@ -182,13 +182,22 @@ class Presupuesto(db.Model):
     tipo_pedido = db.Column(db.String(50), nullable=False)  # confeccion, bordado, serigrafia, sublimacion, varios
     
     # Estado del presupuesto
-    estado = db.Column(db.String(50), nullable=False, default='Pendiente de enviar')  # Pendiente de enviar, Enviado, Aceptado, Rechazado
+    estado = db.Column(db.String(50), nullable=False, default='Pendiente de enviar')  # Pendiente de enviar, Diseño, Enviado, Aceptado, Rechazado
     
     # Forma de pago
     forma_pago = db.Column(db.Text)
     
     # Imagen del diseño
     imagen_diseno = db.Column(db.String(255))
+    
+    # Imágenes para el PDF del presupuesto
+    imagen_portada = db.Column(db.String(255))  # Imagen de portada (primera página)
+    imagen_adicional_1 = db.Column(db.String(255))  # Imagen adicional 1 (segunda página)
+    imagen_adicional_2 = db.Column(db.String(255))  # Imagen adicional 2 (segunda página)
+    imagen_adicional_3 = db.Column(db.String(255))  # Imagen adicional 3 (segunda página)
+    imagen_adicional_4 = db.Column(db.String(255))  # Imagen adicional 4 (segunda página)
+    imagen_adicional_5 = db.Column(db.String(255))  # Imagen adicional 5 (segunda página)
+    imagen_adicional_6 = db.Column(db.String(255))  # Imagen adicional 6 (segunda página)
     
     # Campo de seguimiento para actualizaciones de comerciales
     seguimiento = db.Column(db.Text)
@@ -395,3 +404,98 @@ class PlantillaEmail(db.Model):
     
     def __repr__(self):
         return f'<PlantillaEmail {self.tipo}>'
+
+class Proveedor(db.Model):
+    """Proveedores del sistema"""
+    __tablename__ = 'proveedores'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(200), nullable=False)
+    cif = db.Column(db.String(20))  # CIF del proveedor
+    telefono = db.Column(db.String(50))
+    correo = db.Column(db.String(100))
+    
+    # Timestamp
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relación con facturas de proveedor
+    facturas = db.relationship('FacturaProveedor', backref='proveedor', lazy=True)
+    
+    def __repr__(self):
+        return f'<Proveedor {self.nombre}>'
+
+class FacturaProveedor(db.Model):
+    """Facturas de proveedores"""
+    __tablename__ = 'facturas_proveedor'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Relación con proveedor
+    proveedor_id = db.Column(db.Integer, db.ForeignKey('proveedores.id'), nullable=False)
+    
+    # Datos de la factura
+    numero_factura = db.Column(db.String(100), nullable=False)  # Número de factura del proveedor
+    fecha_factura = db.Column(db.Date, nullable=False)
+    fecha_vencimiento = db.Column(db.Date)  # Fecha de vencimiento para pago
+    
+    # Importes
+    base_imponible = db.Column(db.Numeric(10, 2), nullable=False)
+    tipo_iva = db.Column(db.Numeric(5, 2), nullable=False, default=21.00)  # Porcentaje de IVA
+    importe_iva = db.Column(db.Numeric(10, 2), nullable=False)
+    total = db.Column(db.Numeric(10, 2), nullable=False)  # base_imponible + importe_iva
+    
+    # Estado
+    estado = db.Column(db.String(50), nullable=False, default='pendiente')  # pendiente, pagada, vencida
+    
+    # Observaciones
+    observaciones = db.Column(db.Text)
+    
+    # Timestamp
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<FacturaProveedor {self.numero_factura} - {self.proveedor.nombre if self.proveedor else "Sin proveedor"}>'
+
+class Empleado(db.Model):
+    """Empleados del sistema"""
+    __tablename__ = 'empleados'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(200), nullable=False)
+    dni = db.Column(db.String(20))  # DNI del empleado
+    telefono = db.Column(db.String(50))
+    correo = db.Column(db.String(100))
+    
+    # Timestamp
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relación con nóminas
+    nominas = db.relationship('Nomina', backref='empleado', lazy=True)
+    
+    def __repr__(self):
+        return f'<Empleado {self.nombre}>'
+
+class Nomina(db.Model):
+    """Nóminas de empleados"""
+    __tablename__ = 'nominas'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Relación con empleado
+    empleado_id = db.Column(db.Integer, db.ForeignKey('empleados.id'), nullable=False)
+    
+    # Datos de la nómina
+    mes = db.Column(db.Integer, nullable=False)  # Mes (1-12)
+    año = db.Column(db.Integer, nullable=False)  # Año
+    
+    # Importe
+    total_devengado = db.Column(db.Numeric(10, 2), nullable=False)
+    
+    # Observaciones
+    observaciones = db.Column(db.Text)
+    
+    # Timestamp
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<Nomina {self.empleado.nombre if self.empleado else "Sin empleado"} - {self.mes}/{self.año}>'

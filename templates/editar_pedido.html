@@ -40,6 +40,7 @@
             <label for="estado">Estado *</label>
             <select name="estado" id="estado" required>
                 <option value="Pendiente" {% if pedido.estado == 'Pendiente' %}selected{% endif %}>Pendiente</option>
+                <option value="Diseño" {% if pedido.estado == 'Diseño' %}selected{% endif %}>Diseño</option>
                 <option value="En preparación" {% if pedido.estado == 'En preparación' %}selected{% endif %}>En preparación</option>
                 <option value="Todo listo" {% if pedido.estado == 'Todo listo' %}selected{% endif %}>Todo listo</option>
                 <option value="Enviado" {% if pedido.estado == 'Enviado' %}selected{% endif %}>Enviado</option>
@@ -99,14 +100,10 @@
         <div class="linea-pedido-row">
             <div class="linea-pedido-numero">#{{ loop.index }}</div>
             <div class="linea-pedido-campos">
-                <!-- Campos ocultos para compatibilidad (nombre y cargo) -->
-                <input type="hidden" name="nombre[]" value="{{ linea.nombre or '' }}">
-                <input type="hidden" name="cargo[]" value="{{ linea.cargo or '' }}">
-                
-                <!-- Orden: nombre_mostrar, cantidad, modelo, color, forma, talla, tejido, precio -->
-                <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" value="{{ linea.nombre_mostrar or '' }}" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 2;">
-                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="{{ linea.cantidad }}" min="1" required placeholder="Cant *" title="Cantidad">
-                <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo de Prenda">
+                <!-- Orden: nombre_mostrar, unidades, modelo, color, forma, sexo, talla, tejido, precio -->
+                <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" value="{{ linea.nombre_mostrar or '' }}" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 3.5;">
+                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="{{ linea.cantidad }}" min="1" required placeholder="Unidades *" title="Unidades">
+                <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo">
                     <option value="">Modelo *</option>
                     {% for prenda in prendas %}
                     <option value="{{ prenda.id }}" {% if linea.prenda_id == prenda.id %}selected{% endif %}>{{ prenda.nombre }}</option>
@@ -114,6 +111,12 @@
                 </select>
                 <input type="text" name="color[]" class="linea-campo-compact" value="{{ linea.color or '' }}" placeholder="Color" title="Color">
                 <input type="text" name="forma[]" class="linea-campo-compact" value="{{ linea.forma or '' }}" placeholder="Forma" title="Forma">
+                <select name="sexo[]" class="linea-campo-compact" title="Sexo">
+                    <option value="">Sexo</option>
+                    <option value="cro" {% if linea.sexo == 'cro' %}selected{% endif %}>Cro</option>
+                    <option value="sra" {% if linea.sexo == 'sra' %}selected{% endif %}>Sra</option>
+                    <option value="unisex" {% if linea.sexo == 'unisex' %}selected{% endif %}>Unisex</option>
+                </select>
                 <input type="text" name="talla[]" class="linea-campo-compact" value="{{ linea.talla or '' }}" placeholder="Talla" title="Talla">
                 <select name="tejido[]" class="linea-campo-compact" title="Tejido">
                     <option value="">Tejido</option>
@@ -123,15 +126,28 @@
                     <option value="T.CAMISETA" {% if linea.tejido == 'T.CAMISETA' %}selected{% endif %}>T.CAMISETA</option>
                     <option value="T.SHOFT" {% if linea.tejido == 'T.SHOFT' %}selected{% endif %}>T.SHOFT</option>
                 </select>
-                <input type="number" name="precio_unitario[]" class="linea-campo-compact" step="0.01" min="0" value="{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '' }}" placeholder="Precio €" title="Precio Unitario">
+                <input type="number" name="precio_unitario[]" class="linea-campo-compact" step="0.01" min="0" value="{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '' }}" placeholder="Precio €" title="Precio" style="flex: 0.5;">
                 <select name="estado_linea[]" class="linea-campo-compact" required title="Estado">
                     <option value="pendiente" {% if (linea.estado or 'pendiente') == 'pendiente' %}selected{% endif %}>Pendiente</option>
                     <option value="en confección" {% if (linea.estado or 'pendiente') == 'en confección' %}selected{% endif %}>En confección</option>
                     <option value="en bordado" {% if (linea.estado or 'pendiente') == 'en bordado' %}selected{% endif %}>En bordado</option>
                     <option value="listo" {% if (linea.estado or 'pendiente') == 'listo' %}selected{% endif %}>Listo</option>
                 </select>
+                
+                <!-- Campos personalizados (nombre y cargo) - se muestran al final si tienen valor o si se activa personalización -->
+                {% set mostrarPersonalizados = linea.nombre or linea.cargo %}
+                <input type="text" name="nombre[]" class="linea-campo-compact campo-personalizado" value="{{ linea.nombre or '' }}" placeholder="Nombre personalizado" title="Nombre personalizado" style="display: {% if mostrarPersonalizados %}block{% else %}none{% endif %}; flex: 2.5;">
+                <input type="text" name="cargo[]" class="linea-campo-compact campo-personalizado" value="{{ linea.cargo or '' }}" placeholder="Cargo" title="Cargo" style="display: {% if mostrarPersonalizados %}block{% else %}none{% endif %};">
             </div>
-            <button type="button" class="btn-remove-linea-inline" onclick="eliminarLinea(this)">×</button>
+            <div class="linea-acciones">
+                <button type="button" class="btn-duplicar" onclick="duplicarLinea(this)" title="Duplicar línea (mantiene todo excepto talla y unidades)">
+                    📋
+                </button>
+                <button type="button" class="btn-personalizar {% if mostrarPersonalizados %}active{% endif %}" onclick="togglePersonalizar(this)" title="Personalizar nombre y cargo" style="{% if mostrarPersonalizados %}background: #3498db; opacity: 1;{% endif %}">
+                    ✏️
+                </button>
+                <button type="button" class="btn-remove-linea-inline" onclick="eliminarLinea(this)">×</button>
+            </div>
         </div>
         {% endfor %}
     </div>
@@ -188,6 +204,19 @@ function agregarLinea() {
         }
     });
     
+    // Ocultar campos personalizados por defecto
+    nuevaLinea.querySelectorAll('.campo-personalizado').forEach(campo => {
+        campo.style.display = 'none';
+    });
+    
+    // Resetear botón de personalizar
+    const btnPersonalizar = nuevaLinea.querySelector('.btn-personalizar');
+    if (btnPersonalizar) {
+        btnPersonalizar.style.background = '#95a5a6';
+        btnPersonalizar.style.opacity = '0.7';
+        btnPersonalizar.classList.remove('active');
+    }
+    
     // Actualizar número
     renumerarPrendas();
     
@@ -212,6 +241,88 @@ function eliminarLinea(btn) {
     } else {
         alert('Debe haber al menos una prenda en el pedido');
     }
+}
+
+function togglePersonalizar(btn) {
+    const lineaRow = btn.closest('.linea-pedido-row');
+    const camposPersonalizados = lineaRow.querySelectorAll('.campo-personalizado');
+    
+    if (camposPersonalizados.length === 0) {
+        return;
+    }
+    
+    // Verificar si los campos están visibles
+    const primerCampo = camposPersonalizados[0];
+    const estaActivo = primerCampo.style.display !== 'none' && 
+                       window.getComputedStyle(primerCampo).display !== 'none';
+    
+    camposPersonalizados.forEach(campo => {
+        if (estaActivo) {
+            campo.style.display = 'none';
+        } else {
+            campo.style.display = 'block';
+        }
+    });
+    
+    // Actualizar estado visual del botón
+    if (estaActivo) {
+        btn.style.background = '#95a5a6';
+        btn.style.opacity = '0.7';
+        btn.classList.remove('active');
+    } else {
+        btn.style.background = '#3498db';
+        btn.style.opacity = '1';
+        btn.classList.add('active');
+    }
+}
+
+function duplicarLinea(btn) {
+    const lineaRow = btn.closest('.linea-pedido-row');
+    const nuevaLinea = lineaRow.cloneNode(true);
+    const container = document.getElementById('prendas-container');
+    
+    // Limpiar talla y unidades
+    const tallaInput = nuevaLinea.querySelector('input[name="talla[]"]');
+    const unidadesInput = nuevaLinea.querySelector('input[name="cantidad[]"]');
+    
+    if (tallaInput) {
+        tallaInput.value = '';
+    }
+    if (unidadesInput) {
+        unidadesInput.value = '1';
+    }
+    
+    // Mantener el estado de los campos personalizados
+    const camposPersonalizados = nuevaLinea.querySelectorAll('.campo-personalizado');
+    const btnPersonalizar = nuevaLinea.querySelector('.btn-personalizar');
+    const estaActivo = camposPersonalizados[0] && camposPersonalizados[0].style.display !== 'none';
+    
+    if (estaActivo && camposPersonalizados.length > 0) {
+        camposPersonalizados.forEach(campo => {
+            campo.style.display = 'block';
+        });
+        if (btnPersonalizar) {
+            btnPersonalizar.style.background = '#3498db';
+            btnPersonalizar.style.opacity = '1';
+            btnPersonalizar.classList.add('active');
+        }
+    } else {
+        camposPersonalizados.forEach(campo => {
+            campo.style.display = 'none';
+        });
+        if (btnPersonalizar) {
+            btnPersonalizar.style.background = '#95a5a6';
+            btnPersonalizar.style.opacity = '0.7';
+            btnPersonalizar.classList.remove('active');
+        }
+    }
+    
+    // Actualizar número
+    renumerarPrendas();
+    
+    // Insertar después de la línea actual
+    lineaRow.parentNode.insertBefore(nuevaLinea, lineaRow.nextSibling);
+    renumerarPrendas();
 }
 </script>
 {% endblock %}

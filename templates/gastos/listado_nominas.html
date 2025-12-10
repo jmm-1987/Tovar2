@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block title %}Nóminas - Gastos{% endblock %}
+
+{% block content %}
+<div class="clientes-container">
+    <div class="clientes-header">
+        <h2>Nóminas</h2>
+        <a href="{{ url_for('gastos.nueva_nomina') }}" class="btn btn-success">➕ Nueva Nómina</a>
+    </div>
+
+    {% if nominas %}
+    <div class="table-container">
+        <table class="clientes-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Empleado</th>
+                    <th>Mes</th>
+                    <th>Año</th>
+                    <th>Total Devengado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for nomina in nominas %}
+                <tr>
+                    <td>{{ nomina.id }}</td>
+                    <td>{{ nomina.empleado.nombre if nomina.empleado else 'N/A' }}</td>
+                    <td>
+                        {% set meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] %}
+                        {{ meses[nomina.mes] }}
+                    </td>
+                    <td>{{ nomina.año }}</td>
+                    <td><strong>{{ "%.2f"|format(nomina.total_devengado) }} €</strong></td>
+                    <td class="acciones-cell">
+                        <a href="{{ url_for('gastos.editar_nomina', nomina_id=nomina.id) }}" class="btn btn-sm btn-primary">Editar</a>
+                        <form method="POST" action="{{ url_for('gastos.eliminar_nomina', nomina_id=nomina.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar esta nómina?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="no-data">
+        <p>No hay nóminas registradas.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle Facturación Soportada - Informes{% endblock %}
+
+{% block content %}
+<div class="informes-container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>Detalle Facturación Soportada - {{ periodo_label }}</h2>
+        <a href="{{ url_for('informes.facturacion_soportada', tipo=tipo_filtro, año=año, periodo=periodo) }}" class="btn btn-secondary">← Volver al Resumen</a>
+    </div>
+    
+    {% if facturas %}
+    <div class="table-container">
+        <table class="clientes-table">
+            <thead>
+                <tr>
+                    <th>Número Factura</th>
+                    <th>Fecha</th>
+                    <th>Proveedor</th>
+                    <th>Base Imponible</th>
+                    <th>Tipo IVA</th>
+                    <th>IVA</th>
+                    <th>Total</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for factura in facturas %}
+                <tr>
+                    <td>{{ factura.numero_factura }}</td>
+                    <td>{{ factura.fecha_factura.strftime('%d/%m/%Y') if factura.fecha_factura else '-' }}</td>
+                    <td>{{ factura.proveedor.nombre if factura.proveedor else 'N/A' }}</td>
+                    <td>{{ "%.2f"|format(factura.base_imponible) }} €</td>
+                    <td>{{ "%.0f"|format(factura.tipo_iva) }}%</td>
+                    <td>{{ "%.2f"|format(factura.importe_iva) }} €</td>
+                    <td><strong>{{ "%.2f"|format(factura.total) }} €</strong></td>
+                    <td>
+                        <span class="badge badge-{{ 'success' if factura.estado == 'pagada' else 'warning' if factura.estado == 'pendiente' else 'danger' }}">
+                            {{ factura.estado|title }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('gastos.editar_factura_proveedor', factura_id=factura.id) }}" class="btn btn-sm btn-primary">Editar</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="background: #f8f9fa; font-weight: bold;">
+                    <td colspan="3" style="text-align: right;">TOTALES:</td>
+                    <td>
+                        {% set total_base = facturas|sum(attribute='base_imponible') %}
+                        {{ "%.2f"|format(total_base) }} €
+                    </td>
+                    <td></td>
+                    <td>
+                        {% set total_iva = facturas|sum(attribute='importe_iva') %}
+                        {{ "%.2f"|format(total_iva) }} €
+                    </td>
+                    <td>
+                        {% set total_facturacion = facturas|sum(attribute='total') %}
+                        {{ "%.2f"|format(total_facturacion) }} €
+                    </td>
+                    <td colspan="2"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% else %}
+    <div class="no-data">
+        <p>No hay facturas de proveedor para el período seleccionado.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

@@ -93,7 +93,7 @@ def load_user(user_id):
         return Usuario.query.get(int(user_id))
 
 # Importar modelos (se crean automáticamente al importar models.py)
-from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, Usuario, PlantillaEmail
+from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, Usuario, PlantillaEmail, Proveedor, FacturaProveedor, Empleado, Nomina
 
 # Importar y registrar blueprints
 from routes.index import index_bp
@@ -101,13 +101,15 @@ from routes.auth import auth_bp
 from routes.pedidos import pedidos_bp
 from routes.presupuestos import presupuestos_bp
 from routes.clientes import clientes_bp
-from routes.comerciales import comerciales_bp
+# from routes.comerciales import comerciales_bp  # Ya no se usa
 from routes.prendas import prendas_bp
 from routes.facturacion import facturacion_bp
 from routes.tickets import tickets_bp
 from routes.maestros import maestros_bp
 from routes.configuracion import configuracion_bp
 from routes.cliente_web import cliente_web_bp
+from routes.gastos import gastos_bp
+from routes.informes import informes_bp
 
 # Registrar blueprints
 app.register_blueprint(index_bp)
@@ -115,13 +117,15 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(pedidos_bp)
 app.register_blueprint(presupuestos_bp)
 app.register_blueprint(clientes_bp)
-app.register_blueprint(comerciales_bp)
+# app.register_blueprint(comerciales_bp)  # Ya no se usa
 app.register_blueprint(prendas_bp)
 app.register_blueprint(facturacion_bp)
 app.register_blueprint(tickets_bp)
 app.register_blueprint(maestros_bp)
 app.register_blueprint(configuracion_bp)
 app.register_blueprint(cliente_web_bp)
+app.register_blueprint(gastos_bp)
+app.register_blueprint(informes_bp)
 
 def migrate_database():
     """Migrar la base de datos agregando columnas faltantes"""
@@ -167,9 +171,28 @@ def migrate_database():
                             conn.commit()
                     except Exception:
                         pass
+                
+                # Verificar y agregar columnas de imágenes para el PDF
+                nuevas_columnas_imagenes = {
+                    'imagen_portada': 'VARCHAR(255)',
+                    'imagen_adicional_1': 'VARCHAR(255)',
+                    'imagen_adicional_2': 'VARCHAR(255)',
+                    'imagen_adicional_3': 'VARCHAR(255)',
+                    'imagen_adicional_4': 'VARCHAR(255)',
+                    'imagen_adicional_5': 'VARCHAR(255)',
+                    'imagen_adicional_6': 'VARCHAR(255)'
+                }
+                for columna, tipo in nuevas_columnas_imagenes.items():
+                    if columna not in columns_presupuesto:
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(text(f'ALTER TABLE presupuestos ADD COLUMN {columna} {tipo}'))
+                                conn.commit()
+                        except Exception:
+                            pass
             
             # Verificar que todas las tablas necesarias existan
-            tablas_requeridas = ['comerciales', 'clientes', 'prendas', 'pedidos', 'lineas_pedido', 'presupuestos', 'lineas_presupuesto', 'tickets', 'lineas_ticket', 'facturas', 'lineas_factura', 'usuarios', 'plantillas_email']
+            tablas_requeridas = ['comerciales', 'clientes', 'prendas', 'pedidos', 'lineas_pedido', 'presupuestos', 'lineas_presupuesto', 'tickets', 'lineas_ticket', 'facturas', 'lineas_factura', 'usuarios', 'plantillas_email', 'proveedores', 'facturas_proveedor', 'empleados', 'nominas']
             tablas_faltantes = [t for t in tablas_requeridas if t not in table_names]
             if tablas_faltantes:
                 db.create_all()
@@ -315,6 +338,92 @@ Saludos cordiales,
                                 conn.commit()
                         except Exception:
                             pass
+            
+            # Verificar y crear tablas de gastos si no existen
+            tablas_gastos = ['proveedores', 'facturas_proveedor', 'empleados', 'nominas']
+            for tabla in tablas_gastos:
+                if tabla not in table_names:
+                    try:
+                        db.create_all()
+                        break  # Si se crean las tablas, salir del bucle
+                    except Exception:
+                        pass
+            
+            # Asegurar que la tabla empleados existe antes de migrar nominas
+            if 'empleados' not in table_names:
+                try:
+                    db.create_all()
+                    # Refrescar lista de tablas
+                    inspector = inspect(db.engine)
+                    table_names = inspector.get_table_names()
+                except Exception as e:
+                    print(f"Error creando tabla empleados: {e}")
+            
+            # Migrar tabla nominas para usar empleado_id en lugar de empleado (string)
+            if 'nominas' in table_names and 'empleados' in table_names:
+                columns_nominas = [col['name'] for col in inspector.get_columns('nominas')]
+                if 'empleado_id' not in columns_nominas:
+                    try:
+                        with db.engine.connect() as conn:
+                            # Si existe la columna empleado (string), migrar datos primero
+                            if 'empleado' in columns_nominas:
+                                # Agregar columna empleado_id (temporalmente nullable)
+                                conn.execute(text('ALTER TABLE nominas ADD COLUMN empleado_id INTEGER'))
+                                conn.commit()
+                                
+                                # Migrar datos: crear empleados desde los nombres existentes y asignar IDs
+                                result = conn.execute(text('SELECT DISTINCT empleado FROM nominas WHERE empleado IS NOT NULL AND empleado != \'\''))
+                                empleados_nombres = [row[0] for row in result]
+                                
+                                # Crear empleados y asignar IDs
+                                for nombre_empleado in empleados_nombres:
+                                    if nombre_empleado:
+                                        # Crear empleado si no existe
+                                        check_result = conn.execute(text('SELECT id FROM empleados WHERE nombre = :nombre'), {'nombre': nombre_empleado})
+                                        empleado_row = check_result.fetchone()
+                                        if not empleado_row:
+                                            conn.execute(text('INSERT INTO empleados (nombre, fecha_creacion) VALUES (:nombre, CURRENT_TIMESTAMP)'), {'nombre': nombre_empleado})
+                                            conn.commit()
+                                            check_result = conn.execute(text('SELECT id FROM empleados WHERE nombre = :nombre'), {'nombre': nombre_empleado})
+                                            empleado_row = check_result.fetchone()
+                                        
+                                        if empleado_row:
+                                            empleado_id = empleado_row[0]
+                                            # Actualizar nóminas con este empleado_id
+                                            conn.execute(text('UPDATE nominas SET empleado_id = :empleado_id WHERE empleado = :nombre'), {'empleado_id': empleado_id, 'nombre': nombre_empleado})
+                                            conn.commit()
+                                
+                                # Agregar constraint de foreign key
+                                try:
+                                    conn.execute(text('ALTER TABLE nominas ADD CONSTRAINT fk_nomina_empleado FOREIGN KEY (empleado_id) REFERENCES empleados(id)'))
+                                    conn.commit()
+                                except Exception as e:
+                                    # Si la constraint ya existe o hay error, continuar
+                                    print(f"Nota al agregar constraint: {e}")
+                                    pass
+                                
+                                # Eliminar columna empleado antigua
+                                conn.execute(text('ALTER TABLE nominas DROP COLUMN empleado'))
+                                conn.commit()
+                            else:
+                                # Si no existe empleado, solo agregar la columna empleado_id
+                                conn.execute(text('ALTER TABLE nominas ADD COLUMN empleado_id INTEGER'))
+                                try:
+                                    conn.execute(text('ALTER TABLE nominas ADD CONSTRAINT fk_nomina_empleado FOREIGN KEY (empleado_id) REFERENCES empleados(id)'))
+                                    conn.commit()
+                                except Exception as e:
+                                    print(f"Nota al agregar constraint: {e}")
+                                    pass
+                        print("Migración de nominas completada exitosamente")
+                    except Exception as e:
+                        print(f"Error en migración de nominas: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        # Intentar crear todas las tablas como fallback
+                        try:
+                            db.create_all()
+                        except Exception as e2:
+                            print(f"Error en create_all: {e2}")
         except Exception:
             # Si hay error, intentar crear todas las tablas
             try:
@@ -438,4 +547,6 @@ except Exception:
     pass
 
 if __name__ == '__main__':
+    # Ejecutar migraciones antes de iniciar la aplicación
+    migrate_database()
     app.run(debug=True)

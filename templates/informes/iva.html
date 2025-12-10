@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+
+{% block title %}IVA - Informes{% endblock %}
+
+{% block content %}
+<div class="informes-container">
+    <h2>Contraste de IVA</h2>
+    
+    <!-- Filtros -->
+    <div class="filtros-box">
+        <form method="GET" class="filtros-form">
+            <div class="filtro-group">
+                <label for="tipo">Tipo de Filtro:</label>
+                <select name="tipo" id="tipo" onchange="actualizarFiltros()">
+                    <option value="mes" {% if tipo_filtro == 'mes' %}selected{% endif %}>Por Mes</option>
+                    <option value="trimestre" {% if tipo_filtro == 'trimestre' %}selected{% endif %}>Por Trimestre</option>
+                </select>
+            </div>
+            
+            <div class="filtro-group">
+                <label for="año">Año:</label>
+                <input type="number" name="año" id="año" value="{{ año }}" min="2000" max="2100" required>
+            </div>
+            
+            <div class="filtro-group" id="periodo-group">
+                {% if tipo_filtro == 'mes' %}
+                <label for="periodo">Mes:</label>
+                <select name="periodo" id="periodo">
+                    <option value="">Todos los meses</option>
+                    {% for i in range(1, 13) %}
+                    <option value="{{ i }}" {% if periodo == i %}selected{% endif %}>
+                        {{ ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][i] }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% else %}
+                <label for="periodo">Trimestre:</label>
+                <select name="periodo" id="periodo" required>
+                    <option value="">Seleccione un trimestre</option>
+                    <option value="1" {% if periodo == 1 %}selected{% endif %}>1T - Primer Trimestre (Ene-Mar)</option>
+                    <option value="2" {% if periodo == 2 %}selected{% endif %}>2T - Segundo Trimestre (Abr-Jun)</option>
+                    <option value="3" {% if periodo == 3 %}selected{% endif %}>3T - Tercer Trimestre (Jul-Sep)</option>
+                    <option value="4" {% if periodo == 4 %}selected{% endif %}>4T - Cuarto Trimestre (Oct-Dic)</option>
+                </select>
+                {% endif %}
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Filtrar</button>
+        </form>
+    </div>
+    
+    <!-- Resumen -->
+    <div class="resumen-box">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0;">Resumen IVA - {{ periodo_label }}</h3>
+            <a href="{{ url_for('informes.iva_detalle', tipo=tipo_filtro, año=año, periodo=periodo) }}" class="btn btn-light" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">Ver Detalle</a>
+        </div>
+        <div class="resumen-grid">
+            <div class="resumen-item">
+                <span class="resumen-label">IVA Repercutido:</span>
+                <span class="resumen-value">{{ "%.2f"|format(iva_repercutido) }} €</span>
+            </div>
+            <div class="resumen-item">
+                <span class="resumen-label">Base Repercutida:</span>
+                <span class="resumen-value">{{ "%.2f"|format(base_repercutida) }} €</span>
+            </div>
+            <div class="resumen-item">
+                <span class="resumen-label">IVA Soportado:</span>
+                <span class="resumen-value">{{ "%.2f"|format(iva_soportado) }} €</span>
+            </div>
+            <div class="resumen-item">
+                <span class="resumen-label">Base Soportada:</span>
+                <span class="resumen-value">{{ "%.2f"|format(base_soportada) }} €</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Diferencia -->
+    <div class="diferencia-box" style="background: {% if diferencia_iva >= 0 %}linear-gradient(135deg, #11998e 0%, #38ef7d 100%){% else %}linear-gradient(135deg, #ee0979 0%, #ff6a00 100%){% endif %};">
+        <h3>Diferencia (IVA a Pagar/Recibir)</h3>
+        <div class="diferencia-value">
+            {% if diferencia_iva >= 0 %}
+                <span style="font-size: 2.5em; font-weight: bold;">{{ "%.2f"|format(diferencia_iva) }} €</span>
+                <p style="margin-top: 10px; opacity: 0.9;">IVA a pagar a Hacienda</p>
+            {% else %}
+                <span style="font-size: 2.5em; font-weight: bold;">{{ "%.2f"|format(diferencia_iva) }} €</span>
+                <p style="margin-top: 10px; opacity: 0.9;">IVA a recibir de Hacienda</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Estadísticas -->
+    <div class="stats-box">
+        <div class="stat-item">
+            <span class="stat-label">Facturas Emitidas:</span>
+            <span class="stat-value">{{ num_facturas_emitidas }}</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Facturas de Proveedor:</span>
+            <span class="stat-value">{{ num_facturas_proveedor }}</span>
+        </div>
+    </div>
+</div>
+
+<style>
+.informes-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.filtros-box {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.filtros-form {
+    display: flex;
+    gap: 15px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.filtro-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.filtro-group label {
+    font-weight: 500;
+    color: #555;
+    font-size: 0.9em;
+}
+
+.filtro-group select,
+.filtro-group input {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.resumen-box {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 25px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.resumen-box h3 {
+    margin: 0 0 20px 0;
+    font-size: 1.5em;
+}
+
+.resumen-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+}
+
+.resumen-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.resumen-label {
+    font-size: 0.9em;
+    opacity: 0.9;
+}
+
+.resumen-value {
+    font-size: 1.5em;
+    font-weight: bold;
+}
+
+.diferencia-box {
+    color: white;
+    padding: 40px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.diferencia-box h3 {
+    margin: 0 0 20px 0;
+    font-size: 1.5em;
+}
+
+.diferencia-value {
+    font-size: 2em;
+}
+
+.stats-box {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    display: flex;
+    gap: 30px;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.stat-label {
+    font-size: 0.9em;
+    color: #666;
+}
+
+.stat-value {
+    font-size: 2em;
+    font-weight: bold;
+    color: #2c3e50;
+}
+</style>
+
+<script>
+function actualizarFiltros() {
+    const tipo = document.getElementById('tipo').value;
+    const periodoGroup = document.getElementById('periodo-group');
+    
+    if (tipo === 'mes') {
+        periodoGroup.innerHTML = `
+            <label for="periodo">Mes:</label>
+            <select name="periodo" id="periodo">
+                <option value="">Todos los meses</option>
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3">Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+            </select>
+        `;
+    } else {
+        periodoGroup.innerHTML = `
+            <label for="periodo">Trimestre:</label>
+            <select name="periodo" id="periodo" required>
+                <option value="">Seleccione un trimestre</option>
+                <option value="1">1T - Primer Trimestre (Ene-Mar)</option>
+                <option value="2">2T - Segundo Trimestre (Abr-Jun)</option>
+                <option value="3">3T - Tercer Trimestre (Jul-Sep)</option>
+                <option value="4">4T - Cuarto Trimestre (Oct-Dic)</option>
+            </select>
+        `;
+    }
+}
+</script>
+{% endblock %}
+

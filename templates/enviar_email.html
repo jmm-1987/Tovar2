@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enviar por Email</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+        }
+        .message {
+            margin: 20px 0;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>📧 Enviando por Email</h2>
+        <p class="message">Preparando el envío...</p>
+        <p class="message">El PDF se descargará automáticamente y se abrirá tu cliente de correo.</p>
+    </div>
+
+    <script>
+        // Descargar el PDF
+        function descargarPDF() {
+            {% if tipo == 'presupuesto' %}
+            const pdfUrl = "{{ url_for('presupuestos.descargar_pdf_presupuesto', presupuesto_id=id_documento) }}";
+            {% else %}
+            const pdfUrl = "{{ url_for('pedidos.descargar_pdf_pedido', pedido_id=id_documento) }}";
+            {% endif %}
+            const link = document.createElement('a');
+            link.href = pdfUrl;
+            link.download = "{{ pdf_filename }}";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Abrir cliente de correo
+        function abrirEmail() {
+            const email = "{{ email }}";
+            const asunto = encodeURIComponent("{{ asunto }}");
+            const cuerpo = encodeURIComponent("{{ cuerpo }}");
+            const mailtoUrl = `mailto:${email}?subject=${asunto}&body=${cuerpo}`;
+            window.location.href = mailtoUrl;
+        }
+
+        // Ejecutar cuando la página cargue
+        window.onload = function() {
+            // Descargar PDF primero
+            setTimeout(descargarPDF, 500);
+            
+            // Abrir cliente de correo después de un breve delay
+            setTimeout(abrirEmail, 1000);
+            
+            // Cerrar la ventana después de 3 segundos
+            setTimeout(function() {
+                window.close();
+            }, 3000);
+        };
+    </script>
+</body>
+</html>
+

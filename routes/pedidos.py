@@ -1,8 +1,9 @@
 """Rutas para gestión de pedidos"""
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, make_response
 from flask_login import login_required
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
+from io import BytesIO
 import os
 from extensions import db
 from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Usuario
@@ -322,6 +323,7 @@ def cambiar_estado_pedido(pedido_id):
         # Mapeo de estados a fechas y nombres de estado
         estados_fechas = {
             'Pendiente': (None, 'Pendiente'),
+            'Diseño': (None, 'Diseño'),
             'En preparación': ('fecha_aceptacion', 'En preparación'),
             'Todo listo': (None, 'Todo listo'),
             'Enviado': (None, 'Enviado'),
@@ -396,6 +398,133 @@ def imprimir_pedido(pedido_id):
     """Vista de impresión del pedido"""
     pedido = Pedido.query.get_or_404(pedido_id)
     return render_template('imprimir_pedido.html', pedido=pedido)
+
+@pedidos_bp.route('/pedidos/<int:pedido_id>/descargar-pdf')
+@login_required
+def descargar_pdf_pedido(pedido_id):
+    """Generar y descargar PDF del pedido"""
+    try:
+        pdf_data = generar_pdf_pedido(pedido_id)
+        response = make_response(pdf_data)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=pedido_{pedido_id}.pdf'
+        return response
+    except ImportError:
+        flash('La librería xhtml2pdf no está instalada. Por favor, ejecuta: pip install xhtml2pdf', 'error')
+        return redirect(url_for('pedidos.ver_pedido', pedido_id=pedido_id))
+    except Exception as e:
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        return redirect(url_for('pedidos.ver_pedido', pedido_id=pedido_id))
+
+def generar_pdf_pedido(pedido_id):
+    """Generar PDF del pedido y retornar los datos del PDF"""
+    try:
+        from decimal import Decimal
+        from xhtml2pdf import pisa
+        
+        pedido = Pedido.query.get_or_404(pedido_id)
+        
+        # Renderizar template HTML
+        html = render_template('imprimir_pedido.html', pedido=pedido)
+        
+        # Generar PDF
+        result = BytesIO()
+        
+        pdf = pisa.pisaDocument(
+            BytesIO(html.encode("UTF-8")), 
+            result
+        )
+        
+        if not pdf.err:
+            return result.getvalue()
+        else:
+            raise Exception(f'Error al generar PDF: {pdf.err}')
+            
+    except Exception as e:
+        import traceback
+        print(f"Error en generar_pdf_pedido: {traceback.format_exc()}")
+        raise
+
+@pedidos_bp.route('/pedidos/<int:pedido_id>/enviar-whatsapp')
+@login_required
+def enviar_pedido_whatsapp(pedido_id):
+    """Generar PDF y preparar para enviar por WhatsApp"""
+    try:
+        pedido = Pedido.query.get_or_404(pedido_id)
+        
+        # Verificar que el cliente tenga teléfono
+        if not pedido.cliente or not pedido.cliente.telefono:
+            flash('El cliente no tiene teléfono configurado', 'error')
+            return redirect(url_for('pedidos.listado_pedidos'))
+        
+        # Generar PDF
+        try:
+            pdf_data = generar_pdf_pedido(pedido_id)
+        except Exception as e:
+            flash(f'Error al generar PDF: {str(e)}', 'error')
+            return redirect(url_for('pedidos.listado_pedidos'))
+        
+        # Guardar PDF temporalmente
+        temp_dir = current_app.config.get('UPLOAD_FOLDER', 'static/uploads')
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        pdf_filename = f'pedido_{pedido_id}.pdf'
+        pdf_path = os.path.join(temp_dir, pdf_filename)
+        
+        with open(pdf_path, 'wb') as f:
+            f.write(pdf_data)
+        
+        # Preparar mensaje para WhatsApp
+        from urllib.parse import urlencode
+        telefono = pedido.cliente.telefono.replace(' ', '').replace('-', '').replace('+', '')
+        mensaje = f"Hola {pedido.cliente.nombre}, te envío el pedido #{pedido_id}."
+        mensaje_encoded = urlencode({'text': mensaje})
+        
+        # Retornar template con JavaScript para abrir WhatsApp
+        return render_template('enviar_whatsapp.html', 
+                             pdf_path=pdf_path,
+                             pdf_filename=pdf_filename,
+                             telefono=telefono,
+                             mensaje_encoded=mensaje_encoded,
+                             tipo='pedido',
+                             id_documento=pedido_id)
+        
+    except Exception as e:
+        flash(f'Error al preparar envío por WhatsApp: {str(e)}', 'error')
+        return redirect(url_for('pedidos.listado_pedidos'))
+
+@pedidos_bp.route('/pedidos/<int:pedido_id>/enviar-email-cliente')
+@login_required
+def enviar_pedido_email_cliente(pedido_id):
+    """Generar PDF y enviar por email directamente al cliente"""
+    try:
+        pedido = Pedido.query.get_or_404(pedido_id)
+        
+        # Verificar que el cliente tenga email
+        if not pedido.cliente or not pedido.cliente.email:
+            flash('El cliente no tiene email configurado', 'error')
+            return redirect(url_for('pedidos.listado_pedidos'))
+        
+        # Generar PDF
+        try:
+            pdf_data = generar_pdf_pedido(pedido_id)
+        except Exception as e:
+            flash(f'Error al generar PDF: {str(e)}', 'error')
+            return redirect(url_for('pedidos.listado_pedidos'))
+        
+        # Enviar email usando Flask-Mail
+        from utils.email import enviar_email_pedido
+        exito, mensaje = enviar_email_pedido(pedido, pdf_data)
+        
+        if exito:
+            flash(f'Pedido enviado por email a {pedido.cliente.email}', 'success')
+        else:
+            flash(f'Error al enviar email: {mensaje}', 'error')
+        
+    except Exception as e:
+        flash(f'Error al enviar pedido por email: {str(e)}', 'error')
+    
+    return redirect(url_for('pedidos.listado_pedidos'))
 
 @pedidos_bp.route('/pedidos/<int:pedido_id>/eliminar', methods=['POST'])
 @login_required

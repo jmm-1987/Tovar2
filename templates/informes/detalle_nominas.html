@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle Nóminas - Informes{% endblock %}
+
+{% block content %}
+<div class="informes-container">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h2>Detalle Nóminas - Año {{ año }}{% if empleado_seleccionado %} - {{ empleado_seleccionado.nombre }}{% endif %}</h2>
+        <a href="{{ url_for('informes.nominas', empleado_id=empleado_id, año=año) }}" class="btn btn-secondary">← Volver al Resumen</a>
+    </div>
+    
+    {% if nominas %}
+    <div class="table-container">
+        <table class="clientes-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Empleado</th>
+                    <th>Mes</th>
+                    <th>Año</th>
+                    <th>Total Devengado</th>
+                    <th>Observaciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for nomina in nominas %}
+                <tr>
+                    <td>{{ nomina.id }}</td>
+                    <td>{{ nomina.empleado.nombre if nomina.empleado else 'N/A' }}</td>
+                    <td>
+                        {% set meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] %}
+                        {{ meses[nomina.mes] }}
+                    </td>
+                    <td>{{ nomina.año }}</td>
+                    <td><strong>{{ "%.2f"|format(nomina.total_devengado) }} €</strong></td>
+                    <td>{{ nomina.observaciones or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="background: #f8f9fa; font-weight: bold;">
+                    <td colspan="4" style="text-align: right;">TOTAL:</td>
+                    <td>
+                        {% set total_global = nominas|sum(attribute='total_devengado') %}
+                        {{ "%.2f"|format(total_global) }} €
+                    </td>
+                    <td></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% else %}
+    <div class="no-data">
+        <p>No hay nóminas para el período seleccionado.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

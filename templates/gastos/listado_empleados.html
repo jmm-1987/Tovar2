@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Empleados - Gastos{% endblock %}
+
+{% block content %}
+<div class="clientes-container">
+    <div class="clientes-header">
+        <h2>Gestión de Empleados</h2>
+        <a href="{{ url_for('gastos.nuevo_empleado') }}" class="btn btn-success">➕ Crear Empleado</a>
+    </div>
+
+    {% if empleados %}
+    <div class="table-container">
+        <table class="clientes-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>DNI</th>
+                    <th>Teléfono</th>
+                    <th>Correo</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for empleado in empleados %}
+                <tr>
+                    <td>{{ empleado.id }}</td>
+                    <td>{{ empleado.nombre }}</td>
+                    <td>{{ empleado.dni or '-' }}</td>
+                    <td>{{ empleado.telefono or '-' }}</td>
+                    <td>{{ empleado.correo or '-' }}</td>
+                    <td class="acciones-cell">
+                        <a href="{{ url_for('gastos.editar_empleado', empleado_id=empleado.id) }}" class="btn btn-sm btn-primary">Editar</a>
+                        <form method="POST" action="{{ url_for('gastos.eliminar_empleado', empleado_id=empleado.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar este empleado?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="no-data">
+        <p>No hay empleados registrados.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

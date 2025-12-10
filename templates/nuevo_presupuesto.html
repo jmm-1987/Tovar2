@@ -31,7 +31,7 @@
             <label for="tipo_pedido">Tipo *</label>
             <select name="tipo_pedido" id="tipo_pedido" required>
                 <option value="fabricacion">Fabricación</option>
-                <option value="no fabricacion">No Fabricación</option>
+                <option value="pedido proveedor">Pedido proveedor</option>
             </select>
         </div>
 
@@ -39,6 +39,7 @@
             <label for="estado">Estado *</label>
             <select name="estado" id="estado" required>
                 <option value="Pendiente de enviar" selected>Pendiente de enviar</option>
+                <option value="Diseño">Diseño</option>
                 <option value="Enviado">Enviado</option>
                 <option value="Aceptado">Aceptado</option>
                 <option value="Rechazado">Rechazado</option>
@@ -58,8 +59,32 @@
         </div>
     </div>
 
+    <h3>Imágenes para el PDF del Presupuesto</h3>
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="imagen_portada">Imagen de Portada (Página 1)</label>
+            <input type="file" name="imagen_portada" id="imagen_portada" accept="image/*">
+            <small style="color: #666; font-size: 0.85em;">Se mostrará en la primera página del PDF</small>
+        </div>
+        <div class="form-group-compact">
+            <label>Imágenes Adicionales (Página 2)</label>
+            <button type="button" class="btn btn-secondary" onclick="abrirModalImagenes()" style="width: 100%; padding: 8px;">
+                Gestionar 6 Imágenes Adicionales
+            </button>
+            <small style="color: #666; font-size: 0.85em;" id="contador-imagenes">0/6 imágenes seleccionadas</small>
+        </div>
+    </div>
+
+    <!-- Campos ocultos para las imágenes adicionales (se actualizan desde el modal) -->
+    <input type="file" name="imagen_adicional_1" id="imagen_adicional_1" accept="image/*" style="display: none;">
+    <input type="file" name="imagen_adicional_2" id="imagen_adicional_2" accept="image/*" style="display: none;">
+    <input type="file" name="imagen_adicional_3" id="imagen_adicional_3" accept="image/*" style="display: none;">
+    <input type="file" name="imagen_adicional_4" id="imagen_adicional_4" accept="image/*" style="display: none;">
+    <input type="file" name="imagen_adicional_5" id="imagen_adicional_5" accept="image/*" style="display: none;">
+    <input type="file" name="imagen_adicional_6" id="imagen_adicional_6" accept="image/*" style="display: none;">
+
     <div class="form-group">
-        <label for="seguimiento">Seguimiento</label>
+        <label for="seguimiento">Comertarios internos y seguimiento</label>
         <textarea name="seguimiento" id="seguimiento" rows="3" placeholder="Escribe aquí las actualizaciones y seguimiento del presupuesto..."></textarea>
     </div>
 
@@ -68,14 +93,10 @@
         <div class="linea-pedido-row">
             <div class="linea-pedido-numero">#1</div>
             <div class="linea-pedido-campos">
-                <!-- Campos ocultos para compatibilidad (nombre y cargo) -->
-                <input type="hidden" name="nombre[]" value="">
-                <input type="hidden" name="cargo[]" value="">
-                
-                <!-- Orden: nombre_mostrar, cantidad, modelo, color, forma, talla, tejido, precio -->
-                <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 2;">
-                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="1" min="1" required placeholder="Cant *" title="Cantidad">
-                <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo de Prenda">
+                <!-- Orden: nombre_mostrar, unidades, modelo, color, forma, sexo, talla, tejido, precio -->
+                <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 0 0 750px; width: 750px;">
+                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="1" min="1" required placeholder="Unidades *" title="Unidades">
+                <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo">
                     <option value="">Modelo *</option>
                     {% for prenda in prendas %}
                     <option value="{{ prenda.id }}">{{ prenda.nombre }}</option>
@@ -83,6 +104,12 @@
                 </select>
                 <input type="text" name="color[]" class="linea-campo-compact" placeholder="Color" title="Color">
                 <input type="text" name="forma[]" class="linea-campo-compact" placeholder="Forma" title="Forma">
+                <select name="sexo[]" class="linea-campo-compact" title="Sexo">
+                    <option value="">Sexo</option>
+                    <option value="cro">Cro</option>
+                    <option value="sra">Sra</option>
+                    <option value="unisex">Unisex</option>
+                </select>
                 <input type="text" name="talla[]" class="linea-campo-compact" placeholder="Talla" title="Talla">
                 <select name="tejido[]" class="linea-campo-compact" title="Tejido">
                     <option value="">Tejido</option>
@@ -92,9 +119,21 @@
                     <option value="T.CAMISETA">T.CAMISETA</option>
                     <option value="T.SHOFT">T.SHOFT</option>
                 </select>
-                <input type="number" name="precio_unitario[]" class="linea-campo-compact" step="0.01" min="0" placeholder="Precio €" title="Precio Unitario">
+                <input type="number" name="precio_unitario[]" class="linea-campo-compact" step="0.01" min="0" placeholder="Precio €" title="Precio" style="flex: 0 0 100px; width: 100px;">
+                
+                <!-- Campos personalizados (nombre y cargo) - se muestran al final si tienen valor o si se activa personalización -->
+                <input type="text" name="nombre[]" class="linea-campo-compact campo-personalizado" placeholder="Nombre personalizado" title="Nombre personalizado" style="display: none; flex: 2.5;">
+                <input type="text" name="cargo[]" class="linea-campo-compact campo-personalizado" placeholder="Cargo" title="Cargo" style="display: none;">
             </div>
-            <button type="button" class="btn-remove-linea-inline" onclick="eliminarLinea(this)">×</button>
+            <div class="linea-acciones">
+                <button type="button" class="btn-duplicar" onclick="duplicarLinea(this)" title="Duplicar línea (mantiene todo excepto talla y unidades)">
+                    📋
+                </button>
+                <button type="button" class="btn-personalizar" onclick="togglePersonalizar(this)" title="Personalizar nombre y cargo">
+                    ✏️
+                </button>
+                <button type="button" class="btn-remove-linea-inline" onclick="eliminarLinea(this)">×</button>
+            </div>
         </div>
     </div>
 
@@ -106,9 +145,138 @@
     </div>
 </form>
 
-<script>
-let contadorPrendas = 1;
+<!-- Modal para gestionar imágenes adicionales -->
+<div id="modalImagenes" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+    <div style="background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 800px; border-radius: 8px; max-height: 90vh; overflow-y: auto;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0;">Gestionar Imágenes Adicionales (Página 2 del PDF)</h2>
+            <span style="color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer;" onclick="cerrarModalImagenes()">&times;</span>
+        </div>
+        
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
+            {% for i in range(1, 7) %}
+            <div style="border: 1px solid #ddd; padding: 15px; border-radius: 4px; background: #f9f9f9;">
+                <label for="modal_imagen_adicional_{{ i }}" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                    Imagen {{ i }}
+                </label>
+                <input type="file" id="modal_imagen_adicional_{{ i }}" accept="image/*" onchange="actualizarImagen({{ i }}, this)" style="width: 100%; margin-bottom: 8px;">
+                <div id="preview_imagen_{{ i }}" style="margin-top: 10px; text-align: center;">
+                    <img id="img_preview_{{ i }}" src="" alt="Preview" style="max-width: 100%; max-height: 150px; display: none; border: 1px solid #ddd; border-radius: 4px;">
+                    <p id="nombre_imagen_{{ i }}" style="font-size: 0.85em; color: #666; margin-top: 5px; display: none;"></p>
+                </div>
+                <button type="button" onclick="eliminarImagen({{ i }})" style="margin-top: 8px; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; display: none;" id="btn_eliminar_{{ i }}">Eliminar</button>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <div style="text-align: right; margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
+            <button type="button" onclick="cerrarModalImagenes()" class="btn btn-secondary" style="margin-right: 10px;">Cerrar</button>
+        </div>
+    </div>
+</div>
 
+<style>
+#modalImagenes {
+    animation: fadeIn 0.3s;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+</style>
+
+<script>
+let imagenesSeleccionadas = {};
+
+function abrirModalImagenes() {
+    document.getElementById('modalImagenes').style.display = 'block';
+    // Cargar imágenes existentes si las hay
+    for (let i = 1; i <= 6; i++) {
+        const inputOculto = document.getElementById('imagen_adicional_' + i);
+        if (inputOculto.files.length > 0) {
+            const file = inputOculto.files[0];
+            mostrarPreview(i, file);
+        }
+    }
+    actualizarContador();
+}
+
+function cerrarModalImagenes() {
+    document.getElementById('modalImagenes').style.display = 'none';
+}
+
+function actualizarImagen(numero, input) {
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        // Actualizar el input oculto del formulario
+        const inputOculto = document.getElementById('imagen_adicional_' + numero);
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        inputOculto.files = dataTransfer.files;
+        
+        mostrarPreview(numero, file);
+        imagenesSeleccionadas[numero] = file;
+        actualizarContador();
+    }
+}
+
+function mostrarPreview(numero, file) {
+    const imgPreview = document.getElementById('img_preview_' + numero);
+    const nombreImagen = document.getElementById('nombre_imagen_' + numero);
+    const btnEliminar = document.getElementById('btn_eliminar_' + numero);
+    
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            imgPreview.src = e.target.result;
+            imgPreview.style.display = 'block';
+            nombreImagen.textContent = file.name;
+            nombreImagen.style.display = 'block';
+            btnEliminar.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function eliminarImagen(numero) {
+    // Limpiar el input oculto
+    const inputOculto = document.getElementById('imagen_adicional_' + numero);
+    inputOculto.value = '';
+    
+    // Limpiar el input del modal
+    const inputModal = document.getElementById('modal_imagen_adicional_' + numero);
+    inputModal.value = '';
+    
+    // Ocultar preview
+    document.getElementById('img_preview_' + numero).style.display = 'none';
+    document.getElementById('nombre_imagen_' + numero).style.display = 'none';
+    document.getElementById('btn_eliminar_' + numero).style.display = 'none';
+    
+    delete imagenesSeleccionadas[numero];
+    actualizarContador();
+}
+
+function actualizarContador() {
+    let contador = 0;
+    for (let i = 1; i <= 6; i++) {
+        const inputOculto = document.getElementById('imagen_adicional_' + i);
+        if (inputOculto.files.length > 0) {
+            contador++;
+        }
+    }
+    document.getElementById('contador-imagenes').textContent = contador + '/6 imágenes seleccionadas';
+}
+
+// Cerrar modal al hacer clic fuera de él
+window.onclick = function(event) {
+    const modal = document.getElementById('modalImagenes');
+    if (event.target == modal) {
+        cerrarModalImagenes();
+    }
+}
+
+let contadorPrendas = 1;
 function agregarLinea() {
     contadorPrendas++;
     const container = document.getElementById('prendas-container');
@@ -128,6 +296,18 @@ function agregarLinea() {
     nuevaLinea.querySelectorAll('select').forEach(select => {
         select.selectedIndex = 0;
     });
+    
+    // Ocultar campos personalizados por defecto
+    nuevaLinea.querySelectorAll('.campo-personalizado').forEach(campo => {
+        campo.style.display = 'none';
+    });
+    
+    // Resetear botón de personalizar
+    const btnPersonalizar = nuevaLinea.querySelector('.btn-personalizar');
+    if (btnPersonalizar) {
+        btnPersonalizar.style.background = '#95a5a6';
+        btnPersonalizar.style.opacity = '0.7';
+    }
     
     // Actualizar número
     renumerarPrendas();
@@ -153,6 +333,88 @@ function eliminarLinea(btn) {
     } else {
         alert('Debe haber al menos una prenda en el presupuesto');
     }
+}
+
+function togglePersonalizar(btn) {
+    const lineaRow = btn.closest('.linea-pedido-row');
+    const camposPersonalizados = lineaRow.querySelectorAll('.campo-personalizado');
+    
+    if (camposPersonalizados.length === 0) {
+        return;
+    }
+    
+    // Verificar si los campos están visibles
+    const primerCampo = camposPersonalizados[0];
+    const estaActivo = primerCampo.style.display !== 'none' && 
+                       window.getComputedStyle(primerCampo).display !== 'none';
+    
+    camposPersonalizados.forEach(campo => {
+        if (estaActivo) {
+            campo.style.display = 'none';
+        } else {
+            campo.style.display = 'block';
+        }
+    });
+    
+    // Actualizar estado visual del botón
+    if (estaActivo) {
+        btn.style.background = '#95a5a6';
+        btn.style.opacity = '0.7';
+        btn.classList.remove('active');
+    } else {
+        btn.style.background = '#3498db';
+        btn.style.opacity = '1';
+        btn.classList.add('active');
+    }
+}
+
+function duplicarLinea(btn) {
+    const lineaRow = btn.closest('.linea-pedido-row');
+    const nuevaLinea = lineaRow.cloneNode(true);
+    const container = document.getElementById('prendas-container');
+    
+    // Limpiar talla y unidades
+    const tallaInput = nuevaLinea.querySelector('input[name="talla[]"]');
+    const unidadesInput = nuevaLinea.querySelector('input[name="cantidad[]"]');
+    
+    if (tallaInput) {
+        tallaInput.value = '';
+    }
+    if (unidadesInput) {
+        unidadesInput.value = '1';
+    }
+    
+    // Mantener el estado de los campos personalizados
+    const camposPersonalizados = nuevaLinea.querySelectorAll('.campo-personalizado');
+    const btnPersonalizar = nuevaLinea.querySelector('.btn-personalizar');
+    const estaActivo = camposPersonalizados[0] && camposPersonalizados[0].style.display !== 'none';
+    
+    if (estaActivo && camposPersonalizados.length > 0) {
+        camposPersonalizados.forEach(campo => {
+            campo.style.display = 'block';
+        });
+        if (btnPersonalizar) {
+            btnPersonalizar.style.background = '#3498db';
+            btnPersonalizar.style.opacity = '1';
+            btnPersonalizar.classList.add('active');
+        }
+    } else {
+        camposPersonalizados.forEach(campo => {
+            campo.style.display = 'none';
+        });
+        if (btnPersonalizar) {
+            btnPersonalizar.style.background = '#95a5a6';
+            btnPersonalizar.style.opacity = '0.7';
+            btnPersonalizar.classList.remove('active');
+        }
+    }
+    
+    // Actualizar número
+    renumerarPrendas();
+    
+    // Insertar después de la línea actual
+    lineaRow.parentNode.insertBefore(nuevaLinea, lineaRow.nextSibling);
+    renumerarPrendas();
 }
 </script>
 {% endblock %}

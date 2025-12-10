@@ -15,16 +15,33 @@
             <nav>
                 {% if current_user.is_authenticated %}
                     <a href="{{ url_for('index.index') }}">PANEL DE CONTROL</a>
-                    <a href="{{ url_for('presupuestos.listado_presupuestos') }}">Presupuestos</a>
-                    <a href="{{ url_for('pedidos.listado_pedidos') }}">Pedidos</a>
-                    <a href="{{ url_for('facturacion.facturacion') }}">Facturación</a>
-                    <a href="{{ url_for('tickets.listado_tickets') }}">🛒 Tickets Tienda</a>
                     <div class="dropdown">
-                        <a href="#" class="dropdown-toggle">Maestros <span class="dropdown-arrow">▼</span></a>
+                        <a href="#" class="dropdown-toggle">💰 Ventas <span class="dropdown-arrow">▼</span></a>
                         <div class="dropdown-menu">
-                            <a href="{{ url_for('comerciales.gestion_comerciales') }}">Comerciales</a>
+                            <a href="{{ url_for('presupuestos.listado_presupuestos') }}">Presupuestos</a>
+                            <a href="{{ url_for('pedidos.listado_pedidos') }}">Pedidos</a>
+                            <a href="{{ url_for('facturacion.facturacion') }}">Facturación</a>
                             <a href="{{ url_for('clientes.gestion_clientes') }}">Clientes</a>
                             <a href="{{ url_for('prendas.gestion_prendas') }}">Prendas</a>
+                        </div>
+                    </div>
+                    <a href="{{ url_for('tickets.listado_tickets') }}">🛒 Tickets Tienda</a>
+                    <div class="dropdown">
+                        <a href="#" class="dropdown-toggle">📊 Informes <span class="dropdown-arrow">▼</span></a>
+                        <div class="dropdown-menu">
+                            <a href="{{ url_for('informes.facturacion_emitida') }}">Facturación Emitida</a>
+                            <a href="{{ url_for('informes.facturacion_soportada') }}">Facturación Soportada</a>
+                            <a href="{{ url_for('informes.nominas') }}">Nóminas</a>
+                            <a href="{{ url_for('informes.iva') }}">IVA</a>
+                        </div>
+                    </div>
+                    <div class="dropdown">
+                        <a href="#" class="dropdown-toggle">💰 Gastos <span class="dropdown-arrow">▼</span></a>
+                        <div class="dropdown-menu">
+                            <a href="{{ url_for('gastos.listado_proveedores') }}">Proveedores</a>
+                            <a href="{{ url_for('gastos.listado_facturas_proveedor') }}">Facturas Proveedor</a>
+                            <a href="{{ url_for('gastos.listado_empleados') }}">Empleados</a>
+                            <a href="{{ url_for('gastos.listado_nominas') }}">Nóminas</a>
                         </div>
                     </div>
                     {% if current_user.is_supervisor() %}
