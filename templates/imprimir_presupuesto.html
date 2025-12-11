@@ -445,13 +445,15 @@
         presupuesto.imagen_adicional_1 if presupuesto.imagen_adicional_1 else None,
         presupuesto.imagen_adicional_2 if presupuesto.imagen_adicional_2 else None,
         presupuesto.imagen_adicional_3 if presupuesto.imagen_adicional_3 else None,
-        presupuesto.imagen_adicional_4 if presupuesto.imagen_adicional_4 else None
+        presupuesto.imagen_adicional_4 if presupuesto.imagen_adicional_4 else None,
+        presupuesto.imagen_adicional_5 if presupuesto.imagen_adicional_5 else None
     ] %}
     {% set descripciones_adicionales = [
         descripciones_imagenes[0] if descripciones_imagenes is defined and descripciones_imagenes[0] else (presupuesto.descripcion_imagen_1 if presupuesto.descripcion_imagen_1 else ''),
         descripciones_imagenes[1] if descripciones_imagenes is defined and descripciones_imagenes[1] else (presupuesto.descripcion_imagen_2 if presupuesto.descripcion_imagen_2 else ''),
         descripciones_imagenes[2] if descripciones_imagenes is defined and descripciones_imagenes[2] else (presupuesto.descripcion_imagen_3 if presupuesto.descripcion_imagen_3 else ''),
-        descripciones_imagenes[3] if descripciones_imagenes is defined and descripciones_imagenes[3] else (presupuesto.descripcion_imagen_4 if presupuesto.descripcion_imagen_4 else '')
+        descripciones_imagenes[3] if descripciones_imagenes is defined and descripciones_imagenes[3] else (presupuesto.descripcion_imagen_4 if presupuesto.descripcion_imagen_4 else ''),
+        descripciones_imagenes[4] if descripciones_imagenes is defined and descripciones_imagenes[4] else (presupuesto.descripcion_imagen_5 if presupuesto.descripcion_imagen_5 else '')
     ] %}
     
     <!-- PÁGINA 1: CONTENIDO DEL PRESUPUESTO -->

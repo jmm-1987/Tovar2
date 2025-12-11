@@ -51,12 +51,14 @@ def nuevo_presupuesto():
             guardar_imagen('imagen_adicional_2', 'imagen_adicional_2')
             guardar_imagen('imagen_adicional_3', 'imagen_adicional_3')
             guardar_imagen('imagen_adicional_4', 'imagen_adicional_4')
+            guardar_imagen('imagen_adicional_5', 'imagen_adicional_5')
             
             # Guardar descripciones de imágenes
             presupuesto.descripcion_imagen_1 = request.form.get('descripcion_imagen_1', '')
             presupuesto.descripcion_imagen_2 = request.form.get('descripcion_imagen_2', '')
             presupuesto.descripcion_imagen_3 = request.form.get('descripcion_imagen_3', '')
             presupuesto.descripcion_imagen_4 = request.form.get('descripcion_imagen_4', '')
+            presupuesto.descripcion_imagen_5 = request.form.get('descripcion_imagen_5', '')
             
             db.session.add(presupuesto)
             db.session.flush()  # Para obtener el ID del presupuesto
@@ -193,8 +195,8 @@ def preparar_datos_imprimir_presupuesto(presupuesto_id):
         imagen_path = os.path.join(current_app.config['UPLOAD_FOLDER'], presupuesto.imagen_portada)
         imagen_portada_base64 = convertir_imagen_a_base64(imagen_path)
     
-    # Convertir imágenes adicionales a base64 y obtener descripciones (solo 4 imágenes)
-    for i in range(1, 5):
+    # Convertir imágenes adicionales a base64 y obtener descripciones (5 imágenes)
+    for i in range(1, 6):
         campo_imagen = f'imagen_adicional_{i}'
         campo_descripcion = f'descripcion_imagen_{i}'
         
@@ -318,56 +320,6 @@ def enviar_presupuesto_email(presupuesto_id):
     
     return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
 
-@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/enviar-whatsapp')
-@login_required
-def enviar_presupuesto_whatsapp(presupuesto_id):
-    """Generar PDF y preparar para enviar por WhatsApp"""
-    try:
-        presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
-        
-        # Verificar que el cliente tenga teléfono
-        if not presupuesto.cliente or not presupuesto.cliente.telefono:
-            flash('El cliente no tiene teléfono configurado', 'error')
-            return redirect(url_for('presupuestos.listado_presupuestos'))
-        
-        # Generar PDF
-        try:
-            pdf_data = generar_pdf_presupuesto(presupuesto_id)
-        except Exception as e:
-            flash(f'Error al generar PDF: {str(e)}', 'error')
-            return redirect(url_for('presupuestos.listado_presupuestos'))
-        
-        # Guardar PDF temporalmente
-        import tempfile
-        import base64
-        temp_dir = current_app.config.get('UPLOAD_FOLDER', 'static/uploads')
-        os.makedirs(temp_dir, exist_ok=True)
-        
-        pdf_filename = f'presupuesto_{presupuesto_id}.pdf'
-        pdf_path = os.path.join(temp_dir, pdf_filename)
-        
-        with open(pdf_path, 'wb') as f:
-            f.write(pdf_data)
-        
-        # Preparar mensaje para WhatsApp
-        from urllib.parse import urlencode
-        telefono = presupuesto.cliente.telefono.replace(' ', '').replace('-', '').replace('+', '')
-        mensaje = f"Hola {presupuesto.cliente.nombre}, te envío el presupuesto #{presupuesto_id}."
-        mensaje_encoded = urlencode({'text': mensaje})
-        
-        # Retornar template con JavaScript para abrir WhatsApp
-        return render_template('enviar_whatsapp.html', 
-                             pdf_path=pdf_path,
-                             pdf_filename=pdf_filename,
-                             telefono=telefono,
-                             mensaje_encoded=mensaje_encoded,
-                             tipo='presupuesto',
-                             id_documento=presupuesto_id)
-        
-    except Exception as e:
-        flash(f'Error al preparar envío por WhatsApp: {str(e)}', 'error')
-        return redirect(url_for('presupuestos.listado_presupuestos'))
-
 @presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/enviar-email-cliente')
 @login_required
 def enviar_presupuesto_email_cliente(presupuesto_id):
@@ -452,12 +404,14 @@ def editar_presupuesto(presupuesto_id):
             actualizar_imagen('imagen_adicional_2', 'imagen_adicional_2')
             actualizar_imagen('imagen_adicional_3', 'imagen_adicional_3')
             actualizar_imagen('imagen_adicional_4', 'imagen_adicional_4')
+            actualizar_imagen('imagen_adicional_5', 'imagen_adicional_5')
             
             # Actualizar descripciones de imágenes
             presupuesto.descripcion_imagen_1 = request.form.get('descripcion_imagen_1', '')
             presupuesto.descripcion_imagen_2 = request.form.get('descripcion_imagen_2', '')
             presupuesto.descripcion_imagen_3 = request.form.get('descripcion_imagen_3', '')
             presupuesto.descripcion_imagen_4 = request.form.get('descripcion_imagen_4', '')
+            presupuesto.descripcion_imagen_5 = request.form.get('descripcion_imagen_5', '')
             
             # Eliminar líneas existentes (dentro de la misma transacción)
             try:

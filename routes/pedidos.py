@@ -445,54 +445,6 @@ def generar_pdf_pedido(pedido_id):
         print(f"Error en generar_pdf_pedido: {traceback.format_exc()}")
         raise
 
-@pedidos_bp.route('/pedidos/<int:pedido_id>/enviar-whatsapp')
-@login_required
-def enviar_pedido_whatsapp(pedido_id):
-    """Generar PDF y preparar para enviar por WhatsApp"""
-    try:
-        pedido = Pedido.query.get_or_404(pedido_id)
-        
-        # Verificar que el cliente tenga teléfono
-        if not pedido.cliente or not pedido.cliente.telefono:
-            flash('El cliente no tiene teléfono configurado', 'error')
-            return redirect(url_for('pedidos.listado_pedidos'))
-        
-        # Generar PDF
-        try:
-            pdf_data = generar_pdf_pedido(pedido_id)
-        except Exception as e:
-            flash(f'Error al generar PDF: {str(e)}', 'error')
-            return redirect(url_for('pedidos.listado_pedidos'))
-        
-        # Guardar PDF temporalmente
-        temp_dir = current_app.config.get('UPLOAD_FOLDER', 'static/uploads')
-        os.makedirs(temp_dir, exist_ok=True)
-        
-        pdf_filename = f'pedido_{pedido_id}.pdf'
-        pdf_path = os.path.join(temp_dir, pdf_filename)
-        
-        with open(pdf_path, 'wb') as f:
-            f.write(pdf_data)
-        
-        # Preparar mensaje para WhatsApp
-        from urllib.parse import urlencode
-        telefono = pedido.cliente.telefono.replace(' ', '').replace('-', '').replace('+', '')
-        mensaje = f"Hola {pedido.cliente.nombre}, te envío el pedido #{pedido_id}."
-        mensaje_encoded = urlencode({'text': mensaje})
-        
-        # Retornar template con JavaScript para abrir WhatsApp
-        return render_template('enviar_whatsapp.html', 
-                             pdf_path=pdf_path,
-                             pdf_filename=pdf_filename,
-                             telefono=telefono,
-                             mensaje_encoded=mensaje_encoded,
-                             tipo='pedido',
-                             id_documento=pedido_id)
-        
-    except Exception as e:
-        flash(f'Error al preparar envío por WhatsApp: {str(e)}', 'error')
-        return redirect(url_for('pedidos.listado_pedidos'))
-
 @pedidos_bp.route('/pedidos/<int:pedido_id>/enviar-email-cliente')
 @login_required
 def enviar_pedido_email_cliente(pedido_id):

@@ -178,7 +178,8 @@ def migrate_database():
                     'imagen_adicional_1': 'VARCHAR(255)',
                     'imagen_adicional_2': 'VARCHAR(255)',
                     'imagen_adicional_3': 'VARCHAR(255)',
-                    'imagen_adicional_4': 'VARCHAR(255)'
+                    'imagen_adicional_4': 'VARCHAR(255)',
+                    'imagen_adicional_5': 'VARCHAR(255)'
                 }
                 for columna, tipo in nuevas_columnas_imagenes.items():
                     if columna not in columns_presupuesto:
@@ -186,7 +187,9 @@ def migrate_database():
                             with db.engine.connect() as conn:
                                 conn.execute(text(f'ALTER TABLE presupuestos ADD COLUMN {columna} {tipo}'))
                                 conn.commit()
-                        except Exception:
+                                print(f"Migración: Columna {columna} agregada exitosamente")
+                        except Exception as e:
+                            print(f"Error al agregar columna {columna}: {e}")
                             pass
                 
                 # Verificar y agregar columnas de descripciones de imágenes
@@ -194,7 +197,8 @@ def migrate_database():
                     'descripcion_imagen_1': 'TEXT',
                     'descripcion_imagen_2': 'TEXT',
                     'descripcion_imagen_3': 'TEXT',
-                    'descripcion_imagen_4': 'TEXT'
+                    'descripcion_imagen_4': 'TEXT',
+                    'descripcion_imagen_5': 'TEXT'
                 }
                 for columna, tipo in columnas_descripciones.items():
                     if columna not in columns_presupuesto:
@@ -202,11 +206,13 @@ def migrate_database():
                             with db.engine.connect() as conn:
                                 conn.execute(text(f'ALTER TABLE presupuestos ADD COLUMN {columna} {tipo}'))
                                 conn.commit()
-                        except Exception:
+                                print(f"Migración: Columna {columna} agregada exitosamente")
+                        except Exception as e:
+                            print(f"Error al agregar columna {columna}: {e}")
                             pass
                 
-                # Eliminar columnas de imágenes 5 y 6 si existen (ya no se usan)
-                columnas_a_eliminar = ['imagen_adicional_5', 'imagen_adicional_6']
+                # Eliminar columna de imagen 6 si existe (ya no se usa, pero mantenemos imagen_adicional_5)
+                columnas_a_eliminar = ['imagen_adicional_6']
                 for columna in columnas_a_eliminar:
                     if columna in columns_presupuesto:
                         try:

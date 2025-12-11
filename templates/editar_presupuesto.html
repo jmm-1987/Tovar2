@@ -86,7 +86,7 @@
         <div class="form-group-compact">
             <label>Imágenes Adicionales (Página 2)</label>
             <button type="button" class="btn btn-secondary" onclick="abrirModalImagenes()" style="width: 100%; padding: 8px;">
-                Gestionar 6 Imágenes Adicionales
+                Gestionar 5 Imágenes Adicionales
             </button>
             <small style="color: #666; font-size: 0.85em;" id="contador-imagenes">
                 {% set contador = 0 %}
@@ -95,8 +95,7 @@
                 {% if presupuesto.imagen_adicional_3 %}{% set contador = contador + 1 %}{% endif %}
                 {% if presupuesto.imagen_adicional_4 %}{% set contador = contador + 1 %}{% endif %}
                 {% if presupuesto.imagen_adicional_5 %}{% set contador = contador + 1 %}{% endif %}
-                {% if presupuesto.imagen_adicional_6 %}{% set contador = contador + 1 %}{% endif %}
-                {{ contador }}/6 imágenes seleccionadas
+                {{ contador }}/5 imágenes seleccionadas
             </small>
         </div>
     </div>
@@ -107,7 +106,6 @@
     <input type="file" name="imagen_adicional_3" id="imagen_adicional_3" accept="image/*" style="display: none;">
     <input type="file" name="imagen_adicional_4" id="imagen_adicional_4" accept="image/*" style="display: none;">
     <input type="file" name="imagen_adicional_5" id="imagen_adicional_5" accept="image/*" style="display: none;">
-    <input type="file" name="imagen_adicional_6" id="imagen_adicional_6" accept="image/*" style="display: none;">
 
     <div class="form-group">
         <label for="seguimiento">Seguimiento</label>
@@ -183,7 +181,7 @@
         </div>
         
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
-            {% for i in range(1, 7) %}
+            {% for i in range(1, 6) %}
             <div style="border: 1px solid #ddd; padding: 15px; border-radius: 4px; background: #f9f9f9;">
                 <label for="modal_imagen_adicional_{{ i }}" style="display: block; margin-bottom: 8px; font-weight: bold;">
                     Imagen {{ i }}
@@ -205,15 +203,12 @@
                     {% elif i == 5 and presupuesto.imagen_adicional_5 %}
                     <img id="img_preview_5" src="{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_5) }}" alt="Preview" style="max-width: 100%; max-height: 150px; border: 1px solid #ddd; border-radius: 4px;">
                     <p id="nombre_imagen_5" style="font-size: 0.85em; color: #666; margin-top: 5px;">{{ presupuesto.imagen_adicional_5 }}</p>
-                    {% elif i == 6 and presupuesto.imagen_adicional_6 %}
-                    <img id="img_preview_6" src="{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_6) }}" alt="Preview" style="max-width: 100%; max-height: 150px; border: 1px solid #ddd; border-radius: 4px;">
-                    <p id="nombre_imagen_6" style="font-size: 0.85em; color: #666; margin-top: 5px;">{{ presupuesto.imagen_adicional_6 }}</p>
                     {% else %}
                     <img id="img_preview_{{ i }}" src="" alt="Preview" style="max-width: 100%; max-height: 150px; display: none; border: 1px solid #ddd; border-radius: 4px;">
                     <p id="nombre_imagen_{{ i }}" style="font-size: 0.85em; color: #666; margin-top: 5px; display: none;"></p>
                     {% endif %}
                 </div>
-                <button type="button" onclick="eliminarImagen({{ i }})" style="margin-top: 8px; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; {% if (i == 1 and not presupuesto.imagen_adicional_1) or (i == 2 and not presupuesto.imagen_adicional_2) or (i == 3 and not presupuesto.imagen_adicional_3) or (i == 4 and not presupuesto.imagen_adicional_4) or (i == 5 and not presupuesto.imagen_adicional_5) or (i == 6 and not presupuesto.imagen_adicional_6) %}display: none;{% endif %}" id="btn_eliminar_{{ i }}">Eliminar</button>
+                <button type="button" onclick="eliminarImagen({{ i }})" style="margin-top: 8px; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; {% if (i == 1 and not presupuesto.imagen_adicional_1) or (i == 2 and not presupuesto.imagen_adicional_2) or (i == 3 and not presupuesto.imagen_adicional_3) or (i == 4 and not presupuesto.imagen_adicional_4) or (i == 5 and not presupuesto.imagen_adicional_5) %}display: none;{% endif %}" id="btn_eliminar_{{ i }}">Eliminar</button>
             </div>
             {% endfor %}
         </div>
@@ -242,14 +237,13 @@ const imagenesExistentes = {
     2: {% if presupuesto.imagen_adicional_2 %}'{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_2) }}'{% else %}null{% endif %},
     3: {% if presupuesto.imagen_adicional_3 %}'{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_3) }}'{% else %}null{% endif %},
     4: {% if presupuesto.imagen_adicional_4 %}'{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_4) }}'{% else %}null{% endif %},
-    5: {% if presupuesto.imagen_adicional_5 %}'{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_5) }}'{% else %}null{% endif %},
-    6: {% if presupuesto.imagen_adicional_6 %}'{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_6) }}'{% else %}null{% endif %}
+    5: {% if presupuesto.imagen_adicional_5 %}'{{ url_for('static', filename='uploads/' + presupuesto.imagen_adicional_5) }}'{% else %}null{% endif %}
 };
 
 function abrirModalImagenes() {
     document.getElementById('modalImagenes').style.display = 'block';
     // Mostrar imágenes existentes
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 5; i++) {
         if (imagenesExistentes[i]) {
             const imgPreview = document.getElementById('img_preview_' + i);
             const nombreImagen = document.getElementById('nombre_imagen_' + i);
@@ -328,14 +322,14 @@ function eliminarImagen(numero) {
 
 function actualizarContador() {
     let contador = 0;
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 5; i++) {
         const inputOculto = document.getElementById('imagen_adicional_' + i);
         const imgPreview = document.getElementById('img_preview_' + i);
         if ((inputOculto && inputOculto.files.length > 0) || (imgPreview && imgPreview.src && imgPreview.style.display !== 'none')) {
             contador++;
         }
     }
-    document.getElementById('contador-imagenes').textContent = contador + '/6 imágenes seleccionadas';
+    document.getElementById('contador-imagenes').textContent = contador + '/5 imágenes seleccionadas';
 }
 
 // Cerrar modal al hacer clic fuera de él

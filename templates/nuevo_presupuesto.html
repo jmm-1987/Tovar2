@@ -50,9 +50,9 @@
 
     <h3>Imágenes para el PDF del Presupuesto</h3>
     <div style="margin-bottom: 20px;">
-        <label style="display: block; margin-bottom: 10px; font-weight: 500;">Imágenes Adicionales (Página 2) - Máximo 4 imágenes</label>
+        <label style="display: block; margin-bottom: 10px; font-weight: 500;">Imágenes Adicionales (Página 2) - Máximo 5 imágenes</label>
         <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-            {% for i in range(1, 5) %}
+            {% for i in range(1, 6) %}
             <div style="display: flex; flex-direction: column; gap: 10px; width: 200px;">
                 <div class="imagen-miniatura-container" style="position: relative; width: 200px; height: 200px; border: 2px dashed #ddd; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f9f9f9; cursor: pointer; transition: all 0.3s ease;" 
                      ondrop="dropHandler(event, {{ i }})" 
@@ -77,7 +77,7 @@
             </div>
             {% endfor %}
         </div>
-        <small style="color: #666; font-size: 0.85em; display: block; margin-top: 10px;" id="contador-imagenes">0/4 imágenes seleccionadas</small>
+        <small style="color: #666; font-size: 0.85em; display: block; margin-top: 10px;" id="contador-imagenes">0/5 imágenes seleccionadas</small>
     </div>
 
     <div class="form-group">
@@ -218,7 +218,7 @@ function eliminarImagen(numero) {
 // Actualizar contador
 function actualizarContador() {
     let contador = 0;
-    for (let i = 1; i <= 4; i++) {
+    for (let i = 1; i <= 5; i++) {
         const input = document.getElementById('imagen_adicional_' + i);
         if (input && input.files.length > 0) {
             contador++;
@@ -226,7 +226,7 @@ function actualizarContador() {
     }
     const contadorElement = document.getElementById('contador-imagenes');
     if (contadorElement) {
-        contadorElement.textContent = contador + '/4 imágenes seleccionadas';
+        contadorElement.textContent = contador + '/5 imágenes seleccionadas';
     }
 }
 

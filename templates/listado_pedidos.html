@@ -56,7 +56,6 @@
                     <a href="{{ url_for('pedidos.ver_pedido', pedido_id=pedido.id) }}" class="btn btn-info" style="padding: 4px 8px; font-size: 0.75rem;">Ver</a>
                     <a href="{{ url_for('pedidos.editar_pedido', pedido_id=pedido.id) }}" class="btn btn-primary" style="padding: 4px 8px; font-size: 0.75rem;">Editar</a>
                     <a href="{{ url_for('pedidos.imprimir_pedido', pedido_id=pedido.id) }}" class="btn btn-warning" target="_blank" style="padding: 4px 8px; font-size: 0.75rem;">Impr</a>
-                    <a href="{{ url_for('pedidos.enviar_pedido_whatsapp', pedido_id=pedido.id) }}" class="btn" style="padding: 4px 8px; font-size: 0.75rem; background: #25D366; color: white;" title="Enviar por WhatsApp" target="_blank">📱</a>
                     <a href="{{ url_for('pedidos.enviar_pedido_email_cliente', pedido_id=pedido.id) }}" class="btn" style="padding: 4px 8px; font-size: 0.75rem; background: #4285F4; color: white;" title="Enviar por Email" target="_blank">📧</a>
                     <form method="POST" action="{{ url_for('pedidos.eliminar_pedido', pedido_id=pedido.id) }}" style="display: inline;" onsubmit="return confirm('¿Estás seguro de que deseas eliminar el pedido #{{ pedido.id }}? Esta acción no se puede deshacer.');">
                         <button type="submit" class="btn-eliminar-lista" title="Eliminar pedido">×</button>

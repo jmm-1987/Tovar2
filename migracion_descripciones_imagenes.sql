@@ -10,3 +10,4 @@ ALTER TABLE presupuestos ADD COLUMN IF NOT EXISTS descripcion_imagen_4 TEXT;
 ALTER TABLE presupuestos DROP COLUMN IF EXISTS imagen_adicional_5;
 ALTER TABLE presupuestos DROP COLUMN IF EXISTS imagen_adicional_6;
 
+

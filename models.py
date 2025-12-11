@@ -200,6 +200,8 @@ class Presupuesto(db.Model):
     descripcion_imagen_3 = db.Column(db.Text)  # Descripción de imagen adicional 3
     imagen_adicional_4 = db.Column(db.String(255))  # Imagen adicional 4 (segunda página)
     descripcion_imagen_4 = db.Column(db.Text)  # Descripción de imagen adicional 4
+    imagen_adicional_5 = db.Column(db.String(255))  # Imagen adicional 5 (segunda página)
+    descripcion_imagen_5 = db.Column(db.Text)  # Descripción de imagen adicional 5
     
     # Campo de seguimiento para actualizaciones de comerciales
     seguimiento = db.Column(db.Text)
