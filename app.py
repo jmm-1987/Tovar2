@@ -178,15 +178,40 @@ def migrate_database():
                     'imagen_adicional_1': 'VARCHAR(255)',
                     'imagen_adicional_2': 'VARCHAR(255)',
                     'imagen_adicional_3': 'VARCHAR(255)',
-                    'imagen_adicional_4': 'VARCHAR(255)',
-                    'imagen_adicional_5': 'VARCHAR(255)',
-                    'imagen_adicional_6': 'VARCHAR(255)'
+                    'imagen_adicional_4': 'VARCHAR(255)'
                 }
                 for columna, tipo in nuevas_columnas_imagenes.items():
                     if columna not in columns_presupuesto:
                         try:
                             with db.engine.connect() as conn:
                                 conn.execute(text(f'ALTER TABLE presupuestos ADD COLUMN {columna} {tipo}'))
+                                conn.commit()
+                        except Exception:
+                            pass
+                
+                # Verificar y agregar columnas de descripciones de imágenes
+                columnas_descripciones = {
+                    'descripcion_imagen_1': 'TEXT',
+                    'descripcion_imagen_2': 'TEXT',
+                    'descripcion_imagen_3': 'TEXT',
+                    'descripcion_imagen_4': 'TEXT'
+                }
+                for columna, tipo in columnas_descripciones.items():
+                    if columna not in columns_presupuesto:
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(text(f'ALTER TABLE presupuestos ADD COLUMN {columna} {tipo}'))
+                                conn.commit()
+                        except Exception:
+                            pass
+                
+                # Eliminar columnas de imágenes 5 y 6 si existen (ya no se usan)
+                columnas_a_eliminar = ['imagen_adicional_5', 'imagen_adicional_6']
+                for columna in columnas_a_eliminar:
+                    if columna in columns_presupuesto:
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(text(f'ALTER TABLE presupuestos DROP COLUMN IF EXISTS {columna}'))
                                 conn.commit()
                         except Exception:
                             pass

@@ -34,17 +34,6 @@
                 <option value="pedido proveedor">Pedido proveedor</option>
             </select>
         </div>
-
-        <div class="form-group-compact">
-            <label for="estado">Estado *</label>
-            <select name="estado" id="estado" required>
-                <option value="Pendiente de enviar" selected>Pendiente de enviar</option>
-                <option value="Diseño">Diseño</option>
-                <option value="Enviado">Enviado</option>
-                <option value="Aceptado">Aceptado</option>
-                <option value="Rechazado">Rechazado</option>
-            </select>
-        </div>
     </div>
 
     <div class="form-row-compact">
@@ -60,28 +49,36 @@
     </div>
 
     <h3>Imágenes para el PDF del Presupuesto</h3>
-    <div class="form-row-compact">
-        <div class="form-group-compact">
-            <label for="imagen_portada">Imagen de Portada (Página 1)</label>
-            <input type="file" name="imagen_portada" id="imagen_portada" accept="image/*">
-            <small style="color: #666; font-size: 0.85em;">Se mostrará en la primera página del PDF</small>
+    <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 10px; font-weight: 500;">Imágenes Adicionales (Página 2) - Máximo 4 imágenes</label>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            {% for i in range(1, 5) %}
+            <div style="display: flex; flex-direction: column; gap: 10px; width: 200px;">
+                <div class="imagen-miniatura-container" style="position: relative; width: 200px; height: 200px; border: 2px dashed #ddd; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f9f9f9; cursor: pointer; transition: all 0.3s ease;" 
+                     ondrop="dropHandler(event, {{ i }})" 
+                     ondragover="allowDrop(event)" 
+                     ondragleave="dragLeave(event)"
+                     onclick="document.getElementById('imagen_adicional_{{ i }}').click()">
+                    <input type="file" name="imagen_adicional_{{ i }}" id="imagen_adicional_{{ i }}" accept="image/*" style="display: none;" onchange="handleImageSelect({{ i }}, this)">
+                    <div class="imagen-preview" id="preview_container_{{ i }}" style="width: 100%; height: 100%; display: none; position: relative; border-radius: 6px; overflow: hidden;">
+                        <img id="preview_img_{{ i }}" src="" alt="Preview" style="width: 100%; height: 100%; object-fit: cover;">
+                        <button type="button" onclick="eliminarImagen({{ i }}); event.stopPropagation();" style="position: absolute; top: 5px; right: 5px; background: rgba(220, 53, 69, 0.9); color: white; border: none; border-radius: 50%; width: 25px; height: 25px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center;">×</button>
+                    </div>
+                    <div class="imagen-placeholder" id="placeholder_{{ i }}" style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%;">
+                        <div style="font-size: 40px; color: #ccc; margin-bottom: 8px;">📷</div>
+                        <div style="font-size: 12px; color: #999; text-align: center;">Imagen {{ i }}</div>
+                        <div style="font-size: 11px; color: #999; margin-top: 4px;">Arrastra o haz clic</div>
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                    <label for="descripcion_imagen_{{ i }}" style="font-size: 12px; color: #666; margin-bottom: 5px;">Descripción (opcional)</label>
+                    <textarea name="descripcion_imagen_{{ i }}" id="descripcion_imagen_{{ i }}" rows="3" placeholder="Descripción de la imagen..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; resize: vertical;"></textarea>
+                </div>
+            </div>
+            {% endfor %}
         </div>
-        <div class="form-group-compact">
-            <label>Imágenes Adicionales (Página 2)</label>
-            <button type="button" class="btn btn-secondary" onclick="abrirModalImagenes()" style="width: 100%; padding: 8px;">
-                Gestionar 6 Imágenes Adicionales
-            </button>
-            <small style="color: #666; font-size: 0.85em;" id="contador-imagenes">0/6 imágenes seleccionadas</small>
-        </div>
+        <small style="color: #666; font-size: 0.85em; display: block; margin-top: 10px;" id="contador-imagenes">0/4 imágenes seleccionadas</small>
     </div>
-
-    <!-- Campos ocultos para las imágenes adicionales (se actualizan desde el modal) -->
-    <input type="file" name="imagen_adicional_1" id="imagen_adicional_1" accept="image/*" style="display: none;">
-    <input type="file" name="imagen_adicional_2" id="imagen_adicional_2" accept="image/*" style="display: none;">
-    <input type="file" name="imagen_adicional_3" id="imagen_adicional_3" accept="image/*" style="display: none;">
-    <input type="file" name="imagen_adicional_4" id="imagen_adicional_4" accept="image/*" style="display: none;">
-    <input type="file" name="imagen_adicional_5" id="imagen_adicional_5" accept="image/*" style="display: none;">
-    <input type="file" name="imagen_adicional_6" id="imagen_adicional_6" accept="image/*" style="display: none;">
 
     <div class="form-group">
         <label for="seguimiento">Comertarios internos y seguimiento</label>
@@ -145,134 +142,91 @@
     </div>
 </form>
 
-<!-- Modal para gestionar imágenes adicionales -->
-<div id="modalImagenes" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
-    <div style="background-color: #fefefe; margin: 5% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 800px; border-radius: 8px; max-height: 90vh; overflow-y: auto;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <h2 style="margin: 0;">Gestionar Imágenes Adicionales (Página 2 del PDF)</h2>
-            <span style="color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer;" onclick="cerrarModalImagenes()">&times;</span>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px;">
-            {% for i in range(1, 7) %}
-            <div style="border: 1px solid #ddd; padding: 15px; border-radius: 4px; background: #f9f9f9;">
-                <label for="modal_imagen_adicional_{{ i }}" style="display: block; margin-bottom: 8px; font-weight: bold;">
-                    Imagen {{ i }}
-                </label>
-                <input type="file" id="modal_imagen_adicional_{{ i }}" accept="image/*" onchange="actualizarImagen({{ i }}, this)" style="width: 100%; margin-bottom: 8px;">
-                <div id="preview_imagen_{{ i }}" style="margin-top: 10px; text-align: center;">
-                    <img id="img_preview_{{ i }}" src="" alt="Preview" style="max-width: 100%; max-height: 150px; display: none; border: 1px solid #ddd; border-radius: 4px;">
-                    <p id="nombre_imagen_{{ i }}" style="font-size: 0.85em; color: #666; margin-top: 5px; display: none;"></p>
-                </div>
-                <button type="button" onclick="eliminarImagen({{ i }})" style="margin-top: 8px; padding: 5px 10px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; width: 100%; display: none;" id="btn_eliminar_{{ i }}">Eliminar</button>
-            </div>
-            {% endfor %}
-        </div>
-        
-        <div style="text-align: right; margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd;">
-            <button type="button" onclick="cerrarModalImagenes()" class="btn btn-secondary" style="margin-right: 10px;">Cerrar</button>
-        </div>
-    </div>
-</div>
-
 <style>
-#modalImagenes {
-    animation: fadeIn 0.3s;
+.imagen-miniatura-container:hover {
+    border-color: #3498db;
+    background: #f0f8ff;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+.imagen-miniatura-container.drag-over {
+    border-color: #3498db;
+    background: #e3f2fd;
+    transform: scale(1.05);
 }
 </style>
 
 <script>
-let imagenesSeleccionadas = {};
+// Funciones para drag & drop
+function allowDrop(ev) {
+    ev.preventDefault();
+    ev.currentTarget.classList.add('drag-over');
+}
 
-function abrirModalImagenes() {
-    document.getElementById('modalImagenes').style.display = 'block';
-    // Cargar imágenes existentes si las hay
-    for (let i = 1; i <= 6; i++) {
-        const inputOculto = document.getElementById('imagen_adicional_' + i);
-        if (inputOculto.files.length > 0) {
-            const file = inputOculto.files[0];
-            mostrarPreview(i, file);
-        }
+function dragLeave(ev) {
+    ev.currentTarget.classList.remove('drag-over');
+}
+
+function dropHandler(ev, numero) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove('drag-over');
+    
+    const files = ev.dataTransfer.files;
+    if (files.length > 0 && files[0].type.startsWith('image/')) {
+        const input = document.getElementById('imagen_adicional_' + numero);
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(files[0]);
+        input.files = dataTransfer.files;
+        handleImageSelect(numero, input);
     }
-    actualizarContador();
 }
 
-function cerrarModalImagenes() {
-    document.getElementById('modalImagenes').style.display = 'none';
-}
-
-function actualizarImagen(numero, input) {
+// Manejar selección de imagen (click o drop)
+function handleImageSelect(numero, input) {
     if (input.files && input.files[0]) {
         const file = input.files[0];
-        // Actualizar el input oculto del formulario
-        const inputOculto = document.getElementById('imagen_adicional_' + numero);
-        const dataTransfer = new DataTransfer();
-        dataTransfer.items.add(file);
-        inputOculto.files = dataTransfer.files;
+        const reader = new FileReader();
         
-        mostrarPreview(numero, file);
-        imagenesSeleccionadas[numero] = file;
+        reader.onload = function(e) {
+            const preview = document.getElementById('preview_container_' + numero);
+            const placeholder = document.getElementById('placeholder_' + numero);
+            const img = document.getElementById('preview_img_' + numero);
+            
+            img.src = e.target.result;
+            preview.style.display = 'flex';
+            placeholder.style.display = 'none';
+        };
+        
+        reader.readAsDataURL(file);
         actualizarContador();
     }
 }
 
-function mostrarPreview(numero, file) {
-    const imgPreview = document.getElementById('img_preview_' + numero);
-    const nombreImagen = document.getElementById('nombre_imagen_' + numero);
-    const btnEliminar = document.getElementById('btn_eliminar_' + numero);
-    
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            imgPreview.src = e.target.result;
-            imgPreview.style.display = 'block';
-            nombreImagen.textContent = file.name;
-            nombreImagen.style.display = 'block';
-            btnEliminar.style.display = 'block';
-        };
-        reader.readAsDataURL(file);
-    }
-}
-
+// Eliminar imagen
 function eliminarImagen(numero) {
-    // Limpiar el input oculto
-    const inputOculto = document.getElementById('imagen_adicional_' + numero);
-    inputOculto.value = '';
+    const input = document.getElementById('imagen_adicional_' + numero);
+    input.value = '';
     
-    // Limpiar el input del modal
-    const inputModal = document.getElementById('modal_imagen_adicional_' + numero);
-    inputModal.value = '';
+    const preview = document.getElementById('preview_container_' + numero);
+    const placeholder = document.getElementById('placeholder_' + numero);
     
-    // Ocultar preview
-    document.getElementById('img_preview_' + numero).style.display = 'none';
-    document.getElementById('nombre_imagen_' + numero).style.display = 'none';
-    document.getElementById('btn_eliminar_' + numero).style.display = 'none';
+    preview.style.display = 'none';
+    placeholder.style.display = 'flex';
     
-    delete imagenesSeleccionadas[numero];
     actualizarContador();
 }
 
+// Actualizar contador
 function actualizarContador() {
     let contador = 0;
-    for (let i = 1; i <= 6; i++) {
-        const inputOculto = document.getElementById('imagen_adicional_' + i);
-        if (inputOculto.files.length > 0) {
+    for (let i = 1; i <= 4; i++) {
+        const input = document.getElementById('imagen_adicional_' + i);
+        if (input && input.files.length > 0) {
             contador++;
         }
     }
-    document.getElementById('contador-imagenes').textContent = contador + '/6 imágenes seleccionadas';
-}
-
-// Cerrar modal al hacer clic fuera de él
-window.onclick = function(event) {
-    const modal = document.getElementById('modalImagenes');
-    if (event.target == modal) {
-        cerrarModalImagenes();
+    const contadorElement = document.getElementById('contador-imagenes');
+    if (contadorElement) {
+        contadorElement.textContent = contador + '/4 imágenes seleccionadas';
     }
 }
 

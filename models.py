@@ -193,11 +193,13 @@ class Presupuesto(db.Model):
     # Imágenes para el PDF del presupuesto
     imagen_portada = db.Column(db.String(255))  # Imagen de portada (primera página)
     imagen_adicional_1 = db.Column(db.String(255))  # Imagen adicional 1 (segunda página)
+    descripcion_imagen_1 = db.Column(db.Text)  # Descripción de imagen adicional 1
     imagen_adicional_2 = db.Column(db.String(255))  # Imagen adicional 2 (segunda página)
+    descripcion_imagen_2 = db.Column(db.Text)  # Descripción de imagen adicional 2
     imagen_adicional_3 = db.Column(db.String(255))  # Imagen adicional 3 (segunda página)
+    descripcion_imagen_3 = db.Column(db.Text)  # Descripción de imagen adicional 3
     imagen_adicional_4 = db.Column(db.String(255))  # Imagen adicional 4 (segunda página)
-    imagen_adicional_5 = db.Column(db.String(255))  # Imagen adicional 5 (segunda página)
-    imagen_adicional_6 = db.Column(db.String(255))  # Imagen adicional 6 (segunda página)
+    descripcion_imagen_4 = db.Column(db.Text)  # Descripción de imagen adicional 4
     
     # Campo de seguimiento para actualizaciones de comerciales
     seguimiento = db.Column(db.Text)

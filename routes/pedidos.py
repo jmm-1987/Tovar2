@@ -68,7 +68,7 @@ def nuevo_pedido():
                 comercial_id=request.form.get('comercial_id'),
                 cliente_id=request.form.get('cliente_id'),
                 tipo_pedido=request.form.get('tipo_pedido'),
-                estado=request.form.get('estado', 'Pendiente'),
+                estado='Pendiente',  # Siempre se establece como Pendiente al crear
                 forma_pago=request.form.get('forma_pago', ''),
                 fecha_aceptacion=fecha_aceptacion,
                 fecha_objetivo=fecha_objetivo

@@ -27,7 +27,7 @@ def nuevo_presupuesto():
                 comercial_id=request.form.get('comercial_id'),
                 cliente_id=request.form.get('cliente_id'),
                 tipo_pedido=request.form.get('tipo_pedido'),
-                estado=request.form.get('estado', 'Pendiente de enviar'),
+                estado='Pendiente de enviar',  # Siempre se establece como Pendiente de enviar al crear
                 forma_pago=request.form.get('forma_pago', ''),
                 seguimiento=request.form.get('seguimiento', '')
             )
@@ -47,13 +47,16 @@ def nuevo_presupuesto():
             
             # Manejar imágenes
             guardar_imagen('imagen_diseno', 'imagen_diseno')
-            guardar_imagen('imagen_portada', 'imagen_portada')
             guardar_imagen('imagen_adicional_1', 'imagen_adicional_1')
             guardar_imagen('imagen_adicional_2', 'imagen_adicional_2')
             guardar_imagen('imagen_adicional_3', 'imagen_adicional_3')
             guardar_imagen('imagen_adicional_4', 'imagen_adicional_4')
-            guardar_imagen('imagen_adicional_5', 'imagen_adicional_5')
-            guardar_imagen('imagen_adicional_6', 'imagen_adicional_6')
+            
+            # Guardar descripciones de imágenes
+            presupuesto.descripcion_imagen_1 = request.form.get('descripcion_imagen_1', '')
+            presupuesto.descripcion_imagen_2 = request.form.get('descripcion_imagen_2', '')
+            presupuesto.descripcion_imagen_3 = request.form.get('descripcion_imagen_3', '')
+            presupuesto.descripcion_imagen_4 = request.form.get('descripcion_imagen_4', '')
             
             db.session.add(presupuesto)
             db.session.flush()  # Para obtener el ID del presupuesto
@@ -127,10 +130,8 @@ def ver_presupuesto(presupuesto_id):
     presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
     return render_template('ver_presupuesto.html', presupuesto=presupuesto)
 
-@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/imprimir')
-@login_required
-def imprimir_presupuesto(presupuesto_id):
-    """Vista de impresión del presupuesto (HTML para imprimir desde navegador)"""
+def preparar_datos_imprimir_presupuesto(presupuesto_id):
+    """Función auxiliar para preparar todos los datos necesarios para imprimir/generar PDF del presupuesto"""
     from decimal import Decimal
     import base64
     
@@ -176,6 +177,7 @@ def imprimir_presupuesto(presupuesto_id):
     imagen_diseno_base64 = None
     imagen_portada_base64 = None
     imagenes_adicionales_base64 = []
+    descripciones_imagenes = []
     
     # Convertir logo a base64
     logo_path = os.path.join(current_app.static_folder, 'logo.png')
@@ -191,120 +193,61 @@ def imprimir_presupuesto(presupuesto_id):
         imagen_path = os.path.join(current_app.config['UPLOAD_FOLDER'], presupuesto.imagen_portada)
         imagen_portada_base64 = convertir_imagen_a_base64(imagen_path)
     
-    # Convertir imágenes adicionales a base64
-    for i in range(1, 7):
+    # Convertir imágenes adicionales a base64 y obtener descripciones (solo 4 imágenes)
+    for i in range(1, 5):
         campo_imagen = f'imagen_adicional_{i}'
+        campo_descripcion = f'descripcion_imagen_{i}'
+        
         if hasattr(presupuesto, campo_imagen) and getattr(presupuesto, campo_imagen):
             imagen_nombre = getattr(presupuesto, campo_imagen)
             imagen_path = os.path.join(current_app.config['UPLOAD_FOLDER'], imagen_nombre)
-            imagen_base64 = convertir_imagen_a_base64(imagen_path)
-            imagenes_adicionales_base64.append(imagen_base64)
+            if os.path.exists(imagen_path):
+                imagen_base64 = convertir_imagen_a_base64(imagen_path)
+                imagenes_adicionales_base64.append(imagen_base64)
+            else:
+                print(f"ADVERTENCIA: No se encontró la imagen {imagen_path}")
+                imagenes_adicionales_base64.append(None)
         else:
             imagenes_adicionales_base64.append(None)
+        
+        # Obtener descripción
+        descripcion = getattr(presupuesto, campo_descripcion, '') if hasattr(presupuesto, campo_descripcion) else ''
+        descripciones_imagenes.append(descripcion)
+    
+    return {
+        'presupuesto': presupuesto,
+        'base_imponible': base_imponible,
+        'iva_total': iva_total,
+        'total_con_iva': total_con_iva,
+        'tipo_iva': tipo_iva,
+        'logo_base64': logo_base64,
+        'imagen_diseno_base64': imagen_diseno_base64,
+        'imagen_portada_base64': imagen_portada_base64,
+        'imagenes_adicionales_base64': imagenes_adicionales_base64,
+        'descripciones_imagenes': descripciones_imagenes
+    }
+
+@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/imprimir')
+@login_required
+def imprimir_presupuesto(presupuesto_id):
+    """Vista de impresión del presupuesto (HTML para imprimir desde navegador)"""
+    datos = preparar_datos_imprimir_presupuesto(presupuesto_id)
     
     return render_template('imprimir_presupuesto.html', 
-                         presupuesto=presupuesto,
-                         base_imponible=base_imponible,
-                         iva_total=iva_total,
-                         total_con_iva=total_con_iva,
-                         tipo_iva=tipo_iva,
-                         logo_base64=logo_base64,
-                         imagen_diseno_base64=imagen_diseno_base64,
-                         imagen_portada_base64=imagen_portada_base64,
-                         imagenes_adicionales_base64=imagenes_adicionales_base64,
+                         **datos,
                          use_base64=True)
 
 def generar_pdf_presupuesto(presupuesto_id):
     """Generar PDF del presupuesto y retornar los datos del PDF"""
     try:
-        from decimal import Decimal
         from xhtml2pdf import pisa
-        import base64
         
-        presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+        # Usar la misma función auxiliar para preparar los datos
+        datos = preparar_datos_imprimir_presupuesto(presupuesto_id)
         
-        # Calcular totales
-        tipo_iva = 21
-        base_imponible = Decimal('0.00')
-        
-        for linea in presupuesto.lineas:
-            precio_unit = Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0.00')
-            cantidad = Decimal(str(linea.cantidad))
-            total_linea = precio_unit * cantidad
-            base_imponible += total_linea
-        
-        iva_total = base_imponible * Decimal(str(tipo_iva)) / Decimal('100')
-        total_con_iva = base_imponible + iva_total
-        
-        # Función auxiliar para convertir imagen a base64
-        def convertir_imagen_a_base64(ruta_imagen):
-            """Convertir imagen a base64"""
-            if not ruta_imagen or not os.path.exists(ruta_imagen):
-                return None
-            try:
-                with open(ruta_imagen, 'rb') as f:
-                    imagen_data = f.read()
-                    imagen_base64 = base64.b64encode(imagen_data).decode('utf-8')
-                    # Detectar tipo MIME
-                    if ruta_imagen.lower().endswith('.png'):
-                        return f'data:image/png;base64,{imagen_base64}'
-                    elif ruta_imagen.lower().endswith(('.jpg', '.jpeg')):
-                        return f'data:image/jpeg;base64,{imagen_base64}'
-                    elif ruta_imagen.lower().endswith('.gif'):
-                        return f'data:image/gif;base64,{imagen_base64}'
-                    else:
-                        return f'data:image/png;base64,{imagen_base64}'  # Por defecto PNG
-            except Exception as e:
-                print(f"Error al leer imagen {ruta_imagen}: {e}")
-                return None
-        
-        # Convertir imágenes a base64 para evitar problemas con URLs en producción
-        logo_base64 = None
-        imagen_diseno_base64 = None
-        imagen_portada_base64 = None
-        imagenes_adicionales_base64 = {}
-        
-        # Convertir logo a base64
-        logo_path = os.path.join(current_app.static_folder, 'logo.png')
-        logo_base64 = convertir_imagen_a_base64(logo_path)
-        
-        # Convertir imagen de diseño a base64 si existe
-        if presupuesto.imagen_diseno:
-            imagen_path = os.path.join(current_app.config['UPLOAD_FOLDER'], presupuesto.imagen_diseno)
-            imagen_diseno_base64 = convertir_imagen_a_base64(imagen_path)
-        
-        # Convertir imagen de portada a base64 si existe
-        if presupuesto.imagen_portada:
-            imagen_path = os.path.join(current_app.config['UPLOAD_FOLDER'], presupuesto.imagen_portada)
-            imagen_portada_base64 = convertir_imagen_a_base64(imagen_path)
-        
-        # Convertir imágenes adicionales a base64
-        imagenes_adicionales_base64 = []
-        for i in range(1, 7):
-            campo_imagen = f'imagen_adicional_{i}'
-            if hasattr(presupuesto, campo_imagen) and getattr(presupuesto, campo_imagen):
-                imagen_nombre = getattr(presupuesto, campo_imagen)
-                imagen_path = os.path.join(current_app.config['UPLOAD_FOLDER'], imagen_nombre)
-                if os.path.exists(imagen_path):
-                    imagen_base64 = convertir_imagen_a_base64(imagen_path)
-                    imagenes_adicionales_base64.append(imagen_base64)
-                else:
-                    print(f"ADVERTENCIA: No se encontró la imagen {imagen_path}")
-                    imagenes_adicionales_base64.append(None)
-            else:
-                imagenes_adicionales_base64.append(None)
-        
-        # Renderizar template HTML con imágenes en base64
+        # Renderizar template HTML con los mismos datos que la vista de impresión
         html = render_template('imprimir_presupuesto.html', 
-                             presupuesto=presupuesto,
-                             base_imponible=base_imponible,
-                             iva_total=iva_total,
-                             total_con_iva=total_con_iva,
-                             tipo_iva=tipo_iva,
-                             logo_base64=logo_base64,
-                             imagen_diseno_base64=imagen_diseno_base64,
-                             imagen_portada_base64=imagen_portada_base64,
-                             imagenes_adicionales_base64=imagenes_adicionales_base64,
+                             **datos,
                              use_base64=True)
         
         # Generar PDF
@@ -509,8 +452,12 @@ def editar_presupuesto(presupuesto_id):
             actualizar_imagen('imagen_adicional_2', 'imagen_adicional_2')
             actualizar_imagen('imagen_adicional_3', 'imagen_adicional_3')
             actualizar_imagen('imagen_adicional_4', 'imagen_adicional_4')
-            actualizar_imagen('imagen_adicional_5', 'imagen_adicional_5')
-            actualizar_imagen('imagen_adicional_6', 'imagen_adicional_6')
+            
+            # Actualizar descripciones de imágenes
+            presupuesto.descripcion_imagen_1 = request.form.get('descripcion_imagen_1', '')
+            presupuesto.descripcion_imagen_2 = request.form.get('descripcion_imagen_2', '')
+            presupuesto.descripcion_imagen_3 = request.form.get('descripcion_imagen_3', '')
+            presupuesto.descripcion_imagen_4 = request.form.get('descripcion_imagen_4', '')
             
             # Eliminar líneas existentes (dentro de la misma transacción)
             try:
