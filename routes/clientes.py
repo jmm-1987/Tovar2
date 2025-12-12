@@ -12,6 +12,15 @@ clientes_bp = Blueprint('clientes', __name__)
 def gestion_clientes():
     if request.method == 'POST':
         try:
+            # Procesar fecha de alta
+            fecha_alta_str = request.form.get('fecha_alta', '')
+            fecha_alta = None
+            if fecha_alta_str:
+                try:
+                    fecha_alta = datetime.strptime(fecha_alta_str, '%Y-%m-%d').date()
+                except ValueError:
+                    pass
+            
             cliente = Cliente(
                 nombre=request.form.get('nombre'),
                 alias=request.form.get('alias', ''),
@@ -22,10 +31,12 @@ def gestion_clientes():
                 codigo_postal=request.form.get('codigo_postal', ''),
                 pais=request.form.get('pais', 'España'),
                 telefono=request.form.get('telefono', ''),
+                movil=request.form.get('movil', ''),
                 email=request.form.get('email', ''),
                 personas_contacto=request.form.get('personas_contacto', ''),
                 anotaciones=request.form.get('anotaciones', ''),
-                usuario_web=request.form.get('usuario_web', '').strip() or None
+                usuario_web=request.form.get('usuario_web', '').strip() or None,
+                fecha_alta=fecha_alta
             )
             
             # Si se proporciona usuario web, también establecer contraseña si se proporciona
@@ -41,8 +52,35 @@ def gestion_clientes():
             db.session.rollback()
             flash(f'Error: {str(e)}', 'error')
     
-    clientes = Cliente.query.all()
-    return render_template('clientes.html', clientes=clientes)
+    # Obtener parámetros de búsqueda y ordenamiento
+    busqueda = request.args.get('busqueda', '').strip()
+    orden = request.args.get('orden', 'id')  # 'id' o 'nombre'
+    
+    # Construir consulta
+    query = Cliente.query
+    
+    # Aplicar filtro de búsqueda
+    if busqueda:
+        query = query.filter(
+            db.or_(
+                Cliente.nombre.ilike(f'%{busqueda}%'),
+                Cliente.alias.ilike(f'%{busqueda}%'),
+                Cliente.nif.ilike(f'%{busqueda}%'),
+                Cliente.poblacion.ilike(f'%{busqueda}%'),
+                Cliente.provincia.ilike(f'%{busqueda}%')
+            )
+        )
+    
+    # Aplicar ordenamiento
+    if orden == 'nombre':
+        clientes = query.order_by(Cliente.nombre.asc()).all()
+    else:
+        clientes = query.order_by(Cliente.id.asc()).all()
+    
+    return render_template('clientes.html', 
+                         clientes=clientes,
+                         busqueda=busqueda,
+                         orden=orden)
 
 @clientes_bp.route('/clientes/<int:id>')
 @login_required
@@ -82,9 +120,20 @@ def editar_cliente(id):
             cliente.codigo_postal = request.form.get('codigo_postal', '')
             cliente.pais = request.form.get('pais', 'España')
             cliente.telefono = request.form.get('telefono', '')
+            cliente.movil = request.form.get('movil', '')
             cliente.email = request.form.get('email', '')
             cliente.personas_contacto = request.form.get('personas_contacto', '')
             cliente.anotaciones = request.form.get('anotaciones', '')
+            
+            # Procesar fecha de alta
+            fecha_alta_str = request.form.get('fecha_alta', '')
+            if fecha_alta_str:
+                try:
+                    cliente.fecha_alta = datetime.strptime(fecha_alta_str, '%Y-%m-%d').date()
+                except ValueError:
+                    pass
+            else:
+                cliente.fecha_alta = None
             
             # Manejar acceso web
             usuario_web = request.form.get('usuario_web', '').strip()

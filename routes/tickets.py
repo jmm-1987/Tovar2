@@ -16,10 +16,43 @@ tickets_bp = Blueprint('tickets', __name__)
 @login_required
 def listado_tickets():
     """Listado de tickets con opciones de ver y eliminar"""
-    # Obtener todos los tickets
-    tickets = Ticket.query.order_by(Ticket.id.desc()).all()
+    query = Ticket.query
     
-    return render_template('listado_tickets.html', tickets=tickets)
+    # Filtro por estado
+    estado_filtro = request.args.get('estado', '')
+    if estado_filtro:
+        query = query.filter(Ticket.estado == estado_filtro)
+    
+    # Filtro por fecha desde
+    fecha_desde = request.args.get('fecha_desde', '')
+    if fecha_desde:
+        try:
+            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+            query = query.filter(Ticket.fecha_expedicion >= fecha_desde_obj)
+        except ValueError:
+            pass
+    
+    # Filtro por fecha hasta
+    fecha_hasta = request.args.get('fecha_hasta', '')
+    if fecha_hasta:
+        try:
+            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+            query = query.filter(Ticket.fecha_expedicion <= fecha_hasta_obj)
+        except ValueError:
+            pass
+    
+    tickets = query.order_by(Ticket.id.desc()).all()
+    
+    # Obtener estados únicos para el filtro
+    estados = db.session.query(Ticket.estado).distinct().all()
+    estados_list = [estado[0] for estado in estados if estado[0]]
+    
+    return render_template('listado_tickets.html', 
+                         tickets=tickets,
+                         estados=estados_list,
+                         estado_filtro=estado_filtro,
+                         fecha_desde=fecha_desde,
+                         fecha_hasta=fecha_hasta)
 
 @tickets_bp.route('/tickets/nuevo', methods=['GET', 'POST'])
 @login_required

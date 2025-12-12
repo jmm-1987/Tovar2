@@ -14,8 +14,33 @@ pedidos_bp = Blueprint('pedidos', __name__)
 @login_required
 def listado_pedidos():
     """Listado de pedidos con opciones de editar y eliminar"""
-    # Obtener todos los pedidos
-    pedidos = Pedido.query.order_by(Pedido.id.desc()).all()
+    query = Pedido.query
+    
+    # Filtro por estado
+    estado_filtro = request.args.get('estado', '')
+    if estado_filtro:
+        query = query.filter(Pedido.estado == estado_filtro)
+    
+    # Filtro por fecha desde
+    fecha_desde = request.args.get('fecha_desde', '')
+    if fecha_desde:
+        try:
+            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+            query = query.filter(Pedido.fecha_creacion >= datetime.combine(fecha_desde_obj, datetime.min.time()))
+        except ValueError:
+            pass
+    
+    # Filtro por fecha hasta
+    fecha_hasta = request.args.get('fecha_hasta', '')
+    if fecha_hasta:
+        try:
+            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+            query = query.filter(Pedido.fecha_creacion <= datetime.combine(fecha_hasta_obj, datetime.max.time()))
+        except ValueError:
+            pass
+    
+    # Obtener pedidos
+    pedidos = query.order_by(Pedido.id.desc()).all()
     
     # Calcular fecha objetivo de entrega (20 días desde aceptación) y clasificar
     hoy = datetime.now().date()
@@ -42,7 +67,16 @@ def listado_pedidos():
         else:
             pedido.fecha_class = ''
     
-    return render_template('listado_pedidos.html', pedidos=pedidos)
+    # Obtener estados únicos para el filtro
+    estados = db.session.query(Pedido.estado).distinct().all()
+    estados_list = [estado[0] for estado in estados if estado[0]]
+    
+    return render_template('listado_pedidos.html', 
+                         pedidos=pedidos,
+                         estados=estados_list,
+                         estado_filtro=estado_filtro,
+                         fecha_desde=fecha_desde,
+                         fecha_hasta=fecha_hasta)
 
 @pedidos_bp.route('/pedidos/nuevo', methods=['GET', 'POST'])
 @login_required

@@ -13,9 +13,44 @@ presupuestos_bp = Blueprint('presupuestos', __name__)
 @presupuestos_bp.route('/presupuestos')
 @login_required
 def listado_presupuestos():
-    """Listado de presupuestos"""
-    presupuestos = Presupuesto.query.order_by(Presupuesto.id.desc()).all()
-    return render_template('listado_presupuestos.html', presupuestos=presupuestos)
+    """Listado de presupuestos con filtros"""
+    query = Presupuesto.query
+    
+    # Filtro por estado
+    estado_filtro = request.args.get('estado', '')
+    if estado_filtro:
+        query = query.filter(Presupuesto.estado == estado_filtro)
+    
+    # Filtro por fecha desde
+    fecha_desde = request.args.get('fecha_desde', '')
+    if fecha_desde:
+        try:
+            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+            query = query.filter(Presupuesto.fecha_creacion >= datetime.combine(fecha_desde_obj, datetime.min.time()))
+        except ValueError:
+            pass
+    
+    # Filtro por fecha hasta
+    fecha_hasta = request.args.get('fecha_hasta', '')
+    if fecha_hasta:
+        try:
+            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+            query = query.filter(Presupuesto.fecha_creacion <= datetime.combine(fecha_hasta_obj, datetime.max.time()))
+        except ValueError:
+            pass
+    
+    presupuestos = query.order_by(Presupuesto.id.desc()).all()
+    
+    # Obtener estados únicos para el filtro
+    estados = db.session.query(Presupuesto.estado).distinct().all()
+    estados_list = [estado[0] for estado in estados if estado[0]]
+    
+    return render_template('listado_presupuestos.html', 
+                         presupuestos=presupuestos,
+                         estados=estados_list,
+                         estado_filtro=estado_filtro,
+                         fecha_desde=fecha_desde,
+                         fecha_hasta=fecha_hasta)
 
 @presupuestos_bp.route('/presupuestos/nuevo', methods=['GET', 'POST'])
 def nuevo_presupuesto():

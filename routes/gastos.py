@@ -107,8 +107,43 @@ def eliminar_proveedor(proveedor_id):
 @login_required
 def listado_facturas_proveedor():
     """Listado de facturas de proveedor"""
-    facturas = FacturaProveedor.query.order_by(FacturaProveedor.fecha_factura.desc()).all()
-    return render_template('gastos/listado_facturas_proveedor.html', facturas=facturas)
+    query = FacturaProveedor.query
+    
+    # Filtro por estado
+    estado_filtro = request.args.get('estado', '')
+    if estado_filtro:
+        query = query.filter(FacturaProveedor.estado == estado_filtro)
+    
+    # Filtro por fecha desde
+    fecha_desde = request.args.get('fecha_desde', '')
+    if fecha_desde:
+        try:
+            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+            query = query.filter(FacturaProveedor.fecha_factura >= fecha_desde_obj)
+        except ValueError:
+            pass
+    
+    # Filtro por fecha hasta
+    fecha_hasta = request.args.get('fecha_hasta', '')
+    if fecha_hasta:
+        try:
+            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+            query = query.filter(FacturaProveedor.fecha_factura <= fecha_hasta_obj)
+        except ValueError:
+            pass
+    
+    facturas = query.order_by(FacturaProveedor.fecha_factura.desc()).all()
+    
+    # Obtener estados únicos para el filtro
+    estados = db.session.query(FacturaProveedor.estado).distinct().all()
+    estados_list = [estado[0] for estado in estados if estado[0]]
+    
+    return render_template('gastos/listado_facturas_proveedor.html', 
+                         facturas=facturas,
+                         estados=estados_list,
+                         estado_filtro=estado_filtro,
+                         fecha_desde=fecha_desde,
+                         fecha_hasta=fecha_hasta)
 
 @gastos_bp.route('/gastos/facturas-proveedor/nueva', methods=['GET', 'POST'])
 @login_required
@@ -308,8 +343,61 @@ def eliminar_empleado(empleado_id):
 @login_required
 def listado_nominas():
     """Listado de nóminas"""
-    nominas = Nomina.query.order_by(Nomina.año.desc(), Nomina.mes.desc()).all()
-    return render_template('gastos/listado_nominas.html', nominas=nominas)
+    query = Nomina.query
+    
+    # Filtro por fecha desde (año-mes)
+    año_desde = request.args.get('año_desde', '')
+    mes_desde = request.args.get('mes_desde', '')
+    if año_desde:
+        try:
+            año_desde_int = int(año_desde)
+            if mes_desde:
+                mes_desde_int = int(mes_desde)
+                from sqlalchemy import or_, and_
+                query = query.filter(
+                    or_(
+                        Nomina.año > año_desde_int,
+                        and_(Nomina.año == año_desde_int, Nomina.mes >= mes_desde_int)
+                    )
+                )
+            else:
+                query = query.filter(Nomina.año >= año_desde_int)
+        except ValueError:
+            pass
+    
+    # Filtro por fecha hasta (año-mes)
+    año_hasta = request.args.get('año_hasta', '')
+    mes_hasta = request.args.get('mes_hasta', '')
+    if año_hasta:
+        try:
+            año_hasta_int = int(año_hasta)
+            if mes_hasta:
+                mes_hasta_int = int(mes_hasta)
+                from sqlalchemy import or_, and_
+                query = query.filter(
+                    or_(
+                        Nomina.año < año_hasta_int,
+                        and_(Nomina.año == año_hasta_int, Nomina.mes <= mes_hasta_int)
+                    )
+                )
+            else:
+                query = query.filter(Nomina.año <= año_hasta_int)
+        except ValueError:
+            pass
+    
+    nominas = query.order_by(Nomina.año.desc(), Nomina.mes.desc()).all()
+    
+    # Obtener años únicos para el filtro
+    años = db.session.query(Nomina.año).distinct().order_by(Nomina.año.desc()).all()
+    años_list = [año[0] for año in años if año[0]]
+    
+    return render_template('gastos/listado_nominas.html', 
+                         nominas=nominas,
+                         años=años_list,
+                         año_desde=año_desde,
+                         mes_desde=mes_desde,
+                         año_hasta=año_hasta,
+                         mes_hasta=mes_hasta)
 
 @gastos_bp.route('/gastos/nominas/nueva', methods=['GET', 'POST'])
 @login_required

@@ -6,28 +6,40 @@
 <div class="editar-cliente-container">
     <h2>✏️ Editar Cliente: {{ cliente.nombre }}</h2>
     
-    <form method="POST" class="cliente-form">
+    <form method="POST" class="cliente-form" autocomplete="off">
         <div class="form-section">
             <h3>Información Principal</h3>
             <div class="form-group">
                 <label for="nombre">Nombre del Cliente *</label>
                 <input type="text" name="nombre" id="nombre" value="{{ cliente.nombre }}" required>
             </div>
-            <div class="form-group">
-                <label for="alias">Alias</label>
-                <input type="text" name="alias" id="alias" value="{{ cliente.alias or '' }}" placeholder="Nombre alternativo o alias">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="alias">Alias</label>
+                    <input type="text" name="alias" id="alias" value="{{ cliente.alias or '' }}" placeholder="Nombre alternativo o alias">
+                </div>
+                <div class="form-group">
+                    <label for="nif">NIF/CIF</label>
+                    <input type="text" name="nif" id="nif" value="{{ cliente.nif or '' }}" maxlength="20">
+                </div>
             </div>
             <div class="form-group">
-                <label for="nif">NIF/CIF</label>
-                <input type="text" name="nif" id="nif" value="{{ cliente.nif or '' }}" maxlength="20">
+                <label for="fecha_alta">Fecha de Alta</label>
+                <input type="date" name="fecha_alta" id="fecha_alta" value="{{ cliente.fecha_alta.strftime('%Y-%m-%d') if cliente.fecha_alta else '' }}">
             </div>
         </div>
 
         <div class="form-section">
             <h3>Contacto</h3>
-            <div class="form-group">
-                <label for="telefono">Teléfono</label>
-                <input type="text" name="telefono" id="telefono" value="{{ cliente.telefono or '' }}">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="telefono">Teléfono</label>
+                    <input type="text" name="telefono" id="telefono" value="{{ cliente.telefono or '' }}" placeholder="Teléfono fijo">
+                </div>
+                <div class="form-group">
+                    <label for="movil">Móvil</label>
+                    <input type="text" name="movil" id="movil" value="{{ cliente.movil or '' }}" placeholder="Teléfono móvil">
+                </div>
             </div>
             <div class="form-group">
                 <label for="email">Email</label>
@@ -71,12 +83,12 @@
             <h3>Acceso Web</h3>
             <div class="form-group">
                 <label for="usuario_web">Usuario Web</label>
-                <input type="text" name="usuario_web" id="usuario_web" value="{{ cliente.usuario_web or '' }}" placeholder="Usuario para acceso web del cliente">
+                <input type="text" name="usuario_web" id="usuario_web" value="{{ cliente.usuario_web or '' }}" placeholder="Usuario para acceso web del cliente" autocomplete="off">
                 <small style="color: #666; font-size: 12px;">Si se completa, el cliente podrá acceder a su área web</small>
             </div>
             <div class="form-group">
                 <label for="password_web">Contraseña Web</label>
-                <input type="password" name="password_web" id="password_web" placeholder="Dejar vacío para no cambiar">
+                <input type="password" name="password_web" id="password_web" value="" placeholder="Dejar vacío para no cambiar" autocomplete="new-password">
                 <small style="color: #666; font-size: 12px;">Solo completar si deseas cambiar la contraseña</small>
             </div>
             {% if cliente.tiene_acceso_web() %}

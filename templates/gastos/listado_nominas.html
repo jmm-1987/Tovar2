@@ -9,6 +9,105 @@
         <a href="{{ url_for('gastos.nueva_nomina') }}" class="btn btn-success">➕ Nueva Nómina</a>
     </div>
 
+    <div style="margin-bottom: 25px;">
+        <div class="filtros-container" style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #e9ecef;">
+            <form method="GET" action="{{ url_for('gastos.listado_nominas') }}" style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                    <label for="año_desde" style="font-size: 0.875rem; font-weight: 600; color: #495057; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                        <span>📅</span> Año Desde
+                    </label>
+                    <select name="año_desde" id="año_desde" class="filtro-input" style="padding: 10px 14px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                        <option value="">Todos</option>
+                        {% for año in años %}
+                        <option value="{{ año }}" {% if año_desde|string == año|string %}selected{% endif %}>{{ año }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                    <label for="mes_desde" style="font-size: 0.875rem; font-weight: 600; color: #495057; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                        <span>📆</span> Mes Desde
+                    </label>
+                    <select name="mes_desde" id="mes_desde" class="filtro-input" style="padding: 10px 14px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                        <option value="">Todos</option>
+                        {% set meses_nombres = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] %}
+                        {% for i in range(1, 13) %}
+                        <option value="{{ i }}" {% if mes_desde == i|string %}selected{% endif %}>{{ meses_nombres[i] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                    <label for="año_hasta" style="font-size: 0.875rem; font-weight: 600; color: #495057; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                        <span>📅</span> Año Hasta
+                    </label>
+                    <select name="año_hasta" id="año_hasta" class="filtro-input" style="padding: 10px 14px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                        <option value="">Todos</option>
+                        {% for año in años %}
+                        <option value="{{ año }}" {% if año_hasta|string == año|string %}selected{% endif %}>{{ año }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                    <label for="mes_hasta" style="font-size: 0.875rem; font-weight: 600; color: #495057; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                        <span>📆</span> Mes Hasta
+                    </label>
+                    <select name="mes_hasta" id="mes_hasta" class="filtro-input" style="padding: 10px 14px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                        <option value="">Todos</option>
+                        {% for i in range(1, 13) %}
+                        <option value="{{ i }}" {% if mes_hasta == i|string %}selected{% endif %}>{{ meses_nombres[i] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div style="display: flex; gap: 10px; align-items: flex-end;">
+                    <button type="submit" class="btn btn-primary" style="padding: 10px 20px; border-radius: 8px; font-weight: 600; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
+                        🔍 Filtrar
+                    </button>
+                    {% if año_desde or mes_desde or año_hasta or mes_hasta %}
+                    <a href="{{ url_for('gastos.listado_nominas') }}" class="btn btn-secondary" style="padding: 10px 20px; border-radius: 8px; font-weight: 600; transition: all 0.3s ease;">
+                        🗑️ Limpiar
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <style>
+    .filtro-input:hover {
+        border-color: #adb5bd !important;
+        box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+    }
+
+    .filtro-input:focus {
+        outline: none;
+        border-color: #007bff !important;
+        box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+    }
+
+    select.filtro-input {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23495057' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        padding-right: 35px !important;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,123,255,0.4) !important;
+    }
+
+    .btn-secondary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(108,117,125,0.3);
+    }
+    </style>
+
     {% if nominas %}
     <div class="table-container">
         <table class="clientes-table">

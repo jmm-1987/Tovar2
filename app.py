@@ -303,7 +303,9 @@ Saludos cordiales,
                     'usuario_web': 'VARCHAR(80)',
                     'password_hash': 'VARCHAR(255)',
                     'fecha_creacion': 'TIMESTAMP',
-                    'ultimo_acceso': 'TIMESTAMP'
+                    'fecha_alta': 'DATE',
+                    'ultimo_acceso': 'TIMESTAMP',
+                    'movil': 'VARCHAR(50)'
                 }
                 for columna, tipo in nuevas_columnas.items():
                     if columna not in columns_clientes:

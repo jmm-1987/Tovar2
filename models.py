@@ -43,7 +43,8 @@ class Cliente(db.Model, UserMixin):
     provincia = db.Column(db.String(100))  # Provincia
     codigo_postal = db.Column(db.String(10))  # Código Postal
     pais = db.Column(db.String(100), default='España')  # País
-    telefono = db.Column(db.String(50))
+    telefono = db.Column(db.String(50))  # Teléfono fijo
+    movil = db.Column(db.String(50))  # Teléfono móvil
     email = db.Column(db.String(100))
     personas_contacto = db.Column(db.Text)  # Personas de contacto
     anotaciones = db.Column(db.Text)  # Anotaciones adicionales
@@ -54,6 +55,7 @@ class Cliente(db.Model, UserMixin):
     
     # Timestamps
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    fecha_alta = db.Column(db.Date)  # Fecha de alta del cliente
     ultimo_acceso = db.Column(db.DateTime)
     
     # Relación con pedidos

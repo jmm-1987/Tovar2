@@ -9,6 +9,29 @@
         <button onclick="abrirModalCrear()" class="btn btn-success">➕ Crear Cliente</button>
     </div>
 
+    <!-- Barra de búsqueda y ordenamiento -->
+    <div style="margin-bottom: 20px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+        <form method="GET" action="{{ url_for('clientes.gestion_clientes') }}" style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 300px;">
+            <div style="position: relative; flex: 1;">
+                <input type="text" name="busqueda" id="busqueda" value="{{ busqueda }}" placeholder="Buscar por nombre, alias, NIF, población..." style="width: 100%; padding: 10px 40px 10px 15px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 14px;">
+                <span style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #6c757d; font-size: 18px;">🔍</span>
+            </div>
+            <input type="hidden" name="orden" value="{{ orden }}">
+            <button type="submit" class="btn btn-primary" style="padding: 10px 20px; border-radius: 8px;">Buscar</button>
+            {% if busqueda %}
+            <a href="{{ url_for('clientes.gestion_clientes', orden=orden) }}" class="btn btn-secondary" style="padding: 10px 20px; border-radius: 8px;">Limpiar</a>
+            {% endif %}
+        </form>
+        
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <label for="orden" style="font-size: 14px; font-weight: 500; color: #495057;">Ordenar por:</label>
+            <select name="orden" id="orden" onchange="cambiarOrden(this.value)" style="padding: 8px 12px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 14px; cursor: pointer;">
+                <option value="id" {% if orden == 'id' %}selected{% endif %}>ID</option>
+                <option value="nombre" {% if orden == 'nombre' %}selected{% endif %}>Nombre (A-Z)</option>
+            </select>
+        </div>
+    </div>
+
     {% if clientes %}
     <div class="table-container">
         <table class="clientes-table">
@@ -17,10 +40,7 @@
                     <th>ID</th>
                     <th>Nombre</th>
                     <th>Alias</th>
-                    <th>NIF/CIF</th>
                     <th>Población</th>
-                    <th>Teléfono</th>
-                    <th>Email</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
@@ -30,15 +50,9 @@
                     <td>{{ cliente.id }}</td>
                     <td>{{ cliente.nombre }}</td>
                     <td>{{ cliente.alias or '-' }}</td>
-                    <td>{{ cliente.nif or '-' }}</td>
                     <td>{{ cliente.poblacion or '-' }}</td>
-                    <td>{{ cliente.telefono or '-' }}</td>
-                    <td>{{ cliente.email or '-' }}</td>
                     <td class="acciones-cell">
                         <a href="{{ url_for('clientes.ficha_cliente', id=cliente.id) }}" class="btn btn-sm btn-primary">Ver Ficha</a>
-                        <form method="POST" action="{{ url_for('clientes.eliminar_cliente', id=cliente.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar este cliente?');">
-                            <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
-                        </form>
                     </td>
                 </tr>
                 {% endfor %}
@@ -63,25 +77,39 @@
         <form method="POST" id="formCrearCliente" class="modal-form">
             <div class="form-section">
                 <h4>Información Principal</h4>
-                <div class="form-group">
-                    <label for="nombre">Nombre del Cliente *</label>
-                    <input type="text" name="nombre" id="nombre" required placeholder="Nombre o razón social">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nombre">Nombre *</label>
+                        <input type="text" name="nombre" id="nombre" required placeholder="Nombre o razón social">
+                    </div>
+                    <div class="form-group">
+                        <label for="alias">Alias</label>
+                        <input type="text" name="alias" id="alias" placeholder="Alias">
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="alias">Alias</label>
-                    <input type="text" name="alias" id="alias" placeholder="Nombre alternativo o alias">
-                </div>
-                <div class="form-group">
-                    <label for="nif">NIF/CIF</label>
-                    <input type="text" name="nif" id="nif" placeholder="A15022510" maxlength="20">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nif">NIF/CIF</label>
+                        <input type="text" name="nif" id="nif" placeholder="A15022510" maxlength="20">
+                    </div>
+                    <div class="form-group">
+                        <label for="fecha_alta">Fecha de Alta</label>
+                        <input type="date" name="fecha_alta" id="fecha_alta">
+                    </div>
                 </div>
             </div>
 
             <div class="form-section">
                 <h4>Contacto</h4>
-                <div class="form-group">
-                    <label for="telefono">Teléfono</label>
-                    <input type="text" name="telefono" id="telefono" placeholder="Teléfono de contacto">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="telefono">Teléfono</label>
+                        <input type="text" name="telefono" id="telefono" placeholder="Teléfono fijo">
+                    </div>
+                    <div class="form-group">
+                        <label for="movil">Móvil</label>
+                        <input type="text" name="movil" id="movil" placeholder="Teléfono móvil">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="email">Email</label>
@@ -89,7 +117,7 @@
                 </div>
                 <div class="form-group">
                     <label for="personas_contacto">Personas de Contacto</label>
-                    <textarea name="personas_contacto" id="personas_contacto" rows="3" placeholder="Nombre, teléfono, email de personas de contacto"></textarea>
+                    <textarea name="personas_contacto" id="personas_contacto" rows="2" placeholder="Nombre, teléfono, email"></textarea>
                 </div>
             </div>
 
@@ -97,7 +125,7 @@
                 <h4>Dirección</h4>
                 <div class="form-group">
                     <label for="direccion">Dirección</label>
-                    <textarea name="direccion" id="direccion" rows="3" placeholder="Dirección completa"></textarea>
+                    <textarea name="direccion" id="direccion" rows="2" placeholder="Dirección completa"></textarea>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
@@ -125,7 +153,7 @@
                 <h4>Anotaciones</h4>
                 <div class="form-group">
                     <label for="anotaciones">Anotaciones</label>
-                    <textarea name="anotaciones" id="anotaciones" rows="4" placeholder="Notas adicionales sobre el cliente"></textarea>
+                    <textarea name="anotaciones" id="anotaciones" rows="2" placeholder="Notas adicionales"></textarea>
                 </div>
             </div>
 
@@ -221,10 +249,10 @@
 
 .modal-content {
     background-color: white;
-    margin: 2% auto;
+    margin: 3% auto;
     padding: 0;
     border-radius: 10px;
-    max-width: 800px;
+    max-width: 700px;
     width: 90%;
     max-height: 90vh;
     overflow-y: auto;
@@ -235,7 +263,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px 30px;
+    padding: 15px 20px;
     border-bottom: 2px solid #e0e0e0;
     background: #f8f9fa;
     border-radius: 10px 10px 0 0;
@@ -244,11 +272,12 @@
 .modal-header h3 {
     margin: 0;
     color: #2c3e50;
+    font-size: 18px;
 }
 
 .close {
     color: #aaa;
-    font-size: 28px;
+    font-size: 24px;
     font-weight: bold;
     cursor: pointer;
     line-height: 1;
@@ -260,12 +289,12 @@
 }
 
 .modal-form {
-    padding: 30px;
+    padding: 20px;
 }
 
 .form-section {
-    margin-bottom: 25px;
-    padding-bottom: 20px;
+    margin-bottom: 18px;
+    padding-bottom: 15px;
     border-bottom: 1px solid #e0e0e0;
 }
 
@@ -275,11 +304,12 @@
 
 .form-section h4 {
     margin-top: 0;
-    margin-bottom: 15px;
+    margin-bottom: 12px;
     color: #2c3e50;
-    font-size: 16px;
+    font-size: 14px;
+    font-weight: 600;
     border-bottom: 1px solid #667eea;
-    padding-bottom: 8px;
+    padding-bottom: 6px;
 }
 
 .form-group {
@@ -288,19 +318,19 @@
 
 .form-group label {
     display: block;
-    margin-bottom: 5px;
+    margin-bottom: 4px;
     font-weight: 500;
     color: #555;
-    font-size: 14px;
+    font-size: 13px;
 }
 
 .form-group input,
 .form-group textarea {
     width: 100%;
-    padding: 10px;
+    padding: 8px 10px;
     border: 1px solid #ddd;
     border-radius: 5px;
-    font-size: 14px;
+    font-size: 13px;
     box-sizing: border-box;
     font-family: inherit;
 }
@@ -319,15 +349,15 @@
 .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 15px;
+    gap: 12px;
 }
 
 .modal-actions {
     display: flex;
     gap: 10px;
     justify-content: flex-end;
-    margin-top: 25px;
-    padding-top: 20px;
+    margin-top: 15px;
+    padding-top: 15px;
     border-top: 2px solid #e0e0e0;
 }
 
@@ -364,6 +394,20 @@ document.addEventListener('keydown', function(event) {
         cerrarModalCrear();
     }
 });
+
+// Función para cambiar el orden
+function cambiarOrden(nuevoOrden) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('orden', nuevoOrden);
+    // Mantener la búsqueda si existe
+    const busquedaInput = document.getElementById('busqueda');
+    if (busquedaInput && busquedaInput.value) {
+        url.searchParams.set('busqueda', busquedaInput.value);
+    } else {
+        url.searchParams.delete('busqueda');
+    }
+    window.location.href = url.toString();
+}
 </script>
 {% endblock %}
 

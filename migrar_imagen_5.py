@@ -51,3 +51,5 @@ if __name__ == '__main__':
     agregar_columnas_imagen_5()
     print("Migración completada.")
 
+
+
