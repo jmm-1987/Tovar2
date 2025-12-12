@@ -372,10 +372,10 @@ def descargar_pdf_presupuesto(presupuesto_id):
                     format='A4',
                     print_background=True,
                     margin={
-                        'top': '15mm',
-                        'right': '15mm',
-                        'bottom': '15mm',
-                        'left': '15mm'
+                        'top': '10mm',
+                        'right': '10mm',
+                        'bottom': '10mm',
+                        'left': '10mm'
                     }
                 )
                 
