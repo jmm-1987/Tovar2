@@ -58,6 +58,10 @@ class Cliente(db.Model, UserMixin):
     fecha_alta = db.Column(db.Date)  # Fecha de alta del cliente
     ultimo_acceso = db.Column(db.DateTime)
     
+    # Comercial asignado
+    comercial_id = db.Column(db.Integer, db.ForeignKey('comerciales.id'), nullable=True)
+    comercial = db.relationship('Comercial', backref='clientes_asignados', lazy=True)
+    
     # Relación con pedidos
     pedidos = db.relationship('Pedido', backref='cliente', lazy=True)
     # Relación con presupuestos
@@ -209,6 +213,8 @@ class Presupuesto(db.Model):
     seguimiento = db.Column(db.Text)
     
     # Fechas
+    fecha_pendiente_enviar = db.Column(db.Date)  # Fecha en que se marcó como Pendiente de enviar
+    fecha_diseno = db.Column(db.Date)  # Fecha en que se marcó como Diseño
     fecha_envio = db.Column(db.Date)  # Fecha en que se envió el presupuesto
     fecha_respuesta = db.Column(db.Date)  # Fecha de aceptación o rechazo
     

@@ -1,12 +1,15 @@
 """Rutas para gestión de presupuestos"""
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, make_response
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, make_response, jsonify
 from flask_login import login_required
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import os
+import tempfile
 from io import BytesIO
 from extensions import db
 from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Usuario
+from flask import jsonify
+from playwright.sync_api import sync_playwright
 
 presupuestos_bp = Blueprint('presupuestos', __name__)
 
@@ -58,13 +61,15 @@ def nuevo_presupuesto():
     if request.method == 'POST':
         try:
             # Crear presupuesto
+            hoy = datetime.now().date()
             presupuesto = Presupuesto(
                 comercial_id=request.form.get('comercial_id'),
                 cliente_id=request.form.get('cliente_id'),
                 tipo_pedido=request.form.get('tipo_pedido'),
                 estado='Pendiente de enviar',  # Siempre se establece como Pendiente de enviar al crear
                 forma_pago=request.form.get('forma_pago', ''),
-                seguimiento=request.form.get('seguimiento', '')
+                seguimiento=request.form.get('seguimiento', ''),
+                fecha_pendiente_enviar=hoy  # Establecer la fecha al crear
             )
             
             # Función auxiliar para guardar imagen
@@ -160,6 +165,64 @@ def nuevo_presupuesto():
                          clientes=clientes, 
                          prendas=prendas)
 
+@presupuestos_bp.route('/presupuestos/crear-cliente-ajax', methods=['POST'])
+@login_required
+def crear_cliente_ajax():
+    """Crear cliente desde AJAX (desde la creación de presupuesto)"""
+    try:
+        # Procesar fecha de alta
+        fecha_alta_str = request.form.get('fecha_alta', '')
+        fecha_alta = None
+        if fecha_alta_str:
+            try:
+                fecha_alta = datetime.strptime(fecha_alta_str, '%Y-%m-%d').date()
+            except ValueError:
+                pass
+        
+        comercial_id = request.form.get('comercial_id', '').strip()
+        comercial_id = int(comercial_id) if comercial_id else None
+        
+        cliente = Cliente(
+            nombre=request.form.get('nombre'),
+            alias=request.form.get('alias', ''),
+            nif=request.form.get('nif', ''),
+            direccion=request.form.get('direccion', ''),
+            poblacion=request.form.get('poblacion', ''),
+            provincia=request.form.get('provincia', ''),
+            codigo_postal=request.form.get('codigo_postal', ''),
+            pais=request.form.get('pais', 'España'),
+            telefono=request.form.get('telefono', ''),
+            movil=request.form.get('movil', ''),
+            email=request.form.get('email', ''),
+            personas_contacto=request.form.get('personas_contacto', ''),
+            anotaciones=request.form.get('anotaciones', ''),
+            usuario_web=request.form.get('usuario_web', '').strip() or None,
+            fecha_alta=fecha_alta,
+            comercial_id=comercial_id
+        )
+        
+        # Si se proporciona usuario web, también establecer contraseña si se proporciona
+        password_web = request.form.get('password_web', '').strip()
+        if cliente.usuario_web and password_web:
+            cliente.set_password(password_web)
+        
+        db.session.add(cliente)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'cliente': {
+                'id': cliente.id,
+                'nombre': cliente.nombre
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
+
 @presupuestos_bp.route('/presupuestos/<int:presupuesto_id>')
 @login_required
 def ver_presupuesto(presupuesto_id):
@@ -168,7 +231,7 @@ def ver_presupuesto(presupuesto_id):
     return render_template('ver_presupuesto.html', presupuesto=presupuesto)
 
 def preparar_datos_imprimir_presupuesto(presupuesto_id):
-    """Función auxiliar para preparar todos los datos necesarios para imprimir/generar PDF del presupuesto"""
+    """Función auxiliar para preparar todos los datos necesarios para imprimir el presupuesto"""
     from decimal import Decimal
     import base64
     
@@ -253,9 +316,9 @@ def preparar_datos_imprimir_presupuesto(presupuesto_id):
     
     return {
         'presupuesto': presupuesto,
-        'base_imponible': base_imponible,
-        'iva_total': iva_total,
-        'total_con_iva': total_con_iva,
+        'base_imponible': float(base_imponible),
+        'iva_total': float(iva_total),
+        'total_con_iva': float(total_con_iva),
         'tipo_iva': tipo_iva,
         'logo_base64': logo_base64,
         'imagen_diseno_base64': imagen_diseno_base64,
@@ -274,51 +337,78 @@ def imprimir_presupuesto(presupuesto_id):
                          **datos,
                          use_base64=True)
 
-def generar_pdf_presupuesto(presupuesto_id):
-    """Generar PDF del presupuesto y retornar los datos del PDF"""
+@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/descargar-pdf')
+@login_required
+def descargar_pdf_presupuesto(presupuesto_id):
+    """Descargar presupuesto en formato PDF"""
     try:
-        from xhtml2pdf import pisa
-        
-        # Usar la misma función auxiliar para preparar los datos
         datos = preparar_datos_imprimir_presupuesto(presupuesto_id)
         
-        # Renderizar template HTML con los mismos datos que la vista de impresión
+        # Renderizar el HTML del presupuesto
         html = render_template('imprimir_presupuesto.html', 
                              **datos,
                              use_base64=True)
         
-        # Generar PDF
-        result = BytesIO()
+        # Crear el PDF en memoria usando playwright
+        pdf_buffer = BytesIO()
         
-        pdf = pisa.pisaDocument(
-            BytesIO(html.encode("UTF-8")), 
-            result
-        )
-        
-        if not pdf.err:
-            return result.getvalue()
-        else:
-            raise Exception(f'Error al generar PDF: {pdf.err}')
+        try:
+            # Guardar HTML temporalmente para que playwright pueda acceder a él
+            # Crear un archivo HTML temporal
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+                temp_file.write(html)
+                temp_html_path = temp_file.name
             
+            # Usar playwright para generar el PDF
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                
+                # Cargar el HTML desde el archivo temporal
+                page.goto(f'file://{temp_html_path}')
+                
+                # Generar PDF
+                pdf_bytes = page.pdf(
+                    format='A4',
+                    print_background=True,
+                    margin={
+                        'top': '15mm',
+                        'right': '15mm',
+                        'bottom': '15mm',
+                        'left': '15mm'
+                    }
+                )
+                
+                browser.close()
+            
+            # Escribir el PDF al buffer
+            pdf_buffer.write(pdf_bytes)
+            
+            # Limpiar archivo temporal
+            try:
+                os.unlink(temp_html_path)
+            except:
+                pass
+            
+        except Exception as pdf_error:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error al crear PDF con playwright: {error_trace}")
+            flash(f'Error al generar PDF: {str(pdf_error)}', 'error')
+            return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
+        
+        # Preparar la respuesta con el PDF
+        pdf_buffer.seek(0)
+        response = make_response(pdf_buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=presupuesto_{presupuesto_id}.pdf'
+        
+        return response
+        
     except Exception as e:
         import traceback
-        print(f"Error en generar_pdf_presupuesto: {traceback.format_exc()}")
-        raise
-
-@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/descargar-pdf')
-@login_required
-def descargar_pdf_presupuesto(presupuesto_id):
-    """Generar y descargar PDF del presupuesto"""
-    try:
-        pdf_data = generar_pdf_presupuesto(presupuesto_id)
-        response = make_response(pdf_data)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=presupuesto_{presupuesto_id}.pdf'
-        return response
-    except ImportError:
-        flash('La librería xhtml2pdf no está instalada. Por favor, ejecuta: pip install xhtml2pdf', 'error')
-        return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
-    except Exception as e:
+        error_trace = traceback.format_exc()
+        print(f"Error completo al generar PDF: {error_trace}")
         flash(f'Error al generar PDF: {str(e)}', 'error')
         return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
 
@@ -334,16 +424,9 @@ def enviar_presupuesto_email(presupuesto_id):
             flash('El cliente no tiene email configurado', 'error')
             return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
         
-        # Generar PDF
-        try:
-            pdf_data = generar_pdf_presupuesto(presupuesto_id)
-        except Exception as e:
-            flash(f'Error al generar PDF: {str(e)}', 'error')
-            return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
-        
         # Enviar email
         from utils.email import enviar_email_presupuesto
-        exito, mensaje = enviar_email_presupuesto(presupuesto, pdf_data)
+        exito, mensaje = enviar_email_presupuesto(presupuesto, None)
         
         if exito:
             flash(f'Presupuesto enviado por email a {presupuesto.cliente.email}', 'success')
@@ -358,7 +441,7 @@ def enviar_presupuesto_email(presupuesto_id):
 @presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/enviar-email-cliente')
 @login_required
 def enviar_presupuesto_email_cliente(presupuesto_id):
-    """Generar PDF y enviar por email directamente al cliente"""
+    """Enviar por email directamente al cliente"""
     try:
         presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
         
@@ -367,16 +450,9 @@ def enviar_presupuesto_email_cliente(presupuesto_id):
             flash('El cliente no tiene email configurado', 'error')
             return redirect(url_for('presupuestos.listado_presupuestos'))
         
-        # Generar PDF
-        try:
-            pdf_data = generar_pdf_presupuesto(presupuesto_id)
-        except Exception as e:
-            flash(f'Error al generar PDF: {str(e)}', 'error')
-            return redirect(url_for('presupuestos.listado_presupuestos'))
-        
         # Enviar email usando Flask-Mail
         from utils.email import enviar_email_presupuesto
-        exito, mensaje = enviar_email_presupuesto(presupuesto, pdf_data)
+        exito, mensaje = enviar_email_presupuesto(presupuesto, None)
         
         if exito:
             flash(f'Presupuesto enviado por email a {presupuesto.cliente.email}', 'success')
@@ -536,8 +612,8 @@ def cambiar_estado_presupuesto(presupuesto_id):
         
         # Mapeo de estados a fechas
         estados_fechas = {
-            'Pendiente de enviar': (None, 'Pendiente de enviar'),
-            'Diseño': (None, 'Diseño'),
+            'Pendiente de enviar': ('fecha_pendiente_enviar', 'Pendiente de enviar'),
+            'Diseño': ('fecha_diseno', 'Diseño'),
             'Enviado': ('fecha_envio', 'Enviado'),
             'Aceptado': ('fecha_respuesta', 'Aceptado'),
             'Rechazado': ('fecha_respuesta', 'Rechazado')
@@ -549,9 +625,12 @@ def cambiar_estado_presupuesto(presupuesto_id):
             # Actualizar el estado
             presupuesto.estado = estado_nombre
             
-            # Si tiene fecha asociada, actualizar la fecha a hoy
+            # Si tiene fecha asociada, actualizar la fecha a hoy SOLO si no está ya establecida
+            # Esto preserva las fechas de estados anteriores
             if fecha_campo:
-                setattr(presupuesto, fecha_campo, hoy)
+                fecha_actual = getattr(presupuesto, fecha_campo)
+                if not fecha_actual:  # Solo establecer si no tiene fecha
+                    setattr(presupuesto, fecha_campo, hoy)
             
             # Si el presupuesto se acepta, crear un pedido automáticamente
             if nuevo_estado == 'Aceptado' and estado_anterior != 'Aceptado':

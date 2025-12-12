@@ -46,6 +46,12 @@
                     <strong>Email:</strong>
                     <span>{{ cliente.email or '-' }}</span>
                 </div>
+                {% if cliente.comercial %}
+                <div class="info-item">
+                    <strong>Comercial Asignado:</strong>
+                    <span>{{ cliente.comercial.nombre }}</span>
+                </div>
+                {% endif %}
             </div>
         </div>
 
@@ -76,19 +82,17 @@
             </div>
         </div>
 
-        <!-- Personas de Contacto -->
-        {% if cliente.personas_contacto %}
-        <div class="ficha-section">
-            <h3>Personas de Contacto</h3>
-            <div class="info-text">
-                {{ cliente.personas_contacto | nl2br }}
-            </div>
-        </div>
-        {% endif %}
-
         <!-- Anotaciones -->
         <div class="ficha-section">
             <h3>Anotaciones</h3>
+            {% if cliente.personas_contacto %}
+            <div style="margin-bottom: 12px;">
+                <strong style="color: #555; font-size: 12px; font-weight: 600; display: block; margin-bottom: 5px;">Personas de Contacto:</strong>
+                <div class="info-text-enmarcado">
+                    {{ cliente.personas_contacto | nl2br }}
+                </div>
+            </div>
+            {% endif %}
             {% if cliente.anotaciones %}
             <div class="info-text-enmarcado">
                 {{ cliente.anotaciones | nl2br }}

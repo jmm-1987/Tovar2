@@ -74,7 +74,10 @@ def dashboard():
     
     # Obtener estadísticas
     total_pedidos = Pedido.query.filter_by(cliente_id=cliente.id).count()
-    pedidos_pendientes = Pedido.query.filter_by(cliente_id=cliente.id, estado='Pendiente').count()
+    pedidos_pendientes = Pedido.query.filter(
+        Pedido.cliente_id == cliente.id,
+        Pedido.estado.in_(['Pendiente', 'Pendiente de enviar'])
+    ).count()
     pedidos_en_preparacion = Pedido.query.filter_by(cliente_id=cliente.id, estado='En preparación').count()
     
     # Obtener facturas a través de pedidos
@@ -190,7 +193,7 @@ def nuevo_pedido():
                 comercial_id=comercial.id,
                 cliente_id=cliente.id,
                 tipo_pedido='cliente web',  # Siempre cliente web para pedidos desde área cliente
-                estado='Pendiente',
+                estado='Pendiente de enviar',
                 forma_pago='',  # No se permite desde área cliente
                 fecha_aceptacion=None,  # Se establecerá cuando el comercial lo acepte
                 fecha_objetivo=None

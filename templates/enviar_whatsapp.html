@@ -32,25 +32,10 @@
     <div class="container">
         <h2>📱 Enviando por WhatsApp</h2>
         <p class="message">Preparando el envío...</p>
-        <p class="message">El PDF se descargará automáticamente y se abrirá WhatsApp.</p>
+        <p class="message">Se abrirá WhatsApp.</p>
     </div>
 
     <script>
-        // Descargar el PDF
-        function descargarPDF() {
-            {% if tipo == 'presupuesto' %}
-            const pdfUrl = "{{ url_for('presupuestos.descargar_pdf_presupuesto', presupuesto_id=id_documento) }}";
-            {% else %}
-            const pdfUrl = "{{ url_for('pedidos.descargar_pdf_pedido', pedido_id=id_documento) }}";
-            {% endif %}
-            const link = document.createElement('a');
-            link.href = pdfUrl;
-            link.download = "{{ pdf_filename }}";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
         // Abrir WhatsApp Web
         function abrirWhatsApp() {
             const telefono = "{{ telefono }}";
@@ -61,11 +46,8 @@
 
         // Ejecutar cuando la página cargue
         window.onload = function() {
-            // Descargar PDF primero
-            setTimeout(descargarPDF, 500);
-            
             // Abrir WhatsApp después de un breve delay
-            setTimeout(abrirWhatsApp, 1000);
+            setTimeout(abrirWhatsApp, 500);
             
             // Cerrar la ventana después de 3 segundos
             setTimeout(function() {

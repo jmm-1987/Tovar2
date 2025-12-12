@@ -102,7 +102,7 @@ def nuevo_pedido():
                 comercial_id=request.form.get('comercial_id'),
                 cliente_id=request.form.get('cliente_id'),
                 tipo_pedido=request.form.get('tipo_pedido'),
-                estado='Pendiente',  # Siempre se establece como Pendiente al crear
+                estado='Pendiente de enviar',  # Siempre se establece como Pendiente de enviar al crear
                 forma_pago=request.form.get('forma_pago', ''),
                 fecha_aceptacion=fecha_aceptacion,
                 fecha_objetivo=fecha_objetivo
@@ -356,6 +356,7 @@ def cambiar_estado_pedido(pedido_id):
         
         # Mapeo de estados a fechas y nombres de estado
         estados_fechas = {
+            'Pendiente de enviar': (None, 'Pendiente de enviar'),
             'Pendiente': (None, 'Pendiente'),
             'Diseño': (None, 'Diseño'),
             'En preparación': ('fecha_aceptacion', 'En preparación'),
@@ -433,56 +434,10 @@ def imprimir_pedido(pedido_id):
     pedido = Pedido.query.get_or_404(pedido_id)
     return render_template('imprimir_pedido.html', pedido=pedido)
 
-@pedidos_bp.route('/pedidos/<int:pedido_id>/descargar-pdf')
-@login_required
-def descargar_pdf_pedido(pedido_id):
-    """Generar y descargar PDF del pedido"""
-    try:
-        pdf_data = generar_pdf_pedido(pedido_id)
-        response = make_response(pdf_data)
-        response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'attachment; filename=pedido_{pedido_id}.pdf'
-        return response
-    except ImportError:
-        flash('La librería xhtml2pdf no está instalada. Por favor, ejecuta: pip install xhtml2pdf', 'error')
-        return redirect(url_for('pedidos.ver_pedido', pedido_id=pedido_id))
-    except Exception as e:
-        flash(f'Error al generar PDF: {str(e)}', 'error')
-        return redirect(url_for('pedidos.ver_pedido', pedido_id=pedido_id))
-
-def generar_pdf_pedido(pedido_id):
-    """Generar PDF del pedido y retornar los datos del PDF"""
-    try:
-        from decimal import Decimal
-        from xhtml2pdf import pisa
-        
-        pedido = Pedido.query.get_or_404(pedido_id)
-        
-        # Renderizar template HTML
-        html = render_template('imprimir_pedido.html', pedido=pedido)
-        
-        # Generar PDF
-        result = BytesIO()
-        
-        pdf = pisa.pisaDocument(
-            BytesIO(html.encode("UTF-8")), 
-            result
-        )
-        
-        if not pdf.err:
-            return result.getvalue()
-        else:
-            raise Exception(f'Error al generar PDF: {pdf.err}')
-            
-    except Exception as e:
-        import traceback
-        print(f"Error en generar_pdf_pedido: {traceback.format_exc()}")
-        raise
-
 @pedidos_bp.route('/pedidos/<int:pedido_id>/enviar-email-cliente')
 @login_required
 def enviar_pedido_email_cliente(pedido_id):
-    """Generar PDF y enviar por email directamente al cliente"""
+    """Enviar por email directamente al cliente"""
     try:
         pedido = Pedido.query.get_or_404(pedido_id)
         
@@ -491,16 +446,9 @@ def enviar_pedido_email_cliente(pedido_id):
             flash('El cliente no tiene email configurado', 'error')
             return redirect(url_for('pedidos.listado_pedidos'))
         
-        # Generar PDF
-        try:
-            pdf_data = generar_pdf_pedido(pedido_id)
-        except Exception as e:
-            flash(f'Error al generar PDF: {str(e)}', 'error')
-            return redirect(url_for('pedidos.listado_pedidos'))
-        
         # Enviar email usando Flask-Mail
         from utils.email import enviar_email_pedido
-        exito, mensaje = enviar_email_pedido(pedido, pdf_data)
+        exito, mensaje = enviar_email_pedido(pedido, None)
         
         if exito:
             flash(f'Pedido enviado por email a {pedido.cliente.email}', 'success')

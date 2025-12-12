@@ -19,12 +19,25 @@
 
         <div class="form-group-compact">
             <label for="cliente_id">Cliente *</label>
-            <select name="cliente_id" id="cliente_id" required>
-                <option value="">Seleccione un cliente</option>
-                {% for cliente in clientes %}
-                <option value="{{ cliente.id }}">{{ cliente.nombre }}</option>
-                {% endfor %}
-            </select>
+            <div style="display: flex; gap: 5px;">
+                <div style="position: relative; flex: 1;">
+                    <input type="text" id="cliente_search" placeholder="🔍 Buscar cliente..." 
+                           style="width: 100%; padding: 10px 35px 10px 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; box-sizing: border-box;"
+                           autocomplete="off">
+                    <select name="cliente_id" id="cliente_id" required style="display: none;">
+                        <option value="">Seleccione un cliente</option>
+                        {% for cliente in clientes %}
+                        <option value="{{ cliente.id }}" data-nombre="{{ cliente.nombre|lower }}">{{ cliente.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <div id="cliente_results" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px; max-height: 200px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+                </div>
+                <button type="button" onclick="abrirModalCrearCliente()" 
+                        style="padding: 10px 15px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; white-space: nowrap;"
+                        title="Crear nuevo cliente">
+                    ➕
+                </button>
+            </div>
         </div>
 
         <div class="form-group-compact">
@@ -370,6 +383,406 @@ function duplicarLinea(btn) {
     lineaRow.parentNode.insertBefore(nuevaLinea, lineaRow.nextSibling);
     renumerarPrendas();
 }
+
+// Buscador de clientes
+document.addEventListener('DOMContentLoaded', function() {
+    const clienteSearch = document.getElementById('cliente_search');
+    const clienteSelect = document.getElementById('cliente_id');
+    const clienteResults = document.getElementById('cliente_results');
+    const clientes = Array.from(clienteSelect.options).slice(1).map(opt => ({
+        id: opt.value,
+        nombre: opt.textContent,
+        nombreLower: opt.getAttribute('data-nombre') || opt.textContent.toLowerCase()
+    }));
+    
+    let selectedClienteId = null;
+    let selectedClienteNombre = '';
+    
+    clienteSearch.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        
+        if (searchTerm === '') {
+            clienteResults.style.display = 'none';
+            clienteSelect.value = '';
+            selectedClienteId = null;
+            selectedClienteNombre = '';
+            return;
+        }
+        
+        // Filtrar clientes
+        const filtered = clientes.filter(cliente => 
+            cliente.nombreLower.includes(searchTerm)
+        );
+        
+        if (filtered.length === 0) {
+            clienteResults.innerHTML = '<div style="padding: 10px; color: #999; text-align: center;">No se encontraron clientes</div>';
+            clienteResults.style.display = 'block';
+            return;
+        }
+        
+        // Mostrar resultados
+        clienteResults.innerHTML = filtered.map(cliente => 
+            `<div class="cliente-option" data-id="${cliente.id}" data-nombre="${cliente.nombre}" 
+                  style="padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; transition: background 0.2s;"
+                  onmouseover="this.style.background='#f0f0f0'" 
+                  onmouseout="this.style.background='white'"
+                  onclick="selectCliente(${cliente.id}, '${cliente.nombre.replace(/'/g, "\\'")}')">
+                ${cliente.nombre}
+            </div>`
+        ).join('');
+        
+        clienteResults.style.display = 'block';
+    });
+    
+    // Ocultar resultados al hacer clic fuera
+    document.addEventListener('click', function(e) {
+        if (!clienteSearch.contains(e.target) && !clienteResults.contains(e.target)) {
+            clienteResults.style.display = 'none';
+        }
+    });
+    
+    // Función para seleccionar cliente
+    window.selectCliente = function(id, nombre) {
+        selectedClienteId = id;
+        selectedClienteNombre = nombre;
+        clienteSearch.value = nombre;
+        clienteSelect.value = id;
+        clienteResults.style.display = 'none';
+    };
+    
+    // Validar antes de enviar
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (!selectedClienteId && !clienteSelect.value) {
+                e.preventDefault();
+                alert('Por favor, seleccione un cliente');
+                clienteSearch.focus();
+                return false;
+            }
+            // Asegurar que el select tenga el valor correcto
+            if (selectedClienteId) {
+                clienteSelect.value = selectedClienteId;
+            }
+        });
+    }
+});
+
+// Funciones para el modal de crear cliente
+function abrirModalCrearCliente() {
+    document.getElementById('modalCrearClientePresupuesto').style.display = 'block';
+}
+
+function cerrarModalCrearClientePresupuesto() {
+    document.getElementById('modalCrearClientePresupuesto').style.display = 'none';
+    document.getElementById('formCrearClientePresupuesto').reset();
+}
+
+// Manejar el envío del formulario de crear cliente
+document.getElementById('formCrearClientePresupuesto').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creando...';
+    
+    fetch('{{ url_for("presupuestos.crear_cliente_ajax") }}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Agregar el nuevo cliente al select
+            const clienteSelect = document.getElementById('cliente_id');
+            const newOption = document.createElement('option');
+            newOption.value = data.cliente.id;
+            newOption.textContent = data.cliente.nombre;
+            newOption.setAttribute('data-nombre', data.cliente.nombre.toLowerCase());
+            clienteSelect.appendChild(newOption);
+            
+            // Seleccionar el nuevo cliente
+            selectCliente(data.cliente.id, data.cliente.nombre);
+            
+            // Cerrar modal y limpiar formulario
+            cerrarModalCrearClientePresupuesto();
+            
+            alert('Cliente creado correctamente');
+        } else {
+            alert('Error al crear cliente: ' + data.error);
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    })
+    .catch(error => {
+        alert('Error al crear cliente: ' + error);
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    });
+});
+
+// Cerrar modal al hacer clic fuera
+window.onclick = function(event) {
+    const modal = document.getElementById('modalCrearClientePresupuesto');
+    if (event.target == modal) {
+        cerrarModalCrearClientePresupuesto();
+    }
+}
 </script>
+
+<!-- Modal para crear cliente desde presupuesto -->
+<div id="modalCrearClientePresupuesto" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-header">
+            <h3>Crear Nuevo Cliente</h3>
+            <span class="close" onclick="cerrarModalCrearClientePresupuesto()">&times;</span>
+        </div>
+        <form id="formCrearClientePresupuesto" class="modal-form">
+            <div class="form-section">
+                <h4>Información Principal</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nombre_cliente_modal">Nombre *</label>
+                        <input type="text" name="nombre" id="nombre_cliente_modal" required placeholder="Nombre o razón social">
+                    </div>
+                    <div class="form-group">
+                        <label for="alias_cliente_modal">Alias</label>
+                        <input type="text" name="alias" id="alias_cliente_modal" placeholder="Alias">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nif_cliente_modal">NIF/CIF</label>
+                        <input type="text" name="nif" id="nif_cliente_modal" placeholder="A15022510" maxlength="20">
+                    </div>
+                    <div class="form-group">
+                        <label for="fecha_alta_cliente_modal">Fecha de Alta</label>
+                        <input type="date" name="fecha_alta" id="fecha_alta_cliente_modal">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="comercial_id_cliente_modal">Comercial Asignado</label>
+                        <select name="comercial_id" id="comercial_id_cliente_modal">
+                            <option value="">Sin comercial asignado</option>
+                            {% for comercial in comerciales %}
+                            <option value="{{ comercial.id }}">{{ comercial.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Contacto</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="telefono_cliente_modal">Teléfono</label>
+                        <input type="text" name="telefono" id="telefono_cliente_modal" placeholder="Teléfono fijo">
+                    </div>
+                    <div class="form-group">
+                        <label for="movil_cliente_modal">Móvil</label>
+                        <input type="text" name="movil" id="movil_cliente_modal" placeholder="Teléfono móvil">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="email_cliente_modal">Email</label>
+                    <input type="email" name="email" id="email_cliente_modal" placeholder="email@ejemplo.com">
+                </div>
+                <div class="form-group">
+                    <label for="personas_contacto_cliente_modal">Personas de Contacto</label>
+                    <textarea name="personas_contacto" id="personas_contacto_cliente_modal" rows="2" placeholder="Nombre, teléfono, email"></textarea>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Dirección</h4>
+                <div class="form-group">
+                    <label for="direccion_cliente_modal">Dirección</label>
+                    <textarea name="direccion" id="direccion_cliente_modal" rows="2" placeholder="Dirección completa"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="poblacion_cliente_modal">Población</label>
+                        <input type="text" name="poblacion" id="poblacion_cliente_modal" placeholder="Ciudad">
+                    </div>
+                    <div class="form-group">
+                        <label for="provincia_cliente_modal">Provincia</label>
+                        <input type="text" name="provincia" id="provincia_cliente_modal" placeholder="Provincia">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="codigo_postal_cliente_modal">Código Postal</label>
+                        <input type="text" name="codigo_postal" id="codigo_postal_cliente_modal" placeholder="28001" maxlength="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="pais_cliente_modal">País</label>
+                        <input type="text" name="pais" id="pais_cliente_modal" placeholder="España" value="España">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Anotaciones</h4>
+                <div class="form-group">
+                    <label for="anotaciones_cliente_modal">Anotaciones</label>
+                    <textarea name="anotaciones" id="anotaciones_cliente_modal" rows="2" placeholder="Notas adicionales"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Crear Cliente</button>
+                <button type="button" class="btn btn-secondary" onclick="cerrarModalCrearClientePresupuesto()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    overflow-y: auto;
+}
+
+.modal-content {
+    background-color: white;
+    margin: 3% auto;
+    padding: 0;
+    border-radius: 10px;
+    max-width: 700px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 2px solid #e0e0e0;
+    background: #f8f9fa;
+    border-radius: 10px 10px 0 0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.close {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 20px;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.modal-form {
+    padding: 20px;
+}
+
+.form-section {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.form-section:last-child {
+    border-bottom: none;
+}
+
+.form-section h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #2c3e50;
+    font-size: 16px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #555;
+    font-size: 14px;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 2px solid #e0e0e0;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+</style>
 {% endblock %}
 

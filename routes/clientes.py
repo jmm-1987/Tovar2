@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required
 from extensions import db
-from models import Cliente, Presupuesto, Factura, Pedido
+from models import Cliente, Presupuesto, Factura, Pedido, Comercial, Usuario
 from datetime import datetime
 
 clientes_bp = Blueprint('clientes', __name__)
@@ -21,6 +21,9 @@ def gestion_clientes():
                 except ValueError:
                     pass
             
+            comercial_id = request.form.get('comercial_id', '').strip()
+            comercial_id = int(comercial_id) if comercial_id else None
+            
             cliente = Cliente(
                 nombre=request.form.get('nombre'),
                 alias=request.form.get('alias', ''),
@@ -36,7 +39,8 @@ def gestion_clientes():
                 personas_contacto=request.form.get('personas_contacto', ''),
                 anotaciones=request.form.get('anotaciones', ''),
                 usuario_web=request.form.get('usuario_web', '').strip() or None,
-                fecha_alta=fecha_alta
+                fecha_alta=fecha_alta,
+                comercial_id=comercial_id
             )
             
             # Si se proporciona usuario web, también establecer contraseña si se proporciona
@@ -77,10 +81,17 @@ def gestion_clientes():
     else:
         clientes = query.order_by(Cliente.id.asc()).all()
     
+    # Obtener comerciales para el formulario
+    comerciales = Comercial.query.join(Usuario).filter(
+        Usuario.activo == True,
+        Usuario.rol.in_(['comercial', 'administracion'])
+    ).all()
+    
     return render_template('clientes.html', 
                          clientes=clientes,
                          busqueda=busqueda,
-                         orden=orden)
+                         orden=orden,
+                         comerciales=comerciales)
 
 @clientes_bp.route('/clientes/<int:id>')
 @login_required
@@ -125,6 +136,10 @@ def editar_cliente(id):
             cliente.personas_contacto = request.form.get('personas_contacto', '')
             cliente.anotaciones = request.form.get('anotaciones', '')
             
+            # Procesar comercial asignado
+            comercial_id = request.form.get('comercial_id', '').strip()
+            cliente.comercial_id = int(comercial_id) if comercial_id else None
+            
             # Procesar fecha de alta
             fecha_alta_str = request.form.get('fecha_alta', '')
             if fecha_alta_str:
@@ -156,7 +171,13 @@ def editar_cliente(id):
             db.session.rollback()
             flash(f'Error al actualizar cliente: {str(e)}', 'error')
     
-    return render_template('editar_cliente.html', cliente=cliente)
+    # Obtener comerciales para el formulario
+    comerciales = Comercial.query.join(Usuario).filter(
+        Usuario.activo == True,
+        Usuario.rol.in_(['comercial', 'administracion'])
+    ).all()
+    
+    return render_template('editar_cliente.html', cliente=cliente, comerciales=comerciales)
 
 @clientes_bp.route('/clientes/<int:id>/eliminar', methods=['POST'])
 @login_required

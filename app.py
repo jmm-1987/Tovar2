@@ -211,6 +211,22 @@ def migrate_database():
                             print(f"Error al agregar columna {columna}: {e}")
                             pass
                 
+                # Verificar y agregar columnas de fechas de estados
+                nuevas_fechas = {
+                    'fecha_pendiente_enviar': 'DATE',
+                    'fecha_diseno': 'DATE'
+                }
+                for columna, tipo in nuevas_fechas.items():
+                    if columna not in columns_presupuesto:
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(text(f'ALTER TABLE presupuestos ADD COLUMN {columna} {tipo}'))
+                                conn.commit()
+                                print(f"Migración: Columna {columna} agregada exitosamente")
+                        except Exception as e:
+                            print(f"Error al agregar columna {columna}: {e}")
+                            pass
+                
                 # Eliminar columna de imagen 6 si existe (ya no se usa, pero mantenemos imagen_adicional_5)
                 columnas_a_eliminar = ['imagen_adicional_6']
                 for columna in columnas_a_eliminar:
@@ -305,7 +321,8 @@ Saludos cordiales,
                     'fecha_creacion': 'TIMESTAMP',
                     'fecha_alta': 'DATE',
                     'ultimo_acceso': 'TIMESTAMP',
-                    'movil': 'VARCHAR(50)'
+                    'movil': 'VARCHAR(50)',
+                    'comercial_id': 'INTEGER REFERENCES comerciales(id)'
                 }
                 for columna, tipo in nuevas_columnas.items():
                     if columna not in columns_clientes:

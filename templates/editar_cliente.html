@@ -23,9 +23,20 @@
                     <input type="text" name="nif" id="nif" value="{{ cliente.nif or '' }}" maxlength="20">
                 </div>
             </div>
-            <div class="form-group">
-                <label for="fecha_alta">Fecha de Alta</label>
-                <input type="date" name="fecha_alta" id="fecha_alta" value="{{ cliente.fecha_alta.strftime('%Y-%m-%d') if cliente.fecha_alta else '' }}">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="fecha_alta">Fecha de Alta</label>
+                    <input type="date" name="fecha_alta" id="fecha_alta" value="{{ cliente.fecha_alta.strftime('%Y-%m-%d') if cliente.fecha_alta else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="comercial_id">Comercial Asignado</label>
+                    <select name="comercial_id" id="comercial_id">
+                        <option value="">Sin comercial asignado</option>
+                        {% for comercial in comerciales %}
+                        <option value="{{ comercial.id }}" {% if cliente.comercial_id == comercial.id %}selected{% endif %}>{{ comercial.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
         </div>
 

@@ -97,6 +97,17 @@
                         <input type="date" name="fecha_alta" id="fecha_alta">
                     </div>
                 </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="comercial_id">Comercial Asignado</label>
+                        <select name="comercial_id" id="comercial_id">
+                            <option value="">Sin comercial asignado</option>
+                            {% for comercial in comerciales %}
+                            <option value="{{ comercial.id }}">{{ comercial.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
             </div>
 
             <div class="form-section">

@@ -69,20 +69,24 @@
             opacity: 0.9;
         }
         
-        /* PÁGINA 1: PORTADA */
+        /* PÁGINA 0: PORTADA */
         .portada-page {
             display: flex;
             align-items: center;
             justify-content: center;
             height: 100%;
+            text-align: center;
         }
         
         .portada-image {
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
             max-width: 100%;
             max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: block;
+            margin: auto;
+            vertical-align: middle;
         }
         
         /* PÁGINA 2: IMÁGENES ADICIONALES */
@@ -110,52 +114,58 @@
         }
         
         .imagenes-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15mm;
-            flex: 1;
             width: 100%;
-            padding: 0;
+            border-collapse: separate;
+            border-spacing: 10mm 15mm;
             box-sizing: border-box;
         }
         
         .imagen-item {
-            display: flex;
-            flex-direction: row;
-            align-items: flex-start;
-            gap: 10mm;
-            width: 100%;
+            width: 50%;
+            vertical-align: top;
+            padding: 0;
             page-break-inside: avoid;
         }
         
+        .imagen-item-wrapper {
+            display: block;
+            text-align: center;
+            width: 100%;
+        }
+        
         .imagen-container {
-            flex-shrink: 0;
-            width: 200px;
-            height: 200px;
+            width: 300px !important;
+            height: 250px !important;
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 5mm;
+            box-sizing: border-box;
+            margin: 0 auto;
         }
         
         .imagen-adicional {
-            max-width: 200px;
-            max-height: 200px;
+            width: 300px !important;
+            height: 250px !important;
+            max-width: 300px !important;
+            max-height: 250px !important;
             object-fit: contain;
             display: block;
             margin: 0;
             padding: 0;
-            border: 1px solid #ddd;
-            background: #f9f9f9;
-            border-radius: 8px;
         }
         
         .descripcion-imagen {
-            flex: 1;
-            padding: 5mm 0;
-            font-size: 10pt;
-            line-height: 1.5;
+            width: 100%;
+            padding: 0;
+            font-size: 9pt;
+            line-height: 1.4;
             color: #333;
+            text-align: center;
         }
         
         /* PÁGINA 3: CONDICIONADO */
@@ -456,6 +466,19 @@
         descripciones_imagenes[4] if descripciones_imagenes is defined and descripciones_imagenes[4] else (presupuesto.descripcion_imagen_5 if presupuesto.descripcion_imagen_5 else '')
     ] %}
     
+    <!-- PÁGINA 0: PORTADA (si existe imagen_portada) -->
+    {% if presupuesto.imagen_portada and imagen_portada_base64 %}
+    <div class="page portada-page">
+        {% if use_base64 is defined and use_base64 and imagen_portada_base64 %}
+        <img src="{{ imagen_portada_base64 }}" alt="Portada" class="portada-image">
+        {% elif base_url is defined and base_url %}
+        <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + presupuesto.imagen_portada) }}" alt="Portada" class="portada-image">
+        {% else %}
+        <img src="{{ url_for('static', filename='uploads/' + presupuesto.imagen_portada, _external=True) }}" alt="Portada" class="portada-image">
+        {% endif %}
+    </div>
+    {% endif %}
+    
     <!-- PÁGINA 1: CONTENIDO DEL PRESUPUESTO -->
     <div class="page">
         <div class="presupuesto-header">
@@ -522,14 +545,16 @@
             </thead>
             <tbody>
                 {% for linea in presupuesto.lineas %}
-                {% set precio_unit = linea.precio_unitario|float if linea.precio_unitario else 0 %}
-                {% set cantidad = linea.cantidad|int %}
+                {% set precio_unitario_val = linea.precio_unitario if linea.precio_unitario else 0 %}
+                {% set cantidad_val = linea.cantidad if linea.cantidad else 0 %}
+                {% set precio_unit = precio_unitario_val|float %}
+                {% set cantidad = cantidad_val|int %}
                 {% set total_linea = precio_unit * cantidad %}
                 <tr>
                     <td>{{ linea.nombre_mostrar or linea.nombre or 'N/A' }}</td>
                     <td style="text-align: center;">{{ cantidad }}</td>
                     <td style="text-align: right;">{{ "%.2f"|format(precio_unit) }} €</td>
-                    <td style="text-align: right; font-weight: bold;">{{ "%.2f"|format(total_linea) }} €</td>
+                    <td style="text-align: right; font-weight: bold;">{{ "%.2f"|format(total_linea|float) }} €</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -538,15 +563,15 @@
         <div class="totales-section">
             <div class="total-row base">
                 <span class="total-label">Base Imponible:</span>
-                <span>{{ "%.2f"|format(base_imponible|float) }} €</span>
+                <span>{{ "%.2f"|format(base_imponible) }} €</span>
             </div>
             <div class="total-row iva">
                 <span class="total-label">IVA ({{ tipo_iva }}%):</span>
-                <span>{{ "%.2f"|format(iva_total|float) }} €</span>
+                <span>{{ "%.2f"|format(iva_total) }} €</span>
             </div>
             <div class="total-row final">
                 <span class="total-label">TOTAL:</span>
-                <span>{{ "%.2f"|format(total_con_iva|float) }} €</span>
+                <span>{{ "%.2f"|format(total_con_iva) }} €</span>
             </div>
         </div>
         {% else %}
@@ -561,30 +586,135 @@
         <div class="imagenes-header">
             <h2>DISEÑOS DEL PEDIDO</h2>
         </div>
-        <div class="imagenes-grid">
-            {% for i in range(4) %}
-            {% if imagenes_adicionales[i] %}
-            <div class="imagen-item">
-                <div class="imagen-container">
-                    {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[i] %}
-                    <img src="{{ imagenes_adicionales_base64[i] }}" alt="Imagen {{ i+1 }}" class="imagen-adicional">
-                    {% elif base_url is defined and base_url %}
-                    <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[i]) }}" alt="Imagen {{ i+1 }}" class="imagen-adicional">
-                    {% else %}
-                    <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[i], _external=True) }}" alt="Imagen {{ i+1 }}" class="imagen-adicional">
-                    {% endif %}
-                </div>
-                <div class="descripcion-imagen">
-                    {% if descripciones_adicionales[i] %}
-                    {{ descripciones_adicionales[i] }}
-                    {% else %}
-                    <!-- Sin descripción -->
-                    {% endif %}
-                </div>
-            </div>
+        <table class="imagenes-grid" style="width: 100%;">
+            {% set img0 = imagenes_adicionales[0] if imagenes_adicionales[0] else None %}
+            {% set img1 = imagenes_adicionales[1] if imagenes_adicionales[1] else None %}
+            {% set img2 = imagenes_adicionales[2] if imagenes_adicionales[2] else None %}
+            {% set img3 = imagenes_adicionales[3] if imagenes_adicionales[3] else None %}
+            {% set img4 = imagenes_adicionales[4] if imagenes_adicionales[4] else None %}
+            
+            {% if img0 or img1 %}
+            <tr>
+                {% if img0 %}
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[0] %}
+                            <img src="{{ imagenes_adicionales_base64[0] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[0]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[0], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[0] %}
+                            {{ descripciones_adicionales[0] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                {% else %}
+                <td class="imagen-item"></td>
+                {% endif %}
+                {% if img1 %}
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[1] %}
+                            <img src="{{ imagenes_adicionales_base64[1] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[1]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[1], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[1] %}
+                            {{ descripciones_adicionales[1] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                {% else %}
+                <td class="imagen-item"></td>
+                {% endif %}
+            </tr>
             {% endif %}
-            {% endfor %}
-        </div>
+            
+            {% if img2 or img3 %}
+            <tr>
+                {% if img2 %}
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[2] %}
+                            <img src="{{ imagenes_adicionales_base64[2] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[2]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[2], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[2] %}
+                            {{ descripciones_adicionales[2] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                {% else %}
+                <td class="imagen-item"></td>
+                {% endif %}
+                {% if img3 %}
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[3] %}
+                            <img src="{{ imagenes_adicionales_base64[3] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[3]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[3], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[3] %}
+                            {{ descripciones_adicionales[3] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                {% else %}
+                <td class="imagen-item"></td>
+                {% endif %}
+            </tr>
+            {% endif %}
+            
+            {% if img4 %}
+            <tr>
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[4] %}
+                            <img src="{{ imagenes_adicionales_base64[4] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[4]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[4], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[4] %}
+                            {{ descripciones_adicionales[4] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td class="imagen-item"></td>
+            </tr>
+            {% endif %}
+        </table>
     </div>
     
     <!-- PÁGINA 3: CONDICIONADO -->
@@ -687,7 +817,6 @@
 
     <div class="no-print">
         <button onclick="window.print()" class="btn btn-primary">Imprimir</button>
-        <a href="{{ url_for('presupuestos.descargar_pdf_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-success">📄 Descargar PDF</a>
         <a href="{{ url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-secondary">Volver</a>
     </div>
 </body>
