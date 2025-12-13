@@ -10,7 +10,7 @@
     <header>
         <div class="container header-wrapper">
             <a href="{{ url_for('index.index') }}" style="text-decoration: none; display: flex; align-items: center;">
-                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="header-logo">
+                <img src="{{ url_for('static', filename='logo_base.png') }}" alt="Logo" class="header-logo">
             </a>
             <nav>
                 {% if current_user.is_authenticated %}

@@ -11,8 +11,13 @@ index_bp = Blueprint('index', __name__)
 def index():
     """Página principal con lista de pedidos"""
     try:
-        # Obtener todos los pedidos
-        pedidos = Pedido.query.all()
+        # Obtener todos los pedidos con sus relaciones cargadas
+        from sqlalchemy.orm import joinedload
+        from models import LineaPedido
+        pedidos = Pedido.query.options(
+            joinedload(Pedido.cliente),
+            joinedload(Pedido.lineas).joinedload(LineaPedido.prenda)
+        ).all()
         
         # Calcular fecha objetivo de entrega (20 días desde aceptación) y clasificar
         hoy = datetime.now().date()

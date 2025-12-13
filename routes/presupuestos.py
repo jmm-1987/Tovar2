@@ -475,7 +475,8 @@ def editar_presupuesto(presupuesto_id):
             presupuesto.comercial_id = request.form.get('comercial_id')
             presupuesto.cliente_id = request.form.get('cliente_id')
             presupuesto.tipo_pedido = request.form.get('tipo_pedido')
-            presupuesto.estado = request.form.get('estado')
+            # No actualizar el estado al editar, mantener el estado actual
+            # presupuesto.estado se mantiene como está
             presupuesto.forma_pago = request.form.get('forma_pago', '')
             presupuesto.seguimiento = request.form.get('seguimiento', '')
             
@@ -648,15 +649,27 @@ def cambiar_estado_presupuesto(presupuesto_id):
                 try:
                     print(f"DEBUG: Creando pedido para presupuesto {presupuesto.id}")
                     # Crear nuevo pedido basado en el presupuesto
+                    # El estado inicial debe ser "Pendiente" y no establecer fecha_aceptacion hasta que se cambie a "En preparación"
                     pedido = Pedido(
                         comercial_id=presupuesto.comercial_id,
                         cliente_id=presupuesto.cliente_id,
                         tipo_pedido=presupuesto.tipo_pedido,
-                        estado='Pendiente',
+                        estado='Pendiente',  # Estado inicial siempre Pendiente
                         forma_pago=presupuesto.forma_pago or '',
                         imagen_diseno=presupuesto.imagen_diseno,
-                        fecha_aceptacion=hoy,
-                        fecha_objetivo=hoy + timedelta(days=20)  # 20 días desde aceptación
+                        imagen_portada=presupuesto.imagen_portada,
+                        imagen_adicional_1=presupuesto.imagen_adicional_1,
+                        descripcion_imagen_1=presupuesto.descripcion_imagen_1,
+                        imagen_adicional_2=presupuesto.imagen_adicional_2,
+                        descripcion_imagen_2=presupuesto.descripcion_imagen_2,
+                        imagen_adicional_3=presupuesto.imagen_adicional_3,
+                        descripcion_imagen_3=presupuesto.descripcion_imagen_3,
+                        imagen_adicional_4=presupuesto.imagen_adicional_4,
+                        descripcion_imagen_4=presupuesto.descripcion_imagen_4,
+                        imagen_adicional_5=presupuesto.imagen_adicional_5,
+                        descripcion_imagen_5=presupuesto.descripcion_imagen_5,
+                        fecha_aceptacion=None,  # No establecer fecha_aceptacion hasta que se cambie a "En preparación"
+                        fecha_objetivo=None  # Se calculará cuando se establezca fecha_aceptacion
                     )
                     db.session.add(pedido)
                     db.session.flush()  # Para obtener el ID del pedido

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Editar Pedido - Gestión de Pedidos{% endblock %}
+{% block title %}Editar Pedido #{{ pedido.id }} - Gestión de Pedidos{% endblock %}
 
 {% block content %}
 <h2>Editar Pedido #{{ pedido.id }}</h2>
@@ -19,12 +19,26 @@
 
         <div class="form-group-compact">
             <label for="cliente_id">Cliente *</label>
-            <select name="cliente_id" id="cliente_id" required>
-                <option value="">Seleccione un cliente</option>
-                {% for cliente in clientes %}
-                <option value="{{ cliente.id }}" {% if pedido.cliente_id == cliente.id %}selected{% endif %}>{{ cliente.nombre }}</option>
-                {% endfor %}
-            </select>
+            <div style="display: flex; gap: 5px;">
+                <div style="position: relative; flex: 1;">
+                    <input type="text" id="cliente_search" placeholder="🔍 Buscar cliente..." 
+                           value="{% if pedido.cliente %}{{ pedido.cliente.nombre }}{% endif %}"
+                           style="width: 100%; padding: 10px 35px 10px 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; box-sizing: border-box;"
+                           autocomplete="off">
+                    <select name="cliente_id" id="cliente_id" required style="display: none;">
+                        <option value="">Seleccione un cliente</option>
+                        {% for cliente in clientes %}
+                        <option value="{{ cliente.id }}" data-nombre="{{ cliente.nombre|lower }}" {% if pedido.cliente_id == cliente.id %}selected{% endif %}>{{ cliente.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <div id="cliente_results" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px; max-height: 200px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+                </div>
+                <button type="button" onclick="abrirModalCrearCliente()" 
+                        style="padding: 10px 15px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; white-space: nowrap;"
+                        title="Crear nuevo cliente">
+                    ➕
+                </button>
+            </div>
         </div>
 
         <div class="form-group-compact">
@@ -33,19 +47,6 @@
                 <option value="fabricacion" {% if pedido.tipo_pedido == 'fabricacion' %}selected{% endif %}>Fabricación</option>
                 <option value="no fabricacion" {% if pedido.tipo_pedido == 'no fabricacion' %}selected{% endif %}>No Fabricación</option>
                 <option value="cliente web" {% if pedido.tipo_pedido == 'cliente web' %}selected{% endif %}>Cliente Web</option>
-            </select>
-        </div>
-
-        <div class="form-group-compact">
-            <label for="estado">Estado *</label>
-            <select name="estado" id="estado" required>
-                <option value="Pendiente de enviar" {% if pedido.estado == 'Pendiente de enviar' %}selected{% endif %}>Pendiente de enviar</option>
-                <option value="Pendiente" {% if pedido.estado == 'Pendiente' %}selected{% endif %}>Pendiente</option>
-                <option value="Diseño" {% if pedido.estado == 'Diseño' %}selected{% endif %}>Diseño</option>
-                <option value="En preparación" {% if pedido.estado == 'En preparación' %}selected{% endif %}>En preparación</option>
-                <option value="Todo listo" {% if pedido.estado == 'Todo listo' %}selected{% endif %}>Todo listo</option>
-                <option value="Enviado" {% if pedido.estado == 'Enviado' %}selected{% endif %}>Enviado</option>
-                <option value="Entregado al cliente" {% if pedido.estado == 'Entregado al cliente' %}selected{% endif %}>Entregado al cliente</option>
             </select>
         </div>
     </div>
@@ -69,11 +70,11 @@
         <div class="form-group-compact">
             <label for="imagen_diseno">Imagen Diseño</label>
             <input type="file" name="imagen_diseno" id="imagen_diseno" accept="image/*">
+            {% if pedido.imagen_diseno %}
+            <p style="font-size: 0.85em; color: #666; margin-top: 5px;">Imagen actual: <a href="{{ url_for('static', filename='uploads/' + pedido.imagen_diseno) }}" target="_blank">{{ pedido.imagen_diseno }}</a></p>
+            {% endif %}
         </div>
     </div>
-    {% if pedido.imagen_diseno %}
-    <p style="font-size: 0.8rem; color: #666; margin-top: -10px; margin-bottom: 15px;">Imagen actual: <a href="{{ url_for('static', filename='uploads/' + pedido.imagen_diseno) }}" target="_blank">{{ pedido.imagen_diseno }}</a></p>
-    {% endif %}
     <small style="color: #666; font-size: 11px; display: block; margin-top: -10px; margin-bottom: 15px;">La fecha objetivo se calcula automáticamente (20 días desde aceptación) si se deja vacía</small>
 
     <div class="form-row-compact">
@@ -97,60 +98,114 @@
 
     <h3>Prendas del Pedido</h3>
     <div id="prendas-container">
-        {% for linea in pedido.lineas %}
+        {% if pedido.lineas %}
+            {% for linea in pedido.lineas %}
+            <div class="linea-pedido-row">
+                <div class="linea-pedido-numero">#{{ loop.index }}</div>
+                <div class="linea-pedido-campos">
+                    <!-- Orden: nombre_mostrar, unidades, modelo, color, forma, sexo, talla, tejido, precio -->
+                    <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" value="{{ linea.nombre_mostrar or '' }}" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 0 0 750px; width: 750px;">
+                    <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="{{ linea.cantidad }}" min="1" required placeholder="Unidades *" title="Unidades">
+                    <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo">
+                        <option value="">Modelo *</option>
+                        {% for prenda in prendas %}
+                        <option value="{{ prenda.id }}" {% if linea.prenda_id == prenda.id %}selected{% endif %}>{{ prenda.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" name="color[]" class="linea-campo-compact" value="{{ linea.color or '' }}" placeholder="Color" title="Color">
+                    <input type="text" name="forma[]" class="linea-campo-compact" value="{{ linea.forma or '' }}" placeholder="Forma" title="Forma">
+                    <select name="sexo[]" class="linea-campo-compact" title="Sexo">
+                        <option value="">Sexo</option>
+                        <option value="cro" {% if linea.sexo == 'cro' %}selected{% endif %}>Cro</option>
+                        <option value="sra" {% if linea.sexo == 'sra' %}selected{% endif %}>Sra</option>
+                        <option value="unisex" {% if linea.sexo == 'unisex' %}selected{% endif %}>Unisex</option>
+                    </select>
+                    <input type="text" name="talla[]" class="linea-campo-compact" value="{{ linea.talla or '' }}" placeholder="Talla" title="Talla">
+                    <select name="tejido[]" class="linea-campo-compact" title="Tejido">
+                        <option value="">Tejido</option>
+                        <option value="SARGA" {% if linea.tejido == 'SARGA' %}selected{% endif %}>SARGA</option>
+                        <option value="MICRO" {% if linea.tejido == 'MICRO' %}selected{% endif %}>MICRO</option>
+                        <option value="NUEVO T.POLO" {% if linea.tejido == 'NUEVO T.POLO' %}selected{% endif %}>NUEVO T.POLO</option>
+                        <option value="T.CAMISETA" {% if linea.tejido == 'T.CAMISETA' %}selected{% endif %}>T.CAMISETA</option>
+                        <option value="T.SHOFT" {% if linea.tejido == 'T.SHOFT' %}selected{% endif %}>T.SHOFT</option>
+                    </select>
+                    <input type="number" name="precio_unitario[]" class="linea-campo-compact" step="0.01" min="0" value="{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '' }}" placeholder="Precio €" title="Precio" style="flex: 0 0 100px; width: 100px;">
+                    <select name="estado_linea[]" class="linea-campo-compact" required title="Estado">
+                        <option value="pendiente" {% if (linea.estado or 'pendiente') == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                        <option value="en confección" {% if (linea.estado or 'pendiente') == 'en confección' %}selected{% endif %}>En confección</option>
+                        <option value="en bordado" {% if (linea.estado or 'pendiente') == 'en bordado' %}selected{% endif %}>En bordado</option>
+                        <option value="listo" {% if (linea.estado or 'pendiente') == 'listo' %}selected{% endif %}>Listo</option>
+                    </select>
+                    
+                    <!-- Campos personalizados (nombre y cargo) - se muestran al final si tienen valor o si se activa personalización -->
+                    {% set mostrarPersonalizados = linea.nombre or linea.cargo %}
+                    <input type="text" name="nombre[]" class="linea-campo-compact campo-personalizado" value="{{ linea.nombre or '' }}" placeholder="Nombre personalizado" title="Nombre personalizado" style="display: {% if mostrarPersonalizados %}block{% else %}none{% endif %}; flex: 2.5;">
+                    <input type="text" name="cargo[]" class="linea-campo-compact campo-personalizado" value="{{ linea.cargo or '' }}" placeholder="Cargo" title="Cargo" style="display: {% if mostrarPersonalizados %}block{% else %}none{% endif %};">
+                </div>
+                <div class="linea-acciones">
+                    <button type="button" class="btn-duplicar" onclick="duplicarLinea(this)" title="Duplicar línea (mantiene todo excepto talla y unidades)">
+                        📋
+                    </button>
+                    <button type="button" class="btn-personalizar {% if mostrarPersonalizados %}active{% endif %}" onclick="togglePersonalizar(this)" title="Personalizar nombre y cargo" style="{% if mostrarPersonalizados %}background: #3498db; opacity: 1;{% else %}background: #95a5a6; opacity: 0.7;{% endif %}">
+                        ✏️
+                    </button>
+                    <button type="button" class="btn-remove-linea-inline" onclick="eliminarLinea(this)">×</button>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
         <div class="linea-pedido-row">
-            <div class="linea-pedido-numero">#{{ loop.index }}</div>
+            <div class="linea-pedido-numero">#1</div>
             <div class="linea-pedido-campos">
                 <!-- Orden: nombre_mostrar, unidades, modelo, color, forma, sexo, talla, tejido, precio -->
-                <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" value="{{ linea.nombre_mostrar or '' }}" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 3.5;">
-                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="{{ linea.cantidad }}" min="1" required placeholder="Unidades *" title="Unidades">
+                <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 0 0 750px; width: 750px;">
+                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="1" min="1" required placeholder="Unidades *" title="Unidades">
                 <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo">
                     <option value="">Modelo *</option>
                     {% for prenda in prendas %}
-                    <option value="{{ prenda.id }}" {% if linea.prenda_id == prenda.id %}selected{% endif %}>{{ prenda.nombre }}</option>
+                    <option value="{{ prenda.id }}">{{ prenda.nombre }}</option>
                     {% endfor %}
                 </select>
-                <input type="text" name="color[]" class="linea-campo-compact" value="{{ linea.color or '' }}" placeholder="Color" title="Color">
-                <input type="text" name="forma[]" class="linea-campo-compact" value="{{ linea.forma or '' }}" placeholder="Forma" title="Forma">
+                <input type="text" name="color[]" class="linea-campo-compact" placeholder="Color" title="Color">
+                <input type="text" name="forma[]" class="linea-campo-compact" placeholder="Forma" title="Forma">
                 <select name="sexo[]" class="linea-campo-compact" title="Sexo">
                     <option value="">Sexo</option>
-                    <option value="cro" {% if linea.sexo == 'cro' %}selected{% endif %}>Cro</option>
-                    <option value="sra" {% if linea.sexo == 'sra' %}selected{% endif %}>Sra</option>
-                    <option value="unisex" {% if linea.sexo == 'unisex' %}selected{% endif %}>Unisex</option>
+                    <option value="cro">Cro</option>
+                    <option value="sra">Sra</option>
+                    <option value="unisex">Unisex</option>
                 </select>
-                <input type="text" name="talla[]" class="linea-campo-compact" value="{{ linea.talla or '' }}" placeholder="Talla" title="Talla">
+                <input type="text" name="talla[]" class="linea-campo-compact" placeholder="Talla" title="Talla">
                 <select name="tejido[]" class="linea-campo-compact" title="Tejido">
                     <option value="">Tejido</option>
-                    <option value="SARGA" {% if linea.tejido == 'SARGA' %}selected{% endif %}>SARGA</option>
-                    <option value="MICRO" {% if linea.tejido == 'MICRO' %}selected{% endif %}>MICRO</option>
-                    <option value="NUEVO T.POLO" {% if linea.tejido == 'NUEVO T.POLO' %}selected{% endif %}>NUEVO T.POLO</option>
-                    <option value="T.CAMISETA" {% if linea.tejido == 'T.CAMISETA' %}selected{% endif %}>T.CAMISETA</option>
-                    <option value="T.SHOFT" {% if linea.tejido == 'T.SHOFT' %}selected{% endif %}>T.SHOFT</option>
+                    <option value="SARGA">SARGA</option>
+                    <option value="MICRO">MICRO</option>
+                    <option value="NUEVO T.POLO">NUEVO T.POLO</option>
+                    <option value="T.CAMISETA">T.CAMISETA</option>
+                    <option value="T.SHOFT">T.SHOFT</option>
                 </select>
-                <input type="number" name="precio_unitario[]" class="linea-campo-compact" step="0.01" min="0" value="{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '' }}" placeholder="Precio €" title="Precio" style="flex: 0.5;">
+                <input type="number" name="precio_unitario[]" class="linea-campo-compact" step="0.01" min="0" placeholder="Precio €" title="Precio" style="flex: 0 0 100px; width: 100px;">
                 <select name="estado_linea[]" class="linea-campo-compact" required title="Estado">
-                    <option value="pendiente" {% if (linea.estado or 'pendiente') == 'pendiente' %}selected{% endif %}>Pendiente</option>
-                    <option value="en confección" {% if (linea.estado or 'pendiente') == 'en confección' %}selected{% endif %}>En confección</option>
-                    <option value="en bordado" {% if (linea.estado or 'pendiente') == 'en bordado' %}selected{% endif %}>En bordado</option>
-                    <option value="listo" {% if (linea.estado or 'pendiente') == 'listo' %}selected{% endif %}>Listo</option>
+                    <option value="pendiente" selected>Pendiente</option>
+                    <option value="en confección">En confección</option>
+                    <option value="en bordado">En bordado</option>
+                    <option value="listo">Listo</option>
                 </select>
                 
                 <!-- Campos personalizados (nombre y cargo) - se muestran al final si tienen valor o si se activa personalización -->
-                {% set mostrarPersonalizados = linea.nombre or linea.cargo %}
-                <input type="text" name="nombre[]" class="linea-campo-compact campo-personalizado" value="{{ linea.nombre or '' }}" placeholder="Nombre personalizado" title="Nombre personalizado" style="display: {% if mostrarPersonalizados %}block{% else %}none{% endif %}; flex: 2.5;">
-                <input type="text" name="cargo[]" class="linea-campo-compact campo-personalizado" value="{{ linea.cargo or '' }}" placeholder="Cargo" title="Cargo" style="display: {% if mostrarPersonalizados %}block{% else %}none{% endif %};">
+                <input type="text" name="nombre[]" class="linea-campo-compact campo-personalizado" placeholder="Nombre personalizado" title="Nombre personalizado" style="display: none; flex: 2.5;">
+                <input type="text" name="cargo[]" class="linea-campo-compact campo-personalizado" placeholder="Cargo" title="Cargo" style="display: none;">
             </div>
             <div class="linea-acciones">
                 <button type="button" class="btn-duplicar" onclick="duplicarLinea(this)" title="Duplicar línea (mantiene todo excepto talla y unidades)">
                     📋
                 </button>
-                <button type="button" class="btn-personalizar {% if mostrarPersonalizados %}active{% endif %}" onclick="togglePersonalizar(this)" title="Personalizar nombre y cargo" style="{% if mostrarPersonalizados %}background: #3498db; opacity: 1;{% endif %}">
+                <button type="button" class="btn-personalizar" onclick="togglePersonalizar(this)" title="Personalizar nombre y cargo">
                     ✏️
                 </button>
                 <button type="button" class="btn-remove-linea-inline" onclick="eliminarLinea(this)">×</button>
             </div>
         </div>
-        {% endfor %}
+        {% endif %}
     </div>
 
     <button type="button" class="btn btn-primary" onclick="agregarLinea()">Agregar Prenda</button>
@@ -162,8 +217,6 @@
 </form>
 
 <script>
-let contadorPrendas = {{ pedido.lineas|length }};
-
 // Función para calcular automáticamente la fecha objetivo
 function calcularFechaObjetivo() {
     const fechaAceptacion = document.getElementById('fecha_aceptacion').value;
@@ -181,6 +234,7 @@ function calcularFechaObjetivo() {
 
 document.getElementById('fecha_aceptacion').addEventListener('change', calcularFechaObjetivo);
 
+let contadorPrendas = {{ pedido.lineas|length if pedido.lineas else 1 }};
 function agregarLinea() {
     contadorPrendas++;
     const container = document.getElementById('prendas-container');
@@ -325,6 +379,406 @@ function duplicarLinea(btn) {
     lineaRow.parentNode.insertBefore(nuevaLinea, lineaRow.nextSibling);
     renumerarPrendas();
 }
-</script>
-{% endblock %}
 
+// Buscador de clientes
+document.addEventListener('DOMContentLoaded', function() {
+    const clienteSearch = document.getElementById('cliente_search');
+    const clienteSelect = document.getElementById('cliente_id');
+    const clienteResults = document.getElementById('cliente_results');
+    const clientes = Array.from(clienteSelect.options).slice(1).map(opt => ({
+        id: opt.value,
+        nombre: opt.textContent,
+        nombreLower: opt.getAttribute('data-nombre') || opt.textContent.toLowerCase()
+    }));
+    
+    // Establecer el cliente seleccionado inicialmente
+    let selectedClienteId = clienteSelect.value;
+    let selectedClienteNombre = clienteSearch.value;
+    
+    clienteSearch.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        
+        if (searchTerm === '') {
+            clienteResults.style.display = 'none';
+            if (!selectedClienteId) {
+                clienteSelect.value = '';
+            }
+            return;
+        }
+        
+        // Filtrar clientes
+        const filtered = clientes.filter(cliente => 
+            cliente.nombreLower.includes(searchTerm)
+        );
+        
+        if (filtered.length === 0) {
+            clienteResults.innerHTML = '<div style="padding: 10px; color: #999; text-align: center;">No se encontraron clientes</div>';
+            clienteResults.style.display = 'block';
+            return;
+        }
+        
+        // Mostrar resultados
+        clienteResults.innerHTML = filtered.map(cliente => 
+            `<div class="cliente-option" data-id="${cliente.id}" data-nombre="${cliente.nombre}" 
+                  style="padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; transition: background 0.2s;"
+                  onmouseover="this.style.background='#f0f0f0'" 
+                  onmouseout="this.style.background='white'"
+                  onclick="selectCliente(${cliente.id}, '${cliente.nombre.replace(/'/g, "\\'")}')">
+                ${cliente.nombre}
+            </div>`
+        ).join('');
+        
+        clienteResults.style.display = 'block';
+    });
+    
+    // Ocultar resultados al hacer clic fuera
+    document.addEventListener('click', function(e) {
+        if (!clienteSearch.contains(e.target) && !clienteResults.contains(e.target)) {
+            clienteResults.style.display = 'none';
+        }
+    });
+    
+    // Función para seleccionar cliente
+    window.selectCliente = function(id, nombre) {
+        selectedClienteId = id;
+        selectedClienteNombre = nombre;
+        clienteSearch.value = nombre;
+        clienteSelect.value = id;
+        clienteResults.style.display = 'none';
+    };
+    
+    // Validar antes de enviar
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (!selectedClienteId && !clienteSelect.value) {
+                e.preventDefault();
+                alert('Por favor, seleccione un cliente');
+                clienteSearch.focus();
+                return false;
+            }
+            // Asegurar que el select tenga el valor correcto
+            if (selectedClienteId) {
+                clienteSelect.value = selectedClienteId;
+            }
+        });
+    }
+});
+
+// Funciones para el modal de crear cliente
+function abrirModalCrearCliente() {
+    document.getElementById('modalCrearClientePedido').style.display = 'block';
+}
+
+function cerrarModalCrearClientePedido() {
+    document.getElementById('modalCrearClientePedido').style.display = 'none';
+    document.getElementById('formCrearClientePedido').reset();
+}
+
+// Manejar el envío del formulario de crear cliente
+document.getElementById('formCrearClientePedido').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creando...';
+    
+    fetch('{{ url_for("presupuestos.crear_cliente_ajax") }}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Agregar el nuevo cliente al select
+            const clienteSelect = document.getElementById('cliente_id');
+            const newOption = document.createElement('option');
+            newOption.value = data.cliente.id;
+            newOption.textContent = data.cliente.nombre;
+            newOption.setAttribute('data-nombre', data.cliente.nombre.toLowerCase());
+            clienteSelect.appendChild(newOption);
+            
+            // Seleccionar el nuevo cliente
+            selectCliente(data.cliente.id, data.cliente.nombre);
+            
+            // Cerrar modal y limpiar formulario
+            cerrarModalCrearClientePedido();
+            
+            alert('Cliente creado correctamente');
+        } else {
+            alert('Error al crear cliente: ' + data.error);
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    })
+    .catch(error => {
+        alert('Error al crear cliente: ' + error);
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    });
+});
+
+// Cerrar modal al hacer clic fuera
+window.onclick = function(event) {
+    const modal = document.getElementById('modalCrearClientePedido');
+    if (event.target == modal) {
+        cerrarModalCrearClientePedido();
+    }
+}
+</script>
+
+<!-- Modal para crear cliente desde pedido -->
+<div id="modalCrearClientePedido" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-header">
+            <h3>Crear Nuevo Cliente</h3>
+            <span class="close" onclick="cerrarModalCrearClientePedido()">&times;</span>
+        </div>
+        <form id="formCrearClientePedido" class="modal-form">
+            <div class="form-section">
+                <h4>Información Principal</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nombre_cliente_modal">Nombre *</label>
+                        <input type="text" name="nombre" id="nombre_cliente_modal" required placeholder="Nombre o razón social">
+                    </div>
+                    <div class="form-group">
+                        <label for="alias_cliente_modal">Alias</label>
+                        <input type="text" name="alias" id="alias_cliente_modal" placeholder="Alias">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nif_cliente_modal">NIF/CIF</label>
+                        <input type="text" name="nif" id="nif_cliente_modal" placeholder="A15022510" maxlength="20">
+                    </div>
+                    <div class="form-group">
+                        <label for="fecha_alta_cliente_modal">Fecha de Alta</label>
+                        <input type="date" name="fecha_alta" id="fecha_alta_cliente_modal">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="comercial_id_cliente_modal">Comercial Asignado</label>
+                        <select name="comercial_id" id="comercial_id_cliente_modal">
+                            <option value="">Sin comercial asignado</option>
+                            {% for comercial in comerciales %}
+                            <option value="{{ comercial.id }}">{{ comercial.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Contacto</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="telefono_cliente_modal">Teléfono</label>
+                        <input type="text" name="telefono" id="telefono_cliente_modal" placeholder="Teléfono fijo">
+                    </div>
+                    <div class="form-group">
+                        <label for="movil_cliente_modal">Móvil</label>
+                        <input type="text" name="movil" id="movil_cliente_modal" placeholder="Teléfono móvil">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="email_cliente_modal">Email</label>
+                    <input type="email" name="email" id="email_cliente_modal" placeholder="email@ejemplo.com">
+                </div>
+                <div class="form-group">
+                    <label for="personas_contacto_cliente_modal">Personas de Contacto</label>
+                    <textarea name="personas_contacto" id="personas_contacto_cliente_modal" rows="2" placeholder="Nombre, teléfono, email"></textarea>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Dirección</h4>
+                <div class="form-group">
+                    <label for="direccion_cliente_modal">Dirección</label>
+                    <textarea name="direccion" id="direccion_cliente_modal" rows="2" placeholder="Dirección completa"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="poblacion_cliente_modal">Población</label>
+                        <input type="text" name="poblacion" id="poblacion_cliente_modal" placeholder="Ciudad">
+                    </div>
+                    <div class="form-group">
+                        <label for="provincia_cliente_modal">Provincia</label>
+                        <input type="text" name="provincia" id="provincia_cliente_modal" placeholder="Provincia">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="codigo_postal_cliente_modal">Código Postal</label>
+                        <input type="text" name="codigo_postal" id="codigo_postal_cliente_modal" placeholder="28001" maxlength="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="pais_cliente_modal">País</label>
+                        <input type="text" name="pais" id="pais_cliente_modal" placeholder="España" value="España">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Anotaciones</h4>
+                <div class="form-group">
+                    <label for="anotaciones_cliente_modal">Anotaciones</label>
+                    <textarea name="anotaciones" id="anotaciones_cliente_modal" rows="2" placeholder="Notas adicionales"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Crear Cliente</button>
+                <button type="button" class="btn btn-secondary" onclick="cerrarModalCrearClientePedido()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    overflow-y: auto;
+}
+
+.modal-content {
+    background-color: white;
+    margin: 3% auto;
+    padding: 0;
+    border-radius: 10px;
+    max-width: 700px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 2px solid #e0e0e0;
+    background: #f8f9fa;
+    border-radius: 10px 10px 0 0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.close {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 20px;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.modal-form {
+    padding: 20px;
+}
+
+.form-section {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.form-section:last-child {
+    border-bottom: none;
+}
+
+.form-section h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #2c3e50;
+    font-size: 16px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #555;
+    font-size: 14px;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 2px solid #e0e0e0;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+</style>
+{% endblock %}

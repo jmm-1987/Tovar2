@@ -52,7 +52,7 @@
                 <ul class="pedido-lineas-list">
                     {% for linea in pedido.lineas %}
                     <li class="linea-item">
-                        <span class="linea-nombre">{{ linea.nombre }}</span>
+                        <span class="linea-nombre">{{ linea.prenda.nombre if linea.prenda else 'N/A' }}</span>
                         <span class="badge badge-estado-linea badge-estado-{{ linea.estado.lower()|replace(' ', '-')|replace('ó', 'o')|replace('í', 'i')|replace('é', 'e') }}">{{ linea.estado }}</span>
                     </li>
                     {% endfor %}

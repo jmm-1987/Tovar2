@@ -144,6 +144,45 @@ def migrate_database():
                     with db.engine.connect() as conn:
                         conn.execute(text('ALTER TABLE pedidos ADD COLUMN fecha_objetivo DATE'))
                         conn.commit()
+                
+                # Verificar y agregar columnas de imágenes para el PDF
+                nuevas_columnas_imagenes = {
+                    'imagen_portada': 'VARCHAR(255)',
+                    'imagen_adicional_1': 'VARCHAR(255)',
+                    'imagen_adicional_2': 'VARCHAR(255)',
+                    'imagen_adicional_3': 'VARCHAR(255)',
+                    'imagen_adicional_4': 'VARCHAR(255)',
+                    'imagen_adicional_5': 'VARCHAR(255)'
+                }
+                for columna, tipo in nuevas_columnas_imagenes.items():
+                    if columna not in columns:
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(text(f'ALTER TABLE pedidos ADD COLUMN {columna} {tipo}'))
+                                conn.commit()
+                                print(f"Migración: Columna {columna} agregada exitosamente a pedidos")
+                        except Exception as e:
+                            print(f"Error al agregar columna {columna} a pedidos: {e}")
+                            pass
+                
+                # Verificar y agregar columnas de descripciones de imágenes
+                columnas_descripciones = {
+                    'descripcion_imagen_1': 'TEXT',
+                    'descripcion_imagen_2': 'TEXT',
+                    'descripcion_imagen_3': 'TEXT',
+                    'descripcion_imagen_4': 'TEXT',
+                    'descripcion_imagen_5': 'TEXT'
+                }
+                for columna, tipo in columnas_descripciones.items():
+                    if columna not in columns:
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(text(f'ALTER TABLE pedidos ADD COLUMN {columna} {tipo}'))
+                                conn.commit()
+                                print(f"Migración: Columna {columna} agregada exitosamente a pedidos")
+                        except Exception as e:
+                            print(f"Error al agregar columna {columna} a pedidos: {e}")
+                            pass
             else:
                 # Si no existe la tabla, crearla
                 db.create_all()

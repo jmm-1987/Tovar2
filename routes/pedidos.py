@@ -102,7 +102,7 @@ def nuevo_pedido():
                 comercial_id=request.form.get('comercial_id'),
                 cliente_id=request.form.get('cliente_id'),
                 tipo_pedido=request.form.get('tipo_pedido'),
-                estado='Pendiente de enviar',  # Siempre se establece como Pendiente de enviar al crear
+                estado='Pendiente',  # Siempre se establece como Pendiente al crear
                 forma_pago=request.form.get('forma_pago', ''),
                 fecha_aceptacion=fecha_aceptacion,
                 fecha_objetivo=fecha_objetivo
@@ -197,8 +197,13 @@ def editar_pedido(pedido_id):
             pedido.comercial_id = request.form.get('comercial_id')
             pedido.cliente_id = request.form.get('cliente_id')
             pedido.tipo_pedido = request.form.get('tipo_pedido')
-            pedido.estado = request.form.get('estado')
+            # No actualizar el estado al editar, mantener el estado actual
+            # pedido.estado se mantiene como está
             pedido.forma_pago = request.form.get('forma_pago', '')
+            
+            # Actualizar fecha_objetivo si se proporciona
+            if request.form.get('fecha_objetivo'):
+                pedido.fecha_objetivo = datetime.strptime(request.form.get('fecha_objetivo'), '%Y-%m-%d').date()
             
             # Fechas
             if request.form.get('fecha_aceptacion'):
@@ -356,7 +361,6 @@ def cambiar_estado_pedido(pedido_id):
         
         # Mapeo de estados a fechas y nombres de estado
         estados_fechas = {
-            'Pendiente de enviar': (None, 'Pendiente de enviar'),
             'Pendiente': (None, 'Pendiente'),
             'Diseño': (None, 'Diseño'),
             'En preparación': ('fecha_aceptacion', 'En preparación'),
