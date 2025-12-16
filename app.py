@@ -151,6 +151,24 @@ def migrate_database():
                         conn.execute(text('ALTER TABLE pedidos ADD COLUMN fecha_objetivo DATE'))
                         conn.commit()
                 
+                # Verificar y agregar columnas de fechas por estado
+                nuevas_fechas_estado = {
+                    'fecha_pendiente': 'DATE',
+                    'fecha_diseno': 'DATE',
+                    'fecha_todo_listo': 'DATE',
+                    'fecha_enviado': 'DATE'
+                }
+                for columna, tipo in nuevas_fechas_estado.items():
+                    if columna not in columns:
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(text(f'ALTER TABLE pedidos ADD COLUMN {columna} {tipo}'))
+                                conn.commit()
+                                print(f"Migración: Columna {columna} agregada exitosamente a pedidos")
+                        except Exception as e:
+                            print(f"Error al agregar columna {columna} a pedidos: {e}")
+                            pass
+                
                 # Verificar y agregar columna presupuesto_id
                 if 'presupuesto_id' not in columns:
                     try:

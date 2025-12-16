@@ -140,7 +140,11 @@
                     Pendiente
                 </button>
             </form>
+            {% if pedido.fecha_creacion %}
+            <p style="margin-top: 5px; font-size: 11px; color: #666; margin-bottom: 0;">{{ pedido.fecha_creacion.strftime('%d/%m/%Y') }}</p>
+            {% else %}
             <p style="margin-top: 5px; font-size: 11px; color: #999; margin-bottom: 0;">-</p>
+            {% endif %}
         </div>
         
         <div style="display: flex; flex-direction: column; align-items: center; min-width: 100px;">
@@ -151,7 +155,11 @@
                     Diseño
                 </button>
             </form>
+            {% if pedido.fecha_diseno %}
+            <p style="margin-top: 5px; font-size: 11px; color: #666; margin-bottom: 0;">{{ pedido.fecha_diseno.strftime('%d/%m/%Y') }}</p>
+            {% else %}
             <p style="margin-top: 5px; font-size: 11px; color: #999; margin-bottom: 0;">-</p>
+            {% endif %}
         </div>
         
         <div style="display: flex; flex-direction: column; align-items: center; min-width: 130px;">
@@ -183,7 +191,11 @@
                     Todo listo
                 </button>
             </form>
+            {% if pedido.fecha_todo_listo %}
+            <p style="margin-top: 5px; font-size: 11px; color: #666; margin-bottom: 0;">{{ pedido.fecha_todo_listo.strftime('%d/%m/%Y') }}</p>
+            {% else %}
             <p style="margin-top: 5px; font-size: 11px; color: #999; margin-bottom: 0;">-</p>
+            {% endif %}
         </div>
         
         <div style="display: flex; flex-direction: column; align-items: center; min-width: 100px;">
@@ -194,7 +206,11 @@
                     Enviado
                 </button>
             </form>
+            {% if pedido.fecha_enviado %}
+            <p style="margin-top: 5px; font-size: 11px; color: #666; margin-bottom: 0;">{{ pedido.fecha_enviado.strftime('%d/%m/%Y') }}</p>
+            {% else %}
             <p style="margin-top: 5px; font-size: 11px; color: #999; margin-bottom: 0;">-</p>
+            {% endif %}
         </div>
         
         <div style="display: flex; flex-direction: column; align-items: center; min-width: 150px;">

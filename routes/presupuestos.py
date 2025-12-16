@@ -691,6 +691,11 @@ def cambiar_estado_presupuesto(presupuesto_id):
                     )
                     db.session.add(pedido)
                     db.session.flush()  # Para obtener el ID del pedido
+                    
+                    # Establecer fecha_pendiente con fecha_creacion (ya que el estado inicial es Pendiente)
+                    if pedido.fecha_creacion:
+                        pedido.fecha_pendiente = pedido.fecha_creacion.date()
+                    
                     print(f"DEBUG: Pedido creado con ID: {pedido.id}")
                     
                     # Copiar las líneas del presupuesto al pedido

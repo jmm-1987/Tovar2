@@ -151,6 +151,12 @@ class Pedido(db.Model):
     fecha_entrega_bordados = db.Column(db.Date)
     fecha_entrega_cliente = db.Column(db.Date)
     
+    # Fechas por estado (se guardan y no se sobrescriben)
+    fecha_pendiente = db.Column(db.Date)  # Fecha cuando se marcó como Pendiente (usa fecha_creacion si no existe)
+    fecha_diseno = db.Column(db.Date)  # Fecha cuando se marcó como Diseño
+    fecha_todo_listo = db.Column(db.Date)  # Fecha cuando se marcó como Todo listo
+    fecha_enviado = db.Column(db.Date)  # Fecha cuando se marcó como Enviado
+    
     # Timestamp
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
     

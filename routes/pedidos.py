@@ -130,6 +130,10 @@ def nuevo_pedido():
             db.session.add(pedido)
             db.session.flush()  # Para obtener el ID del pedido
             
+            # Establecer fecha_pendiente con fecha_creacion (ya que el estado inicial es Pendiente)
+            if pedido.fecha_creacion:
+                pedido.fecha_pendiente = pedido.fecha_creacion.date()
+            
             # Crear líneas de pedido
             prenda_ids = request.form.getlist('prenda_id[]')
             nombres = request.form.getlist('nombre[]')  # Mantenido para compatibilidad
@@ -369,11 +373,11 @@ def cambiar_estado_pedido(pedido_id):
         
         # Mapeo de estados a fechas y nombres de estado
         estados_fechas = {
-            'Pendiente': (None, 'Pendiente'),
-            'Diseño': (None, 'Diseño'),
+            'Pendiente': ('fecha_pendiente', 'Pendiente'),
+            'Diseño': ('fecha_diseno', 'Diseño'),
             'En preparación': ('fecha_aceptacion', 'En preparación'),
-            'Todo listo': (None, 'Todo listo'),
-            'Enviado': (None, 'Enviado'),
+            'Todo listo': ('fecha_todo_listo', 'Todo listo'),
+            'Enviado': ('fecha_enviado', 'Enviado'),
             'Entregado al cliente': ('fecha_entrega_cliente', 'Entregado al cliente')
         }
         
@@ -383,9 +387,19 @@ def cambiar_estado_pedido(pedido_id):
             # Actualizar el estado
             pedido.estado = estado_nombre
             
-            # Si tiene fecha asociada, actualizar la fecha a hoy
+            # Guardar la fecha solo si no existe (no sobrescribir fechas anteriores)
             if fecha_campo:
-                setattr(pedido, fecha_campo, hoy)
+                fecha_actual = getattr(pedido, fecha_campo)
+                if not fecha_actual:  # Solo establecer si no tiene fecha
+                    setattr(pedido, fecha_campo, hoy)
+            
+            # Para "Pendiente", usar fecha_creacion si no tiene fecha_pendiente
+            if estado_nombre == 'Pendiente' and not pedido.fecha_pendiente and pedido.fecha_creacion:
+                pedido.fecha_pendiente = pedido.fecha_creacion.date()
+            
+            # Para "En preparación", también calcular fecha_objetivo si no existe
+            if estado_nombre == 'En preparación' and not pedido.fecha_objetivo:
+                pedido.fecha_objetivo = hoy + timedelta(days=20)
             
             db.session.commit()
             
