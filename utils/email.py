@@ -181,6 +181,7 @@ def _slug_estado(estado: str) -> str:
         .replace('é', 'e')
         .replace('á', 'a')
         .replace('ú', 'u')
+        .replace('ñ', 'n')  # Convertir ñ a n
     )
     return slug
 
