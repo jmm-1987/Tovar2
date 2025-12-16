@@ -19,10 +19,25 @@ def listado_presupuestos():
     """Listado de presupuestos con filtros"""
     query = Presupuesto.query
     
-    # Filtro por estado
+    # Estados que se muestran por defecto
+    estados_por_defecto = ['Pendiente de enviar', 'En diseño', 'Enviados']
+    
+    # Verificar si se deben mostrar rechazados y aceptados
+    mostrar_rechazados = request.args.get('mostrar_rechazados', '') == 'on'
+    mostrar_aceptados = request.args.get('mostrar_aceptados', '') == 'on'
+    
+    # Filtro por estado específico (si se selecciona uno del dropdown)
     estado_filtro = request.args.get('estado', '')
     if estado_filtro:
         query = query.filter(Presupuesto.estado == estado_filtro)
+    else:
+        # Si no hay filtro específico, aplicar filtro por defecto
+        estados_a_mostrar = estados_por_defecto.copy()
+        if mostrar_rechazados:
+            estados_a_mostrar.append('Rechazado')
+        if mostrar_aceptados:
+            estados_a_mostrar.append('Aceptado')
+        query = query.filter(Presupuesto.estado.in_(estados_a_mostrar))
     
     # Filtro por fecha desde
     fecha_desde = request.args.get('fecha_desde', '')
@@ -53,7 +68,9 @@ def listado_presupuestos():
                          estados=estados_list,
                          estado_filtro=estado_filtro,
                          fecha_desde=fecha_desde,
-                         fecha_hasta=fecha_hasta)
+                         fecha_hasta=fecha_hasta,
+                         mostrar_rechazados=mostrar_rechazados,
+                         mostrar_aceptados=mostrar_aceptados)
 
 @presupuestos_bp.route('/presupuestos/nuevo', methods=['GET', 'POST'])
 def nuevo_presupuesto():
@@ -653,6 +670,7 @@ def cambiar_estado_presupuesto(presupuesto_id):
                     pedido = Pedido(
                         comercial_id=presupuesto.comercial_id,
                         cliente_id=presupuesto.cliente_id,
+                        presupuesto_id=presupuesto.id,  # Guardar referencia al presupuesto
                         tipo_pedido=presupuesto.tipo_pedido,
                         estado='Pendiente',  # Estado inicial siempre Pendiente
                         forma_pago=presupuesto.forma_pago or '',
@@ -737,6 +755,34 @@ def actualizar_seguimiento(presupuesto_id):
     except Exception as e:
         db.session.rollback()
         flash(f'Error al actualizar seguimiento: {str(e)}', 'error')
+    
+    return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
+
+@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/lineas/<int:linea_id>/cambiar-estado', methods=['POST'])
+@login_required
+def cambiar_estado_linea_presupuesto(presupuesto_id, linea_id):
+    """Cambiar el estado de una línea de presupuesto"""
+    linea = LineaPresupuesto.query.get_or_404(linea_id)
+    nuevo_estado = request.form.get('estado')
+    
+    # Validar que la línea pertenece al presupuesto
+    if linea.presupuesto_id != presupuesto_id:
+        flash('La línea no pertenece a este presupuesto', 'error')
+        return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
+    
+    # Validar estados permitidos
+    estados_permitidos = ['pendiente', 'en confección', 'en bordado', 'listo']
+    
+    try:
+        if nuevo_estado in estados_permitidos:
+            linea.estado = nuevo_estado
+            db.session.commit()
+            flash(f'Estado de la línea "{linea.nombre_mostrar or linea.nombre}" cambiado a "{nuevo_estado}"', 'success')
+        else:
+            flash('Estado no válido', 'error')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al cambiar el estado: {str(e)}', 'error')
     
     return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
 

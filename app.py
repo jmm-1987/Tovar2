@@ -145,6 +145,18 @@ def migrate_database():
                         conn.execute(text('ALTER TABLE pedidos ADD COLUMN fecha_objetivo DATE'))
                         conn.commit()
                 
+                # Verificar y agregar columna presupuesto_id
+                if 'presupuesto_id' not in columns:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE pedidos ADD COLUMN presupuesto_id INTEGER'))
+                            conn.execute(text('ALTER TABLE pedidos ADD CONSTRAINT fk_pedido_presupuesto FOREIGN KEY (presupuesto_id) REFERENCES presupuestos(id)'))
+                            conn.commit()
+                            print("Migración: Columna presupuesto_id agregada exitosamente a pedidos")
+                    except Exception as e:
+                        print(f"Error al agregar columna presupuesto_id a pedidos: {e}")
+                        pass
+                
                 # Verificar y agregar columnas de imágenes para el PDF
                 nuevas_columnas_imagenes = {
                     'imagen_portada': 'VARCHAR(255)',
@@ -196,6 +208,17 @@ def migrate_database():
                     with db.engine.connect() as conn:
                         conn.execute(text("ALTER TABLE lineas_pedido ADD COLUMN estado VARCHAR(50) DEFAULT 'pendiente'"))
                         conn.commit()
+            
+            # Verificar si existe la tabla lineas_presupuesto y agregar columna estado si no existe
+            if 'lineas_presupuesto' in table_names:
+                columns_lineas_presupuesto = [col['name'] for col in inspector.get_columns('lineas_presupuesto')]
+                
+                if 'estado' not in columns_lineas_presupuesto:
+                    # Agregar la columna estado usando SQL directo
+                    with db.engine.connect() as conn:
+                        conn.execute(text("ALTER TABLE lineas_presupuesto ADD COLUMN estado VARCHAR(50) DEFAULT 'pendiente'"))
+                        conn.commit()
+                        print("Migración: Columna estado agregada exitosamente a lineas_presupuesto")
             
             # Verificar si existe la tabla presupuestos, si no existe crearla
             if 'presupuestos' not in table_names:
@@ -417,7 +440,9 @@ Saludos cordiales,
                 columns_tickets = [col['name'] for col in inspector.get_columns('tickets')]
                 nuevas_columnas_tickets = {
                     'forma_pago': 'VARCHAR(100)',
-                    'tipo_calculo_iva': 'VARCHAR(20) DEFAULT \'desglosar\''
+                    'tipo_calculo_iva': 'VARCHAR(20) DEFAULT \'desglosar\'',
+                    'email': 'VARCHAR(100)',
+                    'categoria': 'VARCHAR(50)'
                 }
                 for columna, tipo in nuevas_columnas_tickets.items():
                     if columna not in columns_tickets:
@@ -425,8 +450,32 @@ Saludos cordiales,
                             with db.engine.connect() as conn:
                                 conn.execute(text(f'ALTER TABLE tickets ADD COLUMN {columna} {tipo}'))
                                 conn.commit()
-                        except Exception:
+                                print(f"Migración: Columna {columna} agregada exitosamente a tickets")
+                        except Exception as e:
+                            print(f"Error al agregar columna {columna} a tickets: {e}")
                             pass
+            
+            # Verificar y agregar columna categoria en clientes
+            if 'clientes' in table_names:
+                columns_clientes = [col['name'] for col in inspector.get_columns('clientes')]
+                if 'categoria' not in columns_clientes:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE clientes ADD COLUMN categoria VARCHAR(50)'))
+                            conn.commit()
+                            print("Migración: Columna categoria agregada exitosamente a clientes")
+                    except Exception as e:
+                        print(f"Error al agregar columna categoria a clientes: {e}")
+                        pass
+            
+            # Verificar y crear tabla clientes_tienda si no existe
+            if 'clientes_tienda' not in table_names:
+                try:
+                    db.create_all()
+                    print("Migración: Tabla clientes_tienda creada exitosamente")
+                except Exception as e:
+                    print(f"Error al crear tabla clientes_tienda: {e}")
+                    pass
             
             # Verificar y crear tablas de gastos si no existen
             tablas_gastos = ['proveedores', 'facturas_proveedor', 'empleados', 'nominas']

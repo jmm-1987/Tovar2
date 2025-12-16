@@ -3,16 +3,24 @@
 {% block title %}Listado de Presupuestos - Gestión de Pedidos{% endblock %}
 
 {% block content %}
-<h2>Listado de Presupuestos</h2>
+<style>
+.container {
+    padding-top: 10px !important;
+}
+header {
+    margin-bottom: 0.8rem !important;
+}
+</style>
+<h2 style="margin: 0 0 8px 0; padding-bottom: 0; font-size: 1.3rem;">Listado de Presupuestos</h2>
 
-<div style="margin-bottom: 25px;">
-    <div class="filtros-container" style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #e9ecef;">
-        <form method="GET" action="{{ url_for('presupuestos.listado_presupuestos') }}" style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
-            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 180px;">
-                <label for="estado" style="font-size: 0.875rem; font-weight: 600; color: #495057; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+<div style="margin-bottom: 15px;">
+    <div class="filtros-container" style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); padding: 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #e9ecef;">
+        <form method="GET" action="{{ url_for('presupuestos.listado_presupuestos') }}" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                <label for="estado" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
                     <span>🏷️</span> Estado
                 </label>
-                <select name="estado" id="estado" class="filtro-input" style="padding: 10px 14px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                <select name="estado" id="estado" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
                     <option value="">Todos los estados</option>
                     {% for estado in estados %}
                     <option value="{{ estado }}" {% if estado_filtro == estado %}selected{% endif %}>{{ estado }}</option>
@@ -20,27 +28,43 @@
                 </select>
             </div>
             
-            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 180px;">
-                <label for="fecha_desde" style="font-size: 0.875rem; font-weight: 600; color: #495057; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                <label for="fecha_desde" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
                     <span>📅</span> Fecha Desde
                 </label>
-                <input type="date" name="fecha_desde" id="fecha_desde" value="{{ fecha_desde }}" class="filtro-input" style="padding: 10px 14px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; background: white; color: #495057; transition: all 0.3s ease;">
+                <input type="date" name="fecha_desde" id="fecha_desde" value="{{ fecha_desde }}" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease;">
             </div>
             
-            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 180px;">
-                <label for="fecha_hasta" style="font-size: 0.875rem; font-weight: 600; color: #495057; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                <label for="fecha_hasta" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
                     <span>📅</span> Fecha Hasta
                 </label>
-                <input type="date" name="fecha_hasta" id="fecha_hasta" value="{{ fecha_hasta }}" class="filtro-input" style="padding: 10px 14px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; background: white; color: #495057; transition: all 0.3s ease;">
+                <input type="date" name="fecha_hasta" id="fecha_hasta" value="{{ fecha_hasta }}" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease;">
             </div>
             
-            <div style="display: flex; gap: 10px; align-items: flex-end;">
-                <a href="{{ url_for('presupuestos.nuevo_presupuesto') }}" class="btn btn-success" style="padding: 10px 20px; border-radius: 8px; font-weight: 600; transition: all 0.3s ease;">➕ Nuevo Presupuesto</a>
-                <button type="submit" class="btn btn-primary" style="padding: 10px 20px; border-radius: 8px; font-weight: 600; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
+            <div class="filtro-group" style="display: flex; flex-direction: column; gap: 4px; min-width: 180px;">
+                <label style="font-size: 0.75rem; font-weight: 600; color: #495057; display: flex; align-items: center; gap: 4px;">
+                    <span>👁️</span> Mostrar adicionales
+                </label>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <label style="display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: #495057; cursor: pointer; font-weight: normal;">
+                        <input type="checkbox" name="mostrar_rechazados" id="mostrar_rechazados" {% if mostrar_rechazados %}checked{% endif %} style="width: 16px; height: 16px; cursor: pointer; accent-color: #dc3545;">
+                        <span>Rechazados</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: #495057; cursor: pointer; font-weight: normal;">
+                        <input type="checkbox" name="mostrar_aceptados" id="mostrar_aceptados" {% if mostrar_aceptados %}checked{% endif %} style="width: 16px; height: 16px; cursor: pointer; accent-color: #28a745;">
+                        <span>Aceptados</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 8px; align-items: flex-end;">
+                <a href="{{ url_for('presupuestos.nuevo_presupuesto') }}" class="btn btn-success" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; transition: all 0.3s ease;">➕ Nuevo</a>
+                <button type="submit" class="btn btn-primary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
                     🔍 Filtrar
                 </button>
-                {% if estado_filtro or fecha_desde or fecha_hasta %}
-                <a href="{{ url_for('presupuestos.listado_presupuestos') }}" class="btn btn-secondary" style="padding: 10px 20px; border-radius: 8px; font-weight: 600; transition: all 0.3s ease;">
+                {% if estado_filtro or fecha_desde or fecha_hasta or mostrar_rechazados or mostrar_aceptados %}
+                <a href="{{ url_for('presupuestos.listado_presupuestos') }}" class="btn btn-secondary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; transition: all 0.3s ease;">
                     🗑️ Limpiar
                 </a>
                 {% endif %}
@@ -50,6 +74,10 @@
 </div>
 
 <style>
+h2::after {
+    display: none;
+}
+
 .filtro-input:hover {
     border-color: #adb5bd !important;
     box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
@@ -64,8 +92,8 @@
 select.filtro-input {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23495057' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 12px center;
-    padding-right: 35px !important;
+    background-position: right 8px center;
+    padding-right: 30px !important;
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;

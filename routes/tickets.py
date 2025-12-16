@@ -7,10 +7,18 @@ import os
 import requests
 import json
 from extensions import db
-from models import Ticket, LineaTicket
+from models import Ticket, LineaTicket, ClienteTienda
+from flask import jsonify
 from utils.numeracion import obtener_siguiente_numero_ticket
 
 tickets_bp = Blueprint('tickets', __name__)
+
+@tickets_bp.route('/tickets/clientes-tienda')
+@login_required
+def listado_clientes_tienda():
+    """Listado de clientes de tienda"""
+    clientes = ClienteTienda.query.order_by(ClienteTienda.nombre).all()
+    return render_template('listado_clientes_tienda.html', clientes=clientes)
 
 @tickets_bp.route('/tickets')
 @login_required
@@ -67,6 +75,34 @@ def nuevo_ticket():
             serie = 'A'  # Serie fija
             numero = obtener_siguiente_numero_ticket(fecha_expedicion)
             
+            # Obtener datos del cliente
+            nombre_cliente = request.form.get('nombre')
+            nif_cliente = request.form.get('nif', '')
+            email_cliente = request.form.get('email', '')
+            categoria_cliente = request.form.get('categoria', '')
+            
+            # Guardar o actualizar cliente de tienda
+            cliente_tienda = ClienteTienda.query.filter_by(
+                nombre=nombre_cliente,
+                nif=nif_cliente if nif_cliente else None
+            ).first()
+            
+            if not cliente_tienda:
+                cliente_tienda = ClienteTienda(
+                    nombre=nombre_cliente,
+                    nif=nif_cliente if nif_cliente else None,
+                    email=email_cliente if email_cliente else None,
+                    categoria=categoria_cliente
+                )
+                db.session.add(cliente_tienda)
+                db.session.flush()
+            else:
+                # Actualizar email y categoría si están presentes
+                if email_cliente:
+                    cliente_tienda.email = email_cliente
+                if categoria_cliente:
+                    cliente_tienda.categoria = categoria_cliente
+            
             # Crear ticket
             ticket = Ticket(
                 serie=serie,
@@ -74,8 +110,10 @@ def nuevo_ticket():
                 fecha_expedicion=fecha_expedicion,
                 tipo_factura=request.form.get('tipo_factura', 'F2'),
                 descripcion=request.form.get('descripcion', ''),
-                nif=request.form.get('nif', ''),
-                nombre=request.form.get('nombre'),
+                nif=nif_cliente,
+                nombre=nombre_cliente,
+                email=email_cliente,
+                categoria=categoria_cliente,
                 forma_pago=request.form.get('forma_pago', ''),
                 tipo_calculo_iva=request.form.get('tipo_calculo_iva', 'desglosar'),
                 importe_total=Decimal('0.00'),

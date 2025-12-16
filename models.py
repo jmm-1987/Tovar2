@@ -46,6 +46,7 @@ class Cliente(db.Model, UserMixin):
     telefono = db.Column(db.String(50))  # Teléfono fijo
     movil = db.Column(db.String(50))  # Teléfono móvil
     email = db.Column(db.String(100))
+    categoria = db.Column(db.String(50))  # Categoría: hosteleria, clinica, colegio, emerita, carnaval, transporte, varios
     personas_contacto = db.Column(db.Text)  # Personas de contacto
     anotaciones = db.Column(db.Text)  # Anotaciones adicionales
     
@@ -115,6 +116,7 @@ class Pedido(db.Model):
     # Relaciones
     comercial_id = db.Column(db.Integer, db.ForeignKey('comerciales.id'), nullable=False)
     cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False)
+    presupuesto_id = db.Column(db.Integer, db.ForeignKey('presupuestos.id'), nullable=True)  # Presupuesto del que proviene este pedido
     
     # Tipo de pedido
     tipo_pedido = db.Column(db.String(50), nullable=False)  # fabricacion, no fabricacion, cliente web
@@ -154,6 +156,9 @@ class Pedido(db.Model):
     
     # Relación con líneas de pedido
     lineas = db.relationship('LineaPedido', backref='pedido', lazy=True, cascade='all, delete-orphan')
+    
+    # Relación con presupuesto
+    presupuesto = db.relationship('Presupuesto', backref='pedidos', lazy=True)
     
     def __repr__(self):
         return f'<Pedido {self.id} - {self.cliente.nombre if self.cliente else "Sin cliente"}>'
@@ -263,6 +268,9 @@ class LineaPresupuesto(db.Model):
     tejido = db.Column(db.String(100))
     precio_unitario = db.Column(db.Numeric(10, 2), nullable=True)  # Precio unitario de la línea
     
+    # Estado de la línea
+    estado = db.Column(db.String(50), nullable=False, default='pendiente')  # pendiente, en confección, en bordado, listo
+    
     def __repr__(self):
         return f'<LineaPresupuesto {self.id} - {self.nombre} x{self.cantidad}>'
 
@@ -282,6 +290,8 @@ class Ticket(db.Model):
     # Datos del cliente
     nif = db.Column(db.String(20))
     nombre = db.Column(db.String(200), nullable=False)
+    email = db.Column(db.String(100))  # Email del cliente
+    categoria = db.Column(db.String(50))  # Categoría: hosteleria, clinica, colegio, emerita, carnaval, transporte, varios
     
     # Forma de pago
     forma_pago = db.Column(db.String(100))
@@ -323,6 +333,22 @@ class LineaTicket(db.Model):
     
     def __repr__(self):
         return f'<LineaTicket {self.id} - {self.descripcion} x{self.cantidad}>'
+
+class ClienteTienda(db.Model):
+    """Clientes de tienda creados desde tickets"""
+    __tablename__ = 'clientes_tienda'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(200), nullable=False)
+    nif = db.Column(db.String(20))
+    email = db.Column(db.String(100))
+    categoria = db.Column(db.String(50))  # hosteleria, clinica, colegio, emerita, carnaval, transporte, varios
+    
+    # Timestamp
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<ClienteTienda {self.nombre} ({self.categoria})>'
 
 class Factura(db.Model):
     """Facturas formales (tipo F1)"""

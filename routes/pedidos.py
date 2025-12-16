@@ -16,10 +16,17 @@ def listado_pedidos():
     """Listado de pedidos con opciones de editar y eliminar"""
     query = Pedido.query
     
-    # Filtro por estado
+    # Verificar si se deben mostrar pedidos entregados al cliente
+    mostrar_entregados = request.args.get('mostrar_entregados', '') == 'on'
+    
+    # Filtro por estado específico (si se selecciona uno del dropdown)
     estado_filtro = request.args.get('estado', '')
     if estado_filtro:
         query = query.filter(Pedido.estado == estado_filtro)
+    else:
+        # Si no hay filtro específico, excluir "Entregado al cliente" por defecto
+        if not mostrar_entregados:
+            query = query.filter(Pedido.estado != 'Entregado al cliente')
     
     # Filtro por fecha desde
     fecha_desde = request.args.get('fecha_desde', '')
@@ -76,7 +83,8 @@ def listado_pedidos():
                          estados=estados_list,
                          estado_filtro=estado_filtro,
                          fecha_desde=fecha_desde,
-                         fecha_hasta=fecha_hasta)
+                         fecha_hasta=fecha_hasta,
+                         mostrar_entregados=mostrar_entregados)
 
 @pedidos_bp.route('/pedidos/nuevo', methods=['GET', 'POST'])
 @login_required

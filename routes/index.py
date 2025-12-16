@@ -11,10 +11,12 @@ index_bp = Blueprint('index', __name__)
 def index():
     """Página principal con lista de pedidos"""
     try:
-        # Obtener todos los pedidos con sus relaciones cargadas
+        # Obtener todos los pedidos con sus relaciones cargadas, excluyendo los entregados al cliente
         from sqlalchemy.orm import joinedload
         from models import LineaPedido
-        pedidos = Pedido.query.options(
+        pedidos = Pedido.query.filter(
+            Pedido.estado != 'Entregado al cliente'
+        ).options(
             joinedload(Pedido.cliente),
             joinedload(Pedido.lineas).joinedload(LineaPedido.prenda)
         ).all()

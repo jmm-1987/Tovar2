@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Clientes de Tienda - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<style>
+.container {
+    padding-top: 10px !important;
+}
+header {
+    margin-bottom: 0.8rem !important;
+}
+h2::after {
+    display: none;
+}
+</style>
+<h2 style="margin: 0 0 8px 0; padding-bottom: 0; font-size: 1.3rem;">Clientes de Tienda</h2>
+
+{% if clientes %}
+<table class="table-compact">
+    <thead>
+        <tr>
+            <th style="width: 200px;">Nombre</th>
+            <th style="width: 150px;">NIF</th>
+            <th style="width: 200px;">Email</th>
+            <th style="width: 150px;">Categoría</th>
+            <th style="width: 150px;">Fecha Creación</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for cliente in clientes %}
+        <tr>
+            <td>{{ cliente.nombre }}</td>
+            <td>{{ cliente.nif or '-' }}</td>
+            <td>{{ cliente.email or '-' }}</td>
+            <td>
+                {% if cliente.categoria %}
+                    {% if cliente.categoria == 'hosteleria' %}Hostelería
+                    {% elif cliente.categoria == 'clinica' %}Clínica
+                    {% elif cliente.categoria == 'colegio' %}Colegio
+                    {% elif cliente.categoria == 'emerita' %}Emerita
+                    {% elif cliente.categoria == 'carnaval' %}Carnaval
+                    {% elif cliente.categoria == 'transporte' %}Transporte
+                    {% elif cliente.categoria == 'varios' %}Varios
+                    {% else %}{{ cliente.categoria }}
+                    {% endif %}
+                {% else %}
+                    -
+                {% endif %}
+            </td>
+            <td>{{ cliente.fecha_creacion.strftime('%d/%m/%Y') if cliente.fecha_creacion else '-' }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p style="color: #666; padding: 20px; background: #f8f9fa; border-radius: 8px;">No hay clientes de tienda registrados.</p>
+{% endif %}
+{% endblock %}
+

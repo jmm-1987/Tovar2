@@ -3,11 +3,96 @@
 {% block title %}Facturación - Gestión de Pedidos{% endblock %}
 
 {% block content %}
-<h2>Facturación</h2>
+<style>
+.container {
+    padding-top: 10px !important;
+}
+header {
+    margin-bottom: 0.8rem !important;
+}
+h2::after {
+    display: none;
+}
+</style>
+<h2 style="margin: 0 0 8px 0; padding-bottom: 0; font-size: 1.3rem;">Facturación</h2>
+
+<!-- FILTROS -->
+<div style="margin-bottom: 15px;">
+    <div class="filtros-container" style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); padding: 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #e9ecef;">
+        <form method="GET" action="{{ url_for('facturacion.facturacion') }}" id="filtros-form" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+            <!-- Mantener otros filtros al cambiar tipo -->
+            {% if estado_filtro %}<input type="hidden" name="estado" value="{{ estado_filtro }}">{% endif %}
+            {% if fecha_desde %}<input type="hidden" name="fecha_desde" value="{{ fecha_desde }}">{% endif %}
+            {% if fecha_hasta %}<input type="hidden" name="fecha_hasta" value="{{ fecha_hasta }}">{% endif %}
+            
+            <div class="filtro-group" style="display: flex; flex-direction: column; gap: 6px; min-width: 200px;">
+                <label style="font-size: 0.75rem; font-weight: 600; color: #495057; display: flex; align-items: center; gap: 4px;">
+                    <span>📋</span> Tipo
+                </label>
+                <div style="display: flex; gap: 0; border: 2px solid #dee2e6; border-radius: 6px; overflow: hidden; background: white;">
+                    <button type="button" class="tipo-selector-btn {% if tipo_vista == 'pendientes' %}active{% endif %}" 
+                            onclick="cambiarTipoVista('pendientes')"
+                            style="flex: 1; padding: 6px 12px; border: none; background: {% if tipo_vista == 'pendientes' %}#007bff{% else %}#ffffff{% endif %}; color: {% if tipo_vista == 'pendientes' %}#ffffff{% else %}#495057{% endif %}; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">
+                        Pendientes
+                    </button>
+                    <button type="button" class="tipo-selector-btn {% if tipo_vista == 'formalizadas' %}active{% endif %}" 
+                            onclick="cambiarTipoVista('formalizadas')"
+                            style="flex: 1; padding: 6px 12px; border: none; border-left: 2px solid #dee2e6; background: {% if tipo_vista == 'formalizadas' %}#007bff{% else %}#ffffff{% endif %}; color: {% if tipo_vista == 'formalizadas' %}#ffffff{% else %}#495057{% endif %}; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">
+                        Formalizadas
+                    </button>
+                </div>
+                <input type="hidden" name="tipo_vista" id="tipo_vista_input" value="{{ tipo_vista }}">
+            </div>
+            
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                <label for="estado" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>🏷️</span> Estado
+                </label>
+                <select name="estado" id="estado" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                    <option value="">Todos los estados</option>
+                    {% for estado in estados %}
+                    <option value="{{ estado }}" {% if estado_filtro == estado %}selected{% endif %}>{{ estado }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                <label for="fecha_desde" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>📅</span> Fecha Desde
+                </label>
+                <input type="date" name="fecha_desde" id="fecha_desde" value="{{ fecha_desde }}" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease;">
+            </div>
+            
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                <label for="fecha_hasta" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>📅</span> Fecha Hasta
+                </label>
+                <input type="date" name="fecha_hasta" id="fecha_hasta" value="{{ fecha_hasta }}" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease;">
+            </div>
+            
+            <div style="display: flex; gap: 8px; align-items: flex-end;">
+                <button type="submit" class="btn btn-primary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
+                    🔍 Filtrar
+                </button>
+                {% if tipo_vista != 'pendientes' or estado_filtro or fecha_desde or fecha_hasta %}
+                <a href="{{ url_for('facturacion.facturacion') }}" class="btn btn-secondary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; transition: all 0.3s ease;">
+                    🗑️ Limpiar
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function cambiarTipoVista(tipo) {
+    document.getElementById('tipo_vista_input').value = tipo;
+    document.getElementById('filtros-form').submit();
+}
+</script>
 
 <!-- SECCIÓN DE PREFACTURAS (Pendientes de formalizar) -->
-<h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #3498db;">Prefacturas (Pendientes de formalizar)</h3>
-<p style="color: #666; margin-bottom: 20px;">Lista de pedidos pendientes de facturar. Haga clic en "Hacer Factura" para introducir los importes y formalizar.</p>
+{% if tipo_vista == 'pendientes' %}
 
 {% if prefacturas %}
 <div class="table-container" style="background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; margin-bottom: 40px;">
@@ -65,8 +150,7 @@
 {% endif %}
 
 <!-- SECCIÓN DE FACTURAS (Ya formalizadas) -->
-<h3 style="color: #2c3e50; margin-top: 30px; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #27ae60;">Facturas (Ya formalizadas)</h3>
-<p style="color: #666; margin-bottom: 20px;">Lista de facturas ya formalizadas. Puede ver los detalles e imprimir.</p>
+{% else %}
 
 {% if facturas %}
 <div class="table-container" style="background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
@@ -126,8 +210,40 @@
     <p style="color: #999; font-size: 1.1rem; margin: 0;">No hay facturas formalizadas aún.</p>
 </div>
 {% endif %}
+{% endif %}
 
 <style>
+.filtro-input:hover {
+    border-color: #adb5bd !important;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+}
+
+.filtro-input:focus {
+    outline: none;
+    border-color: #007bff !important;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+}
+
+select.filtro-input {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23495057' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 30px !important;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,123,255,0.4) !important;
+}
+
+.btn-secondary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(108,117,125,0.3);
+}
+
 .pedido-row:hover, .factura-row:hover {
     background-color: #f8f9fa;
     transform: translateX(2px);

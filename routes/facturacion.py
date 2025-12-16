@@ -17,17 +17,87 @@ facturacion_bp = Blueprint('facturacion', __name__)
 @login_required
 def facturacion():
     """Página de facturación con prefacturas (pendientes) y facturas (formalizadas)"""
-    # Obtener prefacturas: pedidos que aún no tienen factura formalizada
-    pedidos_con_factura_ids = [f.pedido_id for f in Factura.query.with_entities(Factura.pedido_id).all()]
-    if pedidos_con_factura_ids:
-        prefacturas = Pedido.query.filter(not_(Pedido.id.in_(pedidos_con_factura_ids))).order_by(Pedido.id.desc()).all()
+    # Tipo de vista: 'pendientes' o 'formalizadas'
+    tipo_vista = request.args.get('tipo_vista', 'pendientes')
+    
+    # Filtro por estado
+    estado_filtro = request.args.get('estado', '')
+    
+    # Filtros de fecha
+    fecha_desde = request.args.get('fecha_desde', '')
+    fecha_hasta = request.args.get('fecha_hasta', '')
+    
+    prefacturas = []
+    facturas = []
+    
+    if tipo_vista == 'pendientes':
+        # Obtener prefacturas: pedidos que aún no tienen factura formalizada
+        pedidos_con_factura_ids = [f.pedido_id for f in Factura.query.with_entities(Factura.pedido_id).all()]
+        query = Pedido.query
+        if pedidos_con_factura_ids:
+            query = query.filter(not_(Pedido.id.in_(pedidos_con_factura_ids)))
+        
+        # Aplicar filtro de estado
+        if estado_filtro:
+            query = query.filter(Pedido.estado == estado_filtro)
+        
+        # Aplicar filtros de fecha
+        if fecha_desde:
+            try:
+                fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+                query = query.filter(Pedido.fecha_creacion >= datetime.combine(fecha_desde_obj, datetime.min.time()))
+            except ValueError:
+                pass
+        
+        if fecha_hasta:
+            try:
+                fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+                query = query.filter(Pedido.fecha_creacion <= datetime.combine(fecha_hasta_obj, datetime.max.time()))
+            except ValueError:
+                pass
+        
+        prefacturas = query.order_by(Pedido.id.desc()).all()
+        
+        # Obtener estados únicos de pedidos para el filtro
+        estados = db.session.query(Pedido.estado).distinct().all()
+        estados_list = [estado[0] for estado in estados if estado[0]]
     else:
-        prefacturas = Pedido.query.order_by(Pedido.id.desc()).all()
+        # Obtener facturas formalizadas
+        query = Factura.query
+        
+        # Aplicar filtro de estado
+        if estado_filtro:
+            query = query.filter(Factura.estado == estado_filtro)
+        
+        # Aplicar filtros de fecha
+        if fecha_desde:
+            try:
+                fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+                query = query.filter(Factura.fecha_expedicion >= fecha_desde_obj)
+            except ValueError:
+                pass
+        
+        if fecha_hasta:
+            try:
+                fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+                query = query.filter(Factura.fecha_expedicion <= fecha_hasta_obj)
+            except ValueError:
+                pass
+        
+        facturas = query.order_by(Factura.fecha_creacion.desc()).all()
+        
+        # Obtener estados únicos de facturas para el filtro
+        estados = db.session.query(Factura.estado).distinct().all()
+        estados_list = [estado[0] for estado in estados if estado[0]]
     
-    # Obtener facturas ya formalizadas
-    facturas = Factura.query.order_by(Factura.fecha_creacion.desc()).all()
-    
-    return render_template('facturacion.html', prefacturas=prefacturas, facturas=facturas)
+    return render_template('facturacion.html', 
+                         prefacturas=prefacturas, 
+                         facturas=facturas,
+                         estados=estados_list,
+                         tipo_vista=tipo_vista,
+                         estado_filtro=estado_filtro,
+                         fecha_desde=fecha_desde,
+                         fecha_hasta=fecha_hasta)
 
 @facturacion_bp.route('/facturacion/<int:pedido_id>')
 @login_required

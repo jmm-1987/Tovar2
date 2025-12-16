@@ -44,6 +44,12 @@
                 <span id="pedido-toggle" style="font-size: 18px;">▶</span>
             </h3>
             <div id="pedido-content" style="display: none;">
+                {% if pedido.presupuesto_id %}
+                <p><strong>Presupuesto:</strong> 
+                    <a href="{{ url_for('presupuestos.ver_presupuesto', presupuesto_id=pedido.presupuesto_id) }}" style="color: #3498db; text-decoration: none; font-weight: 600;">#{{ pedido.presupuesto_id }}</a>
+                </p>
+                {% endif %}
+                
                 <p><strong>Estado:</strong> 
                     <span class="badge badge-estado-{{ pedido.estado|lower|replace(' ', '-')|replace('ó', 'o')|replace('í', 'i')|replace('é', 'e')|replace('de', 'de') }}">{{ pedido.estado }}</span>
                 </p>
@@ -244,12 +250,12 @@
                 
                 {% if linea.cargo %}<div><strong>Cargo:</strong> {{ linea.cargo }}</div>{% endif %}
                 
-                <div style="margin-left: auto;">
+                <div style="margin-left: auto; display: flex; align-items: center; gap: 10px;">
                     <strong>Estado:</strong>
-                    <span class="badge badge-estado-linea badge-estado-{{ linea.estado.lower()|replace(' ', '-')|replace('ó', 'o')|replace('í', 'i')|replace('é', 'e') }}" style="margin-left: 8px;">
-                        {{ linea.estado }}
+                    <span class="badge badge-estado-linea badge-estado-{{ (linea.estado or 'pendiente')|lower|replace(' ', '-')|replace('ó', 'o')|replace('í', 'i')|replace('é', 'e') }}" style="margin-left: 8px;">
+                        {{ linea.estado or 'pendiente' }}
                     </span>
-                    <form method="POST" action="{{ url_for('pedidos.cambiar_estado_linea', pedido_id=pedido.id, linea_id=linea.id) }}" style="display: inline-block; margin-left: 10px;">
+                    <form method="POST" action="{{ url_for('pedidos.cambiar_estado_linea', pedido_id=pedido.id, linea_id=linea.id) }}" style="display: inline-block;">
                         <select name="estado" onchange="this.form.submit()" style="padding: 6px 12px; border-radius: 4px; border: 1px solid #ddd; font-size: 14px;">
                             <option value="pendiente" {% if (linea.estado or 'pendiente') == 'pendiente' %}selected{% endif %}>Pendiente</option>
                             <option value="en confección" {% if (linea.estado or 'pendiente') == 'en confección' %}selected{% endif %}>En confección</option>

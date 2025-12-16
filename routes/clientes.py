@@ -36,6 +36,7 @@ def gestion_clientes():
                 telefono=request.form.get('telefono', ''),
                 movil=request.form.get('movil', ''),
                 email=request.form.get('email', ''),
+                categoria=request.form.get('categoria', ''),
                 personas_contacto=request.form.get('personas_contacto', ''),
                 anotaciones=request.form.get('anotaciones', ''),
                 usuario_web=request.form.get('usuario_web', '').strip() or None,
@@ -133,6 +134,7 @@ def editar_cliente(id):
             cliente.telefono = request.form.get('telefono', '')
             cliente.movil = request.form.get('movil', '')
             cliente.email = request.form.get('email', '')
+            cliente.categoria = request.form.get('categoria', '')
             cliente.personas_contacto = request.form.get('personas_contacto', '')
             cliente.anotaciones = request.form.get('anotaciones', '')
             

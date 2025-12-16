@@ -251,6 +251,21 @@
                 {% if linea.nombre %}<div><strong>Nombre personalizado:</strong> {{ linea.nombre }}</div>{% endif %}
                 
                 {% if linea.cargo %}<div><strong>Cargo:</strong> {{ linea.cargo }}</div>{% endif %}
+                
+                <div style="margin-left: auto; display: flex; align-items: center; gap: 10px;">
+                    <strong>Estado:</strong>
+                    <span class="badge badge-estado-linea badge-estado-{{ (linea.estado or 'pendiente')|lower|replace(' ', '-')|replace('ó', 'o')|replace('í', 'i')|replace('é', 'e') }}" style="margin-left: 8px;">
+                        {{ linea.estado or 'pendiente' }}
+                    </span>
+                    <form method="POST" action="{{ url_for('presupuestos.cambiar_estado_linea_presupuesto', presupuesto_id=presupuesto.id, linea_id=linea.id) }}" style="display: inline-block;">
+                        <select name="estado" onchange="this.form.submit()" style="padding: 6px 12px; border-radius: 4px; border: 1px solid #ddd; font-size: 14px;">
+                            <option value="pendiente" {% if (linea.estado or 'pendiente') == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                            <option value="en confección" {% if (linea.estado or 'pendiente') == 'en confección' %}selected{% endif %}>En confección</option>
+                            <option value="en bordado" {% if (linea.estado or 'pendiente') == 'en bordado' %}selected{% endif %}>En bordado</option>
+                            <option value="listo" {% if (linea.estado or 'pendiente') == 'listo' %}selected{% endif %}>Listo</option>
+                        </select>
+                    </form>
+                </div>
             </div>
         </div>
         {% endfor %}
