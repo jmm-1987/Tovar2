@@ -91,9 +91,14 @@ def enviar_email_presupuesto(presupuesto, pdf_data=None):
         asunto = formatear_texto(plantilla['asunto'], variables)
         cuerpo = formatear_texto(plantilla['cuerpo'], variables)
         
-        # Crear mensaje
+        # Crear mensaje con sender explícito
+        sender = current_app.config.get('MAIL_DEFAULT_SENDER')
+        if not sender:
+            sender = current_app.config.get('MAIL_USERNAME', 'noreply@tovar.com')
+        
         msg = Message(
             subject=asunto,
+            sender=sender,
             recipients=[cliente.email],
             body=cuerpo
         )
@@ -136,9 +141,14 @@ Quedamos a su disposición para cualquier consulta.
 Saludos cordiales,
 {current_app.config.get('MAIL_DEFAULT_SENDER', 'Nuestra Empresa')}"""
         
-        # Crear mensaje
+        # Crear mensaje con sender explícito
+        sender = current_app.config.get('MAIL_DEFAULT_SENDER')
+        if not sender:
+            sender = current_app.config.get('MAIL_USERNAME', 'noreply@tovar.com')
+        
         msg = Message(
             subject=asunto,
+            sender=sender,
             recipients=[cliente.email],
             body=cuerpo
         )
@@ -222,9 +232,14 @@ def enviar_email_cambio_estado_pedido(pedido, nuevo_estado, estado_anterior=None
         asunto = formatear_texto(plantilla['asunto'], variables)
         cuerpo = formatear_texto(plantilla['cuerpo'], variables)
 
-        # Crear mensaje
+        # Crear mensaje con sender explícito
+        sender = current_app.config.get('MAIL_DEFAULT_SENDER')
+        if not sender:
+            sender = current_app.config.get('MAIL_USERNAME', 'noreply@tovar.com')
+        
         msg = Message(
             subject=asunto,
+            sender=sender,
             recipients=[cliente.email],
             body=cuerpo
         )

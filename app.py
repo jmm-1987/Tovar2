@@ -51,14 +51,20 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
-# Configuración de email
-app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
+# Configuración de email (usando variables de entorno existentes: EMAIL_HOST, EMAIL_USER, EMAIL_PASS)
+app.config['MAIL_SERVER'] = os.environ.get('EMAIL_HOST', os.environ.get('MAIL_SERVER', 'smtp.ionos.es'))
 app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))
 app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'True').lower() == 'true'
 app.config['MAIL_USE_SSL'] = os.environ.get('MAIL_USE_SSL', 'False').lower() == 'true'
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME', '')
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD', '')
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER', os.environ.get('MAIL_USERNAME', ''))
+app.config['MAIL_USERNAME'] = os.environ.get('EMAIL_USER', os.environ.get('MAIL_USERNAME', ''))
+app.config['MAIL_PASSWORD'] = os.environ.get('EMAIL_PASS', os.environ.get('MAIL_PASSWORD', ''))
+# Configurar remitente por defecto: usar MAIL_DEFAULT_SENDER si existe, sino EMAIL_USER, sino un valor por defecto
+mail_default_sender = os.environ.get('MAIL_DEFAULT_SENDER', '')
+if not mail_default_sender:
+    mail_default_sender = os.environ.get('EMAIL_USER', os.environ.get('MAIL_USERNAME', ''))
+if not mail_default_sender:
+    mail_default_sender = 'noreply@tovar.com'  # Valor por defecto si no hay configuración
+app.config['MAIL_DEFAULT_SENDER'] = mail_default_sender
 
 # Crear carpeta de uploads si no existe
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
