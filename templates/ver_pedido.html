@@ -6,6 +6,9 @@
 <div style="margin-bottom: 20px;">
     <a href="{{ url_for('index.index') }}" class="btn btn-primary">← Volver a la lista</a>
     <a href="{{ url_for('pedidos.editar_pedido', pedido_id=pedido.id) }}" class="btn btn-warning">Editar</a>
+    {% if current_user.rol in ['administracion', 'supervisor'] %}
+    <a href="{{ url_for('pedidos.registro_cambios', pedido_id=pedido.id) }}" class="btn btn-info">📋 Registro</a>
+    {% endif %}
 </div>
 
 <h2>Pedido #{{ pedido.id }} - {{ pedido.cliente.nombre if pedido.cliente else 'N/A' }}</h2>

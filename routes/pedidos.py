@@ -1,12 +1,12 @@
 """Rutas para gestión de pedidos"""
 from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, make_response
-from flask_login import login_required
+from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 from io import BytesIO
 import os
 from extensions import db
-from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Usuario
+from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Usuario, RegistroCambioEstado
 
 pedidos_bp = Blueprint('pedidos', __name__)
 
@@ -401,6 +401,18 @@ def cambiar_estado_pedido(pedido_id):
             if estado_nombre == 'En preparación' and not pedido.fecha_objetivo:
                 pedido.fecha_objetivo = hoy + timedelta(days=20)
             
+            # Registrar el cambio de estado
+            if estado_anterior != estado_nombre:
+                registro = RegistroCambioEstado(
+                    tipo_cambio='pedido',
+                    pedido_id=pedido.id,
+                    linea_id=None,
+                    estado_anterior=estado_anterior,
+                    estado_nuevo=estado_nombre,
+                    usuario_id=current_user.id
+                )
+                db.session.add(registro)
+            
             db.session.commit()
             
             # Enviar email al cliente si el estado cambió
@@ -442,7 +454,21 @@ def cambiar_estado_linea(pedido_id, linea_id):
     
     try:
         if nuevo_estado in estados_permitidos:
+            estado_anterior_linea = linea.estado
             linea.estado = nuevo_estado
+            
+            # Registrar el cambio de estado de la línea
+            if estado_anterior_linea != nuevo_estado:
+                registro = RegistroCambioEstado(
+                    tipo_cambio='linea_pedido',
+                    pedido_id=pedido_id,
+                    linea_id=linea.id,
+                    estado_anterior=estado_anterior_linea,
+                    estado_nuevo=nuevo_estado,
+                    usuario_id=current_user.id
+                )
+                db.session.add(registro)
+            
             db.session.commit()
             flash(f'Estado de la línea "{linea.nombre}" cambiado a "{nuevo_estado}"', 'success')
         else:
@@ -452,6 +478,28 @@ def cambiar_estado_linea(pedido_id, linea_id):
         flash(f'Error al cambiar el estado: {str(e)}', 'error')
     
     return redirect(url_for('pedidos.ver_pedido', pedido_id=pedido_id))
+
+@pedidos_bp.route('/pedidos/<int:pedido_id>/registro')
+@login_required
+def registro_cambios(pedido_id):
+    """Mostrar registro de cambios de estado de un pedido"""
+    # Verificar permisos (solo administración y supervisor)
+    if current_user.rol not in ['administracion', 'supervisor']:
+        flash('No tienes permisos para acceder a esta página', 'error')
+        return redirect(url_for('pedidos.ver_pedido', pedido_id=pedido_id))
+    
+    # Cargar el pedido con sus líneas para poder mostrar información de las líneas en el registro
+    from sqlalchemy.orm import joinedload
+    pedido = Pedido.query.options(joinedload(Pedido.lineas)).get_or_404(pedido_id)
+    
+    # Obtener todos los registros de cambios para este pedido, ordenados por fecha descendente
+    # Cargar relación de usuario para evitar consultas adicionales
+    registros = RegistroCambioEstado.query.filter_by(pedido_id=pedido_id)\
+        .options(joinedload(RegistroCambioEstado.usuario))\
+        .order_by(RegistroCambioEstado.fecha_cambio.desc())\
+        .all()
+    
+    return render_template('pedidos/registro_cambios.html', pedido=pedido, registros=registros)
 
 @pedidos_bp.route('/pedidos/<int:pedido_id>/imprimir')
 @login_required

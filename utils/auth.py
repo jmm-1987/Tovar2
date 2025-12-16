@@ -26,6 +26,19 @@ def login_required_custom(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def administracion_required(f):
+    """Decorador para requerir rol de administración"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            flash('Debes iniciar sesión para acceder a esta página', 'error')
+            return redirect(url_for('auth.login'))
+        if current_user.rol not in ['administracion', 'supervisor']:
+            flash('No tienes permisos para acceder a esta página', 'error')
+            return redirect(url_for('index.index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 
 

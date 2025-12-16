@@ -463,6 +463,38 @@ class PlantillaEmail(db.Model):
     def __repr__(self):
         return f'<PlantillaEmail {self.tipo}>'
 
+class RegistroCambioEstado(db.Model):
+    """Registro de cambios de estado en pedidos y líneas de pedido"""
+    __tablename__ = 'registro_cambio_estado'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Tipo de cambio: 'pedido' o 'linea_pedido'
+    tipo_cambio = db.Column(db.String(20), nullable=False)
+    
+    # Referencia al pedido (siempre presente)
+    pedido_id = db.Column(db.Integer, db.ForeignKey('pedidos.id'), nullable=False)
+    
+    # Referencia a la línea (solo si tipo_cambio es 'linea_pedido')
+    linea_id = db.Column(db.Integer, nullable=True)
+    
+    # Estados
+    estado_anterior = db.Column(db.String(50))
+    estado_nuevo = db.Column(db.String(50), nullable=False)
+    
+    # Usuario que realizó el cambio
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False)
+    
+    # Fecha y hora del cambio
+    fecha_cambio = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relaciones
+    pedido = db.relationship('Pedido', backref='registros_cambio_estado')
+    usuario = db.relationship('Usuario', backref='registros_cambio_estado')
+    
+    def __repr__(self):
+        return f'<RegistroCambioEstado {self.id} - {self.tipo_cambio} - {self.estado_anterior} -> {self.estado_nuevo}>'
+
 class Proveedor(db.Model):
     """Proveedores del sistema"""
     __tablename__ = 'proveedores'
