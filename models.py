@@ -448,6 +448,7 @@ class PlantillaEmail(db.Model):
     tipo = db.Column(db.String(50), nullable=False, unique=True)  # 'presupuesto', 'cambio_estado_pedido'
     asunto = db.Column(db.String(200), nullable=False)
     cuerpo = db.Column(db.Text, nullable=False)
+    enviar_activo = db.Column(db.Boolean, nullable=False, default=True)  # Permite desactivar temporalmente el envío
     
     # Timestamps
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)

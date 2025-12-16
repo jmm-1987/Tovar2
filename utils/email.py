@@ -9,14 +9,26 @@ import os
 from io import BytesIO
 
 def obtener_plantilla(tipo):
-    """Obtener plantilla de email por tipo"""
+    """Obtener plantilla de email por tipo.
+
+    Devuelve siempre un diccionario con claves:
+    - asunto
+    - cuerpo
+    - enviar_activo (bool): True si debe enviarse email para este tipo.
+    """
     plantilla = PlantillaEmail.query.filter_by(tipo=tipo).first()
-    if not plantilla:
-        # Plantillas por defecto si no existen en BD
-        plantillas_defecto = {
-            'presupuesto': {
-                'asunto': 'Presupuesto #{presupuesto_id} - {cliente_nombre}',
-                'cuerpo': '''Estimado/a {cliente_nombre},
+    if plantilla:
+        return {
+            'asunto': plantilla.asunto,
+            'cuerpo': plantilla.cuerpo,
+            'enviar_activo': plantilla.enviar_activo if plantilla.enviar_activo is not None else True,
+        }
+
+    # Plantillas por defecto si no existen en BD
+    plantillas_defecto = {
+        'presupuesto': {
+            'asunto': 'Presupuesto #{presupuesto_id} - {cliente_nombre}',
+            'cuerpo': '''Estimado/a {cliente_nombre},
 
 Adjuntamos el presupuesto #{presupuesto_id} solicitado.
 
@@ -28,30 +40,12 @@ Detalles del presupuesto:
 Quedamos a su disposición para cualquier consulta.
 
 Saludos cordiales,
-{empresa_nombre}'''
-            },
-            'cambio_estado_pedido': {
-                'asunto': 'Actualización del pedido #{pedido_id} - Estado: {nuevo_estado}',
-                'cuerpo': '''Estimado/a {cliente_nombre},
-
-Le informamos que el estado de su pedido #{pedido_id} ha cambiado.
-
-Nuevo estado: {nuevo_estado}
-Fecha de actualización: {fecha_actualizacion}
-
-Detalles del pedido:
-- Tipo: {tipo_pedido}
-- Fecha de aceptación: {fecha_aceptacion}
-- Fecha objetivo de entrega: {fecha_objetivo}
-
-Quedamos a su disposición para cualquier consulta.
-
-Saludos cordiales,
-{empresa_nombre}'''
-            }
-        }
-        return plantillas_defecto.get(tipo, {'asunto': '', 'cuerpo': ''})
-    return {'asunto': plantilla.asunto, 'cuerpo': plantilla.cuerpo}
+{empresa_nombre}''',
+            'enviar_activo': True,
+        },
+    }
+    # Si no hay plantilla conocida, devolver estructura vacía pero activa
+    return plantillas_defecto.get(tipo, {'asunto': '', 'cuerpo': '', 'enviar_activo': True})
 
 def formatear_texto(texto, variables):
     """Formatear texto con variables"""
@@ -164,16 +158,53 @@ Saludos cordiales,
     except Exception as e:
         return False, f'Error al enviar email: {str(e)}'
 
+def _slug_estado(estado: str) -> str:
+    """Convertir un nombre de estado a un slug para usar en el tipo de plantilla."""
+    if not estado:
+        return ''
+    slug = estado.lower()
+    # Normalizar caracteres habituales en los estados
+    slug = (
+        slug.replace(' ', '_')
+        .replace('ó', 'o')
+        .replace('í', 'i')
+        .replace('é', 'e')
+        .replace('á', 'a')
+        .replace('ú', 'u')
+    )
+    return slug
+
+
 def enviar_email_cambio_estado_pedido(pedido, nuevo_estado, estado_anterior=None):
-    """Enviar email al cliente cuando cambia el estado de un pedido"""
+    """Enviar email al cliente cuando cambia el estado de un pedido.
+
+    Intenta usar una plantilla específica por estado (por ejemplo:
+    - cambio_estado_pedido_pendiente
+    - cambio_estado_pedido_diseno
+    - cambio_estado_pedido_en_preparacion
+    - cambio_estado_pedido_todo_listo
+    - cambio_estado_pedido_enviado
+    - cambio_estado_pedido_entregado_al_cliente
+
+    Si no existe una plantilla específica o está desactivada, no se envía email.
+    """
     try:
         cliente = pedido.cliente
         if not cliente or not cliente.email:
             return False, 'El cliente no tiene email configurado'
+
+        # Intentar plantilla específica por estado
+        tipo_especifico = f"cambio_estado_pedido_{_slug_estado(nuevo_estado)}"
+        plantilla = obtener_plantilla(tipo_especifico)
+
+        # Si no hay asunto/cuerpo configurado, no enviar email
+        if not plantilla.get('asunto') or not plantilla.get('cuerpo'):
+            return False, f'No hay plantilla configurada para el estado "{nuevo_estado}"'
         
-        # Obtener plantilla
-        plantilla = obtener_plantilla('cambio_estado_pedido')
-        
+        # Verificar si la plantilla está activa
+        if not plantilla.get('enviar_activo', True):
+            return False, f'La plantilla para el estado "{nuevo_estado}" está desactivada'
+
         # Variables para la plantilla
         variables = {
             'pedido_id': pedido.id,
@@ -186,22 +217,22 @@ def enviar_email_cambio_estado_pedido(pedido, nuevo_estado, estado_anterior=None
             'fecha_objetivo': pedido.fecha_objetivo.strftime('%d/%m/%Y') if pedido.fecha_objetivo else 'N/A',
             'empresa_nombre': current_app.config.get('MAIL_DEFAULT_SENDER', 'Nuestra Empresa')
         }
-        
+
         # Formatear asunto y cuerpo
         asunto = formatear_texto(plantilla['asunto'], variables)
         cuerpo = formatear_texto(plantilla['cuerpo'], variables)
-        
+
         # Crear mensaje
         msg = Message(
             subject=asunto,
             recipients=[cliente.email],
             body=cuerpo
         )
-        
+
         # Enviar email
         mail.send(msg)
         return True, 'Email enviado correctamente'
-        
+
     except Exception as e:
         return False, f'Error al enviar email: {str(e)}'
 

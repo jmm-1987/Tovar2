@@ -339,7 +339,10 @@ def importar_bd():
 @supervisor_required
 def plantillas_email():
     """Gestión de plantillas de email"""
-    plantillas = PlantillaEmail.query.all()
+    # Filtrar para excluir la plantilla genérica 'cambio_estado_pedido'
+    plantillas = PlantillaEmail.query.filter(
+        PlantillaEmail.tipo != 'cambio_estado_pedido'
+    ).all()
     return render_template('configuracion/plantillas_email.html', plantillas=plantillas)
 
 @configuracion_bp.route('/configuracion/plantillas-email/<int:id>/editar', methods=['GET', 'POST'])
@@ -353,6 +356,8 @@ def editar_plantilla_email(id):
         try:
             plantilla.asunto = request.form.get('asunto', '')
             plantilla.cuerpo = request.form.get('cuerpo', '')
+            # Checkbox: si viene marcado es 'on', si no viene es None
+            plantilla.enviar_activo = request.form.get('enviar_activo') == 'on'
             plantilla.fecha_actualizacion = datetime.utcnow()
             
             db.session.commit()
@@ -363,4 +368,24 @@ def editar_plantilla_email(id):
             flash(f'Error al actualizar plantilla: {str(e)}', 'error')
     
     return render_template('configuracion/editar_plantilla_email.html', plantilla=plantilla)
+
+@configuracion_bp.route('/configuracion/plantillas-email/<int:id>/toggle', methods=['POST'])
+@login_required
+@supervisor_required
+def toggle_plantilla_email(id):
+    """Activar/desactivar el envío de una plantilla de email"""
+    plantilla = PlantillaEmail.query.get_or_404(id)
+    try:
+        # Invertir el estado actual
+        plantilla.enviar_activo = not plantilla.enviar_activo
+        plantilla.fecha_actualizacion = datetime.utcnow()
+        db.session.commit()
+        
+        estado = 'activada' if plantilla.enviar_activo else 'desactivada'
+        flash(f'Plantilla {estado} correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al cambiar el estado de la plantilla: {str(e)}', 'error')
+    
+    return redirect(url_for('configuracion.plantillas_email'))
 

@@ -309,9 +309,21 @@ def migrate_database():
             # Verificar y crear tabla plantillas_email si no existe
             if 'plantillas_email' not in table_names:
                 db.create_all()
+            else:
+                # Asegurar columna enviar_activo en plantillas_email
+                columns_plantillas = [col['name'] for col in inspector.get_columns('plantillas_email')]
+                if 'enviar_activo' not in columns_plantillas:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE plantillas_email ADD COLUMN enviar_activo BOOLEAN DEFAULT TRUE"))
+                            conn.commit()
+                            print("Migración: Columna enviar_activo agregada exitosamente a plantillas_email")
+                    except Exception as e:
+                        print(f"Error al agregar columna enviar_activo a plantillas_email: {e}")
             
             # Inicializar plantillas por defecto si no existen
             from models import PlantillaEmail
+            # Plantillas por defecto (se crean solo si no existen)
             plantillas_por_defecto = [
                 {
                     'tipo': 'presupuesto',
@@ -330,26 +342,106 @@ Quedamos a su disposición para cualquier consulta.
 Saludos cordiales,
 {empresa_nombre}'''
                 },
+                # Plantillas específicas por estado de pedido
                 {
-                    'tipo': 'cambio_estado_pedido',
-                    'asunto': 'Actualización del pedido #{pedido_id} - Estado: {nuevo_estado}',
+                    'tipo': 'cambio_estado_pedido_pendiente',
+                    'asunto': 'Pedido #{pedido_id} recibido - Estado: Pendiente',
                     'cuerpo': '''Estimado/a {cliente_nombre},
 
-Le informamos que el estado de su pedido #{pedido_id} ha cambiado.
+Hemos recibido su pedido #{pedido_id} y se encuentra en estado PENDIENTE.
 
-Nuevo estado: {nuevo_estado}
-Fecha de actualización: {fecha_actualizacion}
+En breve empezaremos a trabajar en él. Le iremos informando de los siguientes pasos.
+
+Detalles del pedido:
+- Tipo: {tipo_pedido}
+- Fecha de actualización: {fecha_actualizacion}
+
+Saludos cordiales,
+{empresa_nombre}'''
+                },
+                {
+                    'tipo': 'cambio_estado_pedido_diseno',
+                    'asunto': 'Pedido #{pedido_id} en fase de diseño',
+                    'cuerpo': '''Estimado/a {cliente_nombre},
+
+Su pedido #{pedido_id} ha pasado al estado DISEÑO.
+
+Nuestro equipo está trabajando en las propuestas de diseño. En cuanto estén listas se las enviaremos para su revisión.
+
+Detalles del pedido:
+- Tipo: {tipo_pedido}
+- Fecha de actualización: {fecha_actualizacion}
+
+Saludos cordiales,
+{empresa_nombre}'''
+                },
+                {
+                    'tipo': 'cambio_estado_pedido_en_preparacion',
+                    'asunto': 'Pedido #{pedido_id} en preparación',
+                    'cuerpo': '''Estimado/a {cliente_nombre},
+
+Su pedido #{pedido_id} ha pasado al estado EN PREPARACIÓN.
+
+Estamos preparando la producción de su pedido.
 
 Detalles del pedido:
 - Tipo: {tipo_pedido}
 - Fecha de aceptación: {fecha_aceptacion}
 - Fecha objetivo de entrega: {fecha_objetivo}
 
-Quedamos a su disposición para cualquier consulta.
+Saludos cordiales,
+{empresa_nombre}'''
+                },
+                {
+                    'tipo': 'cambio_estado_pedido_todo_listo',
+                    'asunto': 'Pedido #{pedido_id} listo',
+                    'cuerpo': '''Estimado/a {cliente_nombre},
+
+Su pedido #{pedido_id} se encuentra en estado TODO LISTO.
+
+Estamos ultimando los detalles para su envío o recogida.
+
+Detalles del pedido:
+- Tipo: {tipo_pedido}
+- Fecha objetivo de entrega: {fecha_objetivo}
 
 Saludos cordiales,
 {empresa_nombre}'''
-                }
+                },
+                {
+                    'tipo': 'cambio_estado_pedido_enviado',
+                    'asunto': 'Pedido #{pedido_id} enviado',
+                    'cuerpo': '''Estimado/a {cliente_nombre},
+
+Su pedido #{pedido_id} ha sido ENVIADO.
+
+En breve lo recibirá en la dirección acordada.
+
+Detalles del pedido:
+- Tipo: {tipo_pedido}
+- Fecha objetivo de entrega: {fecha_objetivo}
+
+Saludos cordiales,
+{empresa_nombre}'''
+                },
+                {
+                    'tipo': 'cambio_estado_pedido_entregado_al_cliente',
+                    'asunto': 'Pedido #{pedido_id} entregado',
+                    'cuerpo': '''Estimado/a {cliente_nombre},
+
+Su pedido #{pedido_id} ha sido ENTREGADO.
+
+Esperamos que quede satisfecho con el trabajo realizado.
+
+Detalles del pedido:
+- Tipo: {tipo_pedido}
+- Fecha de entrega: {fecha_actualizacion}
+
+Muchas gracias por confiar en nosotros.
+
+Saludos cordiales,
+{empresa_nombre}'''
+                },
             ]
             
             for plantilla_data in plantillas_por_defecto:
@@ -358,7 +450,8 @@ Saludos cordiales,
                     nueva_plantilla = PlantillaEmail(
                         tipo=plantilla_data['tipo'],
                         asunto=plantilla_data['asunto'],
-                        cuerpo=plantilla_data['cuerpo']
+                        cuerpo=plantilla_data['cuerpo'],
+                        enviar_activo=True
                     )
                     db.session.add(nueva_plantilla)
             try:

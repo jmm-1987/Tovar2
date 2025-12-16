@@ -51,6 +51,14 @@
             <textarea id="cuerpo" name="cuerpo" class="form-control" rows="15" required>{{ plantilla.cuerpo }}</textarea>
             <small class="form-text">Puedes usar variables entre llaves y saltos de línea</small>
         </div>
+
+        <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" name="enviar_activo" {% if plantilla.enviar_activo %}checked{% endif %}>
+                <span>Enviar este email cuando se use esta plantilla</span>
+            </label>
+            <small class="form-text">Si desmarcas esta opción, no se enviará ningún email para este tipo/estado.</small>
+        </div>
         
         <div class="form-actions">
             <button type="submit" class="btn btn-primary">Guardar Cambios</button>

@@ -7,12 +7,13 @@
     <h1>📧 Plantillas de Email</h1>
     
     <div class="info-box" style="margin-bottom: 20px;">
-        <p><strong>Variables disponibles para usar en las plantillas:</strong></p>
-        <ul>
-            <li><strong>Para presupuestos:</strong> {presupuesto_id}, {cliente_nombre}, {tipo_pedido}, {fecha_creacion}, {total_con_iva}, {empresa_nombre}</li>
-            <li><strong>Para cambios de estado de pedidos:</strong> {pedido_id}, {cliente_nombre}, {nuevo_estado}, {estado_anterior}, {fecha_actualizacion}, {tipo_pedido}, {fecha_aceptacion}, {fecha_objetivo}, {empresa_nombre}</li>
-        </ul>
-    </div>
+    <p><strong>Variables disponibles para usar en las plantillas:</strong></p>
+    <ul>
+        <li><strong>Para presupuestos:</strong> {presupuesto_id}, {cliente_nombre}, {tipo_pedido}, {fecha_creacion}, {total_con_iva}, {empresa_nombre}</li>
+        <li><strong>Para cambios de estado de pedidos:</strong> {pedido_id}, {cliente_nombre}, {nuevo_estado}, {estado_anterior}, {fecha_actualizacion}, {tipo_pedido}, {fecha_aceptacion}, {fecha_objetivo}, {empresa_nombre}</li>
+    </ul>
+    <p style="margin-top: 10px;"><strong>Nota:</strong> Puedes activar/desactivar el envío de emails para cada estado usando el interruptor en la columna "Activo".</p>
+</div>
     
     {% if plantillas %}
     <table class="data-table">
@@ -20,6 +21,7 @@
             <tr>
                 <th>Tipo</th>
                 <th>Asunto</th>
+                <th>Activo</th>
                 <th>Última actualización</th>
                 <th>Acciones</th>
             </tr>
@@ -30,13 +32,22 @@
                 <td>
                     {% if plantilla.tipo == 'presupuesto' %}
                         📄 Presupuesto
-                    {% elif plantilla.tipo == 'cambio_estado_pedido' %}
-                        📦 Cambio de Estado de Pedido
+                    {% elif plantilla.tipo.startswith('cambio_estado_pedido_') %}
+                        {% set estado_nombre = plantilla.tipo.replace('cambio_estado_pedido_', '').replace('_', ' ').title() %}
+                        📦 Estado: {{ estado_nombre }}
                     {% else %}
                         {{ plantilla.tipo }}
                     {% endif %}
                 </td>
                 <td>{{ plantilla.asunto[:50] }}{% if plantilla.asunto|length > 50 %}...{% endif %}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('configuracion.toggle_plantilla_email', id=plantilla.id) }}" style="display: inline;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" {% if plantilla.enviar_activo %}checked{% endif %} onchange="this.form.submit()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </form>
+                </td>
                 <td>{{ plantilla.fecha_actualizacion.strftime('%d/%m/%Y %H:%M') if plantilla.fecha_actualizacion else 'N/A' }}</td>
                 <td>
                     <a href="{{ url_for('configuracion.editar_plantilla_email', id=plantilla.id) }}" class="btn btn-primary">Editar</a>
@@ -64,6 +75,55 @@
 
 .info-box li {
     margin: 5px 0;
+}
+
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 50px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 24px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: #28a745;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+    transform: translateX(26px);
+}
+
+.toggle-switch input:focus + .toggle-slider {
+    box-shadow: 0 0 1px #28a745;
 }
 </style>
 {% endblock %}
