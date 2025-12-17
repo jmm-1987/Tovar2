@@ -243,6 +243,17 @@ function duplicarLinea(btn) {
     const nuevaLinea = lineaRow.cloneNode(true);
     const container = document.getElementById('prendas-container');
     
+    // Obtener valores de los selects originales antes de limpiar
+    const prendaSelectOriginal = lineaRow.querySelector('select[name="prenda_id[]"]');
+    const sexoSelectOriginal = lineaRow.querySelector('select[name="sexo[]"]');
+    const tejidoSelectOriginal = lineaRow.querySelector('select[name="tejido[]"]');
+    const estadoSelectOriginal = lineaRow.querySelector('select[name="estado_linea[]"]');
+    
+    const prendaValue = prendaSelectOriginal ? prendaSelectOriginal.value : '';
+    const sexoValue = sexoSelectOriginal ? sexoSelectOriginal.value : '';
+    const tejidoValue = tejidoSelectOriginal ? tejidoSelectOriginal.value : '';
+    const estadoValue = estadoSelectOriginal ? estadoSelectOriginal.value : '';
+    
     // Limpiar talla y unidades
     const tallaInput = nuevaLinea.querySelector('input[name="talla[]"]');
     const unidadesInput = nuevaLinea.querySelector('input[name="cantidad[]"]');
@@ -252,6 +263,25 @@ function duplicarLinea(btn) {
     }
     if (unidadesInput) {
         unidadesInput.value = '1';
+    }
+    
+    // Establecer valores de los selects en la línea duplicada
+    const prendaSelectNuevo = nuevaLinea.querySelector('select[name="prenda_id[]"]');
+    const sexoSelectNuevo = nuevaLinea.querySelector('select[name="sexo[]"]');
+    const tejidoSelectNuevo = nuevaLinea.querySelector('select[name="tejido[]"]');
+    const estadoSelectNuevo = nuevaLinea.querySelector('select[name="estado_linea[]"]');
+    
+    if (prendaSelectNuevo && prendaValue) {
+        prendaSelectNuevo.value = prendaValue;
+    }
+    if (sexoSelectNuevo && sexoValue) {
+        sexoSelectNuevo.value = sexoValue;
+    }
+    if (tejidoSelectNuevo && tejidoValue) {
+        tejidoSelectNuevo.value = tejidoValue;
+    }
+    if (estadoSelectNuevo && estadoValue) {
+        estadoSelectNuevo.value = estadoValue;
     }
     
     // Mantener el estado de los campos personalizados

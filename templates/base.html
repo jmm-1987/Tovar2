@@ -30,6 +30,7 @@
                         <div class="dropdown-menu">
                             <a href="{{ url_for('tickets.listado_tickets') }}">Tickets</a>
                             <a href="{{ url_for('tickets.listado_clientes_tienda') }}">Clientes de Tienda</a>
+                            <a href="{{ url_for('tickets.cuadre_caja') }}">Cuadre de Caja</a>
                         </div>
                     </div>
                     <div class="dropdown">
@@ -55,7 +56,9 @@
                     {% endif %}
                     <div class="user-menu">
                         <span class="user-name">{{ current_user.usuario }}</span>
-                        <a href="{{ url_for('auth.logout') }}" class="logout-btn">Cerrar Sesión</a>
+                        <a href="{{ url_for('auth.logout') }}" class="logout-btn-circle" title="Cerrar Sesión">
+                            <img src="{{ url_for('static', filename='logo_jm.png') }}" alt="Cerrar Sesión" style="width: 100%; height: 100%; object-fit: contain;">
+                        </a>
                     </div>
                 {% endif %}
             </nav>

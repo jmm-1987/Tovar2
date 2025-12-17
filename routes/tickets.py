@@ -275,6 +275,76 @@ def eliminar_ticket(ticket_id):
     
     return redirect(url_for('tickets.listado_tickets'))
 
+@tickets_bp.route('/tickets/cuadre-caja')
+@login_required
+def cuadre_caja():
+    """Cuadre de caja diario - mostrar totales por forma de pago"""
+    # Obtener fecha del filtro o usar hoy por defecto
+    fecha_cuadre = request.args.get('fecha', '')
+    
+    if fecha_cuadre:
+        try:
+            fecha_cuadre_obj = datetime.strptime(fecha_cuadre, '%Y-%m-%d').date()
+        except ValueError:
+            fecha_cuadre_obj = datetime.now().date()
+    else:
+        fecha_cuadre_obj = datetime.now().date()
+    
+    # Obtener todos los tickets del día seleccionado
+    tickets_dia = Ticket.query.filter(
+        Ticket.fecha_expedicion == fecha_cuadre_obj
+    ).all()
+    
+    # Calcular totales por forma de pago
+    total_efectivo = Decimal('0.00')
+    total_tarjeta = Decimal('0.00')
+    total_bizum = Decimal('0.00')
+    total_transferencia = Decimal('0.00')
+    total_general = Decimal('0.00')
+    
+    # Contadores por forma de pago
+    cantidad_efectivo = 0
+    cantidad_tarjeta = 0
+    cantidad_bizum = 0
+    cantidad_transferencia = 0
+    
+    for ticket in tickets_dia:
+        importe = Decimal(str(ticket.importe_total))
+        forma_pago = ticket.forma_pago.lower() if ticket.forma_pago else ''
+        
+        total_general += importe
+        
+        if forma_pago == 'efectivo':
+            total_efectivo += importe
+            cantidad_efectivo += 1
+        elif forma_pago == 'tarjeta':
+            total_tarjeta += importe
+            cantidad_tarjeta += 1
+        elif forma_pago == 'bizum':
+            total_bizum += importe
+            cantidad_bizum += 1
+        elif forma_pago == 'transferencia':
+            total_transferencia += importe
+            cantidad_transferencia += 1
+    
+    # Preparar datos para el template
+    resumen = {
+        'fecha': fecha_cuadre_obj,
+        'total_efectivo': float(total_efectivo),
+        'total_tarjeta': float(total_tarjeta),
+        'total_bizum': float(total_bizum),
+        'total_transferencia': float(total_transferencia),
+        'total_general': float(total_general),
+        'cantidad_efectivo': cantidad_efectivo,
+        'cantidad_tarjeta': cantidad_tarjeta,
+        'cantidad_bizum': cantidad_bizum,
+        'cantidad_transferencia': cantidad_transferencia,
+        'tickets_dia': tickets_dia,
+        'total_tickets': len(tickets_dia)
+    }
+    
+    return render_template('tickets/cuadre_caja.html', **resumen)
+
 @tickets_bp.route('/tickets/<int:ticket_id>/reenviar', methods=['POST'])
 @login_required
 def reenviar_ticket(ticket_id):

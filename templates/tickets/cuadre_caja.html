@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Cuadre de Caja - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<style>
+.container {
+    padding-top: 10px !important;
+}
+header {
+    margin-bottom: 0.8rem !important;
+}
+h2::after {
+    display: none;
+}
+</style>
+
+<h2 style="margin: 0 0 8px 0; padding-bottom: 0; font-size: 1.3rem;">Cuadre de Caja Diario</h2>
+
+<div style="margin-bottom: 20px;">
+    <div class="filtros-container" style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); padding: 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #e9ecef;">
+        <form method="GET" action="{{ url_for('tickets.cuadre_caja') }}" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 200px;">
+                <label for="fecha" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>📅</span> Fecha del Cuadre
+                </label>
+                <input type="date" name="fecha" id="fecha" value="{{ fecha.strftime('%Y-%m-%d') }}" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease;">
+            </div>
+            
+            <div style="display: flex; gap: 8px; align-items: flex-end;">
+                <button type="submit" class="btn btn-primary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
+                    🔍 Consultar
+                </button>
+                <a href="{{ url_for('tickets.cuadre_caja') }}" class="btn btn-secondary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; transition: all 0.3s ease;">
+                    📅 Hoy
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 30px;">
+    <!-- Tarjeta Efectivo -->
+    <div class="card" style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">💵 Efectivo</h3>
+            <span style="font-size: 0.9rem; opacity: 0.9;">{{ cantidad_efectivo }} tickets</span>
+        </div>
+        <div style="font-size: 2rem; font-weight: bold; margin-top: 10px;">
+            {{ "%.2f"|format(total_efectivo) }} €
+        </div>
+    </div>
+    
+    <!-- Tarjeta Tarjeta -->
+    <div class="card" style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">💳 Tarjeta</h3>
+            <span style="font-size: 0.9rem; opacity: 0.9;">{{ cantidad_tarjeta }} tickets</span>
+        </div>
+        <div style="font-size: 2rem; font-weight: bold; margin-top: 10px;">
+            {{ "%.2f"|format(total_tarjeta) }} €
+        </div>
+    </div>
+    
+    <!-- Tarjeta Bizum -->
+    <div class="card" style="background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">📱 Bizum</h3>
+            <span style="font-size: 0.9rem; opacity: 0.9;">{{ cantidad_bizum }} tickets</span>
+        </div>
+        <div style="font-size: 2rem; font-weight: bold; margin-top: 10px;">
+            {{ "%.2f"|format(total_bizum) }} €
+        </div>
+    </div>
+    
+    <!-- Tarjeta Transferencia -->
+    <div class="card" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); color: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 600;">🏦 Transferencia</h3>
+            <span style="font-size: 0.9rem; opacity: 0.9;">{{ cantidad_transferencia }} tickets</span>
+        </div>
+        <div style="font-size: 2rem; font-weight: bold; margin-top: 10px;">
+            {{ "%.2f"|format(total_transferencia) }} €
+        </div>
+    </div>
+</div>
+
+<!-- Resumen Total -->
+<div class="card" style="background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 30px; border: 3px solid #2c3e50;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h3 style="margin: 0 0 5px 0; color: #2c3e50; font-size: 1.3rem;">Total del Día</h3>
+            <p style="margin: 0; color: #666; font-size: 0.9rem;">Fecha: {{ fecha.strftime('%d/%m/%Y') }} | Total de tickets: {{ total_tickets }}</p>
+        </div>
+        <div style="text-align: right;">
+            <div style="font-size: 2.5rem; font-weight: bold; color: #27ae60;">
+                {{ "%.2f"|format(total_general) }} €
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Desglose de Tickets -->
+{% if tickets_dia %}
+<h3 style="margin-bottom: 15px; color: #2c3e50; font-size: 1.1rem;">Desglose de Tickets del Día</h3>
+<table class="table-compact">
+    <thead>
+        <tr>
+            <th style="width: 100px;">Serie-Nº</th>
+            <th style="width: 200px;">Cliente</th>
+            <th style="width: 120px;">Forma de Pago</th>
+            <th style="width: 100px;">Importe</th>
+            <th style="width: 100px;">Estado</th>
+            <th style="width: 100px;">Acciones</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for ticket in tickets_dia %}
+        <tr>
+            <td>{{ ticket.serie }}-{{ ticket.numero }}</td>
+            <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ ticket.nombre }}">{{ ticket.nombre }}</td>
+            <td>
+                {% if ticket.forma_pago %}
+                    {% if ticket.forma_pago.lower() == 'efectivo' %}
+                        <span style="color: #28a745; font-weight: 600;">💵 Efectivo</span>
+                    {% elif ticket.forma_pago.lower() == 'tarjeta' %}
+                        <span style="color: #007bff; font-weight: 600;">💳 Tarjeta</span>
+                    {% elif ticket.forma_pago.lower() == 'bizum' %}
+                        <span style="color: #6f42c1; font-weight: 600;">📱 Bizum</span>
+                    {% elif ticket.forma_pago.lower() == 'transferencia' %}
+                        <span style="color: #17a2b8; font-weight: 600;">🏦 Transferencia</span>
+                    {% else %}
+                        {{ ticket.forma_pago }}
+                    {% endif %}
+                {% else %}
+                    <span style="color: #999;">-</span>
+                {% endif %}
+            </td>
+            <td style="font-weight: 600;">{{ "%.2f"|format(ticket.importe_total) }} €</td>
+            <td>
+                <span class="badge badge-estado-{{ ticket.estado }}">
+                    {% if ticket.estado == 'pendiente' %}
+                        Pendiente
+                    {% elif ticket.estado == 'enviado' %}
+                        Enviado
+                    {% elif ticket.estado == 'confirmado' %}
+                        Confirmado
+                    {% elif ticket.estado == 'error' %}
+                        Error
+                    {% else %}
+                        {{ ticket.estado }}
+                    {% endif %}
+                </span>
+            </td>
+            <td>
+                <a href="{{ url_for('tickets.ver_ticket', ticket_id=ticket.id) }}" class="btn btn-info" style="padding: 4px 8px; font-size: 0.75rem;">Ver</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div style="padding: 40px; background: #f8f9fa; border-radius: 8px; text-align: center; color: #666;">
+    <p style="margin: 0; font-size: 1.1rem;">No hay tickets registrados para el día {{ fecha.strftime('%d/%m/%Y') }}.</p>
+</div>
+{% endif %}
+
+<style>
+.badge-estado-pendiente {
+    background-color: #ffc107;
+    color: #000;
+}
+.badge-estado-enviado {
+    background-color: #17a2b8;
+    color: #fff;
+}
+.badge-estado-confirmado {
+    background-color: #28a745;
+    color: #fff;
+}
+.badge-estado-error {
+    background-color: #dc3545;
+    color: #fff;
+}
+</style>
+
+{% endblock %}
+

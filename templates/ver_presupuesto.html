@@ -7,13 +7,6 @@
     <a href="{{ url_for('presupuestos.listado_presupuestos') }}" class="btn btn-primary">← Volver a la lista</a>
     <a href="{{ url_for('presupuestos.editar_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-warning">Editar</a>
     <a href="{{ url_for('presupuestos.descargar_pdf_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-success" target="_blank">📄 Descargar PDF</a>
-    {% if presupuesto.cliente and presupuesto.cliente.email %}
-    <form method="POST" action="{{ url_for('presupuestos.enviar_presupuesto_email', presupuesto_id=presupuesto.id) }}" style="display: inline;" onsubmit="return confirm('¿Enviar presupuesto por email a {{ presupuesto.cliente.email }}?')">
-        <button type="submit" class="btn btn-info">📧 Enviar por Correo</button>
-    </form>
-    {% else %}
-    <button class="btn btn-info" disabled title="El cliente no tiene email configurado">📧 Enviar por Correo</button>
-    {% endif %}
 </div>
 
 <h2>Presupuesto #{{ presupuesto.id }}</h2>

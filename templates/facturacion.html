@@ -134,8 +134,14 @@ function cambiarTipoVista(tipo) {
                 <td style="padding: 15px; text-align: center;">
                     <a href="{{ url_for('facturacion.ver_factura', pedido_id=pedido.id) }}" 
                        class="btn btn-info" 
-                       style="padding: 8px 20px; font-size: 0.9rem; text-decoration: none; display: inline-block;">
+                       style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block; margin-right: 5px;">
                         Hacer Factura
+                    </a>
+                    <a href="{{ url_for('facturacion.descargar_pdf_albaran_pedido', pedido_id=pedido.id) }}" 
+                       class="btn btn-secondary" 
+                       style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block;"
+                       target="_blank">
+                        📋 Albarán
                     </a>
                 </td>
             </tr>
@@ -193,11 +199,17 @@ function cambiarTipoVista(tipo) {
                        style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block; margin-right: 5px;">
                         Ver
                     </a>
-                    <a href="{{ url_for('facturacion.imprimir_factura', factura_id=factura.id) }}" 
+                    <a href="{{ url_for('facturacion.descargar_pdf_factura', factura_id=factura.id) }}" 
                        class="btn btn-success" 
+                       style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block; margin-right: 5px;"
+                       target="_blank">
+                        📄 PDF
+                    </a>
+                    <a href="{{ url_for('facturacion.descargar_pdf_albaran_factura', factura_id=factura.id) }}" 
+                       class="btn btn-info" 
                        style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block;"
                        target="_blank">
-                        🖨️ Imprimir
+                        📋 Albarán
                     </a>
                 </td>
             </tr>

@@ -5,8 +5,10 @@ from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 from io import BytesIO
 import os
+import tempfile
 from extensions import db
 from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Usuario, RegistroCambioEstado
+from playwright.sync_api import sync_playwright
 
 pedidos_bp = Blueprint('pedidos', __name__)
 
@@ -414,20 +416,7 @@ def cambiar_estado_pedido(pedido_id):
                 db.session.add(registro)
             
             db.session.commit()
-            
-            # Enviar email al cliente si el estado cambió
-            if estado_anterior != estado_nombre:
-                try:
-                    from utils.email import enviar_email_cambio_estado_pedido
-                    exito, mensaje = enviar_email_cambio_estado_pedido(pedido, estado_nombre, estado_anterior)
-                    if exito:
-                        flash(f'Estado del pedido cambiado a "{estado_nombre}". Email enviado al cliente.', 'success')
-                    else:
-                        flash(f'Estado del pedido cambiado a "{estado_nombre}". Error al enviar email: {mensaje}', 'warning')
-                except Exception as e:
-                    flash(f'Estado del pedido cambiado a "{estado_nombre}". Error al enviar email: {str(e)}', 'warning')
-            else:
-                flash(f'Estado del pedido cambiado a "{estado_nombre}"', 'success')
+            flash(f'Estado del pedido cambiado a "{estado_nombre}"', 'success')
         else:
             flash('Estado no válido', 'error')
             
@@ -508,31 +497,178 @@ def imprimir_pedido(pedido_id):
     pedido = Pedido.query.get_or_404(pedido_id)
     return render_template('imprimir_pedido.html', pedido=pedido)
 
-@pedidos_bp.route('/pedidos/<int:pedido_id>/enviar-email-cliente')
-@login_required
-def enviar_pedido_email_cliente(pedido_id):
-    """Enviar por email directamente al cliente"""
-    try:
-        pedido = Pedido.query.get_or_404(pedido_id)
+def preparar_datos_imprimir_pedido(pedido_id):
+    """Función auxiliar para preparar todos los datos necesarios para imprimir el pedido"""
+    from decimal import Decimal
+    import base64
+    
+    pedido = Pedido.query.get_or_404(pedido_id)
+    
+    # Calcular totales
+    tipo_iva = 21
+    base_imponible = Decimal('0.00')
+    
+    for linea in pedido.lineas:
+        precio_unit = Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0.00')
+        cantidad = Decimal(str(linea.cantidad))
+        total_linea = precio_unit * cantidad
+        base_imponible += total_linea
+    
+    iva_total = base_imponible * Decimal(str(tipo_iva)) / Decimal('100')
+    total_con_iva = base_imponible + iva_total
+    
+    # Función auxiliar para convertir imagen a base64
+    def convertir_imagen_a_base64(ruta_imagen):
+        """Convertir imagen a base64"""
+        if not ruta_imagen or not os.path.exists(ruta_imagen):
+            return None
+        try:
+            with open(ruta_imagen, 'rb') as f:
+                imagen_data = f.read()
+                imagen_base64 = base64.b64encode(imagen_data).decode('utf-8')
+                # Detectar tipo MIME
+                if ruta_imagen.lower().endswith('.png'):
+                    return f'data:image/png;base64,{imagen_base64}'
+                elif ruta_imagen.lower().endswith(('.jpg', '.jpeg')):
+                    return f'data:image/jpeg;base64,{imagen_base64}'
+                elif ruta_imagen.lower().endswith('.gif'):
+                    return f'data:image/gif;base64,{imagen_base64}'
+                else:
+                    return f'data:image/png;base64,{imagen_base64}'  # Por defecto PNG
+        except Exception as e:
+            print(f"Error al leer imagen {ruta_imagen}: {e}")
+            return None
+    
+    # Convertir imágenes a base64
+    logo_base64 = None
+    imagen_diseno_base64 = None
+    imagen_portada_base64 = None
+    imagenes_adicionales_base64 = []
+    descripciones_imagenes = []
+    
+    # Convertir logo a base64
+    logo_path = os.path.join(current_app.static_folder, 'logo.png')
+    logo_base64 = convertir_imagen_a_base64(logo_path)
+    
+    # Convertir imagen de diseño a base64 si existe
+    if pedido.imagen_diseno:
+        imagen_path = os.path.join(current_app.config['UPLOAD_FOLDER'], pedido.imagen_diseno)
+        imagen_diseno_base64 = convertir_imagen_a_base64(imagen_path)
+    
+    # Convertir imagen de portada a base64 si existe
+    if pedido.imagen_portada:
+        imagen_path = os.path.join(current_app.config['UPLOAD_FOLDER'], pedido.imagen_portada)
+        imagen_portada_base64 = convertir_imagen_a_base64(imagen_path)
+    
+    # Convertir imágenes adicionales a base64 y obtener descripciones (5 imágenes)
+    for i in range(1, 6):
+        campo_imagen = f'imagen_adicional_{i}'
+        campo_descripcion = f'descripcion_imagen_{i}'
         
-        # Verificar que el cliente tenga email
-        if not pedido.cliente or not pedido.cliente.email:
-            flash('El cliente no tiene email configurado', 'error')
-            return redirect(url_for('pedidos.listado_pedidos'))
-        
-        # Enviar email usando Flask-Mail
-        from utils.email import enviar_email_pedido
-        exito, mensaje = enviar_email_pedido(pedido, None)
-        
-        if exito:
-            flash(f'Pedido enviado por email a {pedido.cliente.email}', 'success')
+        if hasattr(pedido, campo_imagen) and getattr(pedido, campo_imagen):
+            imagen_nombre = getattr(pedido, campo_imagen)
+            imagen_path = os.path.join(current_app.config['UPLOAD_FOLDER'], imagen_nombre)
+            if os.path.exists(imagen_path):
+                imagen_base64 = convertir_imagen_a_base64(imagen_path)
+                imagenes_adicionales_base64.append(imagen_base64)
+            else:
+                print(f"ADVERTENCIA: No se encontró la imagen {imagen_path}")
+                imagenes_adicionales_base64.append(None)
         else:
-            flash(f'Error al enviar email: {mensaje}', 'error')
+            imagenes_adicionales_base64.append(None)
+        
+        # Obtener descripción
+        descripcion = getattr(pedido, campo_descripcion, '') if hasattr(pedido, campo_descripcion) else ''
+        descripciones_imagenes.append(descripcion)
+    
+    return {
+        'pedido': pedido,
+        'base_imponible': float(base_imponible),
+        'iva_total': float(iva_total),
+        'total_con_iva': float(total_con_iva),
+        'tipo_iva': tipo_iva,
+        'logo_base64': logo_base64,
+        'imagen_diseno_base64': imagen_diseno_base64,
+        'imagen_portada_base64': imagen_portada_base64,
+        'imagenes_adicionales_base64': imagenes_adicionales_base64,
+        'descripciones_imagenes': descripciones_imagenes
+    }
+
+@pedidos_bp.route('/pedidos/<int:pedido_id>/descargar-pdf')
+@login_required
+def descargar_pdf_pedido(pedido_id):
+    """Descargar pedido en formato PDF"""
+    try:
+        datos = preparar_datos_imprimir_pedido(pedido_id)
+        
+        # Renderizar el HTML del pedido
+        html = render_template('imprimir_pedido_pdf.html', 
+                             **datos,
+                             use_base64=True)
+        
+        # Crear el PDF en memoria usando playwright
+        pdf_buffer = BytesIO()
+        
+        try:
+            # Guardar HTML temporalmente para que playwright pueda acceder a él
+            # Crear un archivo HTML temporal
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+                temp_file.write(html)
+                temp_html_path = temp_file.name
+            
+            # Usar playwright para generar el PDF
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                
+                # Cargar el HTML desde el archivo temporal
+                page.goto(f'file://{temp_html_path}')
+                
+                # Generar PDF
+                pdf_bytes = page.pdf(
+                    format='A4',
+                    print_background=True,
+                    margin={
+                        'top': '10mm',
+                        'right': '10mm',
+                        'bottom': '10mm',
+                        'left': '10mm'
+                    }
+                )
+                
+                browser.close()
+            
+            # Escribir el PDF al buffer
+            pdf_buffer.write(pdf_bytes)
+            
+            # Limpiar archivo temporal
+            try:
+                os.unlink(temp_html_path)
+            except:
+                pass
+            
+        except Exception as pdf_error:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error al crear PDF con playwright: {error_trace}")
+            flash(f'Error al generar PDF: {str(pdf_error)}', 'error')
+            return redirect(url_for('pedidos.ver_pedido', pedido_id=pedido_id))
+        
+        # Preparar la respuesta con el PDF
+        pdf_buffer.seek(0)
+        response = make_response(pdf_buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=pedido_{pedido_id}.pdf'
+        
+        return response
         
     except Exception as e:
-        flash(f'Error al enviar pedido por email: {str(e)}', 'error')
-    
-    return redirect(url_for('pedidos.listado_pedidos'))
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error completo al generar PDF: {error_trace}")
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        return redirect(url_for('pedidos.ver_pedido', pedido_id=pedido_id))
+
 
 @pedidos_bp.route('/pedidos/<int:pedido_id>/eliminar', methods=['POST'])
 @login_required

@@ -11,7 +11,7 @@
     {% endif %}
 </div>
 
-<h2>Pedido #{{ pedido.id }} - {{ pedido.cliente.nombre if pedido.cliente else 'N/A' }}</h2>
+<h2>Pedido #{{ pedido.id }}{% if pedido.presupuesto_id %} (Presupuesto #{{ pedido.presupuesto_id }}){% endif %} - {{ pedido.cliente.nombre if pedido.cliente else 'N/A' }}</h2>
 
 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 30px;">
     <!-- Columna 1: Datos del Cliente -->

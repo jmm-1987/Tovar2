@@ -122,7 +122,7 @@ select.filtro-input {
     <tbody>
         {% for pedido in pedidos %}
         <tr>
-            <td>#{{ pedido.id }}</td>
+            <td>#{{ pedido.id }}{% if pedido.presupuesto_id %} <span style="color: #666; font-size: 0.85em;">(Presup. #{{ pedido.presupuesto_id }})</span>{% endif %}</td>
             <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ pedido.cliente.nombre if pedido.cliente else 'N/A' }}">{{ pedido.cliente.nombre if pedido.cliente else 'N/A' }}</td>
             <td style="max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ pedido.comercial.nombre if pedido.comercial else 'N/A' }}">{{ pedido.comercial.nombre if pedido.comercial else 'N/A' }}</td>
             <td>{{ pedido.tipo_pedido }}</td>
@@ -151,8 +151,7 @@ select.filtro-input {
                 <div style="display: flex; gap: 4px; align-items: center; flex-wrap: nowrap;">
                     <a href="{{ url_for('pedidos.ver_pedido', pedido_id=pedido.id) }}" class="btn btn-info" style="padding: 4px 8px; font-size: 0.75rem;">Ver</a>
                     <a href="{{ url_for('pedidos.editar_pedido', pedido_id=pedido.id) }}" class="btn btn-primary" style="padding: 4px 8px; font-size: 0.75rem;">Editar</a>
-                    <a href="{{ url_for('pedidos.imprimir_pedido', pedido_id=pedido.id) }}" class="btn btn-warning" target="_blank" style="padding: 4px 8px; font-size: 0.75rem;">Impr</a>
-                    <a href="{{ url_for('pedidos.enviar_pedido_email_cliente', pedido_id=pedido.id) }}" class="btn" style="padding: 4px 8px; font-size: 0.75rem; background: #4285F4; color: white;" title="Enviar por Email" target="_blank">📧</a>
+                    <a href="{{ url_for('pedidos.descargar_pdf_pedido', pedido_id=pedido.id) }}" class="btn btn-success" target="_blank" style="padding: 4px 8px; font-size: 0.75rem;" title="Generar PDF">📄 PDF</a>
                     <form method="POST" action="{{ url_for('pedidos.eliminar_pedido', pedido_id=pedido.id) }}" style="display: inline;" onsubmit="return confirm('¿Estás seguro de que deseas eliminar el pedido #{{ pedido.id }}? Esta acción no se puede deshacer.');">
                         <button type="submit" class="btn-eliminar-lista" title="Eliminar pedido">×</button>
                     </form>

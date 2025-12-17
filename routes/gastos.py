@@ -81,25 +81,21 @@ def editar_proveedor(proveedor_id):
     
     return render_template('gastos/editar_proveedor.html', proveedor=proveedor)
 
-@gastos_bp.route('/gastos/proveedores/<int:proveedor_id>/eliminar', methods=['POST'])
+@gastos_bp.route('/gastos/proveedores/<int:proveedor_id>/toggle', methods=['POST'])
 @login_required
-def eliminar_proveedor(proveedor_id):
-    """Eliminar proveedor"""
+def toggle_proveedor(proveedor_id):
+    """Activar/Desactivar proveedor"""
     proveedor = Proveedor.query.get_or_404(proveedor_id)
     try:
-        # Verificar si tiene facturas asociadas
-        if proveedor.facturas:
-            flash('No se puede eliminar el proveedor porque tiene facturas asociadas', 'error')
-            return redirect(url_for('gastos.listado_proveedores'))
-        
-        db.session.delete(proveedor)
+        proveedor.activo = not proveedor.activo
         db.session.commit()
-        flash('Proveedor eliminado correctamente', 'success')
+        estado = 'activado' if proveedor.activo else 'desactivado'
+        flash(f'Proveedor {estado} correctamente', 'success')
     except Exception as e:
         db.session.rollback()
-        flash(f'Error al eliminar proveedor: {str(e)}', 'error')
+        flash(f'Error al cambiar estado del proveedor: {str(e)}', 'error')
     
-    return redirect(url_for('gastos.listado_proveedores'))
+    return redirect(url_for('gastos.editar_proveedor', proveedor_id=proveedor_id))
 
 # ========== FACTURAS DE PROVEEDOR ==========
 

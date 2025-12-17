@@ -330,6 +330,30 @@ def migrate_database():
             if tablas_faltantes:
                 db.create_all()
             
+            # Verificar si existe la tabla proveedores y agregar columna activo si no existe
+            if 'proveedores' in table_names:
+                columns_proveedor = [col['name'] for col in inspector.get_columns('proveedores')]
+                if 'activo' not in columns_proveedor:
+                    try:
+                        with db.engine.connect() as conn:
+                            # PostgreSQL usa TRUE/FALSE para booleanos
+                            conn.execute(text('ALTER TABLE proveedores ADD COLUMN activo BOOLEAN DEFAULT TRUE'))
+                            conn.commit()
+                            print("Migración: Columna activo agregada exitosamente a proveedores")
+                    except Exception as e:
+                        print(f"Error al agregar columna activo a proveedores: {e}")
+                        # Intentar con sintaxis alternativa
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(text('ALTER TABLE proveedores ADD COLUMN activo BOOLEAN'))
+                                conn.execute(text('UPDATE proveedores SET activo = TRUE'))
+                                conn.execute(text('ALTER TABLE proveedores ALTER COLUMN activo SET DEFAULT TRUE'))
+                                conn.commit()
+                                print("Migración: Columna activo agregada exitosamente a proveedores (método alternativo)")
+                        except Exception as e2:
+                            print(f"Error alternativo al agregar columna activo a proveedores: {e2}")
+                            pass
+            
             # Verificar y crear tabla plantillas_email si no existe
             if 'plantillas_email' not in table_names:
                 db.create_all()

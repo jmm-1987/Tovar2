@@ -35,5 +35,28 @@
         <a href="{{ url_for('gastos.listado_proveedores') }}" class="btn btn-danger">Cancelar</a>
     </div>
 </form>
+
+<div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid {% if proveedor.activo %}#28a745{% else %}#dc3545{% endif %};">
+    <h3 style="margin-top: 0; color: #2c3e50;">Estado del Proveedor</h3>
+    <p style="margin-bottom: 15px;">
+        <strong>Estado actual:</strong> 
+        {% if proveedor.activo %}
+            <span style="color: #28a745; font-weight: 600;">✓ Activo</span>
+        {% else %}
+            <span style="color: #dc3545; font-weight: 600;">✗ Desactivado</span>
+        {% endif %}
+    </p>
+    <form method="POST" action="{{ url_for('gastos.toggle_proveedor', proveedor_id=proveedor.id) }}" style="display: inline;">
+        {% if proveedor.activo %}
+            <button type="submit" class="btn btn-warning" onclick="return confirm('¿Está seguro de desactivar este proveedor?');">
+                Desactivar Proveedor
+            </button>
+        {% else %}
+            <button type="submit" class="btn btn-success" onclick="return confirm('¿Está seguro de activar este proveedor?');">
+                Activar Proveedor
+            </button>
+        {% endif %}
+    </form>
+</div>
 {% endblock %}
 

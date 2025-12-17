@@ -429,57 +429,6 @@ def descargar_pdf_presupuesto(presupuesto_id):
         flash(f'Error al generar PDF: {str(e)}', 'error')
         return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
 
-@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/enviar-email', methods=['POST'])
-@login_required
-def enviar_presupuesto_email(presupuesto_id):
-    """Enviar presupuesto por email al cliente"""
-    try:
-        presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
-        
-        # Verificar que el cliente tenga email
-        if not presupuesto.cliente or not presupuesto.cliente.email:
-            flash('El cliente no tiene email configurado', 'error')
-            return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
-        
-        # Enviar email
-        from utils.email import enviar_email_presupuesto
-        exito, mensaje = enviar_email_presupuesto(presupuesto, None)
-        
-        if exito:
-            flash(f'Presupuesto enviado por email a {presupuesto.cliente.email}', 'success')
-        else:
-            flash(f'Error al enviar email: {mensaje}', 'error')
-        
-    except Exception as e:
-        flash(f'Error al enviar presupuesto por email: {str(e)}', 'error')
-    
-    return redirect(url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto_id))
-
-@presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/enviar-email-cliente')
-@login_required
-def enviar_presupuesto_email_cliente(presupuesto_id):
-    """Enviar por email directamente al cliente"""
-    try:
-        presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
-        
-        # Verificar que el cliente tenga email
-        if not presupuesto.cliente or not presupuesto.cliente.email:
-            flash('El cliente no tiene email configurado', 'error')
-            return redirect(url_for('presupuestos.listado_presupuestos'))
-        
-        # Enviar email usando Flask-Mail
-        from utils.email import enviar_email_presupuesto
-        exito, mensaje = enviar_email_presupuesto(presupuesto, None)
-        
-        if exito:
-            flash(f'Presupuesto enviado por email a {presupuesto.cliente.email}', 'success')
-        else:
-            flash(f'Error al enviar email: {mensaje}', 'error')
-        
-    except Exception as e:
-        flash(f'Error al enviar presupuesto por email: {str(e)}', 'error')
-    
-    return redirect(url_for('presupuestos.listado_presupuestos'))
 
 @presupuestos_bp.route('/presupuestos/<int:presupuesto_id>/editar', methods=['GET', 'POST'])
 @login_required

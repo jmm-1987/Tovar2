@@ -1,15 +1,19 @@
 """Rutas para facturación"""
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, make_response
 from flask_login import login_required
 from datetime import datetime
 from decimal import Decimal
 import os
 import requests
 import json
+import tempfile
+import base64
+from io import BytesIO
 from sqlalchemy import not_
 from extensions import db
 from models import Pedido, LineaPedido, Factura, LineaFactura
 from utils.numeracion import obtener_siguiente_numero_factura
+from playwright.sync_api import sync_playwright
 
 facturacion_bp = Blueprint('facturacion', __name__)
 
@@ -289,10 +293,8 @@ def formalizar_factura(pedido_id):
             'error': f'Error al formalizar la factura: {str(e)}'
         }), 500
 
-@facturacion_bp.route('/facturacion/factura/<int:factura_id>/imprimir')
-@login_required
-def imprimir_factura(factura_id):
-    """Vista de impresión de una factura formalizada"""
+def preparar_datos_imprimir_factura(factura_id):
+    """Función auxiliar para preparar todos los datos necesarios para imprimir la factura"""
     from decimal import Decimal
     
     factura = Factura.query.get_or_404(factura_id)
@@ -312,11 +314,322 @@ def imprimir_factura(factura_id):
     iva_total = iva_total.quantize(Decimal('0.01'))
     total_con_iva = base_imponible + iva_total
     
-    return render_template('imprimir_factura.html', 
-                         factura=factura,
-                         pedido=pedido,
-                         base_imponible=base_imponible,
-                         iva_total=iva_total,
-                         total_con_iva=total_con_iva,
-                         tipo_iva=tipo_iva)
+    # Función auxiliar para convertir imagen a base64
+    def convertir_imagen_a_base64(ruta_imagen):
+        """Convertir imagen a base64"""
+        if not ruta_imagen or not os.path.exists(ruta_imagen):
+            return None
+        try:
+            with open(ruta_imagen, 'rb') as f:
+                imagen_data = f.read()
+                imagen_base64 = base64.b64encode(imagen_data).decode('utf-8')
+                # Detectar tipo MIME
+                if ruta_imagen.lower().endswith('.png'):
+                    return f'data:image/png;base64,{imagen_base64}'
+                elif ruta_imagen.lower().endswith(('.jpg', '.jpeg')):
+                    return f'data:image/jpeg;base64,{imagen_base64}'
+                elif ruta_imagen.lower().endswith('.gif'):
+                    return f'data:image/gif;base64,{imagen_base64}'
+                else:
+                    return f'data:image/png;base64,{imagen_base64}'  # Por defecto PNG
+        except Exception as e:
+            print(f"Error al leer imagen {ruta_imagen}: {e}")
+            return None
+    
+    # Convertir logo a base64
+    logo_base64 = None
+    logo_path = os.path.join(current_app.static_folder, 'logo.png')
+    logo_base64 = convertir_imagen_a_base64(logo_path)
+    
+    return {
+        'factura': factura,
+        'pedido': pedido,
+        'base_imponible': float(base_imponible),
+        'iva_total': float(iva_total),
+        'total_con_iva': float(total_con_iva),
+        'tipo_iva': tipo_iva,
+        'logo_base64': logo_base64
+    }
+
+@facturacion_bp.route('/facturacion/factura/<int:factura_id>/imprimir')
+@login_required
+def imprimir_factura(factura_id):
+    """Vista de impresión de una factura formalizada"""
+    datos = preparar_datos_imprimir_factura(factura_id)
+    return render_template('imprimir_factura.html', **datos)
+
+def preparar_datos_imprimir_albaran(factura_id=None, pedido_id=None):
+    """Función auxiliar para preparar todos los datos necesarios para imprimir el albarán"""
+    from decimal import Decimal
+    
+    if factura_id:
+        # Si tenemos factura_id, obtener factura y pedido
+        factura = Factura.query.get_or_404(factura_id)
+        pedido = factura.pedido
+        lineas = factura.lineas
+    elif pedido_id:
+        # Si solo tenemos pedido_id (prefactura), obtener pedido y usar sus líneas
+        pedido = Pedido.query.get_or_404(pedido_id)
+        factura = None
+        lineas = pedido.lineas
+    else:
+        raise ValueError("Se debe proporcionar factura_id o pedido_id")
+    
+    # Función auxiliar para convertir imagen a base64
+    def convertir_imagen_a_base64(ruta_imagen):
+        """Convertir imagen a base64"""
+        if not ruta_imagen or not os.path.exists(ruta_imagen):
+            return None
+        try:
+            with open(ruta_imagen, 'rb') as f:
+                imagen_data = f.read()
+                imagen_base64 = base64.b64encode(imagen_data).decode('utf-8')
+                # Detectar tipo MIME
+                if ruta_imagen.lower().endswith('.png'):
+                    return f'data:image/png;base64,{imagen_base64}'
+                elif ruta_imagen.lower().endswith(('.jpg', '.jpeg')):
+                    return f'data:image/jpeg;base64,{imagen_base64}'
+                elif ruta_imagen.lower().endswith('.gif'):
+                    return f'data:image/gif;base64,{imagen_base64}'
+                else:
+                    return f'data:image/png;base64,{imagen_base64}'  # Por defecto PNG
+        except Exception as e:
+            print(f"Error al leer imagen {ruta_imagen}: {e}")
+            return None
+    
+    # Convertir logo a base64
+    logo_base64 = None
+    logo_path = os.path.join(current_app.static_folder, 'logo.png')
+    logo_base64 = convertir_imagen_a_base64(logo_path)
+    
+    return {
+        'factura': factura,
+        'pedido': pedido,
+        'lineas': lineas,
+        'logo_base64': logo_base64
+    }
+
+@facturacion_bp.route('/facturacion/factura/<int:factura_id>/descargar-pdf')
+@login_required
+def descargar_pdf_factura(factura_id):
+    """Descargar factura en formato PDF"""
+    try:
+        datos = preparar_datos_imprimir_factura(factura_id)
+        
+        # Renderizar el HTML de la factura
+        html = render_template('imprimir_factura_pdf.html', 
+                             **datos,
+                             use_base64=True)
+        
+        # Crear el PDF en memoria usando playwright
+        pdf_buffer = BytesIO()
+        
+        try:
+            # Guardar HTML temporalmente para que playwright pueda acceder a él
+            # Crear un archivo HTML temporal
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+                temp_file.write(html)
+                temp_html_path = temp_file.name
+            
+            # Usar playwright para generar el PDF
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                
+                # Cargar el HTML desde el archivo temporal
+                page.goto(f'file://{temp_html_path}')
+                
+                # Generar PDF
+                pdf_bytes = page.pdf(
+                    format='A4',
+                    print_background=True,
+                    margin={
+                        'top': '10mm',
+                        'right': '10mm',
+                        'bottom': '10mm',
+                        'left': '10mm'
+                    }
+                )
+                
+                browser.close()
+            
+            # Escribir el PDF al buffer
+            pdf_buffer.write(pdf_bytes)
+            
+            # Limpiar archivo temporal
+            try:
+                os.unlink(temp_html_path)
+            except:
+                pass
+            
+        except Exception as pdf_error:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error al crear PDF con playwright: {error_trace}")
+            flash(f'Error al generar PDF: {str(pdf_error)}', 'error')
+            return redirect(url_for('facturacion.facturacion'))
+        
+        # Preparar la respuesta con el PDF
+        pdf_buffer.seek(0)
+        response = make_response(pdf_buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=factura_{datos["factura"].serie}_{datos["factura"].numero}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error completo al generar PDF: {error_trace}")
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        return redirect(url_for('facturacion.facturacion'))
+
+@facturacion_bp.route('/facturacion/factura/<int:factura_id>/descargar-albaran')
+@login_required
+def descargar_pdf_albaran_factura(factura_id):
+    """Descargar albarán en formato PDF desde una factura formalizada"""
+    try:
+        datos = preparar_datos_imprimir_albaran(factura_id=factura_id)
+        
+        # Renderizar el HTML del albarán
+        html = render_template('imprimir_albaran_pdf.html', 
+                             **datos,
+                             use_base64=True)
+        
+        # Crear el PDF en memoria usando playwright
+        pdf_buffer = BytesIO()
+        
+        try:
+            # Guardar HTML temporalmente para que playwright pueda acceder a él
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+                temp_file.write(html)
+                temp_html_path = temp_file.name
+            
+            # Usar playwright para generar el PDF
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                
+                # Cargar el HTML desde el archivo temporal
+                page.goto(f'file://{temp_html_path}')
+                
+                # Generar PDF
+                pdf_bytes = page.pdf(
+                    format='A4',
+                    print_background=True,
+                    margin={
+                        'top': '10mm',
+                        'right': '10mm',
+                        'bottom': '10mm',
+                        'left': '10mm'
+                    }
+                )
+                
+                browser.close()
+            
+            # Escribir el PDF al buffer
+            pdf_buffer.write(pdf_bytes)
+            
+            # Limpiar archivo temporal
+            try:
+                os.unlink(temp_html_path)
+            except:
+                pass
+            
+        except Exception as pdf_error:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error al crear PDF con playwright: {error_trace}")
+            flash(f'Error al generar PDF: {str(pdf_error)}', 'error')
+            return redirect(url_for('facturacion.facturacion'))
+        
+        # Preparar la respuesta con el PDF
+        pdf_buffer.seek(0)
+        response = make_response(pdf_buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        numero_pedido = datos['pedido'].id if datos['pedido'] else 'N/A'
+        response.headers['Content-Disposition'] = f'inline; filename=albaran_pedido_{numero_pedido}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error completo al generar PDF: {error_trace}")
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        return redirect(url_for('facturacion.facturacion'))
+
+@facturacion_bp.route('/facturacion/pedido/<int:pedido_id>/descargar-albaran')
+@login_required
+def descargar_pdf_albaran_pedido(pedido_id):
+    """Descargar albarán en formato PDF desde un pedido (prefactura)"""
+    try:
+        datos = preparar_datos_imprimir_albaran(pedido_id=pedido_id)
+        
+        # Renderizar el HTML del albarán
+        html = render_template('imprimir_albaran_pdf.html', 
+                             **datos,
+                             use_base64=True)
+        
+        # Crear el PDF en memoria usando playwright
+        pdf_buffer = BytesIO()
+        
+        try:
+            # Guardar HTML temporalmente para que playwright pueda acceder a él
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+                temp_file.write(html)
+                temp_html_path = temp_file.name
+            
+            # Usar playwright para generar el PDF
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                
+                # Cargar el HTML desde el archivo temporal
+                page.goto(f'file://{temp_html_path}')
+                
+                # Generar PDF
+                pdf_bytes = page.pdf(
+                    format='A4',
+                    print_background=True,
+                    margin={
+                        'top': '10mm',
+                        'right': '10mm',
+                        'bottom': '10mm',
+                        'left': '10mm'
+                    }
+                )
+                
+                browser.close()
+            
+            # Escribir el PDF al buffer
+            pdf_buffer.write(pdf_bytes)
+            
+            # Limpiar archivo temporal
+            try:
+                os.unlink(temp_html_path)
+            except:
+                pass
+            
+        except Exception as pdf_error:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error al crear PDF con playwright: {error_trace}")
+            flash(f'Error al generar PDF: {str(pdf_error)}', 'error')
+            return redirect(url_for('facturacion.facturacion'))
+        
+        # Preparar la respuesta con el PDF
+        pdf_buffer.seek(0)
+        response = make_response(pdf_buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=albaran_pedido_{pedido_id}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error completo al generar PDF: {error_trace}")
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        return redirect(url_for('facturacion.facturacion'))
 

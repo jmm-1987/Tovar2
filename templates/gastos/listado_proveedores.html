@@ -24,17 +24,19 @@
             </thead>
             <tbody>
                 {% for proveedor in proveedores %}
-                <tr>
+                <tr {% if not proveedor.activo %}style="opacity: 0.6; background-color: #f8f9fa;"{% endif %}>
                     <td>{{ proveedor.id }}</td>
-                    <td>{{ proveedor.nombre }}</td>
+                    <td>
+                        {{ proveedor.nombre }}
+                        {% if not proveedor.activo %}
+                            <span style="color: #dc3545; font-size: 0.85rem; margin-left: 5px;">(Desactivado)</span>
+                        {% endif %}
+                    </td>
                     <td>{{ proveedor.cif or '-' }}</td>
                     <td>{{ proveedor.telefono or '-' }}</td>
                     <td>{{ proveedor.correo or '-' }}</td>
                     <td class="acciones-cell">
                         <a href="{{ url_for('gastos.editar_proveedor', proveedor_id=proveedor.id) }}" class="btn btn-sm btn-primary">Editar</a>
-                        <form method="POST" action="{{ url_for('gastos.eliminar_proveedor', proveedor_id=proveedor.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar este proveedor?');">
-                            <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
-                        </form>
                     </td>
                 </tr>
                 {% endfor %}

@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedido #{{ pedido.id }}</title>
+    <style type="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        @page {
+            size: A4;
+            margin: 10mm;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f5f5f5;
+            padding: 10px;
+            color: #333;
+            font-size: 12px;
+        }
+        
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            max-height: 297mm;
+            background: white;
+            margin: 0 auto 10px;
+            padding: 10mm;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            page-break-after: always;
+            page-break-inside: avoid;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+        
+        .page:last-child {
+            page-break-after: auto;
+        }
+        
+        .no-print {
+            text-align: center;
+            margin-top: 20px;
+            padding: 20px;
+        }
+        
+        .no-print .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 0 10px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .no-print .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .no-print .btn:hover {
+            opacity: 0.9;
+        }
+        
+        /* PÁGINA 0: PORTADA */
+        .portada-page {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+        }
+        
+        .portada-image {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: block;
+            margin: auto;
+            vertical-align: middle;
+        }
+        
+        /* PÁGINA 2: IMÁGENES ADICIONALES */
+        .imagenes-page {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 0;
+            padding-bottom: 25mm;
+        }
+        
+        .imagenes-header {
+            text-align: center;
+            padding: 0 0 10mm 0;
+            margin-bottom: 10mm;
+            border-bottom: 3px solid #2c3e50;
+            flex-shrink: 0;
+        }
+        
+        .imagenes-header h2 {
+            font-size: 20px;
+            color: #2c3e50;
+            margin: 0;
+            font-weight: bold;
+        }
+        
+        .imagenes-grid {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 10mm 15mm;
+            box-sizing: border-box;
+        }
+        
+        .imagen-item {
+            width: 50%;
+            vertical-align: top;
+            padding: 0;
+            page-break-inside: avoid;
+        }
+        
+        .imagen-item-wrapper {
+            display: block;
+            text-align: center;
+            width: 100%;
+        }
+        
+        .imagen-container {
+            width: 300px !important;
+            height: 250px !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 5mm;
+            box-sizing: border-box;
+            margin: 0 auto;
+        }
+        
+        .imagen-adicional {
+            width: 300px !important;
+            height: 250px !important;
+            max-width: 300px !important;
+            max-height: 250px !important;
+            object-fit: contain;
+            display: block;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .descripcion-imagen {
+            width: 100%;
+            padding: 0;
+            font-size: 9pt;
+            line-height: 1.4;
+            color: #333;
+            text-align: center;
+        }
+        
+        /* PÁGINA 3: CONDICIONADO */
+        .condicionado-page {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 0;
+            padding-top: 20mm;
+            box-sizing: border-box;
+        }
+        
+        .condicionado-header {
+            text-align: center;
+            margin-bottom: 8px;
+            margin-top: 0;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .condicionado-header h1 {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 3px;
+            margin-top: 0;
+            padding-top: 0;
+        }
+        
+        .condicionado-header h2 {
+            font-size: 14px;
+            color: #666;
+            font-weight: normal;
+            margin: 0;
+        }
+        
+        .condicionado-content {
+            flex: 1;
+            font-size: 9px;
+            line-height: 1.4;
+            text-align: justify;
+            margin-bottom: 8px;
+            margin-top: 0;
+            overflow: hidden;
+        }
+        
+        .condicionado-content h3 {
+            font-size: 10px;
+            color: #2c3e50;
+            margin-top: 8px;
+            margin-bottom: 4px;
+            font-weight: bold;
+        }
+        
+        .condicionado-content p {
+            margin-bottom: 5px;
+            margin-top: 0;
+        }
+        
+        .condicionado-content ul {
+            margin-left: 15px;
+            margin-bottom: 5px;
+            margin-top: 0;
+            padding-left: 10px;
+        }
+        
+        .condicionado-content li {
+            margin-bottom: 3px;
+        }
+        
+        .firma-section {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 2px solid #2c3e50;
+            flex-shrink: 0;
+        }
+        
+        .firma-box {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        
+        .firma-cliente, .firma-empresa {
+            width: 45%;
+            text-align: center;
+        }
+        
+        .firma-line {
+            border-top: 2px solid #333;
+            margin-top: 30px;
+            padding-top: 3px;
+        }
+        
+        .firma-label {
+            font-weight: bold;
+            font-size: 9px;
+        }
+        
+        /* PÁGINA 4: CONTENIDO DEL PEDIDO (si no hay portada) */
+        .pedido-container {
+            max-width: 210mm;
+            margin: 0 auto;
+            background: white;
+            padding: 15px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .pedido-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .logo-section {
+            flex: 0 0 auto;
+        }
+        
+        .logo-section img {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+        }
+        
+        .pedido-title {
+            flex: 1;
+            text-align: center;
+            align-self: center;
+        }
+        
+        .pedido-title h1 {
+            font-size: 1.8em;
+            color: #2c3e50;
+            margin-bottom: 0;
+            font-weight: bold;
+        }
+        
+        .pedido-info {
+            text-align: right;
+            flex: 0 0 auto;
+            min-width: 200px;
+        }
+        
+        .pedido-info p {
+            margin: 3px 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .datos-section {
+            margin-bottom: 12px;
+            display: table;
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 10px;
+        }
+        
+        .datos-box {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+        
+        .diseno-box {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+        
+        .datos-box h3 {
+            color: #2c3e50;
+            border-bottom: 1px solid #2c3e50;
+            padding-bottom: 3px;
+            margin-bottom: 5px;
+            font-size: 1rem;
+        }
+        
+        .datos-box p {
+            margin: 2px 0;
+            color: #495057;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        
+        .diseno-box h3 {
+            color: #2c3e50;
+            border-bottom: 1px solid #2c3e50;
+            padding-bottom: 3px;
+            margin-bottom: 5px;
+            font-size: 1rem;
+        }
+        
+        .lineas-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .lineas-table thead {
+            background: #f8f9fa;
+            color: #000000;
+        }
+        
+        .lineas-table th {
+            padding: 5px 8px;
+            text-align: left;
+            font-weight: 600;
+            border: 1px solid #dee2e6;
+            font-size: 0.9em;
+            color: #000000;
+        }
+        
+        .lineas-table td {
+            padding: 5px 8px;
+            border: 1px solid #e9ecef;
+            color: #495057;
+            font-size: 0.85em;
+        }
+        
+        .lineas-table tbody tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .totales-section {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 2px solid #2c3e50;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 0.95em;
+        }
+        
+        .total-row.base {
+            color: #495057;
+        }
+        
+        .total-row.iva {
+            color: #495057;
+        }
+        
+        .total-row.final {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #27ae60;
+            border-top: 2px solid #2c3e50;
+            padding-top: 8px;
+            margin-top: 5px;
+        }
+        
+        .total-label {
+            font-weight: 600;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .no-print {
+                display: none;
+            }
+            
+            .page {
+                margin: 0;
+                box-shadow: none;
+                page-break-after: always;
+                page-break-inside: avoid;
+                overflow: hidden;
+            }
+            
+            .page:last-child {
+                page-break-after: auto;
+            }
+            
+            .pedido-container {
+                page-break-inside: avoid;
+            }
+            
+            .imagenes-page {
+                page-break-inside: avoid;
+            }
+            
+            .condicionado-page {
+                page-break-inside: avoid;
+            }
+            
+            .lineas-table tbody tr {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% set imagenes_adicionales = [
+        pedido.imagen_adicional_1 if pedido.imagen_adicional_1 else None,
+        pedido.imagen_adicional_2 if pedido.imagen_adicional_2 else None,
+        pedido.imagen_adicional_3 if pedido.imagen_adicional_3 else None,
+        pedido.imagen_adicional_4 if pedido.imagen_adicional_4 else None,
+        pedido.imagen_adicional_5 if pedido.imagen_adicional_5 else None
+    ] %}
+    {% set descripciones_adicionales = [
+        descripciones_imagenes[0] if descripciones_imagenes is defined and descripciones_imagenes[0] else (pedido.descripcion_imagen_1 if pedido.descripcion_imagen_1 else ''),
+        descripciones_imagenes[1] if descripciones_imagenes is defined and descripciones_imagenes[1] else (pedido.descripcion_imagen_2 if pedido.descripcion_imagen_2 else ''),
+        descripciones_imagenes[2] if descripciones_imagenes is defined and descripciones_imagenes[2] else (pedido.descripcion_imagen_3 if pedido.descripcion_imagen_3 else ''),
+        descripciones_imagenes[3] if descripciones_imagenes is defined and descripciones_imagenes[3] else (pedido.descripcion_imagen_4 if pedido.descripcion_imagen_4 else ''),
+        descripciones_imagenes[4] if descripciones_imagenes is defined and descripciones_imagenes[4] else (pedido.descripcion_imagen_5 if pedido.descripcion_imagen_5 else '')
+    ] %}
+    
+    <!-- PÁGINA 0: PORTADA (si existe imagen_portada) -->
+    {% if pedido.imagen_portada and imagen_portada_base64 %}
+    <div class="page portada-page">
+        {% if use_base64 is defined and use_base64 and imagen_portada_base64 %}
+        <img src="{{ imagen_portada_base64 }}" alt="Portada" class="portada-image">
+        {% elif base_url is defined and base_url %}
+        <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + pedido.imagen_portada) }}" alt="Portada" class="portada-image">
+        {% else %}
+        <img src="{{ url_for('static', filename='uploads/' + pedido.imagen_portada, _external=True) }}" alt="Portada" class="portada-image">
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- PÁGINA 1: CONTENIDO DEL PEDIDO -->
+    <div class="page">
+        <div class="pedido-header">
+            <div class="logo-section">
+                {% if use_base64 is defined and use_base64 and logo_base64 %}
+                <img src="{{ logo_base64 }}" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;">
+                {% elif base_url is defined and base_url %}
+                <img src="{{ base_url }}{{ url_for('static', filename='logo.png') }}" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;">
+                {% else %}
+                <img src="{{ url_for('static', filename='logo.png', _external=True) }}" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;">
+                {% endif %}
+            </div>
+            <div class="pedido-title">
+                <h1>PEDIDO</h1>
+            </div>
+            <div class="pedido-info">
+                <p><strong>Número:</strong> #{{ pedido.id }}</p>
+                <p><strong>Fecha:</strong> {{ pedido.fecha_creacion.strftime('%d/%m/%Y') if pedido.fecha_creacion else 'N/A' }}</p>
+                <p><strong>Estado:</strong> {{ pedido.estado }}</p>
+                <p><strong>Tipo:</strong> {{ pedido.tipo_pedido }} | <strong>Comercial:</strong> {{ pedido.comercial.nombre if pedido.comercial else 'N/A' }}</p>
+                {% if pedido.forma_pago %}
+                <p><strong>Forma de Pago:</strong> {{ pedido.forma_pago }}</p>
+                {% endif %}
+                {% if pedido.presupuesto_id %}
+                <p><strong>Presupuesto:</strong> #{{ pedido.presupuesto_id }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="datos-section">
+            <div class="datos-box">
+                <h3>Datos del Cliente</h3>
+                <p><strong>Nombre:</strong> {{ pedido.cliente.nombre if pedido.cliente else 'N/A' }}</p>
+                {% if pedido.cliente and pedido.cliente.nif %}
+                <p><strong>NIF:</strong> {{ pedido.cliente.nif }}</p>
+                {% endif %}
+                {% if pedido.cliente and pedido.cliente.direccion %}
+                <p><strong>Dirección:</strong> {{ pedido.cliente.direccion }}</p>
+                {% endif %}
+                {% if pedido.cliente and pedido.cliente.poblacion %}
+                <p><strong>Población:</strong> {{ pedido.cliente.poblacion }}{% if pedido.cliente.provincia %}, {{ pedido.cliente.provincia }}{% endif %}{% if pedido.cliente.codigo_postal %} - {{ pedido.cliente.codigo_postal }}{% endif %}</p>
+                {% elif pedido.cliente and pedido.cliente.provincia %}
+                <p><strong>Provincia:</strong> {{ pedido.cliente.provincia }}</p>
+                {% endif %}
+                {% if pedido.cliente and pedido.cliente.telefono %}
+                <p><strong>Teléfono:</strong> {{ pedido.cliente.telefono }}</p>
+                {% endif %}
+                {% if pedido.cliente and pedido.cliente.movil %}
+                <p><strong>Móvil:</strong> {{ pedido.cliente.movil }}</p>
+                {% endif %}
+                {% if pedido.cliente and pedido.cliente.email %}
+                <p><strong>Email:</strong> {{ pedido.cliente.email }}</p>
+                {% endif %}
+            </div>
+            {% if pedido.imagen_diseno %}
+            <div class="diseno-box">
+                <h3>Diseño</h3>
+                {% if use_base64 is defined and use_base64 and imagen_diseno_base64 %}
+                <img src="{{ imagen_diseno_base64 }}" alt="Diseño" style="width: 100%; max-width: 100%; height: auto; max-height: 300px; object-fit: contain; border-radius: 4px;">
+                {% elif base_url is defined and base_url %}
+                <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + pedido.imagen_diseno) }}" alt="Diseño" style="width: 100%; max-width: 100%; height: auto; max-height: 300px; object-fit: contain; border-radius: 4px;">
+                {% else %}
+                <img src="{{ url_for('static', filename='uploads/' + pedido.imagen_diseno, _external=True) }}" alt="Diseño" style="width: 100%; max-width: 100%; height: auto; max-height: 300px; object-fit: contain; border-radius: 4px;">
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="diseno-box"></div>
+            {% endif %}
+        </div>
+
+        <h3 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 5px; margin-bottom: 10px; font-size: 1rem;">Líneas del Pedido</h3>
+        
+        {% if pedido.lineas %}
+        <table class="lineas-table">
+            <thead>
+                <tr>
+                    <th style="width: 50%;">Nombre</th>
+                    <th style="text-align: center;">Cantidad</th>
+                    <th style="text-align: right;">Precio Unit.</th>
+                    <th style="text-align: right;">Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linea in pedido.lineas %}
+                {% set precio_unitario_val = linea.precio_unitario if linea.precio_unitario else 0 %}
+                {% set cantidad_val = linea.cantidad if linea.cantidad else 0 %}
+                {% set precio_unit = precio_unitario_val|float %}
+                {% set cantidad = cantidad_val|int %}
+                {% set total_linea = precio_unit * cantidad %}
+                <tr>
+                    <td>{{ linea.nombre_mostrar or linea.nombre or 'N/A' }}</td>
+                    <td style="text-align: center;">{{ cantidad }}</td>
+                    <td style="text-align: right;">{{ "%.2f"|format(precio_unit) }} €</td>
+                    <td style="text-align: right; font-weight: bold;">{{ "%.2f"|format(total_linea|float) }} €</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="totales-section">
+            <div class="total-row base">
+                <span class="total-label">Base Imponible:</span>
+                <span>{{ "%.2f"|format(base_imponible) }} €</span>
+            </div>
+            <div class="total-row iva">
+                <span class="total-label">IVA ({{ tipo_iva }}%):</span>
+                <span>{{ "%.2f"|format(iva_total) }} €</span>
+            </div>
+            <div class="total-row final">
+                <span class="total-label">TOTAL:</span>
+                <span>{{ "%.2f"|format(total_con_iva) }} €</span>
+            </div>
+        </div>
+        {% else %}
+        <p style="padding: 30px; background: #f8f9fa; border-radius: 6px; text-align: center; color: #999;">
+            Este pedido no tiene líneas registradas.
+        </p>
+        {% endif %}
+    </div>
+    
+    <!-- PÁGINA 2: IMÁGENES ADICIONALES (Máximo 5 imágenes con descripciones) -->
+    <div class="page imagenes-page">
+        <div class="imagenes-header">
+            <h2>DISEÑOS DEL PEDIDO</h2>
+        </div>
+        <table class="imagenes-grid" style="width: 100%;">
+            {% set img0 = imagenes_adicionales[0] if imagenes_adicionales[0] else None %}
+            {% set img1 = imagenes_adicionales[1] if imagenes_adicionales[1] else None %}
+            {% set img2 = imagenes_adicionales[2] if imagenes_adicionales[2] else None %}
+            {% set img3 = imagenes_adicionales[3] if imagenes_adicionales[3] else None %}
+            {% set img4 = imagenes_adicionales[4] if imagenes_adicionales[4] else None %}
+            
+            {% if img0 or img1 %}
+            <tr>
+                {% if img0 %}
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[0] %}
+                            <img src="{{ imagenes_adicionales_base64[0] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[0]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[0], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[0] %}
+                            {{ descripciones_adicionales[0] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                {% else %}
+                <td class="imagen-item"></td>
+                {% endif %}
+                {% if img1 %}
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[1] %}
+                            <img src="{{ imagenes_adicionales_base64[1] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[1]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[1], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[1] %}
+                            {{ descripciones_adicionales[1] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                {% else %}
+                <td class="imagen-item"></td>
+                {% endif %}
+            </tr>
+            {% endif %}
+            
+            {% if img2 or img3 %}
+            <tr>
+                {% if img2 %}
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[2] %}
+                            <img src="{{ imagenes_adicionales_base64[2] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[2]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[2], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[2] %}
+                            {{ descripciones_adicionales[2] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                {% else %}
+                <td class="imagen-item"></td>
+                {% endif %}
+                {% if img3 %}
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[3] %}
+                            <img src="{{ imagenes_adicionales_base64[3] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[3]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[3], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[3] %}
+                            {{ descripciones_adicionales[3] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                {% else %}
+                <td class="imagen-item"></td>
+                {% endif %}
+            </tr>
+            {% endif %}
+            
+            {% if img4 %}
+            <tr>
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[4] %}
+                            <img src="{{ imagenes_adicionales_base64[4] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[4]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[4], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[4] %}
+                            {{ descripciones_adicionales[4] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td class="imagen-item"></td>
+            </tr>
+            {% endif %}
+        </table>
+    </div>
+    
+    <!-- PÁGINA 3: CONDICIONADO -->
+    <div class="page condicionado-page">
+        <div class="condicionado-header">
+            <h1>CONDICIONES GENERALES</h1>
+            <h2>ACEPTACIÓN DEL PEDIDO</h2>
+        </div>
+        
+        <div class="condicionado-content">
+            <p>El presente documento establece las condiciones generales que rigen la relación comercial entre <strong>{{ pedido.cliente.nombre if pedido.cliente else 'EL CLIENTE' }}</strong> (en adelante "EL CLIENTE") y nuestra empresa de fabricación de ropa (en adelante "LA EMPRESA").</p>
+            
+            <h3>1. ACEPTACIÓN DEL PEDIDO</h3>
+            <p>La aceptación del presente pedido implica la aceptación íntegra de todas y cada una de las condiciones aquí establecidas. La firma de este documento constituye un acuerdo vinculante entre ambas partes.</p>
+            
+            <h3>2. PLAZOS DE ENTREGA</h3>
+            <p>Los plazos de entrega indicados en el pedido son estimados y pueden verse afectados por diversos factores fuera del control de LA EMPRESA, tales como:</p>
+            <ul>
+                <li>Disponibilidad de materias primas y tejidos</li>
+                <li>Retrasos en la recepción de materiales por parte de proveedores</li>
+                <li>Modificaciones o cambios solicitados por EL CLIENTE después de la aceptación del pedido</li>
+                <li>Circunstancias de fuerza mayor (huelgas, catástrofes naturales, pandemias, etc.)</li>
+                <li>Volumen de pedidos y carga de trabajo del taller</li>
+                <li>Procesos de bordado, serigrafía o personalización adicional</li>
+            </ul>
+            <p>LA EMPRESA se compromete a informar a EL CLIENTE de cualquier retraso significativo en los plazos de entrega con la mayor antelación posible.</p>
+            
+            <h3>3. CALIDAD Y ESPECIFICACIONES</h3>
+            <p>LA EMPRESA garantiza que todas las prendas fabricadas cumplirán con las especificaciones acordadas en el pedido. Las muestras, si las hubiera, son orientativas y pueden presentar ligeras variaciones en la producción final debido a las características propias de los procesos de fabricación textil.</p>
+            <p>EL CLIENTE deberá revisar y aprobar las muestras antes de la producción en serie. Cualquier modificación solicitada después de la aprobación de muestras puede conllevar costes adicionales y retrasos en la entrega.</p>
+            
+            <h3>4. COLORES Y TELAS</h3>
+            <p>Los colores de las prendas pueden presentar ligeras variaciones debido a:</p>
+            <ul>
+                <li>Diferencias entre lotes de tela</li>
+                <li>Características de los procesos de teñido</li>
+                <li>Condiciones de visualización (luz natural vs. artificial)</li>
+            </ul>
+            <p>Estas variaciones son normales en la industria textil y no constituyen defecto de fabricación.</p>
+            
+            <h3>5. TALLAS Y MEDIDAS</h3>
+            <p>Las tallas indicadas en el pedido se ajustan a los estándares de la industria textil. Si EL CLIENTE requiere medidas personalizadas o tallas especiales, deberá especificarlo claramente en el momento de la aceptación del pedido. Las modificaciones posteriores pueden conllevar costes adicionales.</p>
+            
+            <h3>6. PAGO Y FACTURACIÓN</h3>
+            <p>Las condiciones de pago se establecerán según lo acordado en el pedido. LA EMPRESA se reserva el derecho de solicitar un anticipo antes de iniciar la producción, especialmente en pedidos de gran volumen o con características especiales.</p>
+            <p>El pago deberá realizarse según las condiciones acordadas. El retraso en el pago puede conllevar la suspensión de la producción o la retención de la mercancía hasta la recepción del importe correspondiente.</p>
+            
+            <h3>7. MODIFICACIONES Y CANCELACIONES</h3>
+            <p>Una vez aceptado el pedido y comenzada la producción, cualquier modificación solicitada por EL CLIENTE puede conllevar:</p>
+            <ul>
+                <li>Costes adicionales</li>
+                <li>Retrasos en los plazos de entrega</li>
+                <li>Pérdida de materiales ya cortados o procesados</li>
+            </ul>
+            <p>Las cancelaciones de pedidos después de la aceptación pueden conllevar el pago de los costes ya incurridos en materiales, mano de obra y procesos de producción iniciados.</p>
+            
+            <h3>8. RECEPCIÓN Y REVISIÓN</h3>
+            <p>EL CLIENTE deberá revisar las prendas recibidas en un plazo máximo de 7 días naturales desde la entrega. Cualquier reclamación por defectos de fabricación deberá comunicarse por escrito dentro de este plazo, adjuntando fotografías y descripción detallada del problema.</p>
+            <p>Pasado este plazo sin comunicación, se entenderá que las prendas han sido aceptadas conforme.</p>
+            
+            <h3>9. GARANTÍA</h3>
+            <p>LA EMPRESA garantiza la calidad de las prendas fabricadas durante un período de 6 meses desde la fecha de entrega, siempre que se hayan seguido las instrucciones de cuidado y mantenimiento proporcionadas.</p>
+            <p>La garantía no cubre:</p>
+            <ul>
+                <li>Desgaste normal por uso</li>
+                <li>Daños causados por uso inadecuado o negligencia</li>
+                <li>Modificaciones realizadas por terceros</li>
+                <li>Lavados o tratamientos no recomendados</li>
+            </ul>
+            
+            <h3>10. PROPIEDAD INTELECTUAL</h3>
+            <p>Los diseños, logos y elementos gráficos proporcionados por EL CLIENTE para su aplicación en las prendas deben ser de su propiedad o contar con las licencias necesarias. LA EMPRESA no se responsabiliza de cualquier reclamación relacionada con derechos de propiedad intelectual de terceros.</p>
+            
+            <h3>11. PROTECCIÓN DE DATOS</h3>
+            <p>Los datos personales y comerciales facilitados por EL CLIENTE serán tratados conforme a la normativa vigente de protección de datos, utilizándose únicamente para la gestión del pedido y la relación comercial.</p>
+            
+            <h3>12. LEGISLACIÓN APLICABLE</h3>
+            <p>El presente acuerdo se rige por la legislación española. Para cualquier controversia, las partes se someten a los juzgados y tribunales del domicilio de LA EMPRESA.</p>
+            
+            <p style="margin-top: 8px; margin-bottom: 0; font-weight: bold; text-align: center; font-size: 9px;">EL CLIENTE DECLARA HABER LEÍDO Y ACEPTADO TODAS LAS CONDICIONES ESTABLECIDAS EN EL PRESENTE DOCUMENTO</p>
+        </div>
+        
+        <div class="firma-section">
+            <div class="firma-box">
+                <div class="firma-cliente">
+                    <div class="firma-line"></div>
+                    <div class="firma-label">Firma y sello del CLIENTE</div>
+                </div>
+                <div class="firma-empresa">
+                    <div class="firma-line"></div>
+                    <div class="firma-label">Firma y sello de LA EMPRESA</div>
+                </div>
+            </div>
+            <div style="margin-top: 10px; text-align: center; font-size: 8px; color: #666;">
+                <p style="margin: 2px 0;">Fecha: ___________________</p>
+                <p style="margin: 2px 0;">Lugar: ___________________</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="no-print">
+        <button onclick="window.print()" class="btn btn-primary">Imprimir</button>
+        <a href="{{ url_for('pedidos.ver_pedido', pedido_id=pedido.id) }}" class="btn btn-secondary">Volver</a>
+    </div>
+</body>
+</html>
+

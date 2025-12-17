@@ -32,8 +32,14 @@
         </div>
         
         <div class="form-group-compact">
-            <label for="forma_pago">Forma de Pago</label>
-            <input type="text" name="forma_pago" id="forma_pago" placeholder="Efectivo, Tarjeta, etc.">
+            <label for="forma_pago">Forma de Pago *</label>
+            <select name="forma_pago" id="forma_pago" required>
+                <option value="">Seleccione una forma de pago</option>
+                <option value="efectivo">Efectivo</option>
+                <option value="tarjeta">Tarjeta</option>
+                <option value="bizum">Bizum</option>
+                <option value="transferencia">Transferencia</option>
+            </select>
         </div>
     </div>
 

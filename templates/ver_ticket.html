@@ -75,7 +75,19 @@
             <p style="margin: 8px 0;"><strong>Descripción:</strong> {{ ticket.descripcion }}</p>
             {% endif %}
             {% if ticket.forma_pago %}
-            <p style="margin: 8px 0;"><strong>Forma de Pago:</strong> {{ ticket.forma_pago }}</p>
+            <p style="margin: 8px 0;"><strong>Forma de Pago:</strong> 
+                {% if ticket.forma_pago.lower() == 'efectivo' %}
+                    <span style="color: #28a745; font-weight: 600;">💵 Efectivo</span>
+                {% elif ticket.forma_pago.lower() == 'tarjeta' %}
+                    <span style="color: #007bff; font-weight: 600;">💳 Tarjeta</span>
+                {% elif ticket.forma_pago.lower() == 'bizum' %}
+                    <span style="color: #6f42c1; font-weight: 600;">📱 Bizum</span>
+                {% elif ticket.forma_pago.lower() == 'transferencia' %}
+                    <span style="color: #17a2b8; font-weight: 600;">🏦 Transferencia</span>
+                {% else %}
+                    {{ ticket.forma_pago }}
+                {% endif %}
+            </p>
             {% endif %}
             <p style="margin: 8px 0;"><strong>Fecha de creación:</strong> {{ ticket.fecha_creacion.strftime('%d/%m/%Y %H:%M:%S') }}</p>
         </div>

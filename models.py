@@ -504,6 +504,7 @@ class Proveedor(db.Model):
     cif = db.Column(db.String(20))  # CIF del proveedor
     telefono = db.Column(db.String(50))
     correo = db.Column(db.String(100))
+    activo = db.Column(db.Boolean, nullable=False, default=True)  # Estado activo/inactivo
     
     # Timestamp
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
