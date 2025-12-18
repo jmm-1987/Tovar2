@@ -50,10 +50,16 @@ database_path = os.path.normpath(database_path)
 db_dir = os.path.dirname(database_path)
 if db_dir:  # Solo crear directorio si hay un directorio padre
     try:
-        os.makedirs(db_dir, exist_ok=True)
+        # En producción, si el directorio es /data (disco persistente), ya existe y no necesita crearse
+        # Solo crear el directorio si no existe
+        if not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
         # Verificar que el directorio es escribible
         if not os.access(db_dir, os.W_OK):
             raise PermissionError(f"No se tienen permisos de escritura en el directorio: {db_dir}")
+    except PermissionError:
+        # Re-lanzar PermissionError tal cual
+        raise
     except Exception as e:
         raise RuntimeError(f"Error al crear el directorio de la base de datos '{db_dir}': {e}")
 

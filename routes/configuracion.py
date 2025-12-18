@@ -2,12 +2,12 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, jsonify, current_app
 from flask_login import login_required, current_user
 from extensions import db
-from models import Usuario, Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, PlantillaEmail
+from models import Usuario, Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, PlantillaEmail, Proveedor
 from utils.auth import supervisor_required
 from datetime import datetime
 import io
 import csv
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from werkzeug.utils import secure_filename
 import os
@@ -507,4 +507,335 @@ def importar_bd_sqlite():
             return redirect(url_for('configuracion.importar_bd_sqlite'))
     
     return render_template('configuracion/importar_bd_sqlite.html')
+
+@configuracion_bp.route('/configuracion/importar-clientes', methods=['GET', 'POST'])
+@login_required
+@supervisor_required
+def importar_clientes():
+    """Importar clientes desde archivo Excel"""
+    if request.method == 'POST':
+        if 'archivo' not in request.files:
+            flash('No se seleccionó ningún archivo', 'error')
+            return redirect(url_for('configuracion.importar_clientes'))
+        
+        archivo = request.files['archivo']
+        if archivo.filename == '':
+            flash('No se seleccionó ningún archivo', 'error')
+            return redirect(url_for('configuracion.importar_clientes'))
+        
+        # Validar extensión
+        if not archivo.filename.endswith(('.xlsx', '.xls')):
+            flash('El archivo debe ser Excel (.xlsx o .xls)', 'error')
+            return redirect(url_for('configuracion.importar_clientes'))
+        
+        temp_path = None
+        try:
+            # Guardar archivo temporalmente
+            filename = secure_filename(archivo.filename)
+            temp_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+            os.makedirs(os.path.dirname(temp_path), exist_ok=True)
+            archivo.save(temp_path)
+            
+            # Cargar el archivo Excel
+            wb = load_workbook(temp_path, data_only=True)
+            ws = wb.active
+            
+            # Leer la primera fila para obtener los encabezados
+            headers = []
+            for cell in ws[1]:
+                headers.append(str(cell.value) if cell.value else '')
+            
+            # Mapeo de columnas del Excel a campos de la base de datos
+            column_map = {}
+            for idx, header in enumerate(headers):
+                if header and header.strip():
+                    header_upper = header.upper()
+                    if 'NOMBRE FISCAL' in header_upper or ('NOMBRE' in header_upper and 'FISCAL' in header_upper):
+                        column_map['nombre'] = idx
+                    elif 'ALIAS' in header_upper:
+                        column_map['alias'] = idx
+                    elif ('TEL' in header_upper or 'TELEFONO' in header_upper) and 'MOVIL' not in header_upper:
+                        column_map['telefono'] = idx
+                    elif 'MOVIL' in header_upper or ('M' in header_upper and 'VIL' in header_upper):
+                        column_map['movil'] = idx
+                    elif 'E-MAIL' in header_upper or 'EMAIL' in header_upper:
+                        column_map['email'] = idx
+                    elif 'PERSONA' in header_upper and 'CONTACTO' in header_upper:
+                        column_map['personas_contacto'] = idx
+                    elif 'N.I.F' in header_upper or ('NIF' in header_upper and '.' in header):
+                        column_map['nif'] = idx
+                    elif 'DOMICILIO' in header_upper or 'DIRECCION' in header_upper:
+                        column_map['direccion'] = idx
+                    elif 'POBLACI' in header_upper:
+                        column_map['poblacion'] = idx
+                    elif ('C' in header_upper or 'COD' in header_upper) and 'POSTAL' in header_upper:
+                        column_map['codigo_postal'] = idx
+                    elif 'PROVINCIA' in header_upper:
+                        column_map['provincia'] = idx
+                    elif 'ANOTACIONES' in header_upper:
+                        column_map['anotaciones'] = idx
+            
+            # Verificar que tenemos al menos nombre
+            if 'nombre' not in column_map:
+                flash('No se encontró la columna "NOMBRE FISCAL" en el archivo', 'error')
+                os.remove(temp_path)
+                return redirect(url_for('configuracion.importar_clientes'))
+            
+            # Leer datos desde la fila 2 en adelante
+            clientes_importados = 0
+            clientes_duplicados = 0
+            errores = 0
+            
+            for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                try:
+                    # Obtener valores de las celdas según el mapeo
+                    valores = {}
+                    for campo, col_idx in column_map.items():
+                        if col_idx < len(row):
+                            valor = row[col_idx].value
+                            if valor is not None and str(valor).strip() != '':
+                                if isinstance(valor, (int, float)):
+                                    if campo in ['telefono', 'movil', 'codigo_postal']:
+                                        valor = str(int(valor))
+                                    else:
+                                        valor = str(int(valor))
+                                else:
+                                    valor = str(valor).strip()
+                                
+                                if campo != 'email' and valor:
+                                    valor = valor.upper()
+                                
+                                # Procesar código postal
+                                if campo == 'codigo_postal' and valor:
+                                    valor_str = ''.join(filter(str.isdigit, str(valor)))
+                                    if valor_str.isdigit() and len(valor_str) == 4:
+                                        valor = '0' + valor_str
+                                
+                                valores[campo] = valor if valor else None
+                            else:
+                                valores[campo] = None
+                        else:
+                            valores[campo] = None
+                    
+                    # Verificar que al menos tenga nombre
+                    if not valores.get('nombre'):
+                        continue
+                    
+                    # Verificar si el cliente ya existe
+                    cliente_existente = None
+                    if valores.get('nif'):
+                        cliente_existente = Cliente.query.filter_by(nif=valores['nif']).first()
+                    
+                    if not cliente_existente:
+                        cliente_existente = Cliente.query.filter_by(nombre=valores['nombre']).first()
+                    
+                    if cliente_existente:
+                        clientes_duplicados += 1
+                        continue
+                    
+                    # Preparar email en minúsculas
+                    email = valores.get('email')
+                    if email:
+                        email = email.lower()
+                    
+                    # Crear nuevo cliente
+                    cliente = Cliente(
+                        nombre=valores.get('nombre'),
+                        alias=valores.get('alias'),
+                        nif=valores.get('nif'),
+                        direccion=valores.get('direccion'),
+                        poblacion=valores.get('poblacion'),
+                        provincia=valores.get('provincia'),
+                        codigo_postal=valores.get('codigo_postal'),
+                        pais='España',
+                        telefono=valores.get('telefono'),
+                        movil=valores.get('movil'),
+                        email=email,
+                        personas_contacto=valores.get('personas_contacto'),
+                        anotaciones=valores.get('anotaciones'),
+                        fecha_alta=datetime.now().date()
+                    )
+                    
+                    db.session.add(cliente)
+                    clientes_importados += 1
+                    
+                    if clientes_importados % 50 == 0:
+                        db.session.commit()
+                        
+                except Exception as e:
+                    errores += 1
+                    continue
+            
+            # Hacer commit final
+            db.session.commit()
+            
+            # Eliminar archivo temporal
+            os.remove(temp_path)
+            
+            flash(f'Importación completada: {clientes_importados} clientes importados, {clientes_duplicados} duplicados omitidos, {errores} errores', 'success')
+            return redirect(url_for('configuracion.index'))
+            
+        except Exception as e:
+            db.session.rollback()
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            flash(f'Error al importar clientes: {str(e)}', 'error')
+            import traceback
+            traceback.print_exc()
+            return redirect(url_for('configuracion.importar_clientes'))
+    
+    return render_template('configuracion/importar_clientes.html')
+
+@configuracion_bp.route('/configuracion/importar-proveedores', methods=['GET', 'POST'])
+@login_required
+@supervisor_required
+def importar_proveedores():
+    """Importar proveedores desde archivo Excel"""
+    if request.method == 'POST':
+        if 'archivo' not in request.files:
+            flash('No se seleccionó ningún archivo', 'error')
+            return redirect(url_for('configuracion.importar_proveedores'))
+        
+        archivo = request.files['archivo']
+        if archivo.filename == '':
+            flash('No se seleccionó ningún archivo', 'error')
+            return redirect(url_for('configuracion.importar_proveedores'))
+        
+        # Validar extensión
+        if not archivo.filename.endswith(('.xlsx', '.xls')):
+            flash('El archivo debe ser Excel (.xlsx o .xls)', 'error')
+            return redirect(url_for('configuracion.importar_proveedores'))
+        
+        temp_path = None
+        try:
+            # Guardar archivo temporalmente
+            filename = secure_filename(archivo.filename)
+            temp_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+            os.makedirs(os.path.dirname(temp_path), exist_ok=True)
+            archivo.save(temp_path)
+            
+            # Cargar el archivo Excel
+            wb = load_workbook(temp_path, data_only=True)
+            ws = wb.active
+            
+            # Leer la primera fila para obtener los encabezados
+            headers = []
+            for cell in ws[1]:
+                headers.append(str(cell.value) if cell.value else '')
+            
+            # Mapeo de columnas del Excel a campos de la base de datos
+            column_map = {}
+            for idx, header in enumerate(headers):
+                if header and header.strip():
+                    header_upper = header.upper()
+                    if 'NOMBRE' in header_upper and 'FISCAL' not in header_upper:
+                        column_map['nombre'] = idx
+                    elif 'CIF' in header_upper or 'NIF' in header_upper:
+                        column_map['cif'] = idx
+                    elif ('TEL' in header_upper or 'TELEFONO' in header_upper) and 'MOVIL' not in header_upper:
+                        column_map['telefono'] = idx
+                    elif 'MOVIL' in header_upper or ('M' in header_upper and 'VIL' in header_upper):
+                        column_map['movil'] = idx
+                    elif 'E-MAIL' in header_upper or 'EMAIL' in header_upper or 'CORREO' in header_upper:
+                        column_map['correo'] = idx
+                    elif 'PERSONA' in header_upper and 'CONTACTO' in header_upper:
+                        column_map['persona_contacto'] = idx
+            
+            # Verificar que tenemos al menos nombre
+            if 'nombre' not in column_map:
+                flash('No se encontró la columna "NOMBRE" en el archivo', 'error')
+                os.remove(temp_path)
+                return redirect(url_for('configuracion.importar_proveedores'))
+            
+            # Leer datos desde la fila 2 en adelante
+            proveedores_importados = 0
+            proveedores_duplicados = 0
+            errores = 0
+            
+            for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                try:
+                    # Obtener valores de las celdas según el mapeo
+                    valores = {}
+                    for campo, col_idx in column_map.items():
+                        if col_idx < len(row):
+                            valor = row[col_idx].value
+                            if valor is not None and str(valor).strip() != '':
+                                if isinstance(valor, (int, float)):
+                                    if campo in ['telefono', 'movil']:
+                                        valor = str(int(valor))
+                                    else:
+                                        valor = str(int(valor))
+                                else:
+                                    valor = str(valor).strip()
+                                
+                                if campo not in ['correo', 'email'] and valor:
+                                    valor = valor.upper()
+                                
+                                valores[campo] = valor if valor else None
+                            else:
+                                valores[campo] = None
+                        else:
+                            valores[campo] = None
+                    
+                    # Verificar que al menos tenga nombre
+                    if not valores.get('nombre'):
+                        continue
+                    
+                    # Verificar si el proveedor ya existe
+                    proveedor_existente = None
+                    if valores.get('cif'):
+                        proveedor_existente = Proveedor.query.filter_by(cif=valores['cif']).first()
+                    
+                    if not proveedor_existente:
+                        proveedor_existente = Proveedor.query.filter_by(nombre=valores['nombre']).first()
+                    
+                    if proveedor_existente:
+                        proveedores_duplicados += 1
+                        continue
+                    
+                    # Preparar correo en minúsculas
+                    correo = valores.get('correo')
+                    if correo:
+                        correo = correo.lower()
+                    
+                    # Crear nuevo proveedor
+                    proveedor = Proveedor(
+                        nombre=valores.get('nombre'),
+                        cif=valores.get('cif'),
+                        telefono=valores.get('telefono'),
+                        movil=valores.get('movil'),
+                        correo=correo,
+                        persona_contacto=valores.get('persona_contacto'),
+                        activo=True
+                    )
+                    
+                    db.session.add(proveedor)
+                    proveedores_importados += 1
+                    
+                    if proveedores_importados % 50 == 0:
+                        db.session.commit()
+                        
+                except Exception as e:
+                    errores += 1
+                    continue
+            
+            # Hacer commit final
+            db.session.commit()
+            
+            # Eliminar archivo temporal
+            os.remove(temp_path)
+            
+            flash(f'Importación completada: {proveedores_importados} proveedores importados, {proveedores_duplicados} duplicados omitidos, {errores} errores', 'success')
+            return redirect(url_for('configuracion.index'))
+            
+        except Exception as e:
+            db.session.rollback()
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            flash(f'Error al importar proveedores: {str(e)}', 'error')
+            import traceback
+            traceback.print_exc()
+            return redirect(url_for('configuracion.importar_proveedores'))
+    
+    return render_template('configuracion/importar_proveedores.html')
 

@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}Importar Proveedores{% endblock %}
+
+{% block content %}
+<div class="importar-container">
+    <h1>📥 Importar Proveedores</h1>
+    
+    <div class="info-section">
+        <div class="alert alert-info">
+            <strong>ℹ️ Información:</strong> Importa proveedores desde un archivo Excel. Los proveedores duplicados (por CIF o nombre) serán omitidos automáticamente.
+        </div>
+    </div>
+    
+    <div class="info-section">
+        <h2>Instrucciones</h2>
+        <ol>
+            <li>Prepara un archivo Excel (.xlsx o .xls) con los datos de los proveedores</li>
+            <li>La primera fila debe contener los encabezados de las columnas</li>
+            <li>Selecciona el archivo a importar</li>
+            <li>Haz clic en "Importar"</li>
+        </ol>
+        
+        <h3 style="margin-top: 20px;">Columnas reconocidas:</h3>
+        <ul>
+            <li><strong>NOMBRE</strong> (obligatorio)</li>
+            <li><strong>CIF</strong> o <strong>NIF</strong></li>
+            <li><strong>TELEFONO</strong> o <strong>TEL</strong></li>
+            <li><strong>MOVIL</strong></li>
+            <li><strong>EMAIL</strong>, <strong>E-MAIL</strong> o <strong>CORREO</strong></li>
+            <li><strong>PERSONA CONTACTO</strong></li>
+        </ul>
+        
+        <p><strong>Nota:</strong> Solo la columna "NOMBRE" es obligatoria. Las demás son opcionales. Todos los proveedores importados se crearán como activos.</p>
+    </div>
+    
+    <div class="info-section">
+        <form method="POST" enctype="multipart/form-data">
+            <div class="form-group">
+                <label>Archivo Excel *</label>
+                <input type="file" name="archivo" accept=".xlsx,.xls" required>
+                <small style="color: #666; display: block; margin-top: 5px;">Formatos aceptados: .xlsx, .xls</small>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Importar Proveedores</button>
+            <a href="{{ url_for('configuracion.index') }}" class="btn btn-secondary">Cancelar</a>
+        </form>
+    </div>
+</div>
+
+<style>
+.importar-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.info-section {
+    background: white;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.alert {
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.alert-info {
+    background: #d1ecf1;
+    border: 1px solid #bee5eb;
+    color: #0c5460;
+}
+
+.info-section ol,
+.info-section ul {
+    margin-left: 20px;
+    line-height: 1.8;
+}
+
+.info-section li {
+    margin-bottom: 8px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.form-group input[type="file"] {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    margin-right: 10px;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+</style>
+{% endblock %}
+
