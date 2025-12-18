@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}Importar Base de Datos SQLite{% endblock %}
+
+{% block content %}
+<div class="importar-container">
+    <h1>💾 Importar Base de Datos SQLite</h1>
+    
+    <div class="info-section">
+        <div class="alert alert-warning">
+            <strong>⚠️ ADVERTENCIA IMPORTANTE:</strong>
+            <ul>
+                <li>Esta operación <strong>reemplazará completamente</strong> la base de datos actual</li>
+                <li>Se creará un backup automático de la base de datos actual antes de reemplazarla</li>
+                <li>Todos los datos actuales serán reemplazados por los datos del archivo subido</li>
+                <li>Asegúrate de que el archivo SQLite es válido y contiene los datos correctos</li>
+                <li>Esta operación no se puede deshacer fácilmente</li>
+            </ul>
+        </div>
+    </div>
+    
+    <div class="info-section">
+        <h2>📋 Instrucciones</h2>
+        <ol>
+            <li><strong>Haz backup primero:</strong> Descarga la base de datos actual usando "Descargar BD" antes de importar</li>
+            <li><strong>Selecciona el archivo:</strong> Elige el archivo SQLite (.db) que quieres importar</li>
+            <li><strong>Verifica el archivo:</strong> Asegúrate de que el archivo es un backup válido de esta aplicación</li>
+            <li><strong>Importa:</strong> Haz clic en "Importar Base de Datos"</li>
+            <li><strong>Espera:</strong> El proceso puede tardar unos segundos</li>
+        </ol>
+    </div>
+    
+    <div class="info-section">
+        <form method="POST" enctype="multipart/form-data" id="importForm">
+            <div class="form-group">
+                <label>Archivo SQLite (.db) *</label>
+                <input type="file" name="archivo" accept=".db" required id="archivoInput">
+                <small class="form-text">Solo archivos .db (SQLite)</small>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" class="btn btn-danger" id="submitBtn" onclick="return confirmarImportacion()">
+                    💾 Importar Base de Datos
+                </button>
+                <a href="{{ url_for('configuracion.index') }}" class="btn btn-secondary">Cancelar</a>
+            </div>
+        </form>
+    </div>
+    
+    <div class="info-section">
+        <h3>ℹ️ Información Adicional</h3>
+        <ul>
+            <li>El archivo debe ser un archivo SQLite válido generado por esta aplicación</li>
+            <li>Se creará un backup automático con fecha y hora antes de reemplazar</li>
+            <li>Los backups se guardan en el mismo directorio que la base de datos</li>
+            <li>Después de importar, es recomendable reiniciar la aplicación</li>
+        </ul>
+    </div>
+</div>
+
+<script>
+function confirmarImportacion() {
+    const archivo = document.getElementById('archivoInput').files[0];
+    if (!archivo) {
+        alert('Por favor, selecciona un archivo');
+        return false;
+    }
+    
+    if (!archivo.name.toLowerCase().endsWith('.db')) {
+        alert('El archivo debe ser un archivo SQLite (.db)');
+        return false;
+    }
+    
+    const confirmacion = confirm(
+        '⚠️ ADVERTENCIA FINAL ⚠️\n\n' +
+        'Estás a punto de REEMPLAZAR COMPLETAMENTE la base de datos actual.\n\n' +
+        '¿Estás seguro de que quieres continuar?\n\n' +
+        'Asegúrate de haber hecho un backup antes de continuar.'
+    );
+    
+    if (confirmacion) {
+        const segundaConfirmacion = confirm(
+            'Última confirmación:\n\n' +
+            '¿Realmente quieres reemplazar TODOS los datos actuales?\n\n' +
+            'Esta acción NO SE PUEDE DESHACER fácilmente.'
+        );
+        return segundaConfirmacion;
+    }
+    
+    return false;
+}
+
+// Deshabilitar el botón mientras se procesa
+document.getElementById('importForm').addEventListener('submit', function() {
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Procesando...';
+});
+</script>
+
+<style>
+.importar-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.info-section {
+    background: white;
+    padding: 25px;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+}
+
+.alert {
+    padding: 20px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.alert-warning {
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    color: #856404;
+}
+
+.alert-warning ul {
+    margin: 10px 0 0 20px;
+    padding-left: 0;
+}
+
+.alert-warning li {
+    margin-bottom: 8px;
+    line-height: 1.6;
+}
+
+.info-section h2 {
+    color: #2c3e50;
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.info-section h3 {
+    color: #34495e;
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.info-section ol,
+.info-section ul {
+    margin-left: 20px;
+    line-height: 1.8;
+}
+
+.info-section li {
+    margin-bottom: 8px;
+}
+
+.form-group {
+    margin-bottom: 25px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.form-group input[type="file"] {
+    width: 100%;
+    padding: 12px;
+    border: 2px dashed #ddd;
+    border-radius: 5px;
+    background: #f8f9fa;
+    cursor: pointer;
+    transition: border-color 0.3s;
+}
+
+.form-group input[type="file"]:hover {
+    border-color: #007bff;
+}
+
+.form-text {
+    display: block;
+    margin-top: 5px;
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 30px;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #c82333;
+    transform: translateY(-2px);
+}
+
+.btn-danger:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #5a6268;
+    transform: translateY(-2px);
+}
+</style>
+{% endblock %}
+

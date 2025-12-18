@@ -31,10 +31,22 @@
             <p>Exportar toda la base de datos a formato texto</p>
         </a>
         
-        <a href="{{ url_for('configuracion.importar_bd') }}" class="config-card">
+        <a href="{{ url_for('configuracion.descargar_bd') }}" class="config-card">
+            <div class="config-icon">💾</div>
+            <h3>Descargar BD</h3>
+            <p>Descargar el archivo completo de la base de datos SQLite</p>
+        </a>
+        
+        <a href="{{ url_for('configuracion.importar_bd_sqlite') }}" class="config-card">
             <div class="config-icon">📥</div>
-            <h3>Importar BD</h3>
-            <p>Importar datos desde archivo Excel o TXT</p>
+            <h3>Importar BD SQLite</h3>
+            <p>Importar y reemplazar la base de datos desde archivo SQLite</p>
+        </a>
+        
+        <a href="{{ url_for('configuracion.importar_bd') }}" class="config-card">
+            <div class="config-icon">📊</div>
+            <h3>Importar BD (Excel/TXT)</h3>
+            <p>Importar datos desde archivo Excel o TXT (en desarrollo)</p>
         </a>
         
         <a href="{{ url_for('configuracion.plantillas_email') }}" class="config-card">

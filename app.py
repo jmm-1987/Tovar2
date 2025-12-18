@@ -23,28 +23,41 @@ def nl2br_filter(value):
 # Configuración de la clave secreta (usar variable de entorno en producción)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'tu-clave-secreta-aqui-cambiar-en-produccion')
 
-# Configuración de la base de datos PostgreSQL
-# Usar DATABASE_URL (misma para local y producción)
-database_url = os.environ.get('DATABASE_URL')
-if not database_url:
-    raise ValueError(
-        "DATABASE_URL no está configurada. "
-        "Por favor, configura la variable de entorno DATABASE_URL con la URL completa de PostgreSQL. "
-        "Ejemplo: postgresql://usuario:password@host:puerto/nombre_base_datos"
-    )
+# Configuración de la base de datos SQLite
+# Usar DATABASE_PATH para especificar la ruta del archivo SQLite (opcional)
+# Si no se especifica, se usa una base de datos por defecto en instance/
+database_path = os.environ.get('DATABASE_PATH', 'instance/pedidos.db')
 
-# Render usa postgres:// pero SQLAlchemy necesita postgresql://
-if database_url.startswith('postgres://'):
-    database_url = database_url.replace('postgres://', 'postgresql://', 1)
+# Convertir a ruta absoluta y asegurar que el directorio existe
+if not os.path.isabs(database_path):
+    # Si es ruta relativa, hacerla absoluta desde el directorio del proyecto
+    database_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), database_path)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+# Normalizar la ruta (convierte barras y maneja rutas de Windows)
+database_path = os.path.normpath(database_path)
 
-# Configuración de PostgreSQL para producción
+# Asegurar que el directorio padre existe
+db_dir = os.path.dirname(database_path)
+if db_dir:  # Solo crear directorio si hay un directorio padre
+    try:
+        os.makedirs(db_dir, exist_ok=True)
+        # Verificar que el directorio es escribible
+        if not os.access(db_dir, os.W_OK):
+            raise PermissionError(f"No se tienen permisos de escritura en el directorio: {db_dir}")
+    except Exception as e:
+        raise RuntimeError(f"Error al crear el directorio de la base de datos '{db_dir}': {e}")
+
+# Configurar URI de SQLite
+# SQLite requiere rutas absolutas con 3 barras (sqlite:///)
+# Para Windows, convertir barras a formato SQLite (usar / en lugar de \)
+sqlite_path = database_path.replace('\\', '/')
+# En Windows, si la ruta empieza con letra de unidad (C:, D:, etc.), mantenerla
+# SQLAlchemy maneja correctamente las rutas absolutas con 3 barras
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{sqlite_path}'
+
+# Configuración de SQLite
 app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_pre_ping': True,  # Verificar conexiones antes de usarlas
-    'pool_recycle': 3600,  # Reciclar conexiones cada hora
-    'pool_size': 10,  # Tamaño del pool de conexiones
-    'max_overflow': 20,  # Máximo de conexiones adicionales
+    'connect_args': {'check_same_thread': False},  # Permitir conexiones desde múltiples threads
 }
 
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -137,6 +150,11 @@ def migrate_database():
     """Migrar la base de datos agregando columnas faltantes"""
     with app.app_context():
         try:
+            # Habilitar foreign keys en SQLite
+            with db.engine.connect() as conn:
+                conn.execute(text('PRAGMA foreign_keys = ON'))
+                conn.commit()
+            
             # Verificar si existe la tabla pedidos
             inspector = inspect(db.engine)
             table_names = inspector.get_table_names()
@@ -173,8 +191,8 @@ def migrate_database():
                 if 'presupuesto_id' not in columns:
                     try:
                         with db.engine.connect() as conn:
+                            # SQLite no soporta ADD CONSTRAINT en ALTER TABLE, se maneja en el modelo
                             conn.execute(text('ALTER TABLE pedidos ADD COLUMN presupuesto_id INTEGER'))
-                            conn.execute(text('ALTER TABLE pedidos ADD CONSTRAINT fk_pedido_presupuesto FOREIGN KEY (presupuesto_id) REFERENCES presupuestos(id)'))
                             conn.commit()
                             print("Migración: Columna presupuesto_id agregada exitosamente a pedidos")
                     except Exception as e:
@@ -314,15 +332,9 @@ def migrate_database():
                             pass
                 
                 # Eliminar columna de imagen 6 si existe (ya no se usa, pero mantenemos imagen_adicional_5)
-                columnas_a_eliminar = ['imagen_adicional_6']
-                for columna in columnas_a_eliminar:
-                    if columna in columns_presupuesto:
-                        try:
-                            with db.engine.connect() as conn:
-                                conn.execute(text(f'ALTER TABLE presupuestos DROP COLUMN IF EXISTS {columna}'))
-                                conn.commit()
-                        except Exception:
-                            pass
+                # Nota: SQLite no soporta DROP COLUMN directamente, se omite esta migración
+                # La columna se puede ignorar si existe
+                pass
             
             # Verificar que todas las tablas necesarias existan
             tablas_requeridas = ['comerciales', 'clientes', 'prendas', 'pedidos', 'lineas_pedido', 'presupuestos', 'lineas_presupuesto', 'tickets', 'lineas_ticket', 'facturas', 'lineas_factura', 'usuarios', 'plantillas_email', 'proveedores', 'facturas_proveedor', 'empleados', 'nominas', 'registro_cambio_estado']
@@ -336,23 +348,13 @@ def migrate_database():
                 if 'activo' not in columns_proveedor:
                     try:
                         with db.engine.connect() as conn:
-                            # PostgreSQL usa TRUE/FALSE para booleanos
-                            conn.execute(text('ALTER TABLE proveedores ADD COLUMN activo BOOLEAN DEFAULT TRUE'))
+                            # SQLite usa INTEGER para booleanos (0/1), pero SQLAlchemy lo maneja
+                            conn.execute(text('ALTER TABLE proveedores ADD COLUMN activo INTEGER DEFAULT 1'))
                             conn.commit()
                             print("Migración: Columna activo agregada exitosamente a proveedores")
                     except Exception as e:
                         print(f"Error al agregar columna activo a proveedores: {e}")
-                        # Intentar con sintaxis alternativa
-                        try:
-                            with db.engine.connect() as conn:
-                                conn.execute(text('ALTER TABLE proveedores ADD COLUMN activo BOOLEAN'))
-                                conn.execute(text('UPDATE proveedores SET activo = TRUE'))
-                                conn.execute(text('ALTER TABLE proveedores ALTER COLUMN activo SET DEFAULT TRUE'))
-                                conn.commit()
-                                print("Migración: Columna activo agregada exitosamente a proveedores (método alternativo)")
-                        except Exception as e2:
-                            print(f"Error alternativo al agregar columna activo a proveedores: {e2}")
-                            pass
+                        pass
             
             # Verificar y crear tabla plantillas_email si no existe
             if 'plantillas_email' not in table_names:
@@ -531,10 +533,8 @@ Saludos cordiales,
                     if columna not in columns_clientes:
                         try:
                             with db.engine.connect() as conn:
-                                if columna == 'usuario_web':
-                                    conn.execute(text(f'ALTER TABLE clientes ADD COLUMN {columna} {tipo} UNIQUE'))
-                                else:
-                                    conn.execute(text(f'ALTER TABLE clientes ADD COLUMN {columna} {tipo}'))
+                                # SQLite no soporta UNIQUE en ALTER TABLE ADD COLUMN, se maneja en el modelo
+                                conn.execute(text(f'ALTER TABLE clientes ADD COLUMN {columna} {tipo}'))
                                 conn.commit()
                         except Exception:
                             pass
@@ -563,15 +563,10 @@ Saludos cordiales,
                         with db.engine.connect() as conn:
                             # Agregar columna usuario_id
                             conn.execute(text('ALTER TABLE comerciales ADD COLUMN usuario_id INTEGER'))
-                            conn.execute(text('ALTER TABLE comerciales ADD CONSTRAINT fk_comercial_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id)'))
+                            # SQLite no soporta ADD CONSTRAINT en ALTER TABLE, se maneja en el modelo
                             # Eliminar la columna nombre antigua si existe
-                            if 'nombre' in columns_comerciales:
-                                # Primero eliminar la restricción unique si existe
-                                try:
-                                    conn.execute(text('ALTER TABLE comerciales DROP CONSTRAINT IF EXISTS comerciales_nombre_key'))
-                                except:
-                                    pass
-                                conn.execute(text('ALTER TABLE comerciales DROP COLUMN nombre'))
+                            # Nota: SQLite no soporta DROP COLUMN directamente, se omite esta migración
+                            # La columna se puede ignorar si existe
                             conn.commit()
                     except Exception:
                         pass
@@ -672,27 +667,16 @@ Saludos cordiales,
                                             conn.execute(text('UPDATE nominas SET empleado_id = :empleado_id WHERE empleado = :nombre'), {'empleado_id': empleado_id, 'nombre': nombre_empleado})
                                             conn.commit()
                                 
-                                # Agregar constraint de foreign key
-                                try:
-                                    conn.execute(text('ALTER TABLE nominas ADD CONSTRAINT fk_nomina_empleado FOREIGN KEY (empleado_id) REFERENCES empleados(id)'))
-                                    conn.commit()
-                                except Exception as e:
-                                    # Si la constraint ya existe o hay error, continuar
-                                    print(f"Nota al agregar constraint: {e}")
-                                    pass
-                                
+                                # SQLite no soporta ADD CONSTRAINT en ALTER TABLE, se maneja en el modelo
                                 # Eliminar columna empleado antigua
-                                conn.execute(text('ALTER TABLE nominas DROP COLUMN empleado'))
-                                conn.commit()
+                                # Nota: SQLite no soporta DROP COLUMN directamente, se omite esta migración
+                                # La columna se puede ignorar si existe
+                                pass
                             else:
                                 # Si no existe empleado, solo agregar la columna empleado_id
                                 conn.execute(text('ALTER TABLE nominas ADD COLUMN empleado_id INTEGER'))
-                                try:
-                                    conn.execute(text('ALTER TABLE nominas ADD CONSTRAINT fk_nomina_empleado FOREIGN KEY (empleado_id) REFERENCES empleados(id)'))
-                                    conn.commit()
-                                except Exception as e:
-                                    print(f"Nota al agregar constraint: {e}")
-                                    pass
+                                # SQLite no soporta ADD CONSTRAINT en ALTER TABLE, se maneja en el modelo
+                                conn.commit()
                         print("Migración de nominas completada exitosamente")
                     except Exception as e:
                         print(f"Error en migración de nominas: {e}")

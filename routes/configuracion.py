@@ -1,5 +1,5 @@
 """Rutas de configuración (solo supervisor)"""
-from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, jsonify, current_app
 from flask_login import login_required, current_user
 from extensions import db
 from models import Usuario, Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, PlantillaEmail
@@ -11,6 +11,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 from werkzeug.utils import secure_filename
 import os
+import shutil
 
 configuracion_bp = Blueprint('configuracion', __name__)
 
@@ -388,4 +389,122 @@ def toggle_plantilla_email(id):
         flash(f'Error al cambiar el estado de la plantilla: {str(e)}', 'error')
     
     return redirect(url_for('configuracion.plantillas_email'))
+
+@configuracion_bp.route('/configuracion/descargar-bd')
+@login_required
+@supervisor_required
+def descargar_bd():
+    """Descargar el archivo de base de datos SQLite"""
+    try:
+        # Obtener la ruta de la base de datos desde la configuración
+        database_uri = current_app.config['SQLALCHEMY_DATABASE_URI']
+        
+        # Extraer la ruta del archivo desde sqlite:///ruta
+        if database_uri.startswith('sqlite:///'):
+            db_path = database_uri.replace('sqlite:///', '')
+            # En Windows, puede venir con barras normales, convertir a barras del sistema
+            db_path = os.path.normpath(db_path)
+        else:
+            flash('No se pudo determinar la ruta de la base de datos', 'error')
+            return redirect(url_for('configuracion.index'))
+        
+        # Verificar que el archivo existe
+        if not os.path.exists(db_path):
+            flash('El archivo de base de datos no existe', 'error')
+            return redirect(url_for('configuracion.index'))
+        
+        # Crear una copia temporal con nombre con fecha
+        fecha = datetime.now().strftime('%Y%m%d_%H%M%S')
+        nombre_archivo = f'pedidos_backup_{fecha}.db'
+        
+        # Crear un archivo temporal en memoria
+        temp_file = io.BytesIO()
+        with open(db_path, 'rb') as f:
+            temp_file.write(f.read())
+        temp_file.seek(0)
+        
+        return send_file(
+            temp_file,
+            mimetype='application/x-sqlite3',
+            as_attachment=True,
+            download_name=nombre_archivo
+        )
+        
+    except Exception as e:
+        flash(f'Error al descargar la base de datos: {str(e)}', 'error')
+        return redirect(url_for('configuracion.index'))
+
+@configuracion_bp.route('/configuracion/importar-bd-sqlite', methods=['GET', 'POST'])
+@login_required
+@supervisor_required
+def importar_bd_sqlite():
+    """Importar/cargar un archivo SQLite para reemplazar la base de datos actual"""
+    if request.method == 'POST':
+        try:
+            # Verificar que se subió un archivo
+            if 'archivo' not in request.files:
+                flash('No se seleccionó ningún archivo', 'error')
+                return redirect(url_for('configuracion.importar_bd_sqlite'))
+            
+            archivo = request.files['archivo']
+            if archivo.filename == '':
+                flash('No se seleccionó ningún archivo', 'error')
+                return redirect(url_for('configuracion.importar_bd_sqlite'))
+            
+            # Verificar extensión
+            if not archivo.filename.lower().endswith('.db'):
+                flash('El archivo debe ser un archivo SQLite (.db)', 'error')
+                return redirect(url_for('configuracion.importar_bd_sqlite'))
+            
+            # Obtener la ruta de la base de datos actual
+            database_uri = current_app.config['SQLALCHEMY_DATABASE_URI']
+            
+            if not database_uri.startswith('sqlite:///'):
+                flash('No se pudo determinar la ruta de la base de datos', 'error')
+                return redirect(url_for('configuracion.importar_bd_sqlite'))
+            
+            db_path = database_uri.replace('sqlite:///', '')
+            db_path = os.path.normpath(db_path)
+            
+            # Validar que el archivo subido es SQLite válido (verificar header)
+            archivo.seek(0)
+            header = archivo.read(16)
+            archivo.seek(0)
+            
+            # SQLite tiene un header específico: "SQLite format 3\000"
+            if not header.startswith(b'SQLite format 3\x00'):
+                flash('El archivo no es un archivo SQLite válido', 'error')
+                return redirect(url_for('configuracion.importar_bd_sqlite'))
+            
+            # Cerrar todas las conexiones de la base de datos antes de reemplazar
+            db.session.close()
+            db.engine.dispose()
+            
+            # Hacer backup de la base de datos actual antes de reemplazarla
+            if os.path.exists(db_path):
+                fecha_backup = datetime.now().strftime('%Y%m%d_%H%M%S')
+                backup_path = db_path.replace('.db', f'_backup_{fecha_backup}.db')
+                try:
+                    shutil.copy2(db_path, backup_path)
+                    flash(f'Backup creado: {os.path.basename(backup_path)}', 'info')
+                except Exception as e:
+                    flash(f'Advertencia: No se pudo crear backup automático: {str(e)}', 'warning')
+            
+            # Guardar el nuevo archivo
+            archivo.save(db_path)
+            
+            # Reinicializar la conexión de la base de datos
+            db.engine.dispose()
+            db.create_all()
+            
+            flash('Base de datos importada correctamente. La aplicación se reiniciará.', 'success')
+            return redirect(url_for('configuracion.index'))
+            
+        except Exception as e:
+            flash(f'Error al importar la base de datos: {str(e)}', 'error')
+            import traceback
+            traceback.print_exc()
+            return redirect(url_for('configuracion.importar_bd_sqlite'))
+    
+    return render_template('configuracion/importar_bd_sqlite.html')
 

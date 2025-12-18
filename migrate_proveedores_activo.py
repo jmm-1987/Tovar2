@@ -16,8 +16,8 @@ def migrate_proveedores_activo():
                 if 'activo' not in columns_proveedor:
                     print("Añadiendo columna activo a proveedores...")
                     with db.engine.connect() as conn:
-                        # PostgreSQL usa TRUE/FALSE para booleanos
-                        conn.execute(text('ALTER TABLE proveedores ADD COLUMN activo BOOLEAN DEFAULT TRUE'))
+                        # SQLite usa INTEGER para booleanos (0/1), pero SQLAlchemy lo maneja como BOOLEAN
+                        conn.execute(text('ALTER TABLE proveedores ADD COLUMN activo INTEGER DEFAULT 1'))
                         conn.commit()
                     print("✓ Columna activo agregada exitosamente a proveedores")
                     
@@ -37,4 +37,5 @@ def migrate_proveedores_activo():
 
 if __name__ == '__main__':
     migrate_proveedores_activo()
+
 
