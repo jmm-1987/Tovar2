@@ -29,11 +29,9 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'tu-clave-secreta-aqui-c
 is_production = os.environ.get('RENDER', '').lower() == 'true'
 
 if is_production:
-    # En producción (Render), usar DATABASE_PATH si está configurado
-    # Si no, usar una ruta en el directorio home que persiste entre despliegues
-    # IMPORTANTE: Configurar DATABASE_PATH en Render para usar un volumen persistente
-    default_prod_path = os.path.join(os.path.expanduser('~'), 'pedidos.db')
-    database_path = os.environ.get('DATABASE_PATH', default_prod_path)
+    # En producción (Render), usar /data/pedidos.db (disco persistente)
+    # IMPORTANTE: Configurar un volumen persistente en Render montado en /data
+    database_path = os.environ.get('DATABASE_PATH', '/data/pedidos.db')
     print(f"[PRODUCCION] Usando base de datos en: {database_path}")
 else:
     # En local, usar instance/pedidos.db
