@@ -96,3 +96,4 @@ if __name__ == '__main__':
     print("Siguiente paso: Ejecutar importar_clientes_sqlite.py")
     print("para importar estos datos a SQLite")
 
+

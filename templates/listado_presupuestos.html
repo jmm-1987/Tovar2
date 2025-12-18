@@ -48,11 +48,11 @@ header {
                 </label>
                 <div style="display: flex; gap: 12px; align-items: center;">
                     <label style="display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: #495057; cursor: pointer; font-weight: normal;">
-                        <input type="checkbox" name="mostrar_rechazados" id="mostrar_rechazados" {% if mostrar_rechazados %}checked{% endif %} style="width: 16px; height: 16px; cursor: pointer; accent-color: #dc3545;">
+                        <input type="checkbox" name="mostrar_rechazados" id="mostrar_rechazados" {% if mostrar_rechazados %}checked{% endif %} onchange="this.form.submit()" style="width: 16px; height: 16px; cursor: pointer; accent-color: #dc3545;">
                         <span>Rechazados</span>
                     </label>
                     <label style="display: flex; align-items: center; gap: 5px; font-size: 0.8rem; color: #495057; cursor: pointer; font-weight: normal;">
-                        <input type="checkbox" name="mostrar_aceptados" id="mostrar_aceptados" {% if mostrar_aceptados %}checked{% endif %} style="width: 16px; height: 16px; cursor: pointer; accent-color: #28a745;">
+                        <input type="checkbox" name="mostrar_aceptados" id="mostrar_aceptados" {% if mostrar_aceptados %}checked{% endif %} onchange="this.form.submit()" style="width: 16px; height: 16px; cursor: pointer; accent-color: #28a745;">
                         <span>Aceptados</span>
                     </label>
                 </div>
@@ -72,6 +72,19 @@ header {
         </form>
     </div>
 </div>
+
+<script>
+// Enviar formulario automáticamente al cargar la página si no hay parámetros
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    // Si no hay parámetros de filtro, enviar el formulario automáticamente
+    if (!urlParams.has('estado') && !urlParams.has('fecha_desde') && !urlParams.has('fecha_hasta') && 
+        !urlParams.has('mostrar_rechazados') && !urlParams.has('mostrar_aceptados')) {
+        // El formulario ya se renderiza con los valores por defecto, no necesitamos enviarlo
+        // Los presupuestos ya se mostrarán con el filtro aplicado en el backend
+    }
+});
+</script>
 
 <style>
 h2::after {

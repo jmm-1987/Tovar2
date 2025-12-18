@@ -342,9 +342,11 @@ def migrate_database():
             if tablas_faltantes:
                 db.create_all()
             
-            # Verificar si existe la tabla proveedores y agregar columna activo si no existe
+            # Verificar si existe la tabla proveedores y agregar columnas faltantes
             if 'proveedores' in table_names:
                 columns_proveedor = [col['name'] for col in inspector.get_columns('proveedores')]
+                
+                # Agregar columna activo si no existe
                 if 'activo' not in columns_proveedor:
                     try:
                         with db.engine.connect() as conn:
@@ -354,6 +356,28 @@ def migrate_database():
                             print("Migración: Columna activo agregada exitosamente a proveedores")
                     except Exception as e:
                         print(f"Error al agregar columna activo a proveedores: {e}")
+                        pass
+                
+                # Agregar columna movil si no existe
+                if 'movil' not in columns_proveedor:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE proveedores ADD COLUMN movil VARCHAR(50)'))
+                            conn.commit()
+                            print("Migración: Columna movil agregada exitosamente a proveedores")
+                    except Exception as e:
+                        print(f"Error al agregar columna movil a proveedores: {e}")
+                        pass
+                
+                # Agregar columna persona_contacto si no existe
+                if 'persona_contacto' not in columns_proveedor:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE proveedores ADD COLUMN persona_contacto VARCHAR(200)'))
+                            conn.commit()
+                            print("Migración: Columna persona_contacto agregada exitosamente a proveedores")
+                    except Exception as e:
+                        print(f"Error al agregar columna persona_contacto a proveedores: {e}")
                         pass
             
             # Verificar y crear tabla plantillas_email si no existe
@@ -558,15 +582,28 @@ Saludos cordiales,
             # Migrar tabla comerciales para usar usuario_id en lugar de nombre
             if 'comerciales' in table_names:
                 columns_comerciales = [col['name'] for col in inspector.get_columns('comerciales')]
+                
+                # Agregar usuario_id si no existe
                 if 'usuario_id' not in columns_comerciales:
                     try:
                         with db.engine.connect() as conn:
                             # Agregar columna usuario_id
                             conn.execute(text('ALTER TABLE comerciales ADD COLUMN usuario_id INTEGER'))
-                            # SQLite no soporta ADD CONSTRAINT en ALTER TABLE, se maneja en el modelo
-                            # Eliminar la columna nombre antigua si existe
-                            # Nota: SQLite no soporta DROP COLUMN directamente, se omite esta migración
-                            # La columna se puede ignorar si existe
+                            conn.commit()
+                    except Exception:
+                        pass
+                
+                # Si existe la columna nombre y hay registros con nombre NULL pero usuario_id válido,
+                # actualizar el nombre desde el usuario
+                if 'nombre' in columns_comerciales and 'usuario_id' in columns_comerciales:
+                    try:
+                        with db.engine.connect() as conn:
+                            # Actualizar registros que tienen usuario_id pero nombre es NULL
+                            conn.execute(text("""
+                                UPDATE comerciales 
+                                SET nombre = (SELECT usuario FROM usuarios WHERE usuarios.id = comerciales.usuario_id)
+                                WHERE nombre IS NULL AND usuario_id IS NOT NULL
+                            """))
                             conn.commit()
                     except Exception:
                         pass

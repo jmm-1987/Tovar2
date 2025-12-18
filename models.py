@@ -13,6 +13,9 @@ class Comercial(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False, unique=True)
+    # Columna _nombre almacenada en BD para compatibilidad con tablas antiguas que tienen NOT NULL
+    # Se establece automáticamente al crear el comercial
+    _nombre = db.Column('nombre', db.String(200), nullable=True)
     
     # Relación con usuario
     usuario = db.relationship('Usuario', backref='comercial', lazy=True)
@@ -24,8 +27,10 @@ class Comercial(db.Model):
     
     @property
     def nombre(self):
-        """Obtener el nombre del usuario asociado"""
-        return self.usuario.usuario if self.usuario else ''
+        """Propiedad que devuelve el nombre del usuario asociado"""
+        if self.usuario:
+            return self.usuario.usuario
+        return self._nombre or ''
     
     def __repr__(self):
         return f'<Comercial {self.nombre}>'
@@ -503,7 +508,9 @@ class Proveedor(db.Model):
     nombre = db.Column(db.String(200), nullable=False)
     cif = db.Column(db.String(20))  # CIF del proveedor
     telefono = db.Column(db.String(50))
+    movil = db.Column(db.String(50))  # Teléfono móvil
     correo = db.Column(db.String(100))
+    persona_contacto = db.Column(db.String(200))  # Persona de contacto
     activo = db.Column(db.Boolean, nullable=False, default=True)  # Estado activo/inactivo
     
     # Timestamp

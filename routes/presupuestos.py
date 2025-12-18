@@ -19,9 +19,6 @@ def listado_presupuestos():
     """Listado de presupuestos con filtros"""
     query = Presupuesto.query
     
-    # Estados que se muestran por defecto
-    estados_por_defecto = ['Pendiente de enviar', 'En diseño', 'Enviados']
-    
     # Verificar si se deben mostrar rechazados y aceptados
     mostrar_rechazados = request.args.get('mostrar_rechazados', '') == 'on'
     mostrar_aceptados = request.args.get('mostrar_aceptados', '') == 'on'
@@ -31,13 +28,15 @@ def listado_presupuestos():
     if estado_filtro:
         query = query.filter(Presupuesto.estado == estado_filtro)
     else:
-        # Si no hay filtro específico, aplicar filtro por defecto
-        estados_a_mostrar = estados_por_defecto.copy()
-        if mostrar_rechazados:
-            estados_a_mostrar.append('Rechazado')
-        if mostrar_aceptados:
-            estados_a_mostrar.append('Aceptado')
-        query = query.filter(Presupuesto.estado.in_(estados_a_mostrar))
+        # Por defecto, excluir Aceptado y Rechazado a menos que se marquen los checkboxes
+        estados_a_excluir = []
+        if not mostrar_rechazados:
+            estados_a_excluir.append('Rechazado')
+        if not mostrar_aceptados:
+            estados_a_excluir.append('Aceptado')
+        
+        if estados_a_excluir:
+            query = query.filter(~Presupuesto.estado.in_(estados_a_excluir))
     
     # Filtro por fecha desde
     fecha_desde = request.args.get('fecha_desde', '')

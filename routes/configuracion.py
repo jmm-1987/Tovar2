@@ -59,7 +59,7 @@ def gestion_usuarios():
             
             # Si el rol es comercial o administracion, crear registro en comerciales
             if rol in ['comercial', 'administracion']:
-                comercial = Comercial(usuario_id=nuevo_usuario.id)
+                comercial = Comercial(usuario_id=nuevo_usuario.id, _nombre=nuevo_usuario.usuario)
                 db.session.add(comercial)
             
             db.session.commit()
@@ -98,7 +98,7 @@ def editar_usuario(id):
         if nuevo_rol in ['comercial', 'administracion']:
             # Si cambió a comercial o administracion y no tiene comercial, crearlo
             if not comercial_existente:
-                comercial = Comercial(usuario_id=usuario.id)
+                comercial = Comercial(usuario_id=usuario.id, _nombre=usuario.usuario)
                 db.session.add(comercial)
         else:
             # Si cambió a otro rol y tiene comercial, eliminarlo

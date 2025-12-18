@@ -95,3 +95,4 @@ Si necesitas migrar datos de clientes desde PostgreSQL:
 
 No se requieren cambios adicionales. La aplicación funciona inmediatamente sin configuración adicional.
 
+

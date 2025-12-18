@@ -18,7 +18,9 @@
                     <th>Nombre</th>
                     <th>CIF</th>
                     <th>Teléfono</th>
+                    <th>Móvil</th>
                     <th>Correo</th>
+                    <th>Persona Contacto</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
@@ -34,7 +36,9 @@
                     </td>
                     <td>{{ proveedor.cif or '-' }}</td>
                     <td>{{ proveedor.telefono or '-' }}</td>
+                    <td>{{ proveedor.movil or '-' }}</td>
                     <td>{{ proveedor.correo or '-' }}</td>
+                    <td>{{ proveedor.persona_contacto or '-' }}</td>
                     <td class="acciones-cell">
                         <a href="{{ url_for('gastos.editar_proveedor', proveedor_id=proveedor.id) }}" class="btn btn-sm btn-primary">Editar</a>
                     </td>

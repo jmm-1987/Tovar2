@@ -27,7 +27,9 @@ def nuevo_proveedor():
                 nombre=request.form.get('nombre'),
                 cif=request.form.get('cif', ''),
                 telefono=request.form.get('telefono', ''),
-                correo=request.form.get('correo', '')
+                movil=request.form.get('movil', ''),
+                correo=request.form.get('correo', ''),
+                persona_contacto=request.form.get('persona_contacto', '')
             )
             db.session.add(proveedor)
             db.session.commit()
@@ -71,7 +73,9 @@ def editar_proveedor(proveedor_id):
             proveedor.nombre = request.form.get('nombre')
             proveedor.cif = request.form.get('cif', '')
             proveedor.telefono = request.form.get('telefono', '')
+            proveedor.movil = request.form.get('movil', '')
             proveedor.correo = request.form.get('correo', '')
+            proveedor.persona_contacto = request.form.get('persona_contacto', '')
             db.session.commit()
             flash('Proveedor actualizado correctamente', 'success')
             return redirect(url_for('gastos.listado_proveedores'))
