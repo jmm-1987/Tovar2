@@ -24,9 +24,21 @@ def nl2br_filter(value):
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'tu-clave-secreta-aqui-cambiar-en-produccion')
 
 # Configuración de la base de datos SQLite
-# Usar DATABASE_PATH para especificar la ruta del archivo SQLite (opcional)
-# Si no se especifica, se usa una base de datos por defecto en instance/
-database_path = os.environ.get('DATABASE_PATH', 'instance/pedidos.db')
+# Detectar si estamos en producción (Render)
+# Render establece la variable RENDER=true automáticamente
+is_production = os.environ.get('RENDER', '').lower() == 'true'
+
+if is_production:
+    # En producción (Render), usar DATABASE_PATH si está configurado
+    # Si no, usar una ruta en el directorio home que persiste entre despliegues
+    # IMPORTANTE: Configurar DATABASE_PATH en Render para usar un volumen persistente
+    default_prod_path = os.path.join(os.path.expanduser('~'), 'pedidos.db')
+    database_path = os.environ.get('DATABASE_PATH', default_prod_path)
+    print(f"[PRODUCCION] Usando base de datos en: {database_path}")
+else:
+    # En local, usar instance/pedidos.db
+    database_path = os.environ.get('DATABASE_PATH', 'instance/pedidos.db')
+    print(f"[LOCAL] Usando base de datos en: {database_path}")
 
 # Convertir a ruta absoluta y asegurar que el directorio existe
 if not os.path.isabs(database_path):
