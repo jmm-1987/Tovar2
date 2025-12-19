@@ -11,7 +11,7 @@ import base64
 from io import BytesIO
 from sqlalchemy import not_
 from extensions import db
-from models import Pedido, LineaPedido, Factura, LineaFactura, Cliente
+from models import Pedido, LineaPedido, Factura, LineaFactura, Cliente, Presupuesto, LineaPresupuesto
 from utils.numeracion import obtener_siguiente_numero_factura
 from playwright.sync_api import sync_playwright
 
@@ -35,37 +35,68 @@ def facturacion():
     facturas = []
     
     if tipo_vista == 'pendientes':
-        # Obtener prefacturas: pedidos que aún no tienen factura formalizada
-        # Filtrar solo facturas con pedido_id (excluir facturas directas)
+        # Obtener prefacturas: pedidos y solicitudes aceptadas que aún no tienen factura formalizada
+        # Filtrar solo facturas con pedido_id o presupuesto_id (excluir facturas directas)
         pedidos_con_factura_ids = [f.pedido_id for f in Factura.query.with_entities(Factura.pedido_id).filter(Factura.pedido_id.isnot(None)).all()]
-        query = Pedido.query
+        presupuestos_con_factura_ids = [f.presupuesto_id for f in Factura.query.with_entities(Factura.presupuesto_id).filter(Factura.presupuesto_id.isnot(None)).all()]
+        
+        # Obtener pedidos sin factura
+        query_pedidos = Pedido.query
         if pedidos_con_factura_ids:
-            query = query.filter(not_(Pedido.id.in_(pedidos_con_factura_ids)))
+            query_pedidos = query_pedidos.filter(not_(Pedido.id.in_(pedidos_con_factura_ids)))
         
-        # Aplicar filtro de estado
+        # Aplicar filtro de estado a pedidos
         if estado_filtro:
-            query = query.filter(Pedido.estado == estado_filtro)
+            query_pedidos = query_pedidos.filter(Pedido.estado == estado_filtro)
         
-        # Aplicar filtros de fecha
+        # Aplicar filtros de fecha a pedidos
         if fecha_desde:
             try:
                 fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
-                query = query.filter(Pedido.fecha_creacion >= datetime.combine(fecha_desde_obj, datetime.min.time()))
+                query_pedidos = query_pedidos.filter(Pedido.fecha_creacion >= datetime.combine(fecha_desde_obj, datetime.min.time()))
             except ValueError:
                 pass
         
         if fecha_hasta:
             try:
                 fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
-                query = query.filter(Pedido.fecha_creacion <= datetime.combine(fecha_hasta_obj, datetime.max.time()))
+                query_pedidos = query_pedidos.filter(Pedido.fecha_creacion <= datetime.combine(fecha_hasta_obj, datetime.max.time()))
             except ValueError:
                 pass
         
-        prefacturas = query.order_by(Pedido.id.desc()).all()
+        pedidos = query_pedidos.order_by(Pedido.id.desc()).all()
         
-        # Obtener estados únicos de pedidos para el filtro
-        estados = db.session.query(Pedido.estado).distinct().all()
-        estados_list = [estado[0] for estado in estados if estado[0]]
+        # Obtener solicitudes (presupuestos) aceptadas sin factura
+        query_solicitudes = Presupuesto.query.filter(Presupuesto.estado == 'aceptado')
+        if presupuestos_con_factura_ids:
+            query_solicitudes = query_solicitudes.filter(not_(Presupuesto.id.in_(presupuestos_con_factura_ids)))
+        
+        # Aplicar filtros de fecha a solicitudes
+        if fecha_desde:
+            try:
+                fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+                query_solicitudes = query_solicitudes.filter(Presupuesto.fecha_creacion >= datetime.combine(fecha_desde_obj, datetime.min.time()))
+            except ValueError:
+                pass
+        
+        if fecha_hasta:
+            try:
+                fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+                query_solicitudes = query_solicitudes.filter(Presupuesto.fecha_creacion <= datetime.combine(fecha_hasta_obj, datetime.max.time()))
+            except ValueError:
+                pass
+        
+        solicitudes = query_solicitudes.order_by(Presupuesto.id.desc()).all()
+        
+        # Combinar pedidos y solicitudes como prefacturas
+        prefacturas = list(pedidos) + list(solicitudes)
+        # Ordenar por fecha de creación descendente
+        prefacturas.sort(key=lambda x: x.fecha_creacion if x.fecha_creacion else datetime.min, reverse=True)
+        
+        # Obtener estados únicos de pedidos y presupuestos para el filtro
+        estados_pedidos = db.session.query(Pedido.estado).distinct().all()
+        estados_presupuestos = db.session.query(Presupuesto.estado).distinct().all()
+        estados_list = list(set([estado[0] for estado in estados_pedidos + estados_presupuestos if estado[0]]))
     else:
         # Obtener facturas formalizadas
         query = Factura.query
@@ -103,6 +134,201 @@ def facturacion():
                          estado_filtro=estado_filtro,
                          fecha_desde=fecha_desde,
                          fecha_hasta=fecha_hasta)
+
+@facturacion_bp.route('/facturacion/solicitud/<int:presupuesto_id>')
+@login_required
+def ver_factura_solicitud(presupuesto_id):
+    """Vista detallada de una factura para introducir importes desde una solicitud"""
+    presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+    
+    # Verificar si ya existe una factura para este presupuesto
+    factura_existente = Factura.query.filter_by(presupuesto_id=presupuesto_id).first()
+    
+    return render_template('ver_factura_solicitud.html', solicitud=presupuesto, factura_existente=factura_existente)
+
+@facturacion_bp.route('/facturacion/solicitud/<int:presupuesto_id>/formalizar', methods=['POST'])
+@login_required
+def formalizar_factura_solicitud(presupuesto_id):
+    """Formalizar una factura desde una solicitud y enviarla a Verifactu"""
+    try:
+        presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+        
+        # Verificar si ya existe una factura para este presupuesto
+        factura_existente = Factura.query.filter_by(presupuesto_id=presupuesto_id).first()
+        if factura_existente:
+            return jsonify({'success': False, 'error': 'Esta solicitud ya tiene una factura formalizada.'}), 400
+        
+        # Obtener datos del formulario
+        data = request.get_json()
+        
+        fecha_expedicion_str = data.get('fecha_expedicion', '')
+        descripcion = data.get('descripcion', '')
+        lineas_data = data.get('lineas', [])
+        
+        if not fecha_expedicion_str:
+            return jsonify({'success': False, 'error': 'La fecha de expedición es obligatoria'}), 400
+        
+        if not lineas_data:
+            return jsonify({'success': False, 'error': 'Debe haber al menos una línea con importe'}), 400
+        
+        # Procesar fecha
+        fecha_expedicion = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d').date()
+        
+        # Generar número de factura automáticamente
+        serie = 'A'  # Serie fija
+        numero = obtener_siguiente_numero_factura(fecha_expedicion)
+        
+        # Calcular importe total
+        importe_total = Decimal('0.00')
+        for linea_data in lineas_data:
+            importe = Decimal(str(linea_data.get('importe', 0)))
+            importe_total += importe
+        
+        # Crear factura
+        cliente = presupuesto.cliente if presupuesto.cliente else None
+        factura = Factura(
+            presupuesto_id=presupuesto_id,
+            pedido_id=None,
+            serie=serie,
+            numero=numero,
+            fecha_expedicion=fecha_expedicion,
+            tipo_factura='F1',  # Factura completa
+            descripcion=descripcion,
+            nif=cliente.nif if cliente and cliente.nif else '',
+            nombre=cliente.nombre if cliente else 'Sin cliente',
+            importe_total=importe_total,
+            estado='pendiente'
+        )
+        
+        db.session.add(factura)
+        db.session.flush()  # Para obtener el ID de la factura
+        
+        # Crear líneas de factura (usando lineas de presupuesto)
+        for linea_data in lineas_data:
+            linea_presupuesto_id = linea_data.get('linea_presupuesto_id')
+            descripcion_linea = linea_data.get('descripcion', '')
+            cantidad = Decimal(str(linea_data.get('cantidad', 1)))
+            precio_unitario = Decimal(str(linea_data.get('precio_unitario', 0)))
+            importe = Decimal(str(linea_data.get('importe', 0)))
+            
+            linea_factura = LineaFactura(
+                factura_id=factura.id,
+                linea_pedido_id=None,  # No hay línea de pedido, es de presupuesto
+                descripcion=descripcion_linea,
+                cantidad=cantidad,
+                precio_unitario=precio_unitario,
+                importe=importe
+            )
+            db.session.add(linea_factura)
+        
+        # Verificar si el envío a Verifactu está activado
+        from models import Configuracion
+        config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+        verifactu_enviar_activo = True  # Por defecto activado
+        if config:
+            verifactu_enviar_activo = config.valor.lower() == 'true'
+        
+        # Enviar a Verifactu solo si está activado y hay token
+        verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
+        verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
+        
+        if verifactu_token and verifactu_enviar_activo:
+            # Preparar datos para la API
+            tipo_impositivo = 21  # IVA estándar en España
+            lineas_payload = []
+            total_base_imponible = Decimal('0.00')
+            total_cuota_repercutida = Decimal('0.00')
+            
+            for linea in factura.lineas:
+                importe_con_iva = Decimal(str(linea.importe))
+                base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
+                cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
+                
+                base_imponible = base_imponible.quantize(Decimal('0.01'))
+                cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
+                
+                total_base_imponible += base_imponible
+                total_cuota_repercutida += cuota_repercutida
+                
+                lineas_payload.append({
+                    'base_imponible': str(base_imponible),
+                    'tipo_impositivo': str(tipo_impositivo),
+                    'cuota_repercutida': str(cuota_repercutida)
+                })
+            
+            payload = {
+                'serie': factura.serie,
+                'numero': factura.numero,
+                'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
+                'tipo_factura': factura.tipo_factura,
+                'descripcion': factura.descripcion or 'Descripcion de la operacion',
+                'nif': factura.nif or '',
+                'nombre': factura.nombre,
+                'lineas': lineas_payload,
+                'importe_total': str(factura.importe_total)
+            }
+            
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {verifactu_token}'
+            }
+            
+            try:
+                response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
+                
+                if response.status_code == 200 or response.status_code == 201:
+                    response_data = response.json()
+                    factura.huella_verifactu = json.dumps(response_data)
+                    factura.estado = 'confirmado'
+                    factura.fecha_confirmacion = datetime.utcnow()
+                    db.session.commit()
+                    return jsonify({
+                        'success': True,
+                        'message': 'Factura formalizada y enviada a Verifactu correctamente.',
+                        'factura_id': factura.id
+                    })
+                else:
+                    factura.estado = 'error'
+                    factura.huella_verifactu = json.dumps({
+                        'error': response.text,
+                        'status_code': response.status_code
+                    })
+                    db.session.commit()
+                    return jsonify({
+                        'success': False,
+                        'error': f'Error al enviar a Verifactu: {response.status_code} - {response.text}'
+                    }), 400
+            except requests.exceptions.RequestException as e:
+                factura.estado = 'error'
+                factura.huella_verifactu = json.dumps({'error': str(e)})
+                db.session.commit()
+                return jsonify({
+                    'success': False,
+                    'error': f'Error de conexión con Verifactu: {str(e)}'
+                }), 400
+        elif not verifactu_enviar_activo:
+            factura.estado = 'pendiente'
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': 'Factura creada. El envío automático a Verifactu está desactivado.',
+                'factura_id': factura.id
+            })
+        else:
+            factura.estado = 'pendiente'
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': 'Factura creada. Configure VERIFACTU_TOKEN para enviar automáticamente.',
+                'factura_id': factura.id
+            })
+            
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': f'Error al formalizar la factura: {str(e)}'
+        }), 500
 
 @facturacion_bp.route('/facturacion/<int:pedido_id>')
 @login_required

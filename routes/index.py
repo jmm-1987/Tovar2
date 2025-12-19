@@ -2,61 +2,77 @@
 from flask import Blueprint, render_template, flash
 from flask_login import login_required
 from datetime import datetime, timedelta
-from models import Pedido
+from models import Presupuesto
 
 index_bp = Blueprint('index', __name__)
 
 @index_bp.route('/')
 @login_required
 def index():
-    """Página principal con lista de pedidos"""
+    """Página principal con lista de solicitudes (solo aceptadas hasta entregadas)"""
     try:
-        # Obtener todos los pedidos con sus relaciones cargadas, excluyendo los entregados al cliente
+        # Obtener solicitudes con estado entre "aceptado" y "entregado al cliente"
         from sqlalchemy.orm import joinedload
-        from models import LineaPedido
-        pedidos = Pedido.query.filter(
-            Pedido.estado != 'Entregado al cliente'
+        from models import LineaPresupuesto
+        from sqlalchemy import or_
+        
+        # Estados que se muestran en el panel: desde aceptado hasta entregado al cliente
+        estados_mostrar = ['aceptado', 'diseño', 'diseño finalizado', 'en preparacion', 'todo listo', 'enviado']
+        
+        solicitudes = Presupuesto.query.filter(
+            Presupuesto.estado.in_(estados_mostrar)
         ).options(
-            joinedload(Pedido.cliente),
-            joinedload(Pedido.lineas).joinedload(LineaPedido.prenda)
+            joinedload(Presupuesto.cliente),
+            joinedload(Presupuesto.lineas).joinedload(LineaPresupuesto.prenda)
         ).all()
         
         # Calcular fecha objetivo de entrega (20 días desde aceptación) y clasificar
         hoy = datetime.now().date()
+        from extensions import db
+        necesita_commit = False
         
-        for pedido in pedidos:
+        for solicitud in solicitudes:
             # Si no tiene fecha objetivo pero tiene fecha de aceptación, calcularla (20 días)
-            if pedido.fecha_aceptacion and not pedido.fecha_objetivo:
-                pedido.fecha_objetivo = pedido.fecha_aceptacion + timedelta(days=20)
+            if solicitud.fecha_aceptado and not solicitud.fecha_objetivo:
+                solicitud.fecha_objetivo = solicitud.fecha_aceptado + timedelta(days=20)
+                necesita_commit = True
             
-            if pedido.fecha_objetivo:
+            if solicitud.fecha_objetivo:
                 # Calcular días restantes hasta la fecha objetivo
-                dias_restantes = (pedido.fecha_objetivo - hoy).days
+                dias_restantes = (solicitud.fecha_objetivo - hoy).days
                 
                 # Clasificar fecha objetivo según días restantes
                 if dias_restantes <= 5:
                     # 5 días o menos (incluye vencidos): Rojo
-                    pedido.fecha_class = 'urgente'
+                    solicitud.fecha_class = 'urgente'
                 elif dias_restantes <= 10:
                     # Entre 6 y 10 días: Naranja
-                    pedido.fecha_class = 'proxima'
+                    solicitud.fecha_class = 'proxima'
                 else:
                     # Más de 10 días: Verde
-                    pedido.fecha_class = 'ok'
+                    solicitud.fecha_class = 'ok'
             else:
-                pedido.fecha_class = ''
+                solicitud.fecha_class = ''
+        
+        # Guardar cambios si se calcularon fechas objetivo
+        if necesita_commit:
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                print(f"Error al guardar fechas objetivo: {e}")
         
         # Ordenar por fecha objetivo (más próximos primero), los que no tienen fecha objetivo al final
-        pedidos.sort(key=lambda p: (
-            p.fecha_objetivo if p.fecha_objetivo else datetime.max.date(),
-            p.fecha_aceptacion if p.fecha_aceptacion else datetime.max.date()
+        solicitudes.sort(key=lambda s: (
+            s.fecha_objetivo if s.fecha_objetivo else datetime.max.date(),
+            s.fecha_aceptado if s.fecha_aceptado else datetime.max.date()
         ))
         
-        return render_template('index.html', pedidos=pedidos)
+        return render_template('index.html', solicitudes=solicitudes)
     except Exception as e:
         import traceback
         error_msg = f"Error en index: {str(e)}\n{traceback.format_exc()}"
         print(error_msg)
         flash(f'Error al cargar el panel de control: {str(e)}', 'error')
-        return render_template('index.html', pedidos=[])
+        return render_template('index.html', solicitudes=[])
 

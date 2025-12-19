@@ -1,0 +1,966 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Solicitud #{{ solicitud.id }} - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<h2>Editar Solicitud #{{ solicitud.id }}</h2>
+
+<form method="POST" enctype="multipart/form-data">
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="comercial_id">Comercial *</label>
+            <select name="comercial_id" id="comercial_id" required>
+                <option value="">Seleccione un comercial</option>
+                {% for comercial in comerciales %}
+                <option value="{{ comercial.id }}" {% if solicitud.comercial_id == comercial.id %}selected{% endif %}>{{ comercial.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="cliente_id">Cliente *</label>
+            <div style="display: flex; gap: 5px;">
+                <div style="position: relative; flex: 1;">
+                    <input type="text" id="cliente_search" placeholder="🔍 Buscar cliente..." 
+                           value="{% if solicitud.cliente %}{{ solicitud.cliente.nombre }}{% endif %}"
+                           style="width: 100%; padding: 10px 35px 10px 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; box-sizing: border-box;"
+                           autocomplete="off">
+                    <select name="cliente_id" id="cliente_id" required style="display: none;">
+                        <option value="">Seleccione un cliente</option>
+                        {% for cliente in clientes %}
+                        <option value="{{ cliente.id }}" data-nombre="{{ cliente.nombre|lower }}" {% if solicitud.cliente_id == cliente.id %}selected{% endif %}>{{ cliente.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <div id="cliente_results" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px; max-height: 200px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+                </div>
+                <button type="button" onclick="abrirModalCrearCliente()" 
+                        style="padding: 10px 15px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; white-space: nowrap;"
+                        title="Crear nuevo cliente">
+                    ➕
+                </button>
+            </div>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="tipo_pedido">Tipo *</label>
+            <select name="tipo_pedido" id="tipo_pedido" required>
+                <option value="fabricacion" {% if solicitud.tipo_pedido == 'fabricacion' %}selected{% endif %}>Fabricación</option>
+                <option value="pedido proveedor" {% if solicitud.tipo_pedido == 'pedido proveedor' %}selected{% endif %}>Pedido proveedor</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="forma_pago">Forma de Pago</label>
+            <input type="text" name="forma_pago" id="forma_pago" value="{{ solicitud.forma_pago or '' }}" placeholder="Ej: Transferencia, Efectivo, etc.">
+        </div>
+
+        <div class="form-group-compact">
+            <label for="fecha_objetivo">Fecha Objetivo</label>
+            <input type="date" name="fecha_objetivo" id="fecha_objetivo" value="{% if solicitud.fecha_objetivo %}{{ solicitud.fecha_objetivo.strftime('%Y-%m-%d') }}{% endif %}" placeholder="Fecha objetivo de entrega">
+            <small style="font-size: 0.8em; color: #666;">Se calcula automáticamente (20 días) al aceptar la solicitud</small>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="imagen_diseno">Imagen Diseño</label>
+            <input type="file" name="imagen_diseno" id="imagen_diseno" accept="image/*">
+            {% if solicitud.imagen_diseno %}
+            <p style="font-size: 0.85em; color: #666; margin-top: 5px;">Imagen actual: <a href="{{ url_for('static', filename='uploads/' + solicitud.imagen_diseno) }}" target="_blank">{{ solicitud.imagen_diseno }}</a></p>
+            {% endif %}
+        </div>
+    </div>
+
+    <h3>Imágenes para el PDF del Presupuesto</h3>
+    <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 10px; font-weight: 500;">Imágenes Adicionales (Página 2) - Máximo 5 imágenes</label>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            {% for i in range(1, 6) %}
+            {% if i == 1 %}
+                {% set tiene_imagen = solicitud.imagen_adicional_1 %}
+                {% set descripcion = solicitud.descripcion_imagen_1 or '' %}
+            {% elif i == 2 %}
+                {% set tiene_imagen = solicitud.imagen_adicional_2 %}
+                {% set descripcion = solicitud.descripcion_imagen_2 or '' %}
+            {% elif i == 3 %}
+                {% set tiene_imagen = solicitud.imagen_adicional_3 %}
+                {% set descripcion = solicitud.descripcion_imagen_3 or '' %}
+            {% elif i == 4 %}
+                {% set tiene_imagen = solicitud.imagen_adicional_4 %}
+                {% set descripcion = solicitud.descripcion_imagen_4 or '' %}
+            {% elif i == 5 %}
+                {% set tiene_imagen = solicitud.imagen_adicional_5 %}
+                {% set descripcion = solicitud.descripcion_imagen_5 or '' %}
+            {% endif %}
+            <div style="display: flex; flex-direction: column; gap: 10px; width: 200px;">
+                <div class="imagen-miniatura-container" style="position: relative; width: 200px; height: 200px; border: 2px dashed #ddd; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f9f9f9; cursor: pointer; transition: all 0.3s ease;" 
+                     ondrop="dropHandler(event, {{ i }})" 
+                     ondragover="allowDrop(event)" 
+                     ondragleave="dragLeave(event)"
+                     onclick="document.getElementById('imagen_adicional_{{ i }}').click()">
+                    <input type="file" name="imagen_adicional_{{ i }}" id="imagen_adicional_{{ i }}" accept="image/*" style="display: none;" onchange="handleImageSelect({{ i }}, this)">
+                    <div class="imagen-preview" id="preview_container_{{ i }}" style="width: 100%; height: 100%; display: {% if tiene_imagen %}flex{% else %}none{% endif %}; position: relative; border-radius: 6px; overflow: hidden;">
+                        <img id="preview_img_{{ i }}" src="{% if tiene_imagen %}{{ url_for('static', filename='uploads/' + tiene_imagen) }}{% endif %}" alt="Preview" style="width: 100%; height: 100%; object-fit: cover;">
+                        <button type="button" onclick="eliminarImagen({{ i }}); event.stopPropagation();" style="position: absolute; top: 5px; right: 5px; background: rgba(220, 53, 69, 0.9); color: white; border: none; border-radius: 50%; width: 25px; height: 25px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center;">×</button>
+                    </div>
+                    <div class="imagen-placeholder" id="placeholder_{{ i }}" style="display: {% if tiene_imagen %}none{% else %}flex{% endif %}; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%;">
+                        <div style="font-size: 40px; color: #ccc; margin-bottom: 8px;">📷</div>
+                        <div style="font-size: 12px; color: #999; text-align: center;">Imagen {{ i }}</div>
+                        <div style="font-size: 11px; color: #999; margin-top: 4px;">Arrastra o haz clic</div>
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                    <label for="descripcion_imagen_{{ i }}" style="font-size: 12px; color: #666; margin-bottom: 5px;">Descripción (opcional)</label>
+                    <textarea name="descripcion_imagen_{{ i }}" id="descripcion_imagen_{{ i }}" rows="3" placeholder="Descripción de la imagen..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; resize: vertical;">{{ descripcion }}</textarea>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <small style="color: #666; font-size: 0.85em; display: block; margin-top: 10px;" id="contador-imagenes">
+            {% set contador = 0 %}
+            {% if solicitud.imagen_adicional_1 %}{% set contador = contador + 1 %}{% endif %}
+            {% if solicitud.imagen_adicional_2 %}{% set contador = contador + 1 %}{% endif %}
+            {% if solicitud.imagen_adicional_3 %}{% set contador = contador + 1 %}{% endif %}
+            {% if solicitud.imagen_adicional_4 %}{% set contador = contador + 1 %}{% endif %}
+            {% if solicitud.imagen_adicional_5 %}{% set contador = contador + 1 %}{% endif %}
+            {{ contador }}/5 imágenes seleccionadas
+        </small>
+    </div>
+
+    <div class="form-group">
+        <label for="seguimiento">Comentarios internos y seguimiento</label>
+        <textarea name="seguimiento" id="seguimiento" rows="3" placeholder="Escribe aquí las actualizaciones y seguimiento de la solicitud...">{{ solicitud.seguimiento or '' }}</textarea>
+    </div>
+
+    <h3>Prendas del Presupuesto</h3>
+    <div id="prendas-container">
+        {% if solicitud.lineas %}
+            {% for linea in solicitud.lineas %}
+            <div class="linea-pedido-row">
+                <div class="linea-pedido-numero">#{{ loop.index }}</div>
+                <div class="linea-pedido-campos">
+                    <!-- Orden: nombre_mostrar, unidades, modelo, color, forma, sexo, talla, tejido, precio -->
+                    <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" value="{{ linea.nombre_mostrar or '' }}" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 0 0 750px; width: 750px;">
+                    <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="{{ linea.cantidad }}" min="1" required placeholder="Unidades *" title="Unidades">
+                    <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo">
+                        <option value="">Modelo *</option>
+                        {% for prenda in prendas %}
+                        <option value="{{ prenda.id }}" {% if linea.prenda_id == prenda.id %}selected{% endif %}>{{ prenda.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="text" name="color[]" class="linea-campo-compact" value="{{ linea.color or '' }}" placeholder="Color" title="Color">
+                    <input type="text" name="forma[]" class="linea-campo-compact" value="{{ linea.forma or '' }}" placeholder="Forma" title="Forma">
+                    <select name="sexo[]" class="linea-campo-compact" title="Sexo">
+                        <option value="">Sexo</option>
+                        <option value="cro" {% if linea.sexo == 'cro' %}selected{% endif %}>Cro</option>
+                        <option value="sra" {% if linea.sexo == 'sra' %}selected{% endif %}>Sra</option>
+                        <option value="unisex" {% if linea.sexo == 'unisex' %}selected{% endif %}>Unisex</option>
+                    </select>
+                    <input type="text" name="talla[]" class="linea-campo-compact" value="{{ linea.talla or '' }}" placeholder="Talla" title="Talla">
+                    <select name="tejido[]" class="linea-campo-compact" title="Tejido">
+                        <option value="">Tejido</option>
+                        <option value="SARGA" {% if linea.tejido == 'SARGA' %}selected{% endif %}>SARGA</option>
+                        <option value="MICRO" {% if linea.tejido == 'MICRO' %}selected{% endif %}>MICRO</option>
+                        <option value="NUEVO T.POLO" {% if linea.tejido == 'NUEVO T.POLO' %}selected{% endif %}>NUEVO T.POLO</option>
+                        <option value="T.CAMISETA" {% if linea.tejido == 'T.CAMISETA' %}selected{% endif %}>T.CAMISETA</option>
+                        <option value="T.SHOFT" {% if linea.tejido == 'T.SHOFT' %}selected{% endif %}>T.SHOFT</option>
+                    </select>
+                    <input type="number" name="precio_unitario[]" class="linea-campo-compact precio-unitario-input" step="0.01" min="0" value="{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '' }}" placeholder="Precio €" title="Precio" style="flex: 0 0 100px; width: 100px;">
+                    <input type="number" name="descuento[]" class="linea-campo-compact descuento-input" step="0.01" min="0" max="100" value="{{ "%.2f"|format(linea.descuento) if linea.descuento else '0' }}" placeholder="Desc. %" title="Descuento (%)" style="flex: 0 0 80px; width: 80px;">
+                    <input type="number" name="precio_final[]" class="linea-campo-compact precio-final-input" step="0.01" min="0" value="{{ "%.2f"|format(linea.precio_final) if linea.precio_final else '' }}" placeholder="P. Final €" title="Precio Final" readonly style="flex: 0 0 100px; width: 100px; background: #f0f0f0;">
+                    
+                    <!-- Campos personalizados (nombre y cargo) - se muestran al final si tienen valor o si se activa personalización -->
+                    {% set mostrarPersonalizados = linea.nombre or linea.cargo %}
+                    <input type="text" name="nombre[]" class="linea-campo-compact campo-personalizado" value="{{ linea.nombre or '' }}" placeholder="Nombre personalizado" title="Nombre personalizado" style="display: {% if mostrarPersonalizados %}block{% else %}none{% endif %}; flex: 2.5;">
+                    <input type="text" name="cargo[]" class="linea-campo-compact campo-personalizado" value="{{ linea.cargo or '' }}" placeholder="Cargo" title="Cargo" style="display: {% if mostrarPersonalizados %}block{% else %}none{% endif %};">
+                </div>
+                <div class="linea-acciones">
+                    <button type="button" class="btn-duplicar" onclick="duplicarLinea(this)" title="Duplicar línea (mantiene todo excepto talla y unidades)">
+                        📋
+                    </button>
+                    <button type="button" class="btn-personalizar {% if mostrarPersonalizados %}active{% endif %}" onclick="togglePersonalizar(this)" title="Personalizar nombre y cargo" style="{% if mostrarPersonalizados %}background: #3498db; opacity: 1;{% else %}background: #95a5a6; opacity: 0.7;{% endif %}">
+                        ✏️
+                    </button>
+                    <button type="button" class="btn-remove-linea-inline" onclick="eliminarLinea(this)">×</button>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="linea-pedido-row">
+            <div class="linea-pedido-numero">#1</div>
+            <div class="linea-pedido-campos">
+                <!-- Orden: nombre_mostrar, unidades, modelo, color, forma, sexo, talla, tejido, precio -->
+                <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 0 0 750px; width: 750px;">
+                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="1" min="1" required placeholder="Unidades *" title="Unidades">
+                <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo">
+                    <option value="">Modelo *</option>
+                    {% for prenda in prendas %}
+                    <option value="{{ prenda.id }}">{{ prenda.nombre }}</option>
+                    {% endfor %}
+                </select>
+                <input type="text" name="color[]" class="linea-campo-compact" placeholder="Color" title="Color">
+                <input type="text" name="forma[]" class="linea-campo-compact" placeholder="Forma" title="Forma">
+                <select name="sexo[]" class="linea-campo-compact" title="Sexo">
+                    <option value="">Sexo</option>
+                    <option value="cro">Cro</option>
+                    <option value="sra">Sra</option>
+                    <option value="unisex">Unisex</option>
+                </select>
+                <input type="text" name="talla[]" class="linea-campo-compact" placeholder="Talla" title="Talla">
+                <select name="tejido[]" class="linea-campo-compact" title="Tejido">
+                    <option value="">Tejido</option>
+                    <option value="SARGA">SARGA</option>
+                    <option value="MICRO">MICRO</option>
+                    <option value="NUEVO T.POLO">NUEVO T.POLO</option>
+                    <option value="T.CAMISETA">T.CAMISETA</option>
+                    <option value="T.SHOFT">T.SHOFT</option>
+                </select>
+                <input type="number" name="precio_unitario[]" class="linea-campo-compact" step="0.01" min="0" placeholder="Precio €" title="Precio" style="flex: 0 0 100px; width: 100px;">
+                
+                <!-- Campos personalizados (nombre y cargo) - se muestran al final si tienen valor o si se activa personalización -->
+                <input type="text" name="nombre[]" class="linea-campo-compact campo-personalizado" placeholder="Nombre personalizado" title="Nombre personalizado" style="display: none; flex: 2.5;">
+                <input type="text" name="cargo[]" class="linea-campo-compact campo-personalizado" placeholder="Cargo" title="Cargo" style="display: none;">
+            </div>
+            <div class="linea-acciones">
+                <button type="button" class="btn-duplicar" onclick="duplicarLinea(this)" title="Duplicar línea (mantiene todo excepto talla y unidades)">
+                    📋
+                </button>
+                <button type="button" class="btn-personalizar" onclick="togglePersonalizar(this)" title="Personalizar nombre y cargo">
+                    ✏️
+                </button>
+                <button type="button" class="btn-remove-linea-inline" onclick="eliminarLinea(this)">×</button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <button type="button" class="btn btn-primary" onclick="agregarLinea()">Agregar Prenda</button>
+
+    <div class="actions">
+        <button type="submit" class="btn btn-success">Actualizar Solicitud</button>
+        <a href="{{ url_for('solicitudes.listado_solicitudes') }}" class="btn btn-danger">Cancelar</a>
+    </div>
+</form>
+
+<style>
+.imagen-miniatura-container:hover {
+    border-color: #3498db;
+    background: #f0f8ff;
+}
+
+.imagen-miniatura-container.drag-over {
+    border-color: #3498db;
+    background: #e3f2fd;
+    transform: scale(1.05);
+}
+</style>
+
+<script>
+// Funciones para drag & drop
+function allowDrop(ev) {
+    ev.preventDefault();
+    ev.currentTarget.classList.add('drag-over');
+}
+
+function dragLeave(ev) {
+    ev.currentTarget.classList.remove('drag-over');
+}
+
+function dropHandler(ev, numero) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove('drag-over');
+    
+    const files = ev.dataTransfer.files;
+    if (files.length > 0 && files[0].type.startsWith('image/')) {
+        const input = document.getElementById('imagen_adicional_' + numero);
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(files[0]);
+        input.files = dataTransfer.files;
+        handleImageSelect(numero, input);
+    }
+}
+
+// Manejar selección de imagen (click o drop)
+function handleImageSelect(numero, input) {
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            const preview = document.getElementById('preview_container_' + numero);
+            const placeholder = document.getElementById('placeholder_' + numero);
+            const img = document.getElementById('preview_img_' + numero);
+            
+            img.src = e.target.result;
+            preview.style.display = 'flex';
+            placeholder.style.display = 'none';
+        };
+        
+        reader.readAsDataURL(file);
+        actualizarContador();
+    }
+}
+
+// Eliminar imagen
+function eliminarImagen(numero) {
+    const input = document.getElementById('imagen_adicional_' + numero);
+    input.value = '';
+    
+    const preview = document.getElementById('preview_container_' + numero);
+    const placeholder = document.getElementById('placeholder_' + numero);
+    
+    preview.style.display = 'none';
+    placeholder.style.display = 'flex';
+    
+    // Limpiar la imagen del preview
+    const img = document.getElementById('preview_img_' + numero);
+    img.src = '';
+    
+    actualizarContador();
+}
+
+// Actualizar contador
+function actualizarContador() {
+    let contador = 0;
+    for (let i = 1; i <= 5; i++) {
+        const preview = document.getElementById('preview_container_' + i);
+        const input = document.getElementById('imagen_adicional_' + i);
+        if ((preview && preview.style.display !== 'none' && preview.querySelector('img').src) || (input && input.files.length > 0)) {
+            contador++;
+        }
+    }
+    const contadorElement = document.getElementById('contador-imagenes');
+    if (contadorElement) {
+        contadorElement.textContent = contador + '/5 imágenes seleccionadas';
+    }
+}
+
+let contadorPrendas = {{ solicitud.lineas|length if solicitud.lineas else 1 }};
+function agregarLinea() {
+    contadorPrendas++;
+    const container = document.getElementById('prendas-container');
+    const primeraLinea = container.querySelector('.linea-pedido-row');
+    const nuevaLinea = primeraLinea.cloneNode(true);
+    
+    // Limpiar valores
+    nuevaLinea.querySelectorAll('input').forEach(input => {
+        if (input.type !== 'button' && input.type !== 'submit') {
+            if (input.type === 'number') {
+                input.value = '1';
+            } else {
+                input.value = '';
+            }
+        }
+    });
+    nuevaLinea.querySelectorAll('select').forEach(select => {
+        select.selectedIndex = 0;
+    });
+    
+    // Resetear descuento y precio final
+    const descuentoInput = nuevaLinea.querySelector('.descuento-input');
+    const precioFinalInput = nuevaLinea.querySelector('.precio-final-input');
+    if (descuentoInput) descuentoInput.value = '0';
+    if (precioFinalInput) precioFinalInput.value = '';
+    
+    // Ocultar campos personalizados por defecto
+    nuevaLinea.querySelectorAll('.campo-personalizado').forEach(campo => {
+        campo.style.display = 'none';
+    });
+    
+    // Añadir event listeners para calcular precio final
+    const precioUnitarioInput = nuevaLinea.querySelector('.precio-unitario-input');
+    if (precioUnitarioInput && descuentoInput && precioFinalInput) {
+        precioUnitarioInput.addEventListener('input', calcularPrecioFinal);
+        descuentoInput.addEventListener('input', calcularPrecioFinal);
+    }
+    
+    // Resetear botón de personalizar
+    const btnPersonalizar = nuevaLinea.querySelector('.btn-personalizar');
+    if (btnPersonalizar) {
+        btnPersonalizar.style.background = '#95a5a6';
+        btnPersonalizar.style.opacity = '0.7';
+        btnPersonalizar.classList.remove('active');
+    }
+    
+    // Actualizar número
+    renumerarPrendas();
+    
+    container.appendChild(nuevaLinea);
+}
+
+function renumerarPrendas() {
+    const todasLineas = document.querySelectorAll('.linea-pedido-row');
+    todasLineas.forEach((linea, index) => {
+        const numero = linea.querySelector('.linea-pedido-numero');
+        if (numero) {
+            numero.textContent = `#${index + 1}`;
+        }
+    });
+}
+
+// Función para calcular el precio final con descuento
+function calcularPrecioFinal(event) {
+    const lineaRow = event.target.closest('.linea-pedido-row');
+    if (!lineaRow) return;
+    
+    const precioUnitarioInput = lineaRow.querySelector('.precio-unitario-input');
+    const descuentoInput = lineaRow.querySelector('.descuento-input');
+    const precioFinalInput = lineaRow.querySelector('.precio-final-input');
+    
+    if (!precioUnitarioInput || !descuentoInput || !precioFinalInput) return;
+    
+    const precioUnitario = parseFloat(precioUnitarioInput.value) || 0;
+    const descuento = parseFloat(descuentoInput.value) || 0;
+    
+    if (precioUnitario > 0 && descuento > 0) {
+        const precioFinal = precioUnitario * (1 - descuento / 100);
+        precioFinalInput.value = precioFinal.toFixed(2);
+    } else {
+        precioFinalInput.value = '';
+    }
+}
+
+// Añadir event listeners a todas las líneas existentes al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.precio-unitario-input, .descuento-input').forEach(input => {
+        input.addEventListener('input', calcularPrecioFinal);
+    });
+});
+
+function eliminarLinea(btn) {
+    const lineas = document.querySelectorAll('.linea-pedido-row');
+    if (lineas.length > 1) {
+        btn.closest('.linea-pedido-row').remove();
+        renumerarPrendas();
+    } else {
+        alert('Debe haber al menos una prenda en el presupuesto');
+    }
+}
+
+function togglePersonalizar(btn) {
+    const lineaRow = btn.closest('.linea-pedido-row');
+    const camposPersonalizados = lineaRow.querySelectorAll('.campo-personalizado');
+    
+    if (camposPersonalizados.length === 0) {
+        return;
+    }
+    
+    // Verificar si los campos están visibles
+    const primerCampo = camposPersonalizados[0];
+    const estaActivo = primerCampo.style.display !== 'none' && 
+                       window.getComputedStyle(primerCampo).display !== 'none';
+    
+    camposPersonalizados.forEach(campo => {
+        if (estaActivo) {
+            campo.style.display = 'none';
+        } else {
+            campo.style.display = 'block';
+        }
+    });
+    
+    // Actualizar estado visual del botón
+    if (estaActivo) {
+        btn.style.background = '#95a5a6';
+        btn.style.opacity = '0.7';
+        btn.classList.remove('active');
+    } else {
+        btn.style.background = '#3498db';
+        btn.style.opacity = '1';
+        btn.classList.add('active');
+    }
+}
+
+function duplicarLinea(btn) {
+    const lineaRow = btn.closest('.linea-pedido-row');
+    const nuevaLinea = lineaRow.cloneNode(true);
+    const container = document.getElementById('prendas-container');
+    
+    // Obtener valores de los selects originales antes de limpiar
+    const prendaSelectOriginal = lineaRow.querySelector('select[name="prenda_id[]"]');
+    const sexoSelectOriginal = lineaRow.querySelector('select[name="sexo[]"]');
+    const tejidoSelectOriginal = lineaRow.querySelector('select[name="tejido[]"]');
+    const estadoSelectOriginal = lineaRow.querySelector('select[name="estado_linea[]"]');
+    
+    const prendaValue = prendaSelectOriginal ? prendaSelectOriginal.value : '';
+    const sexoValue = sexoSelectOriginal ? sexoSelectOriginal.value : '';
+    const tejidoValue = tejidoSelectOriginal ? tejidoSelectOriginal.value : '';
+    const estadoValue = estadoSelectOriginal ? estadoSelectOriginal.value : '';
+    
+    // Limpiar talla y unidades
+    const tallaInput = nuevaLinea.querySelector('input[name="talla[]"]');
+    const unidadesInput = nuevaLinea.querySelector('input[name="cantidad[]"]');
+    
+    if (tallaInput) {
+        tallaInput.value = '';
+    }
+    if (unidadesInput) {
+        unidadesInput.value = '1';
+    }
+    
+    // Establecer valores de los selects en la línea duplicada
+    const prendaSelectNuevo = nuevaLinea.querySelector('select[name="prenda_id[]"]');
+    const sexoSelectNuevo = nuevaLinea.querySelector('select[name="sexo[]"]');
+    const tejidoSelectNuevo = nuevaLinea.querySelector('select[name="tejido[]"]');
+    const estadoSelectNuevo = nuevaLinea.querySelector('select[name="estado_linea[]"]');
+    
+    if (prendaSelectNuevo && prendaValue) {
+        prendaSelectNuevo.value = prendaValue;
+    }
+    if (sexoSelectNuevo && sexoValue) {
+        sexoSelectNuevo.value = sexoValue;
+    }
+    if (tejidoSelectNuevo && tejidoValue) {
+        tejidoSelectNuevo.value = tejidoValue;
+    }
+    if (estadoSelectNuevo && estadoValue) {
+        estadoSelectNuevo.value = estadoValue;
+    }
+    
+    // Mantener el estado de los campos personalizados
+    const camposPersonalizados = nuevaLinea.querySelectorAll('.campo-personalizado');
+    const btnPersonalizar = nuevaLinea.querySelector('.btn-personalizar');
+    const estaActivo = camposPersonalizados[0] && camposPersonalizados[0].style.display !== 'none';
+    
+    if (estaActivo && camposPersonalizados.length > 0) {
+        camposPersonalizados.forEach(campo => {
+            campo.style.display = 'block';
+        });
+        if (btnPersonalizar) {
+            btnPersonalizar.style.background = '#3498db';
+            btnPersonalizar.style.opacity = '1';
+            btnPersonalizar.classList.add('active');
+        }
+    } else {
+        camposPersonalizados.forEach(campo => {
+            campo.style.display = 'none';
+        });
+        if (btnPersonalizar) {
+            btnPersonalizar.style.background = '#95a5a6';
+            btnPersonalizar.style.opacity = '0.7';
+            btnPersonalizar.classList.remove('active');
+        }
+    }
+    
+    // Actualizar número
+    renumerarPrendas();
+    
+    // Insertar después de la línea actual
+    lineaRow.parentNode.insertBefore(nuevaLinea, lineaRow.nextSibling);
+    renumerarPrendas();
+}
+
+// Buscador de clientes
+document.addEventListener('DOMContentLoaded', function() {
+    const clienteSearch = document.getElementById('cliente_search');
+    const clienteSelect = document.getElementById('cliente_id');
+    const clienteResults = document.getElementById('cliente_results');
+    const clientes = Array.from(clienteSelect.options).slice(1).map(opt => ({
+        id: opt.value,
+        nombre: opt.textContent,
+        nombreLower: opt.getAttribute('data-nombre') || opt.textContent.toLowerCase()
+    }));
+    
+    // Establecer el cliente seleccionado inicialmente
+    let selectedClienteId = clienteSelect.value;
+    let selectedClienteNombre = clienteSearch.value;
+    
+    clienteSearch.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        
+        if (searchTerm === '') {
+            clienteResults.style.display = 'none';
+            if (!selectedClienteId) {
+                clienteSelect.value = '';
+            }
+            return;
+        }
+        
+        // Filtrar clientes
+        const filtered = clientes.filter(cliente => 
+            cliente.nombreLower.includes(searchTerm)
+        );
+        
+        if (filtered.length === 0) {
+            clienteResults.innerHTML = '<div style="padding: 10px; color: #999; text-align: center;">No se encontraron clientes</div>';
+            clienteResults.style.display = 'block';
+            return;
+        }
+        
+        // Mostrar resultados
+        clienteResults.innerHTML = filtered.map(cliente => 
+            `<div class="cliente-option" data-id="${cliente.id}" data-nombre="${cliente.nombre}" 
+                  style="padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; transition: background 0.2s;"
+                  onmouseover="this.style.background='#f0f0f0'" 
+                  onmouseout="this.style.background='white'"
+                  onclick="selectCliente(${cliente.id}, '${cliente.nombre.replace(/'/g, "\\'")}')">
+                ${cliente.nombre}
+            </div>`
+        ).join('');
+        
+        clienteResults.style.display = 'block';
+    });
+    
+    // Ocultar resultados al hacer clic fuera
+    document.addEventListener('click', function(e) {
+        if (!clienteSearch.contains(e.target) && !clienteResults.contains(e.target)) {
+            clienteResults.style.display = 'none';
+        }
+    });
+    
+    // Función para seleccionar cliente
+    window.selectCliente = function(id, nombre) {
+        selectedClienteId = id;
+        selectedClienteNombre = nombre;
+        clienteSearch.value = nombre;
+        clienteSelect.value = id;
+        clienteResults.style.display = 'none';
+    };
+    
+    // Validar antes de enviar
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (!selectedClienteId && !clienteSelect.value) {
+                e.preventDefault();
+                alert('Por favor, seleccione un cliente');
+                clienteSearch.focus();
+                return false;
+            }
+            // Asegurar que el select tenga el valor correcto
+            if (selectedClienteId) {
+                clienteSelect.value = selectedClienteId;
+            }
+        });
+    }
+});
+
+// Funciones para el modal de crear cliente
+function abrirModalCrearCliente() {
+    document.getElementById('modalCrearClientePresupuesto').style.display = 'block';
+}
+
+function cerrarModalCrearClientePresupuesto() {
+    document.getElementById('modalCrearClientePresupuesto').style.display = 'none';
+    document.getElementById('formCrearClientePresupuesto').reset();
+}
+
+// Manejar el envío del formulario de crear cliente
+document.getElementById('formCrearClientePresupuesto').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const submitBtn = this.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Creando...';
+    
+    fetch('{{ url_for("solicitudes.crear_cliente_ajax") }}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Agregar el nuevo cliente al select
+            const clienteSelect = document.getElementById('cliente_id');
+            const newOption = document.createElement('option');
+            newOption.value = data.cliente.id;
+            newOption.textContent = data.cliente.nombre;
+            newOption.setAttribute('data-nombre', data.cliente.nombre.toLowerCase());
+            clienteSelect.appendChild(newOption);
+            
+            // Seleccionar el nuevo cliente
+            selectCliente(data.cliente.id, data.cliente.nombre);
+            
+            // Cerrar modal y limpiar formulario
+            cerrarModalCrearClientePresupuesto();
+            
+            alert('Cliente creado correctamente');
+        } else {
+            alert('Error al crear cliente: ' + data.error);
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+        }
+    })
+    .catch(error => {
+        alert('Error al crear cliente: ' + error);
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+    });
+});
+
+// Cerrar modal al hacer clic fuera
+window.onclick = function(event) {
+    const modal = document.getElementById('modalCrearClientePresupuesto');
+    if (event.target == modal) {
+        cerrarModalCrearClientePresupuesto();
+    }
+}
+</script>
+
+<!-- Modal para crear cliente desde presupuesto -->
+<div id="modalCrearClientePresupuesto" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-header">
+            <h3>Crear Nuevo Cliente</h3>
+            <span class="close" onclick="cerrarModalCrearClientePresupuesto()">&times;</span>
+        </div>
+        <form id="formCrearClientePresupuesto" class="modal-form">
+            <div class="form-section">
+                <h4>Información Principal</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nombre_cliente_modal">Nombre *</label>
+                        <input type="text" name="nombre" id="nombre_cliente_modal" required placeholder="Nombre o razón social">
+                    </div>
+                    <div class="form-group">
+                        <label for="alias_cliente_modal">Alias</label>
+                        <input type="text" name="alias" id="alias_cliente_modal" placeholder="Alias">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nif_cliente_modal">NIF/CIF</label>
+                        <input type="text" name="nif" id="nif_cliente_modal" placeholder="A15022510" maxlength="20">
+                    </div>
+                    <div class="form-group">
+                        <label for="fecha_alta_cliente_modal">Fecha de Alta</label>
+                        <input type="date" name="fecha_alta" id="fecha_alta_cliente_modal">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="categoria_cliente_modal">Categoría</label>
+                        <select name="categoria" id="categoria_cliente_modal">
+                            <option value="">Sin categoría</option>
+                            <option value="hosteleria">Hostelería</option>
+                            <option value="clinica">Clínica</option>
+                            <option value="colegio">Colegio</option>
+                            <option value="emerita">Emerita</option>
+                            <option value="carnaval">Carnaval</option>
+                            <option value="transporte">Transporte</option>
+                            <option value="varios">Varios</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="comercial_id_cliente_modal">Comercial Asignado</label>
+                        <select name="comercial_id" id="comercial_id_cliente_modal">
+                            <option value="">Sin comercial asignado</option>
+                            {% for comercial in comerciales %}
+                            <option value="{{ comercial.id }}">{{ comercial.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Contacto</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="telefono_cliente_modal">Teléfono</label>
+                        <input type="text" name="telefono" id="telefono_cliente_modal" placeholder="Teléfono fijo">
+                    </div>
+                    <div class="form-group">
+                        <label for="movil_cliente_modal">Móvil</label>
+                        <input type="text" name="movil" id="movil_cliente_modal" placeholder="Teléfono móvil">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="email_cliente_modal">Email</label>
+                    <input type="email" name="email" id="email_cliente_modal" placeholder="email@ejemplo.com">
+                </div>
+                <div class="form-group">
+                    <label for="personas_contacto_cliente_modal">Personas de Contacto</label>
+                    <textarea name="personas_contacto" id="personas_contacto_cliente_modal" rows="2" placeholder="Nombre, teléfono, email"></textarea>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Dirección</h4>
+                <div class="form-group">
+                    <label for="direccion_cliente_modal">Dirección</label>
+                    <textarea name="direccion" id="direccion_cliente_modal" rows="2" placeholder="Dirección completa"></textarea>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="poblacion_cliente_modal">Población</label>
+                        <input type="text" name="poblacion" id="poblacion_cliente_modal" placeholder="Ciudad">
+                    </div>
+                    <div class="form-group">
+                        <label for="provincia_cliente_modal">Provincia</label>
+                        <input type="text" name="provincia" id="provincia_cliente_modal" placeholder="Provincia">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="codigo_postal_cliente_modal">Código Postal</label>
+                        <input type="text" name="codigo_postal" id="codigo_postal_cliente_modal" placeholder="28001" maxlength="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="pais_cliente_modal">País</label>
+                        <input type="text" name="pais" id="pais_cliente_modal" placeholder="España" value="España">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Anotaciones</h4>
+                <div class="form-group">
+                    <label for="anotaciones_cliente_modal">Anotaciones</label>
+                    <textarea name="anotaciones" id="anotaciones_cliente_modal" rows="2" placeholder="Notas adicionales"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Crear Cliente</button>
+                <button type="button" class="btn btn-secondary" onclick="cerrarModalCrearClientePresupuesto()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    overflow-y: auto;
+}
+
+.modal-content {
+    background-color: white;
+    margin: 3% auto;
+    padding: 0;
+    border-radius: 10px;
+    max-width: 700px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 2px solid #e0e0e0;
+    background: #f8f9fa;
+    border-radius: 10px 10px 0 0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.close {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 20px;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.modal-form {
+    padding: 20px;
+}
+
+.form-section {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.form-section:last-child {
+    border-bottom: none;
+}
+
+.form-section h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #2c3e50;
+    font-size: 16px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #555;
+    font-size: 14px;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 2px solid #e0e0e0;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+</style>
+{% endblock %}

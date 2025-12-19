@@ -277,23 +277,23 @@ def editar_pedido(pedido_id):
                 """Actualizar imagen del formulario"""
                 if campo_file in request.files:
                     file = request.files[campo_file]
-                    if file and file.filename:
-                        # Eliminar imagen anterior si existe
-                        imagen_anterior = getattr(pedido, campo_db)
-                        if imagen_anterior:
-                            old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], imagen_anterior)
-                            if os.path.exists(old_path):
-                                try:
-                                    os.remove(old_path)
-                                except:
-                                    pass
-                        
-                        filename = secure_filename(file.filename)
-                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                        filename = timestamp + filename
-                        filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-                        file.save(filepath)
-                        setattr(pedido, campo_db, filename)
+                if file and file.filename:
+                    # Eliminar imagen anterior si existe
+                    imagen_anterior = getattr(pedido, campo_db)
+                    if imagen_anterior:
+                        old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], imagen_anterior)
+                        if os.path.exists(old_path):
+                            try:
+                                os.remove(old_path)
+                            except:
+                                pass
+                    
+                    filename = secure_filename(file.filename)
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                    filename = timestamp + filename
+                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+                    file.save(filepath)
+                    setattr(pedido, campo_db, filename)
             
             # Manejar imágenes
             actualizar_imagen('imagen_diseno', 'imagen_diseno')
@@ -755,7 +755,7 @@ def descargar_pdf_pedido(pedido_id):
             with sync_playwright() as p:
                 browser = p.chromium.launch(headless=True)
                 page = browser.new_page()
-                
+        
                 # Cargar el HTML desde el archivo temporal
                 page.goto(f'file://{temp_html_path}')
                 

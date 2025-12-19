@@ -209,7 +209,7 @@ class LineaPedido(db.Model):
         return f'<LineaPedido {self.id} - {self.nombre} x{self.cantidad}>'
     
 class Presupuesto(db.Model):
-    """Presupuestos del sistema (pedidos en estado anterior)"""
+    """Solicitudes del sistema (unifica presupuestos y pedidos)"""
     __tablename__ = 'presupuestos'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -221,8 +221,8 @@ class Presupuesto(db.Model):
     # Tipo de presupuesto
     tipo_pedido = db.Column(db.String(50), nullable=False)  # confeccion, bordado, serigrafia, sublimacion, varios
     
-    # Estado del presupuesto
-    estado = db.Column(db.String(50), nullable=False, default='Pendiente de enviar')  # Pendiente de enviar, Diseño, Enviado, Aceptado, Rechazado
+    # Estado unificado de la solicitud (presupuesto/pedido)
+    estado = db.Column(db.String(50), nullable=False, default='presupuesto')  # presupuesto, aceptado, diseño, diseño finalizado, en preparacion, todo listo, enviado, entregado al cliente, pedido rechazado
     
     # Forma de pago
     forma_pago = db.Column(db.Text)
@@ -246,11 +246,29 @@ class Presupuesto(db.Model):
     # Campo de seguimiento para actualizaciones de comerciales
     seguimiento = db.Column(db.Text)
     
-    # Fechas
-    fecha_pendiente_enviar = db.Column(db.Date)  # Fecha en que se marcó como Pendiente de enviar
-    fecha_diseno = db.Column(db.Date)  # Fecha en que se marcó como Diseño
-    fecha_envio = db.Column(db.Date)  # Fecha en que se envió el presupuesto
-    fecha_respuesta = db.Column(db.Date)  # Fecha de aceptación o rechazo
+    # Fechas por estado (se guardan y no se sobrescriben)
+    fecha_presupuesto = db.Column(db.Date)  # Fecha cuando se marcó como presupuesto (usa fecha_creacion si no existe)
+    fecha_aceptado = db.Column(db.Date)  # Fecha cuando se aceptó
+    fecha_diseno = db.Column(db.Date)  # Fecha cuando se marcó como diseño
+    fecha_diseno_finalizado = db.Column(db.Date)  # Fecha cuando se finalizó el diseño
+    fecha_en_preparacion = db.Column(db.Date)  # Fecha cuando se marcó como en preparación
+    fecha_todo_listo = db.Column(db.Date)  # Fecha cuando se marcó como todo listo
+    fecha_enviado = db.Column(db.Date)  # Fecha cuando se envió
+    fecha_entregado_cliente = db.Column(db.Date)  # Fecha cuando se entregó al cliente
+    fecha_rechazado = db.Column(db.Date)  # Fecha cuando se rechazó
+    
+    # Fechas adicionales del proceso (compatibilidad con pedidos)
+    fecha_aceptacion = db.Column(db.Date)  # Alias de fecha_aceptado para compatibilidad
+    fecha_objetivo = db.Column(db.Date)  # Fecha objetivo de entrega
+    fecha_entrega_trabajo = db.Column(db.Date)
+    fecha_envio_taller = db.Column(db.Date)
+    fecha_entrega_bordados = db.Column(db.Date)
+    fecha_entrega_cliente = db.Column(db.Date)
+    
+    # Fechas antiguas (mantener para compatibilidad)
+    fecha_pendiente_enviar = db.Column(db.Date)  # Deprecated: usar fecha_presupuesto
+    fecha_envio = db.Column(db.Date)  # Deprecated: usar fecha_enviado
+    fecha_respuesta = db.Column(db.Date)  # Deprecated: usar fecha_aceptado o fecha_rechazado
     
     # Timestamp
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
@@ -377,6 +395,10 @@ class Factura(db.Model):
     # Relación con pedido (opcional, puede ser None para facturas directas)
     pedido_id = db.Column(db.Integer, db.ForeignKey('pedidos.id'), nullable=True)
     pedido = db.relationship('Pedido', backref='facturas', lazy=True)
+    
+    # Relación con presupuesto/solicitud (opcional, puede ser None para facturas directas)
+    presupuesto_id = db.Column(db.Integer, db.ForeignKey('presupuestos.id'), nullable=True)
+    presupuesto = db.relationship('Presupuesto', backref='facturas', lazy=True)
     
     # Datos de la factura
     serie = db.Column(db.String(10), nullable=False, default='A')

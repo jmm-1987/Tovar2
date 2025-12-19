@@ -116,40 +116,69 @@ function cambiarTipoVista(tipo) {
             </tr>
         </thead>
         <tbody>
-            {% for pedido in prefacturas %}
+            {% for prefactura in prefacturas %}
+            {% set es_solicitud = prefactura.__class__.__name__ == 'Presupuesto' %}
             <tr class="pedido-row" style="border-bottom: 1px solid #e9ecef; transition: all 0.3s ease;">
-                <td style="padding: 15px; color: #212529; font-weight: 600;">#{{ pedido.id }}</td>
+                <td style="padding: 15px; color: #212529; font-weight: 600;">#{{ prefactura.id }}</td>
                 <td style="padding: 15px; color: #212529; font-weight: 500;">
-                    {{ pedido.cliente.nombre if pedido.cliente else 'N/A' }}
+                    {{ prefactura.cliente.nombre if prefactura.cliente else 'N/A' }}
                 </td>
-                <td style="padding: 15px; color: #212529;">{{ pedido.tipo_pedido }}</td>
+                <td style="padding: 15px; color: #212529;">
+                    {% if es_solicitud %}
+                        Solicitud - {{ prefactura.tipo_pedido if prefactura.tipo_pedido else 'N/A' }}
+                    {% else %}
+                        {{ prefactura.tipo_pedido }}
+                    {% endif %}
+                </td>
                 <td style="padding: 15px;">
-                    <span class="badge badge-estado-{{ pedido.estado.lower()|replace(' ', '-')|replace('ó', 'o')|replace('í', 'i')|replace('é', 'e') }}">
-                        {{ pedido.estado }}
+                    <span class="badge badge-estado-{{ prefactura.estado.lower()|replace(' ', '-')|replace('ó', 'o')|replace('í', 'i')|replace('é', 'e') }}">
+                        {{ prefactura.estado }}
                     </span>
                 </td>
                 <td style="padding: 15px; color: #212529;">
-                    {% if pedido.fecha_aceptacion %}
-                        {{ pedido.fecha_aceptacion.strftime('%d/%m/%Y') }}
+                    {% if es_solicitud %}
+                        {% if prefactura.fecha_aceptado %}
+                            {{ prefactura.fecha_aceptado.strftime('%d/%m/%Y') }}
+                        {% else %}
+                            <span style="color: #999;">-</span>
+                        {% endif %}
                     {% else %}
-                        <span style="color: #999;">-</span>
+                        {% if prefactura.fecha_aceptacion %}
+                            {{ prefactura.fecha_aceptacion.strftime('%d/%m/%Y') }}
+                        {% else %}
+                            <span style="color: #999;">-</span>
+                        {% endif %}
                     {% endif %}
                 </td>
                 <td style="padding: 15px; text-align: center; color: #212529;">
-                    {{ pedido.lineas|length }} línea{{ 's' if pedido.lineas|length != 1 else '' }}
+                    {{ prefactura.lineas|length }} línea{{ 's' if prefactura.lineas|length != 1 else '' }}
                 </td>
                 <td style="padding: 15px; text-align: center;">
-                    <a href="{{ url_for('facturacion.ver_factura', pedido_id=pedido.id) }}" 
-                       class="btn btn-info" 
-                       style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block; margin-right: 5px;">
-                        Hacer Factura
-                    </a>
-                    <a href="{{ url_for('facturacion.descargar_pdf_albaran_pedido', pedido_id=pedido.id) }}" 
-                       class="btn btn-secondary" 
-                       style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block;"
-                       target="_blank">
-                        📋 Albarán
-                    </a>
+                    {% if es_solicitud %}
+                        <a href="{{ url_for('facturacion.ver_factura_solicitud', presupuesto_id=prefactura.id) }}" 
+                           class="btn btn-info" 
+                           style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block; margin-right: 5px;">
+                            Hacer Factura
+                        </a>
+                        <a href="{{ url_for('solicitudes.descargar_pdf_solicitud', solicitud_id=prefactura.id) }}" 
+                           class="btn btn-secondary" 
+                           style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block;"
+                           target="_blank">
+                            📋 PDF
+                        </a>
+                    {% else %}
+                        <a href="{{ url_for('facturacion.ver_factura', pedido_id=prefactura.id) }}" 
+                           class="btn btn-info" 
+                           style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block; margin-right: 5px;">
+                            Hacer Factura
+                        </a>
+                        <a href="{{ url_for('facturacion.descargar_pdf_albaran_pedido', pedido_id=prefactura.id) }}" 
+                           class="btn btn-secondary" 
+                           style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block;"
+                           target="_blank">
+                            📋 Albarán
+                        </a>
+                    {% endif %}
                 </td>
             </tr>
             {% endfor %}

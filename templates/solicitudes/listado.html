@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+
+{% block title %}Listado de Solicitudes - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<style>
+.container {
+    padding-top: 10px !important;
+}
+header {
+    margin-bottom: 0.8rem !important;
+}
+</style>
+<h2 style="margin: 0 0 8px 0; padding-bottom: 0; font-size: 1.3rem;">Listado de Solicitudes</h2>
+
+<div style="margin-bottom: 15px;">
+    <div class="filtros-container" style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); padding: 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #e9ecef;">
+        <form method="GET" action="{{ url_for('solicitudes.listado_solicitudes') }}" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                <label for="estado" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>🏷️</span> Estado
+                </label>
+                <select name="estado" id="estado" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                    <option value="">Todos los estados</option>
+                    {% for estado in estados %}
+                    <option value="{{ estado }}" {% if estado_filtro == estado %}selected{% endif %}>{{ estado|title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                <label for="cliente_id" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>👤</span> Cliente
+                </label>
+                <select name="cliente_id" id="cliente_id" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                    <option value="">Todos los clientes</option>
+                    {% for cliente in clientes %}
+                    <option value="{{ cliente.id }}" {% if cliente_id|string == cliente.id|string %}selected{% endif %}>{{ cliente.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                <label for="comercial_id" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>💼</span> Comercial
+                </label>
+                <select name="comercial_id" id="comercial_id" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                    <option value="">Todos los comerciales</option>
+                    {% for comercial in comerciales %}
+                    <option value="{{ comercial.id }}" {% if comercial_id|string == comercial.id|string %}selected{% endif %}>{{ comercial.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                <label for="fecha_desde" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>📅</span> Fecha Desde
+                </label>
+                <input type="date" name="fecha_desde" id="fecha_desde" value="{{ fecha_desde }}" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease;">
+            </div>
+            
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                <label for="fecha_hasta" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>📅</span> Fecha Hasta
+                </label>
+                <input type="date" name="fecha_hasta" id="fecha_hasta" value="{{ fecha_hasta }}" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease;">
+            </div>
+            
+            <div style="display: flex; gap: 8px; align-items: flex-end;">
+                <a href="{{ url_for('solicitudes.nueva_solicitud') }}" class="btn btn-success" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; transition: all 0.3s ease;">➕ Nueva</a>
+                <button type="submit" class="btn btn-primary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
+                    🔍 Filtrar
+                </button>
+                {% if estado_filtro or fecha_desde or fecha_hasta or cliente_id or comercial_id %}
+                <a href="{{ url_for('solicitudes.listado_solicitudes') }}" class="btn btn-secondary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; transition: all 0.3s ease;">
+                    🗑️ Limpiar
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if solicitudes %}
+<div class="table-container" style="background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; margin-bottom: 40px;">
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); border-bottom: 2px solid #1a252f;">
+                <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">ID</th>
+                <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Cliente</th>
+                <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Comercial</th>
+                <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Tipo</th>
+                <th style="padding: 15px; text-align: center; color: #ffffff; font-weight: 600;">Estado</th>
+                <th style="padding: 15px; text-align: center; color: #ffffff; font-weight: 600;">Fecha</th>
+                <th style="padding: 15px; text-align: center; color: #ffffff; font-weight: 600;">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for solicitud in solicitudes %}
+            <tr style="border-bottom: 1px solid #e9ecef; transition: background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
+                <td style="padding: 15px; color: #495057; font-weight: 600;">#{{ solicitud.id }}</td>
+                <td style="padding: 15px; color: #495057;">{{ solicitud.cliente.nombre if solicitud.cliente else 'N/A' }}</td>
+                <td style="padding: 15px; color: #495057;">{{ solicitud.comercial.nombre if solicitud.comercial else 'N/A' }}</td>
+                <td style="padding: 15px; color: #495057;">{{ solicitud.tipo_pedido|title }}</td>
+                <td style="padding: 15px; text-align: center;">
+                    <span class="badge badge-estado-{{ solicitud.estado|lower|replace(' ', '-') }}" style="padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 600; display: inline-block;">
+                        {{ solicitud.estado|title }}
+                    </span>
+                </td>
+                <td style="padding: 15px; text-align: center; color: #495057;">{{ solicitud.fecha_creacion.strftime('%d/%m/%Y') if solicitud.fecha_creacion else 'N/A' }}</td>
+                <td style="padding: 15px; text-align: center;">
+                    <a href="{{ url_for('solicitudes.ver_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-sm btn-primary" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 5px;">Ver</a>
+                    <a href="{{ url_for('solicitudes.editar_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-sm btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;">Editar</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div style="text-align: center; padding: 40px; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+    <p style="color: #6c757d; font-size: 1.1rem;">No se encontraron solicitudes con los filtros aplicados.</p>
+</div>
+{% endif %}
+
+<style>
+h2::after {
+    display: none;
+}
+
+.filtro-input:hover {
+    border-color: #adb5bd !important;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+}
+
+.filtro-input:focus {
+    outline: none;
+    border-color: #007bff !important;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+}
+
+.badge-estado-presupuesto { background: #6c757d; color: white; }
+.badge-estado-aceptado { background: #28a745; color: white; }
+.badge-estado-diseño { background: #17a2b8; color: white; }
+.badge-estado-diseño-finalizado { background: #138496; color: white; }
+.badge-estado-en-preparacion { background: #ffc107; color: #212529; }
+.badge-estado-todo-listo { background: #fd7e14; color: white; }
+.badge-estado-enviado { background: #007bff; color: white; }
+.badge-estado-entregado-al-cliente { background: #28a745; color: white; }
+.badge-estado-pedido-rechazado { background: #dc3545; color: white; }
+</style>
+{% endblock %}
+

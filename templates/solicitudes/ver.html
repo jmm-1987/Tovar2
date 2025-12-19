@@ -1,0 +1,500 @@
+{% extends "base.html" %}
+
+{% block title %}Ver Solicitud #{{ solicitud.id }} - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<style>
+/* Estilos para el modal de imágenes */
+.modal-imagenes {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.9);
+}
+
+.modal-imagenes-content {
+    position: relative;
+    margin: auto;
+    padding: 20px;
+    width: 90%;
+    max-width: 1200px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.modal-imagenes-header {
+    color: white;
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.modal-imagenes-header h2 {
+    margin: 0;
+    font-size: 28px;
+}
+
+.cerrar-modal {
+    position: absolute;
+    top: 20px;
+    right: 35px;
+    color: #f1f1f1;
+    font-size: 40px;
+    font-weight: bold;
+    cursor: pointer;
+    z-index: 1001;
+}
+
+.cerrar-modal:hover {
+    color: #fff;
+}
+
+.galeria-imagenes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.imagen-galeria-item {
+    background: white;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.imagen-galeria-item img {
+    width: 100%;
+    height: auto;
+    border-radius: 4px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: transform 0.3s;
+}
+
+.imagen-galeria-item img:hover {
+    transform: scale(1.05);
+}
+
+.imagen-galeria-item p {
+    margin: 0;
+    color: #333;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.imagen-galeria-descripcion {
+    color: #666;
+    font-size: 12px;
+    margin-top: 5px;
+    font-style: italic;
+}
+</style>
+<div style="margin-bottom: 20px;">
+    <a href="{{ url_for('solicitudes.listado_solicitudes') }}" class="btn btn-primary">← Volver a la lista</a>
+    <a href="{{ url_for('solicitudes.editar_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-warning">Editar</a>
+    <a href="{{ url_for('solicitudes.descargar_pdf_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-success" target="_blank">📄 Descargar PDF</a>
+</div>
+
+<h2>Solicitud #{{ solicitud.id }}</h2>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 30px;">
+    <!-- Columna 1: Datos del Cliente -->
+    <div>
+        <div class="card" style="background-color: white; padding: 20px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px;">
+            <h3 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-bottom: 15px;">Datos del Cliente</h3>
+            
+            <p><strong>Nombre:</strong> {{ solicitud.cliente.nombre if solicitud.cliente else 'N/A' }}</p>
+            
+            {% if solicitud.cliente.direccion %}
+            <p><strong>Dirección:</strong> {{ solicitud.cliente.direccion }}</p>
+            {% endif %}
+            
+            {% if solicitud.cliente.telefono %}
+            <p><strong>Teléfono:</strong> {{ solicitud.cliente.telefono }}</p>
+            {% endif %}
+            
+            {% if solicitud.cliente.email %}
+            <p><strong>Email:</strong> {{ solicitud.cliente.email }}</p>
+            {% endif %}
+        </div>
+        
+        <!-- Sección de Seguimiento -->
+        <div class="card" style="background-color: white; padding: 20px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h3 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-bottom: 20px;">Seguimiento</h3>
+            
+            <form method="POST" action="{{ url_for('solicitudes.actualizar_seguimiento', solicitud_id=solicitud.id) }}">
+                <div class="form-group">
+                    <label for="seguimiento" style="display: block; margin-bottom: 5px; font-weight: 500; color: #555;">Actualizaciones y seguimiento:</label>
+                    <textarea name="seguimiento" id="seguimiento" rows="6" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; font-family: inherit; font-size: 14px; box-sizing: border-box;">{{ solicitud.seguimiento or '' }}</textarea>
+                </div>
+                <button type="submit" class="btn btn-success" style="padding: 8px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Actualizar Seguimiento</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Columna 2: Datos de la Solicitud -->
+    <div>
+        <div class="card" style="background-color: white; padding: 20px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h3 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-bottom: 15px;">Datos de la Solicitud</h3>
+            
+            <p><strong>Estado Actual:</strong> 
+                <span class="badge badge-estado-{{ solicitud.estado|lower|replace(' ', '-') }}" style="padding: 6px 12px; border-radius: 20px; font-size: 0.9rem; font-weight: 600; display: inline-block;">
+                    {{ solicitud.estado|title }}
+                </span>
+            </p>
+            
+            <p><strong>Tipo:</strong> {{ solicitud.tipo_pedido|title }}</p>
+            
+            <p><strong>Comercial:</strong> {{ solicitud.comercial.nombre if solicitud.comercial else 'N/A' }}</p>
+            
+            {% if solicitud.fecha_creacion %}
+            <p><strong>Fecha de Creación:</strong> {{ solicitud.fecha_creacion.strftime('%d/%m/%Y') }}</p>
+            {% endif %}
+            
+            {% if solicitud.forma_pago %}
+            <p><strong>Forma de Pago:</strong> {{ solicitud.forma_pago }}</p>
+            {% endif %}
+            
+            {% if solicitud.fecha_objetivo %}
+            <p><strong>Fecha Objetivo:</strong> 
+                <span style="font-weight: bold; color: #007bff;">{{ solicitud.fecha_objetivo.strftime('%d/%m/%Y') }}</span>
+            </p>
+            {% endif %}
+            
+            <!-- Sección para cambiar estados -->
+            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e0e0e0;">
+                <h4 style="color: #2c3e50; margin-bottom: 10px; font-size: 14px;">Cambiar Estado</h4>
+                <p style="margin-bottom: 10px; color: #666; font-size: 12px;">Selecciona el nuevo estado de la solicitud:</p>
+                
+                <form method="POST" action="{{ url_for('solicitudes.cambiar_estado_solicitud', solicitud_id=solicitud.id) }}">
+                    <select name="estado" id="estado_select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; margin-bottom: 10px;" onchange="this.form.submit()">
+                        {% for estado in estados %}
+                        <option value="{{ estado }}" {% if solicitud.estado == estado %}selected{% endif %}>{{ estado|title }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 8px 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Cambiar Estado</button>
+                </form>
+                
+                <!-- Mostrar fechas según el estado actual -->
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;">
+                    <h4 style="color: #2c3e50; margin-bottom: 10px; font-size: 12px;">Fechas del Proceso</h4>
+                    {% if solicitud.fecha_presupuesto %}
+                    <p style="font-size: 11px; color: #666; margin: 3px 0;"><strong>Presupuesto:</strong> {{ solicitud.fecha_presupuesto.strftime('%d/%m/%Y') }}</p>
+                    {% endif %}
+                    {% if solicitud.fecha_aceptado %}
+                    <p style="font-size: 11px; color: #666; margin: 3px 0;"><strong>Aceptado:</strong> {{ solicitud.fecha_aceptado.strftime('%d/%m/%Y') }}</p>
+                    {% endif %}
+                    {% if solicitud.fecha_diseno %}
+                    <p style="font-size: 11px; color: #666; margin: 3px 0;"><strong>Diseño:</strong> {{ solicitud.fecha_diseno.strftime('%d/%m/%Y') }}</p>
+                    {% endif %}
+                    {% if solicitud.fecha_diseno_finalizado %}
+                    <p style="font-size: 11px; color: #666; margin: 3px 0;"><strong>Diseño Finalizado:</strong> {{ solicitud.fecha_diseno_finalizado.strftime('%d/%m/%Y') }}</p>
+                    {% endif %}
+                    {% if solicitud.fecha_en_preparacion %}
+                    <p style="font-size: 11px; color: #666; margin: 3px 0;"><strong>En Preparación:</strong> {{ solicitud.fecha_en_preparacion.strftime('%d/%m/%Y') }}</p>
+                    {% endif %}
+                    {% if solicitud.fecha_todo_listo %}
+                    <p style="font-size: 11px; color: #666; margin: 3px 0;"><strong>Todo Listo:</strong> {{ solicitud.fecha_todo_listo.strftime('%d/%m/%Y') }}</p>
+                    {% endif %}
+                    {% if solicitud.fecha_enviado %}
+                    <p style="font-size: 11px; color: #666; margin: 3px 0;"><strong>Enviado:</strong> {{ solicitud.fecha_enviado.strftime('%d/%m/%Y') }}</p>
+                    {% endif %}
+                    {% if solicitud.fecha_entregado_cliente %}
+                    <p style="font-size: 11px; color: #666; margin: 3px 0;"><strong>Entregado al Cliente:</strong> {{ solicitud.fecha_entregado_cliente.strftime('%d/%m/%Y') }}</p>
+                    {% endif %}
+                    {% if solicitud.fecha_rechazado %}
+                    <p style="font-size: 11px; color: #dc3545; margin: 3px 0;"><strong>Rechazado:</strong> {{ solicitud.fecha_rechazado.strftime('%d/%m/%Y') }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Columna 3: Imágenes -->
+    <div>
+        <div class="card" style="background-color: white; padding: 20px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <h3 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-bottom: 15px;">Imágenes</h3>
+            
+            {% if solicitud.imagen_diseno %}
+            <div style="margin-bottom: 15px;">
+                <p style="font-weight: 600; margin-bottom: 10px; color: #555;">Imagen de Diseño:</p>
+                <img src="{{ url_for('static', filename='uploads/' + solicitud.imagen_diseno) }}" 
+                     alt="Imagen de diseño" 
+                     style="width: 100%; max-width: 300px; height: auto; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer;"
+                     onclick="abrirModalImagenes()">
+            </div>
+            {% else %}
+            <p style="color: #999; font-style: italic; margin-bottom: 15px;">No hay imagen de diseño</p>
+            {% endif %}
+            
+            {% set tiene_imagenes_adicionales = solicitud.imagen_portada or solicitud.imagen_adicional_1 or solicitud.imagen_adicional_2 or solicitud.imagen_adicional_3 or solicitud.imagen_adicional_4 or solicitud.imagen_adicional_5 %}
+            {% if tiene_imagenes_adicionales %}
+            <div>
+                <a href="#" onclick="abrirModalImagenes(); return false;" 
+                   style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: 500; transition: background-color 0.3s;">
+                    📷 Ver todas las imágenes
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+</div>
+
+<!-- Líneas de la Solicitud - Ocupando todo el ancho -->
+<div style="margin-top: 30px; width: 100%;">
+    <div class="card" style="background-color: white; padding: 20px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h3 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-bottom: 20px;">Líneas de la Solicitud</h3>
+        
+        <!-- DEBUG: Verificando líneas - solicitud.lineas existe: {{ solicitud.lineas is defined }}, longitud: {{ solicitud.lineas|length if solicitud.lineas else 0 }} -->
+        {% if solicitud.lineas and solicitud.lineas|length > 0 %}
+        <div style="display: flex; flex-direction: column; gap: 15px;">
+            {% for linea in solicitud.lineas %}
+            <!-- DEBUG Línea {{ loop.index }}: ID={{ linea.id }}, nombre_mostrar={{ linea.nombre_mostrar }}, prenda_id={{ linea.prenda_id }} -->
+            <div style="border: 1px solid #e9ecef; border-radius: 8px; padding: 15px; background: #f8f9fa;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 10px;">
+                    <div>
+                        <strong style="color: #495057; font-size: 0.85rem;">Nombre para mostrar:</strong>
+                        <p style="margin: 5px 0 0 0; color: #212529;">{{ linea.nombre_mostrar or linea.nombre or 'N/A' }}</p>
+                    </div>
+                    <div>
+                        <strong style="color: #495057; font-size: 0.85rem;">Prenda:</strong>
+                        <p style="margin: 5px 0 0 0; color: #212529;">{{ linea.prenda.nombre if linea.prenda else 'N/A' }}</p>
+                    </div>
+                    <div>
+                        <strong style="color: #495057; font-size: 0.85rem;">Cantidad:</strong>
+                        <p style="margin: 5px 0 0 0; color: #212529;">{{ linea.cantidad }}</p>
+                    </div>
+                    {% if linea.color %}
+                    <div>
+                        <strong style="color: #495057; font-size: 0.85rem;">Color:</strong>
+                        <p style="margin: 5px 0 0 0; color: #212529;">{{ linea.color }}</p>
+                    </div>
+                    {% endif %}
+                    {% if linea.forma %}
+                    <div>
+                        <strong style="color: #495057; font-size: 0.85rem;">Forma:</strong>
+                        <p style="margin: 5px 0 0 0; color: #212529;">{{ linea.forma }}</p>
+                    </div>
+                    {% endif %}
+                    {% if linea.sexo %}
+                    <div>
+                        <strong style="color: #495057; font-size: 0.85rem;">Sexo:</strong>
+                        <p style="margin: 5px 0 0 0; color: #212529;">{{ linea.sexo|title }}</p>
+                    </div>
+                    {% endif %}
+                    {% if linea.talla %}
+                    <div>
+                        <strong style="color: #495057; font-size: 0.85rem;">Talla:</strong>
+                        <p style="margin: 5px 0 0 0; color: #212529;">{{ linea.talla }}</p>
+                    </div>
+                    {% endif %}
+                    {% if linea.tejido %}
+                    <div>
+                        <strong style="color: #495057; font-size: 0.85rem;">Tejido:</strong>
+                        <p style="margin: 5px 0 0 0; color: #212529;">{{ linea.tejido }}</p>
+                    </div>
+                    {% endif %}
+                    <div>
+                        <strong style="color: #495057; font-size: 0.85rem;">Precio Unitario:</strong>
+                        <p style="margin: 5px 0 0 0; color: #212529;">{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '0.00' }} €</p>
+                    </div>
+                    {% if linea.descuento and linea.descuento > 0 %}
+                    <div>
+                        <strong style="color: #495057; font-size: 0.85rem;">Descuento:</strong>
+                        <p style="margin: 5px 0 0 0; color: #d32f2f;">{{ "%.0f"|format(linea.descuento) }}%</p>
+                    </div>
+                    <div>
+                        <strong style="color: #495057; font-size: 0.85rem;">Precio Final:</strong>
+                        <p style="margin: 5px 0 0 0; color: #d32f2f; font-weight: bold;">{{ "%.2f"|format(linea.precio_final) if linea.precio_final else '0.00' }} €</p>
+                    </div>
+                    {% endif %}
+                    {% if linea.nombre %}
+                    <div>
+                        <strong style="color: #495057; font-size: 0.85rem;">Nombre personalizado:</strong>
+                        <p style="margin: 5px 0 0 0; color: #212529;">{{ linea.nombre }}</p>
+                    </div>
+                    {% endif %}
+                    {% if linea.cargo %}
+                    <div>
+                        <strong style="color: #495057; font-size: 0.85rem;">Cargo:</strong>
+                        <p style="margin: 5px 0 0 0; color: #212529;">{{ linea.cargo }}</p>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid #dee2e6; margin-top: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <strong style="color: #495057;">Estado:</strong>
+                        <span class="badge badge-estado-linea-{{ (linea.estado or 'pendiente')|lower|replace(' ', '-') }}" style="padding: 6px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">
+                            {{ (linea.estado or 'pendiente')|title }}
+                        </span>
+                    </div>
+                    <form method="POST" action="{{ url_for('solicitudes.cambiar_estado_linea', solicitud_id=solicitud.id, linea_id=linea.id) }}" style="display: inline-block;">
+                        <select name="estado" onchange="this.form.submit()" style="padding: 6px 12px; border-radius: 4px; border: 1px solid #ddd; font-size: 14px; background: white; cursor: pointer;">
+                            <option value="pendiente" {% if (linea.estado or 'pendiente') == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                            <option value="en confección" {% if (linea.estado or 'pendiente') == 'en confección' %}selected{% endif %}>En confección</option>
+                            <option value="en bordado" {% if (linea.estado or 'pendiente') == 'en bordado' %}selected{% endif %}>En bordado</option>
+                            <option value="listo" {% if (linea.estado or 'pendiente') == 'listo' %}selected{% endif %}>Listo</option>
+                        </select>
+                    </form>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color: #6c757d;">No hay líneas en esta solicitud.</p>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.badge-estado-presupuesto { background: #6c757d; color: white; }
+.badge-estado-aceptado { background: #28a745; color: white; }
+.badge-estado-diseño { background: #17a2b8; color: white; }
+.badge-estado-diseño-finalizado { background: #138496; color: white; }
+.badge-estado-en-preparacion { background: #ffc107; color: #212529; }
+.badge-estado-todo-listo { background: #fd7e14; color: white; }
+.badge-estado-enviado { background: #007bff; color: white; }
+.badge-estado-entregado-al-cliente { background: #28a745; color: white; }
+.badge-estado-pedido-rechazado { background: #dc3545; color: white; }
+
+.badge-estado-linea-pendiente { background: #6c757d; color: white; }
+.badge-estado-linea-en-confección { background: #17a2b8; color: white; }
+.badge-estado-linea-en-bordado { background: #ffc107; color: #212529; }
+.badge-estado-linea-listo { background: #28a745; color: white; }
+
+/* Estilos para las líneas */
+.linea-solicitud-card {
+    transition: all 0.3s ease;
+}
+
+.linea-solicitud-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+}
+
+select[name="estado"] {
+    transition: all 0.3s ease;
+}
+
+select[name="estado"]:hover {
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+}
+
+select[name="estado"]:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+}
+</style>
+
+<!-- Modal de Imágenes -->
+<div id="modalImagenes" class="modal-imagenes">
+    <span class="cerrar-modal" onclick="cerrarModalImagenes()">&times;</span>
+    <div class="modal-imagenes-content">
+        <div class="modal-imagenes-header">
+            <h2>Galería de Imágenes - Solicitud #{{ solicitud.id }}</h2>
+        </div>
+        <div class="galeria-imagenes">
+            {% if solicitud.imagen_diseno %}
+            <div class="imagen-galeria-item">
+                <img src="{{ url_for('static', filename='uploads/' + solicitud.imagen_diseno) }}" alt="Imagen de diseño">
+                <p>Imagen de Diseño</p>
+            </div>
+            {% endif %}
+            
+            {% if solicitud.imagen_portada %}
+            <div class="imagen-galeria-item">
+                <img src="{{ url_for('static', filename='uploads/' + solicitud.imagen_portada) }}" alt="Imagen de portada">
+                <p>Imagen de Portada</p>
+            </div>
+            {% endif %}
+            
+            {% if solicitud.imagen_adicional_1 %}
+            <div class="imagen-galeria-item">
+                <img src="{{ url_for('static', filename='uploads/' + solicitud.imagen_adicional_1) }}" alt="Imagen adicional 1">
+                <p>Imagen Adicional 1</p>
+                {% if solicitud.descripcion_imagen_1 %}
+                <div class="imagen-galeria-descripcion">{{ solicitud.descripcion_imagen_1 }}</div>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            {% if solicitud.imagen_adicional_2 %}
+            <div class="imagen-galeria-item">
+                <img src="{{ url_for('static', filename='uploads/' + solicitud.imagen_adicional_2) }}" alt="Imagen adicional 2">
+                <p>Imagen Adicional 2</p>
+                {% if solicitud.descripcion_imagen_2 %}
+                <div class="imagen-galeria-descripcion">{{ solicitud.descripcion_imagen_2 }}</div>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            {% if solicitud.imagen_adicional_3 %}
+            <div class="imagen-galeria-item">
+                <img src="{{ url_for('static', filename='uploads/' + solicitud.imagen_adicional_3) }}" alt="Imagen adicional 3">
+                <p>Imagen Adicional 3</p>
+                {% if solicitud.descripcion_imagen_3 %}
+                <div class="imagen-galeria-descripcion">{{ solicitud.descripcion_imagen_3 }}</div>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            {% if solicitud.imagen_adicional_4 %}
+            <div class="imagen-galeria-item">
+                <img src="{{ url_for('static', filename='uploads/' + solicitud.imagen_adicional_4) }}" alt="Imagen adicional 4">
+                <p>Imagen Adicional 4</p>
+                {% if solicitud.descripcion_imagen_4 %}
+                <div class="imagen-galeria-descripcion">{{ solicitud.descripcion_imagen_4 }}</div>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            {% if solicitud.imagen_adicional_5 %}
+            <div class="imagen-galeria-item">
+                <img src="{{ url_for('static', filename='uploads/' + solicitud.imagen_adicional_5) }}" alt="Imagen adicional 5">
+                <p>Imagen Adicional 5</p>
+                {% if solicitud.descripcion_imagen_5 %}
+                <div class="imagen-galeria-descripcion">{{ solicitud.descripcion_imagen_5 }}</div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+function abrirModalImagenes() {
+    document.getElementById('modalImagenes').style.display = 'block';
+    document.body.style.overflow = 'hidden'; // Prevenir scroll del body
+}
+
+function cerrarModalImagenes() {
+    document.getElementById('modalImagenes').style.display = 'none';
+    document.body.style.overflow = 'auto'; // Restaurar scroll del body
+}
+
+// Cerrar modal al hacer clic fuera del contenido
+window.onclick = function(event) {
+    const modal = document.getElementById('modalImagenes');
+    if (event.target == modal) {
+        cerrarModalImagenes();
+    }
+}
+
+// Cerrar modal con tecla ESC
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        cerrarModalImagenes();
+    }
+});
+</script>
+{% endblock %}
+

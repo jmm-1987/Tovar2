@@ -134,8 +134,9 @@ from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto,
 # Importar y registrar blueprints
 from routes.index import index_bp
 from routes.auth import auth_bp
-from routes.pedidos import pedidos_bp
-from routes.presupuestos import presupuestos_bp
+# from routes.pedidos import pedidos_bp  # Desactivado: funcionalidad migrada a solicitudes
+# from routes.presupuestos import presupuestos_bp  # Desactivado: funcionalidad migrada a solicitudes
+from routes.solicitudes import solicitudes_bp
 from routes.clientes import clientes_bp
 # from routes.comerciales import comerciales_bp  # Ya no se usa
 from routes.prendas import prendas_bp
@@ -150,8 +151,9 @@ from routes.informes import informes_bp
 # Registrar blueprints
 app.register_blueprint(index_bp)
 app.register_blueprint(auth_bp)
-app.register_blueprint(pedidos_bp)
-app.register_blueprint(presupuestos_bp)
+# app.register_blueprint(pedidos_bp)  # Desactivado: funcionalidad migrada a solicitudes
+# app.register_blueprint(presupuestos_bp)  # Desactivado: funcionalidad migrada a solicitudes
+app.register_blueprint(solicitudes_bp)
 app.register_blueprint(clientes_bp)
 # app.register_blueprint(comerciales_bp)  # Ya no se usa
 app.register_blueprint(prendas_bp)
@@ -263,7 +265,6 @@ def migrate_database():
                             print("Migración: Columna seguimiento agregada exitosamente a pedidos")
                     except Exception as e:
                         print(f"Error al agregar columna seguimiento a pedidos: {e}")
-                        pass
             else:
                 # Si no existe la tabla, crearla
                 db.create_all()
@@ -336,6 +337,16 @@ def migrate_database():
                             print("Migración: pedido_id en facturas puede ser nullable (se aplicará en nuevas facturas)")
                         except Exception as e:
                             print(f"Nota sobre migración de facturas: {e}")
+                
+                # Añadir columna presupuesto_id si no existe
+                if 'presupuesto_id' not in columns_facturas:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE facturas ADD COLUMN presupuesto_id INTEGER'))
+                            conn.commit()
+                            print("Migración: Columna presupuesto_id agregada exitosamente a facturas")
+                    except Exception as e:
+                        print(f"Error al agregar columna presupuesto_id a facturas: {e}")
             
             # Verificar si existe la tabla presupuestos, si no existe crearla
             if 'presupuestos' not in table_names:
@@ -343,6 +354,53 @@ def migrate_database():
             else:
                 # Verificar si existe la columna seguimiento
                 columns_presupuesto = [col['name'] for col in inspector.get_columns('presupuestos')]
+                
+                # Migrar estados antiguos a nuevos estados unificados
+                try:
+                    with db.engine.connect() as conn:
+                        # Mapeo de estados antiguos a nuevos
+                        estados_migracion = {
+                            'Pendiente de enviar': 'presupuesto',
+                            'Diseño': 'diseño',
+                            'Enviado': 'presupuesto',  # Si estaba enviado, volver a presupuesto
+                            'Aceptado': 'aceptado',
+                            'Rechazado': 'pedido rechazado'
+                        }
+                        for estado_antiguo, estado_nuevo in estados_migracion.items():
+                            conn.execute(text("UPDATE presupuestos SET estado = :estado_nuevo WHERE estado = :estado_antiguo"), 
+                                       {'estado_nuevo': estado_nuevo, 'estado_antiguo': estado_antiguo})
+                        conn.commit()
+                        print("Migración: Estados de presupuestos actualizados a estados unificados")
+                except Exception as e:
+                    print(f"Error al migrar estados de presupuestos: {e}")
+                
+                # Añadir nuevas columnas de fechas si no existen
+                nuevas_fechas = {
+                    'fecha_presupuesto': 'DATE',
+                    'fecha_aceptado': 'DATE',
+                    'fecha_diseno_finalizado': 'DATE',
+                    'fecha_en_preparacion': 'DATE',
+                    'fecha_todo_listo': 'DATE',
+                    'fecha_enviado': 'DATE',
+                    'fecha_entregado_cliente': 'DATE',
+                    'fecha_rechazado': 'DATE',
+                    'fecha_aceptacion': 'DATE',
+                    'fecha_objetivo': 'DATE',
+                    'fecha_entrega_trabajo': 'DATE',
+                    'fecha_envio_taller': 'DATE',
+                    'fecha_entrega_bordados': 'DATE',
+                    'fecha_entrega_cliente': 'DATE'
+                }
+                for columna, tipo in nuevas_fechas.items():
+                    if columna not in columns_presupuesto:
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(text(f'ALTER TABLE presupuestos ADD COLUMN {columna} {tipo}'))
+                                conn.commit()
+                                print(f"Migración: Columna {columna} agregada exitosamente a presupuestos")
+                        except Exception as e:
+                            print(f"Error al agregar columna {columna} a presupuestos: {e}")
+                
                 if 'seguimiento' not in columns_presupuesto:
                     try:
                         with db.engine.connect() as conn:
@@ -409,7 +467,7 @@ def migrate_database():
                 # Eliminar columna de imagen 6 si existe (ya no se usa, pero mantenemos imagen_adicional_5)
                 # Nota: SQLite no soporta DROP COLUMN directamente, se omite esta migración
                 # La columna se puede ignorar si existe
-                pass
+                            pass
             
             # Verificar que todas las tablas necesarias existan
             tablas_requeridas = ['comerciales', 'clientes', 'prendas', 'pedidos', 'lineas_pedido', 'presupuestos', 'lineas_presupuesto', 'tickets', 'lineas_ticket', 'facturas', 'lineas_factura', 'usuarios', 'plantillas_email', 'proveedores', 'facturas_proveedor', 'empleados', 'nominas', 'registro_cambio_estado']
@@ -803,7 +861,6 @@ Saludos cordiales,
                     print("Migración: Tabla configuracion creada exitosamente")
                 except Exception as e:
                     print(f"Error al crear tabla configuracion: {e}")
-                    pass
             else:
                 # Verificar que existe la configuración de verifactu activado
                 from models import Configuracion
