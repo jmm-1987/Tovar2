@@ -132,6 +132,8 @@ def nuevo_presupuesto():
             tallas = request.form.getlist('talla[]')
             tejidos = request.form.getlist('tejido[]')
             precios_unitarios = request.form.getlist('precio_unitario[]')
+            descuentos = request.form.getlist('descuento[]')
+            precios_finales = request.form.getlist('precio_final[]')
             
             for i in range(len(prenda_ids)):
                 if prenda_ids[i] and (nombres_mostrar[i] if i < len(nombres_mostrar) else nombres[i] if i < len(nombres) else ''):
@@ -142,6 +144,24 @@ def nuevo_presupuesto():
                             precio_unitario = Decimal(str(precios_unitarios[i]))
                         except:
                             precio_unitario = None
+                    
+                    # Obtener descuento
+                    descuento = Decimal('0')
+                    if i < len(descuentos) and descuentos[i]:
+                        try:
+                            descuento = Decimal(str(descuentos[i]))
+                        except:
+                            descuento = Decimal('0')
+                    
+                    # Calcular precio final si hay descuento
+                    precio_final = None
+                    if precio_unitario and descuento > 0:
+                        precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+                    elif i < len(precios_finales) and precios_finales[i]:
+                        try:
+                            precio_final = Decimal(str(precios_finales[i]))
+                        except:
+                            precio_final = None
                     
                     # Usar nombre_mostrar si existe, sino usar nombre (compatibilidad)
                     nombre_mostrar_val = nombres_mostrar[i] if i < len(nombres_mostrar) and nombres_mostrar[i] else (nombres[i] if i < len(nombres) else '')
@@ -159,7 +179,9 @@ def nuevo_presupuesto():
                         sexo=sexos[i] if i < len(sexos) else '',
                         talla=tallas[i] if i < len(tallas) else '',
                         tejido=tejidos[i] if i < len(tejidos) else '',
-                        precio_unitario=precio_unitario
+                        precio_unitario=precio_unitario,
+                        descuento=descuento,
+                        precio_final=precio_final
                     )
                     db.session.add(linea)
             

@@ -11,7 +11,7 @@ import base64
 from io import BytesIO
 from sqlalchemy import not_
 from extensions import db
-from models import Pedido, LineaPedido, Factura, LineaFactura
+from models import Pedido, LineaPedido, Factura, LineaFactura, Cliente
 from utils.numeracion import obtener_siguiente_numero_factura
 from playwright.sync_api import sync_playwright
 
@@ -36,7 +36,8 @@ def facturacion():
     
     if tipo_vista == 'pendientes':
         # Obtener prefacturas: pedidos que aún no tienen factura formalizada
-        pedidos_con_factura_ids = [f.pedido_id for f in Factura.query.with_entities(Factura.pedido_id).all()]
+        # Filtrar solo facturas con pedido_id (excluir facturas directas)
+        pedidos_con_factura_ids = [f.pedido_id for f in Factura.query.with_entities(Factura.pedido_id).filter(Factura.pedido_id.isnot(None)).all()]
         query = Pedido.query
         if pedidos_con_factura_ids:
             query = query.filter(not_(Pedido.id.in_(pedidos_con_factura_ids)))
@@ -189,11 +190,18 @@ def formalizar_factura(pedido_id):
             )
             db.session.add(linea_factura)
         
-        # Enviar a Verifactu
+        # Verificar si el envío a Verifactu está activado
+        from models import Configuracion
+        config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+        verifactu_enviar_activo = True  # Por defecto activado
+        if config:
+            verifactu_enviar_activo = config.valor.lower() == 'true'
+        
+        # Enviar a Verifactu solo si está activado y hay token
         verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
         verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
         
-        if verifactu_token:
+        if verifactu_token and verifactu_enviar_activo:
             # Preparar datos para la API
             # Calcular base imponible e IVA para cada línea
             # Asumimos que el importe incluye IVA al 21%
@@ -276,6 +284,15 @@ def formalizar_factura(pedido_id):
                     'success': False,
                     'error': f'Error de conexión con Verifactu: {str(e)}'
                 }), 400
+        elif not verifactu_enviar_activo:
+            # Envío desactivado, solo guardar como pendiente
+            factura.estado = 'pendiente'
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': 'Factura creada. El envío automático a Verifactu está desactivado.',
+                'factura_id': factura.id
+            })
         else:
             # Sin token, solo guardar como pendiente
             factura.estado = 'pendiente'
@@ -292,6 +309,194 @@ def formalizar_factura(pedido_id):
             'success': False,
             'error': f'Error al formalizar la factura: {str(e)}'
         }), 500
+
+@facturacion_bp.route('/facturacion/nueva', methods=['GET', 'POST'])
+@login_required
+def nueva_factura():
+    """Crear una factura directamente sin pedido"""
+    if request.method == 'POST':
+        try:
+            # Obtener datos del formulario
+            fecha_expedicion_str = request.form.get('fecha_expedicion', '')
+            tipo_factura = request.form.get('tipo_factura', 'F1')
+            descripcion = request.form.get('descripcion', '')
+            nombre_cliente = request.form.get('nombre_cliente', '')
+            nif_cliente = request.form.get('nif_cliente', '')
+            cliente_id = request.form.get('cliente_id', '')
+            
+            # Obtener líneas de factura
+            descripciones = request.form.getlist('descripcion_linea[]')
+            cantidades = request.form.getlist('cantidad[]')
+            precios_unitarios = request.form.getlist('precio_unitario[]')
+            
+            if not fecha_expedicion_str:
+                flash('La fecha de expedición es obligatoria', 'error')
+                return redirect(url_for('facturacion.nueva_factura'))
+            
+            if not nombre_cliente:
+                flash('El nombre del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.nueva_factura'))
+            
+            if not descripciones or not any(descripciones):
+                flash('Debe haber al menos una línea en la factura', 'error')
+                return redirect(url_for('facturacion.nueva_factura'))
+            
+            # Procesar fecha
+            fecha_expedicion = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d').date()
+            
+            # Si hay cliente_id, obtener datos del cliente
+            if cliente_id:
+                cliente = Cliente.query.get(cliente_id)
+                if cliente:
+                    nombre_cliente = cliente.nombre
+                    if not nif_cliente and cliente.nif:
+                        nif_cliente = cliente.nif
+            
+            # Generar número de factura automáticamente
+            serie = 'A'
+            numero = obtener_siguiente_numero_factura(fecha_expedicion)
+            
+            # Calcular importe total
+            importe_total = Decimal('0.00')
+            lineas_data = []
+            for i in range(len(descripciones)):
+                if descripciones[i]:
+                    cantidad = Decimal(str(cantidades[i])) if i < len(cantidades) and cantidades[i] else Decimal('1')
+                    precio_unitario = Decimal(str(precios_unitarios[i])) if i < len(precios_unitarios) and precios_unitarios[i] else Decimal('0')
+                    importe = cantidad * precio_unitario
+                    importe_total += importe
+                    lineas_data.append({
+                        'descripcion': descripciones[i],
+                        'cantidad': cantidad,
+                        'precio_unitario': precio_unitario,
+                        'importe': importe
+                    })
+            
+            # Crear factura sin pedido
+            factura = Factura(
+                pedido_id=None,  # Factura directa sin pedido
+                serie=serie,
+                numero=numero,
+                fecha_expedicion=fecha_expedicion,
+                tipo_factura=tipo_factura,
+                descripcion=descripcion,
+                nif=nif_cliente,
+                nombre=nombre_cliente,
+                importe_total=importe_total,
+                estado='pendiente'
+            )
+            
+            db.session.add(factura)
+            db.session.flush()  # Para obtener el ID de la factura
+            
+            # Crear líneas de factura
+            for linea_data in lineas_data:
+                linea_factura = LineaFactura(
+                    factura_id=factura.id,
+                    linea_pedido_id=None,  # Sin línea de pedido asociada
+                    descripcion=linea_data['descripcion'],
+                    cantidad=linea_data['cantidad'],
+                    precio_unitario=linea_data['precio_unitario'],
+                    importe=linea_data['importe']
+                )
+                db.session.add(linea_factura)
+            
+            # Verificar si el envío a Verifactu está activado
+            from models import Configuracion
+            config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+            verifactu_enviar_activo = True  # Por defecto activado
+            if config:
+                verifactu_enviar_activo = config.valor.lower() == 'true'
+            
+            # Enviar a Verifactu solo si está activado y hay token
+            verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
+            verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
+            
+            if verifactu_token and verifactu_enviar_activo:
+                # Preparar datos para la API
+                tipo_impositivo = 21  # IVA estándar en España
+                lineas_payload = []
+                total_base_imponible = Decimal('0.00')
+                total_cuota_repercutida = Decimal('0.00')
+                
+                for linea_data in lineas_data:
+                    importe_con_iva = linea_data['importe']
+                    base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
+                    cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
+                    
+                    base_imponible = base_imponible.quantize(Decimal('0.01'))
+                    cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
+                    
+                    total_base_imponible += base_imponible
+                    total_cuota_repercutida += cuota_repercutida
+                    
+                    lineas_payload.append({
+                        'base_imponible': str(base_imponible),
+                        'tipo_impositivo': str(tipo_impositivo),
+                        'cuota_repercutida': str(cuota_repercutida)
+                    })
+                
+                payload = {
+                    'serie': factura.serie,
+                    'numero': factura.numero,
+                    'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
+                    'tipo_factura': factura.tipo_factura,
+                    'descripcion': factura.descripcion or 'Descripcion de la operacion',
+                    'nif': factura.nif or '',
+                    'nombre': factura.nombre,
+                    'lineas': lineas_payload,
+                    'importe_total': str(factura.importe_total)
+                }
+                
+                headers = {
+                    'Content-Type': 'application/json',
+                    'Authorization': f'Bearer {verifactu_token}'
+                }
+                
+                try:
+                    response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
+                    
+                    if response.status_code == 200 or response.status_code == 201:
+                        response_data = response.json()
+                        factura.huella_verifactu = json.dumps(response_data)
+                        factura.estado = 'confirmado'
+                        db.session.commit()
+                        flash('Factura creada y enviada a Verifactu correctamente.', 'success')
+                    else:
+                        factura.estado = 'error'
+                        factura.huella_verifactu = json.dumps({
+                            'error': response.text,
+                            'status_code': response.status_code
+                        })
+                        db.session.commit()
+                        flash(f'Error al enviar a Verifactu: {response.status_code} - {response.text}', 'error')
+                except requests.exceptions.RequestException as e:
+                    factura.estado = 'error'
+                    factura.huella_verifactu = json.dumps({'error': str(e)})
+                    db.session.commit()
+                    flash(f'Error de conexión con Verifactu: {str(e)}', 'error')
+            elif not verifactu_enviar_activo:
+                factura.estado = 'pendiente'
+                db.session.commit()
+                flash('Factura creada. El envío automático a Verifactu está desactivado.', 'info')
+            else:
+                factura.estado = 'pendiente'
+                db.session.commit()
+                flash('Factura creada. Configure VERIFACTU_TOKEN para enviar automáticamente.', 'warning')
+            
+            return redirect(url_for('facturacion.facturacion', tipo_vista='formalizadas'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al crear la factura: {str(e)}', 'error')
+            import traceback
+            traceback.print_exc()
+    
+    # GET: mostrar formulario
+    clientes = Cliente.query.order_by(Cliente.nombre).all()
+    # Establecer fecha de hoy por defecto
+    fecha_hoy = datetime.now().strftime('%Y-%m-%d')
+    return render_template('facturacion/nueva_factura.html', clientes=clientes, fecha_hoy=fecha_hoy)
 
 def preparar_datos_imprimir_factura(factura_id):
     """Función auxiliar para preparar todos los datos necesarios para imprimir la factura"""

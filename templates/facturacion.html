@@ -91,6 +91,13 @@ function cambiarTipoVista(tipo) {
 }
 </script>
 
+<!-- BOTÓN PARA CREAR FACTURA DIRECTA -->
+<div style="margin-bottom: 20px; text-align: right;">
+    <a href="{{ url_for('facturacion.nueva_factura') }}" class="btn btn-success" style="padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(40,167,69,0.3); transition: all 0.3s ease;">
+        ➕ Crear Factura Directa
+    </a>
+</div>
+
 <!-- SECCIÓN DE PREFACTURAS (Pendientes de formalizar) -->
 {% if tipo_vista == 'pendientes' %}
 

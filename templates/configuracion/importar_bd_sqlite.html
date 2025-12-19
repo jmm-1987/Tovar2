@@ -55,6 +55,14 @@
             <li>Los backups se guardan en el mismo directorio que la base de datos</li>
             <li>Después de importar, es recomendable reiniciar la aplicación</li>
         </ul>
+        
+        <div style="margin-top: 20px; padding: 15px; background: #e7f3ff; border-left: 4px solid #2196F3; border-radius: 4px;">
+            <strong>📍 Ubicación de la base de datos:</strong>
+            <code style="display: block; margin-top: 8px; padding: 8px; background: white; border-radius: 3px; word-break: break-all;">{{ db_path }}</code>
+            <small style="display: block; margin-top: 8px; color: #666;">
+                El archivo se guardará en esta ubicación. En producción, esta ruta corresponde al disco persistente montado.
+            </small>
+        </div>
     </div>
 </div>
 
@@ -233,6 +241,7 @@ document.getElementById('importForm').addEventListener('submit', function() {
 }
 </style>
 {% endblock %}
+
 
 
 

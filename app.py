@@ -7,6 +7,7 @@ from extensions import db, login_manager, mail
 from dotenv import load_dotenv
 from markupsafe import Markup
 
+
 # Cargar variables de entorno desde archivo .env (solo en desarrollo)
 load_dotenv()
 
@@ -128,7 +129,7 @@ def load_user(user_id):
         return Usuario.query.get(int(user_id))
 
 # Importar modelos (se crean automáticamente al importar models.py)
-from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, Usuario, PlantillaEmail, Proveedor, FacturaProveedor, Empleado, Nomina, RegistroCambioEstado
+from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, Usuario, PlantillaEmail, Proveedor, FacturaProveedor, Empleado, Nomina, RegistroCambioEstado, Configuracion
 
 # Importar y registrar blueprints
 from routes.index import index_bp
@@ -252,12 +253,22 @@ def migrate_database():
                                 print(f"Migración: Columna {columna} agregada exitosamente a pedidos")
                         except Exception as e:
                             print(f"Error al agregar columna {columna} a pedidos: {e}")
-                            pass
+                
+                # Verificar y agregar columna seguimiento
+                if 'seguimiento' not in columns:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE pedidos ADD COLUMN seguimiento TEXT'))
+                            conn.commit()
+                            print("Migración: Columna seguimiento agregada exitosamente a pedidos")
+                    except Exception as e:
+                        print(f"Error al agregar columna seguimiento a pedidos: {e}")
+                        pass
             else:
                 # Si no existe la tabla, crearla
                 db.create_all()
             
-            # Verificar si existe la tabla lineas_pedido y agregar columna estado si no existe
+            # Verificar si existe la tabla lineas_pedido y agregar columnas si no existen
             if 'lineas_pedido' in table_names:
                 columns_lineas = [col['name'] for col in inspector.get_columns('lineas_pedido')]
                 
@@ -266,8 +277,25 @@ def migrate_database():
                     with db.engine.connect() as conn:
                         conn.execute(text("ALTER TABLE lineas_pedido ADD COLUMN estado VARCHAR(50) DEFAULT 'pendiente'"))
                         conn.commit()
+                # Añadir columnas de descuento y precio_final
+                if 'descuento' not in columns_lineas:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE lineas_pedido ADD COLUMN descuento NUMERIC(5, 2) DEFAULT 0"))
+                            conn.commit()
+                            print("Migración: Columna descuento agregada exitosamente a lineas_pedido")
+                    except Exception as e:
+                        print(f"Error al agregar columna descuento a lineas_pedido: {e}")
+                if 'precio_final' not in columns_lineas:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE lineas_pedido ADD COLUMN precio_final NUMERIC(10, 2)"))
+                            conn.commit()
+                            print("Migración: Columna precio_final agregada exitosamente a lineas_pedido")
+                    except Exception as e:
+                        print(f"Error al agregar columna precio_final a lineas_pedido: {e}")
             
-            # Verificar si existe la tabla lineas_presupuesto y agregar columna estado si no existe
+            # Verificar si existe la tabla lineas_presupuesto y agregar columnas si no existen
             if 'lineas_presupuesto' in table_names:
                 columns_lineas_presupuesto = [col['name'] for col in inspector.get_columns('lineas_presupuesto')]
                 
@@ -277,6 +305,37 @@ def migrate_database():
                         conn.execute(text("ALTER TABLE lineas_presupuesto ADD COLUMN estado VARCHAR(50) DEFAULT 'pendiente'"))
                         conn.commit()
                         print("Migración: Columna estado agregada exitosamente a lineas_presupuesto")
+                # Añadir columnas de descuento y precio_final
+                if 'descuento' not in columns_lineas_presupuesto:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE lineas_presupuesto ADD COLUMN descuento NUMERIC(5, 2) DEFAULT 0"))
+                            conn.commit()
+                            print("Migración: Columna descuento agregada exitosamente a lineas_presupuesto")
+                    except Exception as e:
+                        print(f"Error al agregar columna descuento a lineas_presupuesto: {e}")
+                if 'precio_final' not in columns_lineas_presupuesto:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE lineas_presupuesto ADD COLUMN precio_final NUMERIC(10, 2)"))
+                            conn.commit()
+                            print("Migración: Columna precio_final agregada exitosamente a lineas_presupuesto")
+                    except Exception as e:
+                        print(f"Error al agregar columna precio_final a lineas_presupuesto: {e}")
+            
+            # Verificar si existe la tabla facturas y hacer pedido_id nullable si no lo es
+            if 'facturas' in table_names:
+                columns_facturas = [col['name'] for col in inspector.get_columns('facturas')]
+                # Verificar si pedido_id existe y es NOT NULL
+                for col_info in inspector.get_columns('facturas'):
+                    if col_info['name'] == 'pedido_id' and col_info.get('nullable') == False:
+                        try:
+                            # SQLite no soporta MODIFY COLUMN directamente, pero podemos intentar recrear la tabla
+                            # Por ahora, simplemente intentamos hacer la columna nullable en el modelo
+                            # La migración real se hará cuando se cree una nueva factura sin pedido
+                            print("Migración: pedido_id en facturas puede ser nullable (se aplicará en nuevas facturas)")
+                        except Exception as e:
+                            print(f"Nota sobre migración de facturas: {e}")
             
             # Verificar si existe la tabla presupuestos, si no existe crearla
             if 'presupuestos' not in table_names:
@@ -736,10 +795,29 @@ Saludos cordiales,
                         import traceback
                         traceback.print_exc()
                         # Intentar crear todas las tablas como fallback
-                        try:
-                            db.create_all()
-                        except Exception as e2:
-                            print(f"Error en create_all: {e2}")
+            
+            # Verificar si existe la tabla configuracion
+            if 'configuracion' not in table_names:
+                try:
+                    db.create_all()
+                    print("Migración: Tabla configuracion creada exitosamente")
+                except Exception as e:
+                    print(f"Error al crear tabla configuracion: {e}")
+                    pass
+            else:
+                # Verificar que existe la configuración de verifactu activado
+                from models import Configuracion
+                verifactu_config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+                if not verifactu_config:
+                    # Crear configuración por defecto (activado)
+                    verifactu_config = Configuracion(
+                        clave='verifactu_enviar_activo',
+                        valor='true',
+                        descripcion='Activar/desactivar el envío automático de facturas y tickets a Verifactu'
+                    )
+                    db.session.add(verifactu_config)
+                    db.session.commit()
+                    print("Migración: Configuración verifactu_enviar_activo creada con valor por defecto 'true'")
         except Exception:
             # Si hay error, intentar crear todas las tablas
             try:
@@ -833,10 +911,58 @@ def init_supervisor():
     except Exception:
         db.session.rollback()
 
+# Función para verificar e instalar Playwright si es necesario
+def ensure_playwright_installed():
+    """Verificar e instalar Playwright chromium si no está instalado"""
+    try:
+        from playwright.sync_api import sync_playwright
+        # Intentar lanzar chromium para verificar si está instalado
+        with sync_playwright() as p:
+            try:
+                browser = p.chromium.launch(headless=True)
+                browser.close()
+                print("[Playwright] Chromium ya está instalado y funcionando")
+                return True
+            except Exception as e:
+                # Si falla, intentar instalar
+                print(f"[Playwright] Chromium no está instalado. Error: {str(e)}")
+                print("[Playwright] Intentando instalar Chromium...")
+                import subprocess
+                import sys
+                try:
+                    result = subprocess.run(
+                        [sys.executable, '-m', 'playwright', 'install', 'chromium'],
+                        capture_output=True,
+                        text=True,
+                        timeout=300  # 5 minutos de timeout
+                    )
+                    if result.returncode == 0:
+                        print("[Playwright] Chromium instalado exitosamente")
+                        return True
+                    else:
+                        print(f"[Playwright] Error al instalar Chromium: {result.stderr}")
+                        return False
+                except subprocess.TimeoutExpired:
+                    print("[Playwright] Timeout al instalar Chromium")
+                    return False
+                except Exception as install_error:
+                    print(f"[Playwright] Error al ejecutar instalación: {str(install_error)}")
+                    return False
+    except ImportError:
+        print("[Playwright] Playwright no está instalado. Asegúrate de que esté en requirements.txt")
+        return False
+    except Exception as e:
+        print(f"[Playwright] Error al verificar Playwright: {e}")
+        return False
+
 # Función para inicializar la aplicación (se ejecuta después de que todas las rutas estén registradas)
 def initialize_app():
     """Inicializar la aplicación y la base de datos"""
     try:
+        # Verificar Playwright en producción
+        if is_production:
+            ensure_playwright_installed()
+        
         with app.app_context():
             try:
                 migrate_database()

@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, jsonify, current_app
 from flask_login import login_required, current_user
 from extensions import db
-from models import Usuario, Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, PlantillaEmail, Proveedor
+from models import Usuario, Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, PlantillaEmail, Proveedor, Configuracion
 from utils.auth import supervisor_required
 from datetime import datetime
 import io
@@ -135,12 +135,40 @@ def eliminar_usuario(id):
     
     return redirect(url_for('configuracion.gestion_usuarios'))
 
-@configuracion_bp.route('/configuracion/verifactu')
+@configuracion_bp.route('/configuracion/verifactu', methods=['GET', 'POST'])
 @login_required
 @supervisor_required
 def verifactu_info():
-    """Información sobre API Verifactu"""
-    return render_template('configuracion/verifactu.html')
+    """Información y configuración de API Verifactu"""
+    if request.method == 'POST':
+        try:
+            # Obtener o crear la configuración
+            config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+            if not config:
+                config = Configuracion(
+                    clave='verifactu_enviar_activo',
+                    descripcion='Activar/desactivar el envío automático de facturas y tickets a Verifactu'
+                )
+                db.session.add(config)
+            
+            # Actualizar el valor según el checkbox
+            config.valor = 'true' if request.form.get('verifactu_enviar_activo') == 'on' else 'false'
+            config.fecha_actualizacion = datetime.utcnow()
+            
+            db.session.commit()
+            flash('Configuración de Verifactu actualizada correctamente', 'success')
+            return redirect(url_for('configuracion.verifactu_info'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al actualizar configuración: {str(e)}', 'error')
+    
+    # Obtener la configuración actual
+    config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+    verifactu_activo = True  # Por defecto activado
+    if config:
+        verifactu_activo = config.valor.lower() == 'true'
+    
+    return render_template('configuracion/verifactu.html', verifactu_activo=verifactu_activo)
 
 @configuracion_bp.route('/configuracion/exportar')
 @login_required
@@ -476,11 +504,26 @@ def importar_bd_sqlite():
                 flash('El archivo no es un archivo SQLite válido', 'error')
                 return redirect(url_for('configuracion.importar_bd_sqlite'))
             
+            # Verificar que el directorio destino existe y es escribible
+            db_dir = os.path.dirname(db_path)
+            if db_dir and not os.path.exists(db_dir):
+                try:
+                    os.makedirs(db_dir, exist_ok=True)
+                except Exception as e:
+                    flash(f'Error: No se pudo crear el directorio {db_dir}: {str(e)}', 'error')
+                    return redirect(url_for('configuracion.importar_bd_sqlite'))
+            
+            # Verificar permisos de escritura
+            if not os.access(db_dir if db_dir else os.path.dirname(os.path.abspath(db_path)), os.W_OK):
+                flash(f'Error: No se tienen permisos de escritura en el directorio destino', 'error')
+                return redirect(url_for('configuracion.importar_bd_sqlite'))
+            
             # Cerrar todas las conexiones de la base de datos antes de reemplazar
             db.session.close()
             db.engine.dispose()
             
             # Hacer backup de la base de datos actual antes de reemplazarla
+            backup_path = None
             if os.path.exists(db_path):
                 fecha_backup = datetime.now().strftime('%Y%m%d_%H%M%S')
                 backup_path = db_path.replace('.db', f'_backup_{fecha_backup}.db')
@@ -490,14 +533,42 @@ def importar_bd_sqlite():
                 except Exception as e:
                     flash(f'Advertencia: No se pudo crear backup automático: {str(e)}', 'warning')
             
-            # Guardar el nuevo archivo
-            archivo.save(db_path)
+            # Guardar el nuevo archivo usando shutil para mayor robustez
+            # Primero guardar en un archivo temporal y luego moverlo
+            temp_path = db_path + '.tmp'
+            try:
+                archivo.save(temp_path)
+                # Verificar que el archivo temporal se guardó correctamente
+                if not os.path.exists(temp_path):
+                    raise Exception('No se pudo guardar el archivo temporal')
+                
+                # Si existe la BD actual, eliminarla antes de mover el nuevo
+                if os.path.exists(db_path):
+                    os.remove(db_path)
+                
+                # Mover el archivo temporal a la ubicación final
+                shutil.move(temp_path, db_path)
+                
+                # Verificar que el archivo final existe y tiene contenido
+                if not os.path.exists(db_path) or os.path.getsize(db_path) == 0:
+                    raise Exception('El archivo no se guardó correctamente')
+                
+            except Exception as e:
+                # Si hay error, intentar restaurar el backup si existe
+                if backup_path and os.path.exists(backup_path):
+                    try:
+                        shutil.copy2(backup_path, db_path)
+                        flash(f'Error al guardar. Se restauró el backup automático.', 'warning')
+                    except:
+                        pass
+                raise e
             
             # Reinicializar la conexión de la base de datos
             db.engine.dispose()
             db.create_all()
             
-            flash('Base de datos importada correctamente. La aplicación se reiniciará.', 'success')
+            # Mostrar información sobre dónde se guardó
+            flash(f'Base de datos importada correctamente en: {db_path}', 'success')
             return redirect(url_for('configuracion.index'))
             
         except Exception as e:
@@ -506,7 +577,14 @@ def importar_bd_sqlite():
             traceback.print_exc()
             return redirect(url_for('configuracion.importar_bd_sqlite'))
     
-    return render_template('configuracion/importar_bd_sqlite.html')
+    # Obtener información sobre la ruta de la base de datos para mostrarla al usuario
+    database_uri = current_app.config['SQLALCHEMY_DATABASE_URI']
+    db_path_info = 'No disponible'
+    if database_uri.startswith('sqlite:///'):
+        db_path_info = database_uri.replace('sqlite:///', '')
+        db_path_info = os.path.normpath(db_path_info)
+    
+    return render_template('configuracion/importar_bd_sqlite.html', db_path=db_path_info)
 
 @configuracion_bp.route('/configuracion/importar-clientes', methods=['GET', 'POST'])
 @login_required

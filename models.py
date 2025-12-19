@@ -132,6 +132,9 @@ class Pedido(db.Model):
     # Forma de pago
     forma_pago = db.Column(db.Text)
     
+    # Campo de seguimiento para actualizaciones de comerciales
+    seguimiento = db.Column(db.Text)
+    
     # Imagen del diseño
     imagen_diseno = db.Column(db.String(255))
     
@@ -196,6 +199,8 @@ class LineaPedido(db.Model):
     talla = db.Column(db.String(20))
     tejido = db.Column(db.String(100))
     precio_unitario = db.Column(db.Numeric(10, 2), nullable=True)  # Precio unitario de la línea (copiado del presupuesto)
+    descuento = db.Column(db.Numeric(5, 2), nullable=False, default=0)  # Porcentaje de descuento (0-100)
+    precio_final = db.Column(db.Numeric(10, 2), nullable=True)  # Precio unitario con descuento aplicado
     
     # Estado de la línea
     estado = db.Column(db.String(50), nullable=False, default='pendiente')  # pendiente, en confección, en bordado, listo
@@ -278,6 +283,8 @@ class LineaPresupuesto(db.Model):
     talla = db.Column(db.String(20))
     tejido = db.Column(db.String(100))
     precio_unitario = db.Column(db.Numeric(10, 2), nullable=True)  # Precio unitario de la línea
+    descuento = db.Column(db.Numeric(5, 2), nullable=False, default=0)  # Porcentaje de descuento (0-100)
+    precio_final = db.Column(db.Numeric(10, 2), nullable=True)  # Precio unitario con descuento aplicado
     
     # Estado de la línea
     estado = db.Column(db.String(50), nullable=False, default='pendiente')  # pendiente, en confección, en bordado, listo
@@ -367,8 +374,8 @@ class Factura(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     
-    # Relación con pedido
-    pedido_id = db.Column(db.Integer, db.ForeignKey('pedidos.id'), nullable=False)
+    # Relación con pedido (opcional, puede ser None para facturas directas)
+    pedido_id = db.Column(db.Integer, db.ForeignKey('pedidos.id'), nullable=True)
     pedido = db.relationship('Pedido', backref='facturas', lazy=True)
     
     # Datos de la factura
@@ -597,3 +604,16 @@ class Nomina(db.Model):
     
     def __repr__(self):
         return f'<Nomina {self.empleado.nombre if self.empleado else "Sin empleado"} - {self.mes}/{self.año}>'
+
+class Configuracion(db.Model):
+    """Configuraciones del sistema"""
+    __tablename__ = 'configuracion'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    clave = db.Column(db.String(100), unique=True, nullable=False)
+    valor = db.Column(db.Text)
+    descripcion = db.Column(db.Text)
+    fecha_actualizacion = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<Configuracion {self.clave}={self.valor}>'

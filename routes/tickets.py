@@ -161,11 +161,18 @@ def nuevo_ticket():
             # Actualizar importe total del ticket
             ticket.importe_total = importe_total
             
-            # Enviar a Verifactu
+            # Verificar si el envío a Verifactu está activado
+            from models import Configuracion
+            config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+            verifactu_enviar_activo = True  # Por defecto activado
+            if config:
+                verifactu_enviar_activo = config.valor.lower() == 'true'
+            
+            # Enviar a Verifactu solo si está activado y hay token
             verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
             verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
             
-            if verifactu_token:
+            if verifactu_token and verifactu_enviar_activo:
                 # Preparar datos para la API
                 # Calcular base imponible e IVA para cada línea
                 # Asumimos que el importe incluye IVA al 21%
@@ -237,6 +244,10 @@ def nuevo_ticket():
                     ticket.estado = 'error'
                     ticket.huella_verifactu = json.dumps({'error': str(e)})
                     flash(f'Error de conexión con Verifactu: {str(e)}', 'error')
+            elif not verifactu_enviar_activo:
+                # Envío desactivado, solo guardar como pendiente
+                ticket.estado = 'pendiente'
+                flash('Ticket creado. El envío automático a Verifactu está desactivado.', 'info')
             else:
                 # Sin token, solo guardar como pendiente
                 ticket.estado = 'pendiente'
@@ -352,11 +363,22 @@ def reenviar_ticket(ticket_id):
     try:
         ticket = Ticket.query.get_or_404(ticket_id)
         
+        # Verificar si el envío a Verifactu está activado
+        from models import Configuracion
+        config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+        verifactu_enviar_activo = True  # Por defecto activado
+        if config:
+            verifactu_enviar_activo = config.valor.lower() == 'true'
+        
         verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
         verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
         
         if not verifactu_token:
             flash('No se ha configurado VERIFACTU_TOKEN.', 'error')
+            return redirect(url_for('tickets.ver_ticket', ticket_id=ticket_id))
+        
+        if not verifactu_enviar_activo:
+            flash('El envío automático a Verifactu está desactivado. Actívalo en Configuración > Verifactu para reenviar.', 'warning')
             return redirect(url_for('tickets.ver_ticket', ticket_id=ticket_id))
         
         # Preparar datos para la API

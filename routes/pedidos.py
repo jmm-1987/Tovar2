@@ -1,5 +1,5 @@
 """Rutas para gestión de pedidos"""
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, make_response
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, make_response, jsonify
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
@@ -114,20 +114,39 @@ def nuevo_pedido():
                 tipo_pedido=request.form.get('tipo_pedido'),
                 estado='Pendiente',  # Siempre se establece como Pendiente al crear
                 forma_pago=request.form.get('forma_pago', ''),
+                seguimiento=request.form.get('seguimiento', ''),
                 fecha_aceptacion=fecha_aceptacion,
                 fecha_objetivo=fecha_objetivo
             )
             
-            # Manejar imagen de diseño
-            if 'imagen_diseno' in request.files:
-                file = request.files['imagen_diseno']
-                if file and file.filename:
-                    filename = secure_filename(file.filename)
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                    filename = timestamp + filename
-                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-                    file.save(filepath)
-                    pedido.imagen_diseno = filename
+            # Función auxiliar para guardar imagen
+            def guardar_imagen(campo_file, campo_db):
+                """Guardar imagen del formulario"""
+                if campo_file in request.files:
+                    file = request.files[campo_file]
+                    if file and file.filename:
+                        filename = secure_filename(file.filename)
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                        filename = timestamp + filename
+                        filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+                        file.save(filepath)
+                        setattr(pedido, campo_db, filename)
+            
+            # Manejar imágenes
+            guardar_imagen('imagen_diseno', 'imagen_diseno')
+            guardar_imagen('imagen_portada', 'imagen_portada')
+            guardar_imagen('imagen_adicional_1', 'imagen_adicional_1')
+            guardar_imagen('imagen_adicional_2', 'imagen_adicional_2')
+            guardar_imagen('imagen_adicional_3', 'imagen_adicional_3')
+            guardar_imagen('imagen_adicional_4', 'imagen_adicional_4')
+            guardar_imagen('imagen_adicional_5', 'imagen_adicional_5')
+            
+            # Guardar descripciones de imágenes
+            pedido.descripcion_imagen_1 = request.form.get('descripcion_imagen_1', '')
+            pedido.descripcion_imagen_2 = request.form.get('descripcion_imagen_2', '')
+            pedido.descripcion_imagen_3 = request.form.get('descripcion_imagen_3', '')
+            pedido.descripcion_imagen_4 = request.form.get('descripcion_imagen_4', '')
+            pedido.descripcion_imagen_5 = request.form.get('descripcion_imagen_5', '')
             
             db.session.add(pedido)
             db.session.flush()  # Para obtener el ID del pedido
@@ -149,7 +168,8 @@ def nuevo_pedido():
             tallas = request.form.getlist('talla[]')
             tejidos = request.form.getlist('tejido[]')
             precios_unitarios = request.form.getlist('precio_unitario[]')
-            estados_lineas = request.form.getlist('estado_linea[]')
+            descuentos = request.form.getlist('descuento[]')
+            precios_finales = request.form.getlist('precio_final[]')
             
             for i in range(len(prenda_ids)):
                 if prenda_ids[i] and (nombres_mostrar[i] if i < len(nombres_mostrar) else nombres[i] if i < len(nombres) else ''):
@@ -160,6 +180,24 @@ def nuevo_pedido():
                             precio_unitario = Decimal(str(precios_unitarios[i]))
                         except:
                             precio_unitario = None
+                    
+                    # Obtener descuento
+                    descuento = Decimal('0')
+                    if i < len(descuentos) and descuentos[i]:
+                        try:
+                            descuento = Decimal(str(descuentos[i]))
+                        except:
+                            descuento = Decimal('0')
+                    
+                    # Calcular precio final si hay descuento
+                    precio_final = None
+                    if precio_unitario and descuento > 0:
+                        precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+                    elif i < len(precios_finales) and precios_finales[i]:
+                        try:
+                            precio_final = Decimal(str(precios_finales[i]))
+                        except:
+                            precio_final = None
                     
                     # Usar nombre_mostrar si existe, sino usar nombre (compatibilidad)
                     nombre_mostrar_val = nombres_mostrar[i] if i < len(nombres_mostrar) and nombres_mostrar[i] else (nombres[i] if i < len(nombres) else '')
@@ -178,7 +216,9 @@ def nuevo_pedido():
                         talla=tallas[i] if i < len(tallas) else '',
                         tejido=tejidos[i] if i < len(tejidos) else '',
                         precio_unitario=precio_unitario,
-                        estado=estados_lineas[i] if i < len(estados_lineas) and estados_lineas[i] else 'pendiente'
+                        descuento=descuento,
+                        precio_final=precio_final,
+                        estado='pendiente'
                     )
                     db.session.add(linea)
             
@@ -214,6 +254,7 @@ def editar_pedido(pedido_id):
             # No actualizar el estado al editar, mantener el estado actual
             # pedido.estado se mantiene como está
             pedido.forma_pago = request.form.get('forma_pago', '')
+            pedido.seguimiento = request.form.get('seguimiento', '')
             
             # Actualizar fecha_objetivo si se proporciona
             if request.form.get('fecha_objetivo'):
@@ -231,22 +272,44 @@ def editar_pedido(pedido_id):
             if request.form.get('fecha_entrega_cliente'):
                 pedido.fecha_entrega_cliente = datetime.strptime(request.form.get('fecha_entrega_cliente'), '%Y-%m-%d')
             
-            # Manejar nueva imagen de diseño
-            if 'imagen_diseno' in request.files:
-                file = request.files['imagen_diseno']
-                if file and file.filename:
-                    # Eliminar imagen anterior si existe
-                    if pedido.imagen_diseno:
-                        old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], pedido.imagen_diseno)
-                        if os.path.exists(old_path):
-                            os.remove(old_path)
-                    
-                    filename = secure_filename(file.filename)
-                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                    filename = timestamp + filename
-                    filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-                    file.save(filepath)
-                    pedido.imagen_diseno = filename
+            # Función auxiliar para actualizar imagen
+            def actualizar_imagen(campo_file, campo_db):
+                """Actualizar imagen del formulario"""
+                if campo_file in request.files:
+                    file = request.files[campo_file]
+                    if file and file.filename:
+                        # Eliminar imagen anterior si existe
+                        imagen_anterior = getattr(pedido, campo_db)
+                        if imagen_anterior:
+                            old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], imagen_anterior)
+                            if os.path.exists(old_path):
+                                try:
+                                    os.remove(old_path)
+                                except:
+                                    pass
+                        
+                        filename = secure_filename(file.filename)
+                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
+                        filename = timestamp + filename
+                        filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+                        file.save(filepath)
+                        setattr(pedido, campo_db, filename)
+            
+            # Manejar imágenes
+            actualizar_imagen('imagen_diseno', 'imagen_diseno')
+            actualizar_imagen('imagen_portada', 'imagen_portada')
+            actualizar_imagen('imagen_adicional_1', 'imagen_adicional_1')
+            actualizar_imagen('imagen_adicional_2', 'imagen_adicional_2')
+            actualizar_imagen('imagen_adicional_3', 'imagen_adicional_3')
+            actualizar_imagen('imagen_adicional_4', 'imagen_adicional_4')
+            actualizar_imagen('imagen_adicional_5', 'imagen_adicional_5')
+            
+            # Actualizar descripciones de imágenes
+            pedido.descripcion_imagen_1 = request.form.get('descripcion_imagen_1', '')
+            pedido.descripcion_imagen_2 = request.form.get('descripcion_imagen_2', '')
+            pedido.descripcion_imagen_3 = request.form.get('descripcion_imagen_3', '')
+            pedido.descripcion_imagen_4 = request.form.get('descripcion_imagen_4', '')
+            pedido.descripcion_imagen_5 = request.form.get('descripcion_imagen_5', '')
             
             # Eliminar líneas existentes (dentro de la misma transacción)
             try:
@@ -269,7 +332,8 @@ def editar_pedido(pedido_id):
             tallas = request.form.getlist('talla[]')
             tejidos = request.form.getlist('tejido[]')
             precios_unitarios = request.form.getlist('precio_unitario[]')
-            estados_lineas = request.form.getlist('estado_linea[]')
+            descuentos = request.form.getlist('descuento[]')
+            precios_finales = request.form.getlist('precio_final[]')
             
             for i in range(len(prenda_ids)):
                 if prenda_ids[i] and (nombres_mostrar[i] if i < len(nombres_mostrar) else nombres[i] if i < len(nombres) else ''):
@@ -280,6 +344,24 @@ def editar_pedido(pedido_id):
                             precio_unitario = Decimal(str(precios_unitarios[i]))
                         except:
                             precio_unitario = None
+                    
+                    # Obtener descuento
+                    descuento = Decimal('0')
+                    if i < len(descuentos) and descuentos[i]:
+                        try:
+                            descuento = Decimal(str(descuentos[i]))
+                        except:
+                            descuento = Decimal('0')
+                    
+                    # Calcular precio final si hay descuento
+                    precio_final = None
+                    if precio_unitario and descuento > 0:
+                        precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+                    elif i < len(precios_finales) and precios_finales[i]:
+                        try:
+                            precio_final = Decimal(str(precios_finales[i]))
+                        except:
+                            precio_final = None
                     
                     # Usar nombre_mostrar si existe, sino usar nombre (compatibilidad)
                     nombre_mostrar_val = nombres_mostrar[i] if i < len(nombres_mostrar) and nombres_mostrar[i] else (nombres[i] if i < len(nombres) else '')
@@ -298,7 +380,9 @@ def editar_pedido(pedido_id):
                         talla=tallas[i] if i < len(tallas) else '',
                         tejido=tejidos[i] if i < len(tejidos) else '',
                         precio_unitario=precio_unitario,
-                        estado=estados_lineas[i] if i < len(estados_lineas) and estados_lineas[i] else 'pendiente'
+                        descuento=descuento,
+                        precio_final=precio_final,
+                        estado='pendiente'
                     )
                     db.session.add(linea)
             
@@ -320,6 +404,57 @@ def editar_pedido(pedido_id):
                          comerciales=comerciales, 
                          clientes=clientes, 
                          prendas=prendas)
+
+@pedidos_bp.route('/pedidos/crear-cliente-ajax', methods=['POST'])
+@login_required
+def crear_cliente_ajax():
+    """Crear cliente desde AJAX (desde la creación de pedido)"""
+    try:
+        # Procesar fecha de alta
+        fecha_alta_str = request.form.get('fecha_alta', '')
+        fecha_alta = None
+        if fecha_alta_str:
+            try:
+                fecha_alta = datetime.strptime(fecha_alta_str, '%Y-%m-%d').date()
+            except:
+                pass
+        
+        # Crear cliente
+        cliente = Cliente(
+            nombre=request.form.get('nombre'),
+            alias=request.form.get('alias', ''),
+            nif=request.form.get('nif', ''),
+            direccion=request.form.get('direccion', ''),
+            poblacion=request.form.get('poblacion', ''),
+            provincia=request.form.get('provincia', ''),
+            codigo_postal=request.form.get('codigo_postal', ''),
+            pais=request.form.get('pais', 'España'),
+            telefono=request.form.get('telefono', ''),
+            movil=request.form.get('movil', ''),
+            email=request.form.get('email', ''),
+            categoria=request.form.get('categoria', ''),
+            personas_contacto=request.form.get('personas_contacto', ''),
+            anotaciones=request.form.get('anotaciones', ''),
+            fecha_alta=fecha_alta,
+            comercial_id=request.form.get('comercial_id') or None
+        )
+        
+        db.session.add(cliente)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'cliente': {
+                'id': cliente.id,
+                'nombre': cliente.nombre
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 400
 
 @pedidos_bp.route('/pedidos/<int:pedido_id>')
 @login_required

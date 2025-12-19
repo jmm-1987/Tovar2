@@ -13,11 +13,26 @@
     
     <div class="info-section">
         <h2>Configuración</h2>
+        <form method="POST" style="margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 15px; padding: 15px; background: #f8f9fa; border-radius: 5px; margin-bottom: 15px;">
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 16px; font-weight: 500;">
+                    <input type="checkbox" name="verifactu_enviar_activo" {% if verifactu_activo %}checked{% endif %} 
+                           style="width: 20px; height: 20px; cursor: pointer;">
+                    <span>Enviar automáticamente facturas y tickets a Verifactu</span>
+                </label>
+            </div>
+            <button type="submit" class="btn btn-primary" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 14px;">Guardar Configuración</button>
+        </form>
+        
         <p>La configuración de la API Verifactu se realiza mediante la variable de entorno <code>VERIFACTU_TOKEN</code> en el archivo <code>.env</code> o en las variables de entorno del servidor.</p>
         
         <div class="code-block">
             <pre>VERIFACTU_TOKEN=tu_token_aqui</pre>
         </div>
+        
+        <p style="margin-top: 15px; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+            <strong>Nota:</strong> Si desactivas el envío automático, las facturas y tickets se crearán pero no se enviarán a Verifactu hasta que lo actives nuevamente y los reenvíes manualmente.
+        </p>
     </div>
     
     <div class="info-section">
@@ -133,6 +148,7 @@ code {
 }
 </style>
 {% endblock %}
+
 
 
 

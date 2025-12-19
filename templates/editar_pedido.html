@@ -45,8 +45,7 @@
             <label for="tipo_pedido">Tipo *</label>
             <select name="tipo_pedido" id="tipo_pedido" required>
                 <option value="fabricacion" {% if pedido.tipo_pedido == 'fabricacion' %}selected{% endif %}>Fabricación</option>
-                <option value="no fabricacion" {% if pedido.tipo_pedido == 'no fabricacion' %}selected{% endif %}>No Fabricación</option>
-                <option value="cliente web" {% if pedido.tipo_pedido == 'cliente web' %}selected{% endif %}>Cliente Web</option>
+                <option value="pedido proveedor" {% if pedido.tipo_pedido == 'pedido proveedor' %}selected{% endif %}>Pedido proveedor</option>
             </select>
         </div>
     </div>
@@ -58,16 +57,6 @@
         </div>
 
         <div class="form-group-compact">
-            <label for="fecha_aceptacion">Fecha Aceptación</label>
-            <input type="date" name="fecha_aceptacion" id="fecha_aceptacion" value="{{ pedido.fecha_aceptacion.strftime('%Y-%m-%d') if pedido.fecha_aceptacion else '' }}">
-        </div>
-
-        <div class="form-group-compact">
-            <label for="fecha_objetivo">Fecha Objetivo</label>
-            <input type="date" name="fecha_objetivo" id="fecha_objetivo" value="{{ pedido.fecha_objetivo.strftime('%Y-%m-%d') if pedido.fecha_objetivo else '' }}">
-        </div>
-
-        <div class="form-group-compact">
             <label for="imagen_diseno">Imagen Diseño</label>
             <input type="file" name="imagen_diseno" id="imagen_diseno" accept="image/*">
             {% if pedido.imagen_diseno %}
@@ -75,25 +64,66 @@
             {% endif %}
         </div>
     </div>
-    <small style="color: #666; font-size: 11px; display: block; margin-top: -10px; margin-bottom: 15px;">La fecha objetivo se calcula automáticamente (20 días desde aceptación) si se deja vacía</small>
 
-    <div class="form-row-compact">
-        <div class="form-group-compact">
-            <label for="fecha_entrega_trabajo">F. Entrega Weark</label>
-            <input type="date" name="fecha_entrega_trabajo" id="fecha_entrega_trabajo" value="{{ pedido.fecha_entrega_trabajo.strftime('%Y-%m-%d') if pedido.fecha_entrega_trabajo else '' }}">
+    <h3>Imágenes para el PDF del Pedido</h3>
+    <div style="margin-bottom: 20px;">
+        <label style="display: block; margin-bottom: 10px; font-weight: 500;">Imágenes Adicionales (Página 2) - Máximo 5 imágenes</label>
+        <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+            {% for i in range(1, 6) %}
+            {% if i == 1 %}
+                {% set tiene_imagen = pedido.imagen_adicional_1 %}
+                {% set descripcion = pedido.descripcion_imagen_1 or '' %}
+            {% elif i == 2 %}
+                {% set tiene_imagen = pedido.imagen_adicional_2 %}
+                {% set descripcion = pedido.descripcion_imagen_2 or '' %}
+            {% elif i == 3 %}
+                {% set tiene_imagen = pedido.imagen_adicional_3 %}
+                {% set descripcion = pedido.descripcion_imagen_3 or '' %}
+            {% elif i == 4 %}
+                {% set tiene_imagen = pedido.imagen_adicional_4 %}
+                {% set descripcion = pedido.descripcion_imagen_4 or '' %}
+            {% elif i == 5 %}
+                {% set tiene_imagen = pedido.imagen_adicional_5 %}
+                {% set descripcion = pedido.descripcion_imagen_5 or '' %}
+            {% endif %}
+            <div style="display: flex; flex-direction: column; gap: 10px; width: 200px;">
+                <div class="imagen-miniatura-container" style="position: relative; width: 200px; height: 200px; border: 2px dashed #ddd; border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f9f9f9; cursor: pointer; transition: all 0.3s ease;" 
+                     ondrop="dropHandler(event, {{ i }})" 
+                     ondragover="allowDrop(event)" 
+                     ondragleave="dragLeave(event)"
+                     onclick="document.getElementById('imagen_adicional_{{ i }}').click()">
+                    <input type="file" name="imagen_adicional_{{ i }}" id="imagen_adicional_{{ i }}" accept="image/*" style="display: none;" onchange="handleImageSelect({{ i }}, this)">
+                    <div class="imagen-preview" id="preview_container_{{ i }}" style="width: 100%; height: 100%; display: {% if tiene_imagen %}flex{% else %}none{% endif %}; position: relative; border-radius: 6px; overflow: hidden;">
+                        <img id="preview_img_{{ i }}" src="{% if tiene_imagen %}{{ url_for('static', filename='uploads/' + tiene_imagen) }}{% endif %}" alt="Preview" style="width: 100%; height: 100%; object-fit: cover;">
+                        <button type="button" onclick="eliminarImagen({{ i }}); event.stopPropagation();" style="position: absolute; top: 5px; right: 5px; background: rgba(220, 53, 69, 0.9); color: white; border: none; border-radius: 50%; width: 25px; height: 25px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center;">×</button>
+                    </div>
+                    <div class="imagen-placeholder" id="placeholder_{{ i }}" style="display: {% if tiene_imagen %}none{% else %}flex{% endif %}; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%;">
+                        <div style="font-size: 40px; color: #ccc; margin-bottom: 8px;">📷</div>
+                        <div style="font-size: 12px; color: #999; text-align: center;">Imagen {{ i }}</div>
+                        <div style="font-size: 11px; color: #999; margin-top: 4px;">Arrastra o haz clic</div>
+                    </div>
+                </div>
+                <div style="display: flex; flex-direction: column;">
+                    <label for="descripcion_imagen_{{ i }}" style="font-size: 12px; color: #666; margin-bottom: 5px;">Descripción (opcional)</label>
+                    <textarea name="descripcion_imagen_{{ i }}" id="descripcion_imagen_{{ i }}" rows="3" placeholder="Descripción de la imagen..." style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; resize: vertical;">{{ descripcion }}</textarea>
+                </div>
+            </div>
+            {% endfor %}
         </div>
-        <div class="form-group-compact">
-            <label for="fecha_envio_taller">F. Envío Taller</label>
-            <input type="date" name="fecha_envio_taller" id="fecha_envio_taller" value="{{ pedido.fecha_envio_taller.strftime('%Y-%m-%d') if pedido.fecha_envio_taller else '' }}">
-        </div>
-        <div class="form-group-compact">
-            <label for="fecha_entrega_bordados">F. Entrega Bordados</label>
-            <input type="date" name="fecha_entrega_bordados" id="fecha_entrega_bordados" value="{{ pedido.fecha_entrega_bordados.strftime('%Y-%m-%d') if pedido.fecha_entrega_bordados else '' }}">
-        </div>
-        <div class="form-group-compact">
-            <label for="fecha_entrega_cliente">F. Entrega Cliente</label>
-            <input type="date" name="fecha_entrega_cliente" id="fecha_entrega_cliente" value="{{ pedido.fecha_entrega_cliente.strftime('%Y-%m-%d') if pedido.fecha_entrega_cliente else '' }}">
-        </div>
+        <small style="color: #666; font-size: 0.85em; display: block; margin-top: 10px;" id="contador-imagenes">
+            {% set contador = 0 %}
+            {% if pedido.imagen_adicional_1 %}{% set contador = contador + 1 %}{% endif %}
+            {% if pedido.imagen_adicional_2 %}{% set contador = contador + 1 %}{% endif %}
+            {% if pedido.imagen_adicional_3 %}{% set contador = contador + 1 %}{% endif %}
+            {% if pedido.imagen_adicional_4 %}{% set contador = contador + 1 %}{% endif %}
+            {% if pedido.imagen_adicional_5 %}{% set contador = contador + 1 %}{% endif %}
+            {{ contador }}/5 imágenes seleccionadas
+        </small>
+    </div>
+
+    <div class="form-group">
+        <label for="seguimiento">Comentarios internos y seguimiento</label>
+        <textarea name="seguimiento" id="seguimiento" rows="3" placeholder="Escribe aquí las actualizaciones y seguimiento del pedido...">{{ pedido.seguimiento or '' }}</textarea>
     </div>
 
     <h3>Prendas del Pedido</h3>
@@ -129,13 +159,9 @@
                         <option value="T.CAMISETA" {% if linea.tejido == 'T.CAMISETA' %}selected{% endif %}>T.CAMISETA</option>
                         <option value="T.SHOFT" {% if linea.tejido == 'T.SHOFT' %}selected{% endif %}>T.SHOFT</option>
                     </select>
-                    <input type="number" name="precio_unitario[]" class="linea-campo-compact" step="0.01" min="0" value="{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '' }}" placeholder="Precio €" title="Precio" style="flex: 0 0 100px; width: 100px;">
-                    <select name="estado_linea[]" class="linea-campo-compact" required title="Estado">
-                        <option value="pendiente" {% if (linea.estado or 'pendiente') == 'pendiente' %}selected{% endif %}>Pendiente</option>
-                        <option value="en confección" {% if (linea.estado or 'pendiente') == 'en confección' %}selected{% endif %}>En confección</option>
-                        <option value="en bordado" {% if (linea.estado or 'pendiente') == 'en bordado' %}selected{% endif %}>En bordado</option>
-                        <option value="listo" {% if (linea.estado or 'pendiente') == 'listo' %}selected{% endif %}>Listo</option>
-                    </select>
+                    <input type="number" name="precio_unitario[]" class="linea-campo-compact precio-unitario-input" step="0.01" min="0" value="{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '' }}" placeholder="Precio €" title="Precio" style="flex: 0 0 100px; width: 100px;">
+                    <input type="number" name="descuento[]" class="linea-campo-compact descuento-input" step="0.01" min="0" max="100" value="{{ "%.2f"|format(linea.descuento) if linea.descuento else '0' }}" placeholder="Desc. %" title="Descuento (%)" style="flex: 0 0 80px; width: 80px;">
+                    <input type="number" name="precio_final[]" class="linea-campo-compact precio-final-input" step="0.01" min="0" value="{{ "%.2f"|format(linea.precio_final) if linea.precio_final else '' }}" placeholder="P. Final €" title="Precio Final" readonly style="flex: 0 0 100px; width: 100px; background: #f0f0f0;">
                     
                     <!-- Campos personalizados (nombre y cargo) - se muestran al final si tienen valor o si se activa personalización -->
                     {% set mostrarPersonalizados = linea.nombre or linea.cargo %}
@@ -184,12 +210,6 @@
                     <option value="T.SHOFT">T.SHOFT</option>
                 </select>
                 <input type="number" name="precio_unitario[]" class="linea-campo-compact" step="0.01" min="0" placeholder="Precio €" title="Precio" style="flex: 0 0 100px; width: 100px;">
-                <select name="estado_linea[]" class="linea-campo-compact" required title="Estado">
-                    <option value="pendiente" selected>Pendiente</option>
-                    <option value="en confección">En confección</option>
-                    <option value="en bordado">En bordado</option>
-                    <option value="listo">Listo</option>
-                </select>
                 
                 <!-- Campos personalizados (nombre y cargo) - se muestran al final si tienen valor o si se activa personalización -->
                 <input type="text" name="nombre[]" class="linea-campo-compact campo-personalizado" placeholder="Nombre personalizado" title="Nombre personalizado" style="display: none; flex: 2.5;">
@@ -213,6 +233,20 @@
     <div class="actions">
         <button type="submit" class="btn btn-success">Actualizar Pedido</button>
         <a href="{{ url_for('index.index') }}" class="btn btn-danger">Cancelar</a>
+</form>
+
+<style>
+.imagen-miniatura-container:hover {
+    border-color: #3498db;
+    background: #f0f8ff;
+}
+
+.imagen-miniatura-container.drag-over {
+    border-color: #3498db;
+    background: #e3f2fd;
+    transform: scale(1.05);
+}
+</style>
     </div>
 </form>
 
@@ -235,6 +269,85 @@ function calcularFechaObjetivo() {
 document.getElementById('fecha_aceptacion').addEventListener('change', calcularFechaObjetivo);
 
 let contadorPrendas = {{ pedido.lineas|length if pedido.lineas else 1 }};
+
+// Funciones para drag & drop
+function allowDrop(ev) {
+    ev.preventDefault();
+    ev.currentTarget.classList.add('drag-over');
+}
+
+function dragLeave(ev) {
+    ev.currentTarget.classList.remove('drag-over');
+}
+
+function dropHandler(ev, numero) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove('drag-over');
+    
+    const files = ev.dataTransfer.files;
+    if (files.length > 0 && files[0].type.startsWith('image/')) {
+        const input = document.getElementById('imagen_adicional_' + numero);
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(files[0]);
+        input.files = dataTransfer.files;
+        handleImageSelect(numero, input);
+    }
+}
+
+// Manejar selección de imagen (click o drop)
+function handleImageSelect(numero, input) {
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            const preview = document.getElementById('preview_container_' + numero);
+            const placeholder = document.getElementById('placeholder_' + numero);
+            const img = document.getElementById('preview_img_' + numero);
+            
+            img.src = e.target.result;
+            preview.style.display = 'flex';
+            placeholder.style.display = 'none';
+        };
+        
+        reader.readAsDataURL(file);
+        actualizarContador();
+    }
+}
+
+// Eliminar imagen
+function eliminarImagen(numero) {
+    const input = document.getElementById('imagen_adicional_' + numero);
+    input.value = '';
+    
+    const preview = document.getElementById('preview_container_' + numero);
+    const placeholder = document.getElementById('placeholder_' + numero);
+    
+    preview.style.display = 'none';
+    placeholder.style.display = 'flex';
+    
+    // Limpiar la imagen del preview
+    const img = document.getElementById('preview_img_' + numero);
+    img.src = '';
+    
+    actualizarContador();
+}
+
+// Actualizar contador
+function actualizarContador() {
+    let contador = 0;
+    for (let i = 1; i <= 5; i++) {
+        const preview = document.getElementById('preview_container_' + i);
+        const input = document.getElementById('imagen_adicional_' + i);
+        if ((preview && preview.style.display !== 'none' && preview.querySelector('img').src) || (input && input.files.length > 0)) {
+            contador++;
+        }
+    }
+    const contadorElement = document.getElementById('contador-imagenes');
+    if (contadorElement) {
+        contadorElement.textContent = contador + '/5 imágenes seleccionadas';
+    }
+}
 function agregarLinea() {
     contadorPrendas++;
     const container = document.getElementById('prendas-container');
@@ -252,12 +365,14 @@ function agregarLinea() {
         }
     });
     nuevaLinea.querySelectorAll('select').forEach(select => {
-        if (select.name === 'estado_linea[]') {
-            select.value = 'pendiente';
-        } else {
-            select.selectedIndex = 0;
-        }
+        select.selectedIndex = 0;
     });
+    
+    // Resetear descuento y precio final
+    const descuentoInput = nuevaLinea.querySelector('.descuento-input');
+    const precioFinalInput = nuevaLinea.querySelector('.precio-final-input');
+    if (descuentoInput) descuentoInput.value = '0';
+    if (precioFinalInput) precioFinalInput.value = '';
     
     // Ocultar campos personalizados por defecto
     nuevaLinea.querySelectorAll('.campo-personalizado').forEach(campo => {
@@ -270,6 +385,13 @@ function agregarLinea() {
         btnPersonalizar.style.background = '#95a5a6';
         btnPersonalizar.style.opacity = '0.7';
         btnPersonalizar.classList.remove('active');
+    }
+    
+    // Añadir event listeners para calcular precio final
+    const precioUnitarioInput = nuevaLinea.querySelector('.precio-unitario-input');
+    if (precioUnitarioInput && descuentoInput && precioFinalInput) {
+        precioUnitarioInput.addEventListener('input', calcularPrecioFinal);
+        descuentoInput.addEventListener('input', calcularPrecioFinal);
     }
     
     // Actualizar número
@@ -340,12 +462,10 @@ function duplicarLinea(btn) {
     const prendaSelectOriginal = lineaRow.querySelector('select[name="prenda_id[]"]');
     const sexoSelectOriginal = lineaRow.querySelector('select[name="sexo[]"]');
     const tejidoSelectOriginal = lineaRow.querySelector('select[name="tejido[]"]');
-    const estadoSelectOriginal = lineaRow.querySelector('select[name="estado_linea[]"]');
     
     const prendaValue = prendaSelectOriginal ? prendaSelectOriginal.value : '';
     const sexoValue = sexoSelectOriginal ? sexoSelectOriginal.value : '';
     const tejidoValue = tejidoSelectOriginal ? tejidoSelectOriginal.value : '';
-    const estadoValue = estadoSelectOriginal ? estadoSelectOriginal.value : '';
     
     // Limpiar talla y unidades
     const tallaInput = nuevaLinea.querySelector('input[name="talla[]"]');
@@ -362,7 +482,6 @@ function duplicarLinea(btn) {
     const prendaSelectNuevo = nuevaLinea.querySelector('select[name="prenda_id[]"]');
     const sexoSelectNuevo = nuevaLinea.querySelector('select[name="sexo[]"]');
     const tejidoSelectNuevo = nuevaLinea.querySelector('select[name="tejido[]"]');
-    const estadoSelectNuevo = nuevaLinea.querySelector('select[name="estado_linea[]"]');
     
     if (prendaSelectNuevo && prendaValue) {
         prendaSelectNuevo.value = prendaValue;
@@ -372,9 +491,6 @@ function duplicarLinea(btn) {
     }
     if (tejidoSelectNuevo && tejidoValue) {
         tejidoSelectNuevo.value = tejidoValue;
-    }
-    if (estadoSelectNuevo && estadoValue) {
-        estadoSelectNuevo.value = estadoValue;
     }
     
     // Mantener el estado de los campos personalizados
@@ -516,7 +632,7 @@ document.getElementById('formCrearClientePedido').addEventListener('submit', fun
     submitBtn.disabled = true;
     submitBtn.textContent = 'Creando...';
     
-    fetch('{{ url_for("presupuestos.crear_cliente_ajax") }}', {
+    fetch('{{ url_for("pedidos.crear_cliente_ajax") }}', {
         method: 'POST',
         body: formData
     })

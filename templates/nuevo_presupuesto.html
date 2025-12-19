@@ -129,7 +129,9 @@
                     <option value="T.CAMISETA">T.CAMISETA</option>
                     <option value="T.SHOFT">T.SHOFT</option>
                 </select>
-                <input type="number" name="precio_unitario[]" class="linea-campo-compact" step="0.01" min="0" placeholder="Precio €" title="Precio" style="flex: 0 0 100px; width: 100px;">
+                <input type="number" name="precio_unitario[]" class="linea-campo-compact precio-unitario-input" step="0.01" min="0" placeholder="Precio €" title="Precio" style="flex: 0 0 100px; width: 100px;">
+                <input type="number" name="descuento[]" class="linea-campo-compact descuento-input" step="0.01" min="0" max="100" value="0" placeholder="Desc. %" title="Descuento (%)" style="flex: 0 0 80px; width: 80px;">
+                <input type="number" name="precio_final[]" class="linea-campo-compact precio-final-input" step="0.01" min="0" placeholder="P. Final €" title="Precio Final" readonly style="flex: 0 0 100px; width: 100px; background: #f0f0f0;">
                 
                 <!-- Campos personalizados (nombre y cargo) - se muestran al final si tienen valor o si se activa personalización -->
                 <input type="text" name="nombre[]" class="linea-campo-compact campo-personalizado" placeholder="Nombre personalizado" title="Nombre personalizado" style="display: none; flex: 2.5;">
@@ -264,10 +266,23 @@ function agregarLinea() {
         select.selectedIndex = 0;
     });
     
+    // Resetear descuento y precio final
+    const descuentoInput = nuevaLinea.querySelector('.descuento-input');
+    const precioFinalInput = nuevaLinea.querySelector('.precio-final-input');
+    if (descuentoInput) descuentoInput.value = '0';
+    if (precioFinalInput) precioFinalInput.value = '';
+    
     // Ocultar campos personalizados por defecto
     nuevaLinea.querySelectorAll('.campo-personalizado').forEach(campo => {
         campo.style.display = 'none';
     });
+    
+    // Añadir event listeners para calcular precio final
+    const precioUnitarioInput = nuevaLinea.querySelector('.precio-unitario-input');
+    if (precioUnitarioInput && descuentoInput && precioFinalInput) {
+        precioUnitarioInput.addEventListener('input', calcularPrecioFinal);
+        descuentoInput.addEventListener('input', calcularPrecioFinal);
+    }
     
     // Resetear botón de personalizar
     const btnPersonalizar = nuevaLinea.querySelector('.btn-personalizar');
@@ -291,6 +306,35 @@ function renumerarPrendas() {
         }
     });
 }
+
+// Función para calcular el precio final con descuento
+function calcularPrecioFinal(event) {
+    const lineaRow = event.target.closest('.linea-pedido-row');
+    if (!lineaRow) return;
+    
+    const precioUnitarioInput = lineaRow.querySelector('.precio-unitario-input');
+    const descuentoInput = lineaRow.querySelector('.descuento-input');
+    const precioFinalInput = lineaRow.querySelector('.precio-final-input');
+    
+    if (!precioUnitarioInput || !descuentoInput || !precioFinalInput) return;
+    
+    const precioUnitario = parseFloat(precioUnitarioInput.value) || 0;
+    const descuento = parseFloat(descuentoInput.value) || 0;
+    
+    if (precioUnitario > 0 && descuento > 0) {
+        const precioFinal = precioUnitario * (1 - descuento / 100);
+        precioFinalInput.value = precioFinal.toFixed(2);
+    } else {
+        precioFinalInput.value = '';
+    }
+}
+
+// Añadir event listeners a todas las líneas existentes al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.precio-unitario-input, .descuento-input').forEach(input => {
+        input.addEventListener('input', calcularPrecioFinal);
+    });
+});
 
 function eliminarLinea(btn) {
     const lineas = document.querySelectorAll('.linea-pedido-row');
