@@ -187,12 +187,23 @@ def formalizar_factura_solicitud(presupuesto_id):
             precio_unitario = Decimal(str(linea_data.get('precio_unitario', 0)))
             importe = Decimal(str(linea_data.get('importe', 0)))
             
+            # Obtener descuento y precio_final de la línea de presupuesto si existe
+            descuento = Decimal('0')
+            precio_final = None
+            if linea_presupuesto_id:
+                linea_presupuesto = LineaPresupuesto.query.get(linea_presupuesto_id)
+                if linea_presupuesto:
+                    descuento = Decimal(str(linea_presupuesto.descuento)) if linea_presupuesto.descuento else Decimal('0')
+                    precio_final = Decimal(str(linea_presupuesto.precio_final)) if linea_presupuesto.precio_final else None
+            
             linea_factura = LineaFactura(
                 factura_id=factura.id,
                 linea_pedido_id=None,  # No hay línea de pedido, es de presupuesto
                 descripcion=descripcion_linea,
                 cantidad=cantidad,
                 precio_unitario=precio_unitario,
+                descuento=descuento,
+                precio_final=precio_final,
                 importe=importe
             )
             db.session.add(linea_factura)
@@ -707,15 +718,27 @@ def preparar_datos_imprimir_factura(factura_id):
     factura = Factura.query.get_or_404(factura_id)
     pedido = factura.pedido
     
-    # Calcular totales
+    # Calcular totales usando precio_unitario y descuento de las líneas
     tipo_iva = 21
     base_imponible = Decimal('0.00')
     
     for linea in factura.lineas:
-        importe = Decimal(str(linea.importe))
-        # Si el importe incluye IVA, calcular base imponible
-        base_linea = importe / (Decimal('1') + Decimal(str(tipo_iva)) / Decimal('100'))
-        base_imponible += base_linea.quantize(Decimal('0.01'))
+        cantidad = Decimal(str(linea.cantidad))
+        precio_unitario = Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0.00')
+        descuento = Decimal(str(linea.descuento)) if linea.descuento else Decimal('0')
+        
+        # Calcular precio final con descuento
+        precio_final = precio_unitario
+        if descuento > 0:
+            precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+        
+        # Si hay precio_final guardado, usarlo
+        if linea.precio_final:
+            precio_final = Decimal(str(linea.precio_final))
+        
+        # Calcular total de la línea (sin IVA)
+        total_linea = cantidad * precio_final
+        base_imponible += total_linea
     
     iva_total = base_imponible * Decimal(str(tipo_iva)) / Decimal('100')
     iva_total = iva_total.quantize(Decimal('0.01'))
@@ -819,14 +842,15 @@ def preparar_datos_imprimir_albaran(factura_id=None, pedido_id=None):
 @facturacion_bp.route('/facturacion/factura/<int:factura_id>/descargar-pdf')
 @login_required
 def descargar_pdf_factura(factura_id):
-    """Descargar factura en formato PDF"""
+    """Descargar factura en formato PDF (con precios)"""
     try:
         datos = preparar_datos_imprimir_factura(factura_id)
         
-        # Renderizar el HTML de la factura
+        # Renderizar el HTML como factura (con precios)
         html = render_template('imprimir_factura_pdf.html', 
                              **datos,
-                             use_base64=True)
+                             use_base64=True,
+                             es_albaran=False)
         
         # Crear el PDF en memoria usando playwright
         pdf_buffer = BytesIO()

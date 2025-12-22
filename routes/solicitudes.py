@@ -838,6 +838,81 @@ def imprimir_solicitud(solicitud_id):
                          **datos,
                          use_base64=True)
 
+@solicitudes_bp.route('/solicitudes/<int:solicitud_id>/descargar-albaran')
+@login_required
+def descargar_albaran_solicitud(solicitud_id):
+    """Descargar albarán de solicitud en formato PDF (sin precios)"""
+    try:
+        datos = preparar_datos_imprimir_solicitud(solicitud_id)
+        
+        # Renderizar el HTML como albarán (sin precios)
+        html = render_template('imprimir_presupuesto.html', 
+                             **datos,
+                             use_base64=True,
+                             es_albaran=True)
+        
+        # Crear el PDF en memoria usando playwright
+        pdf_buffer = BytesIO()
+        
+        try:
+            # Guardar HTML temporalmente para que playwright pueda acceder a él
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+                temp_file.write(html)
+                temp_html_path = temp_file.name
+            
+            # Usar playwright para generar el PDF
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                
+                # Cargar el HTML desde el archivo temporal
+                page.goto(f'file://{temp_html_path}')
+                
+                # Generar PDF
+                pdf_bytes = page.pdf(
+                    format='A4',
+                    print_background=True,
+                    margin={
+                        'top': '10mm',
+                        'right': '10mm',
+                        'bottom': '10mm',
+                        'left': '10mm'
+                    }
+                )
+                
+                browser.close()
+            
+            # Escribir el PDF al buffer
+            pdf_buffer.write(pdf_bytes)
+            
+            # Limpiar archivo temporal
+            try:
+                os.unlink(temp_html_path)
+            except:
+                pass
+            
+        except Exception as pdf_error:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error al crear PDF con playwright: {error_trace}")
+            flash(f'Error al generar PDF: {str(pdf_error)}', 'error')
+            return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
+        
+        # Preparar la respuesta con el PDF
+        pdf_buffer.seek(0)
+        response = make_response(pdf_buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=albaran_solicitud_{solicitud_id}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error completo al generar PDF: {error_trace}")
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
+
 @solicitudes_bp.route('/solicitudes/<int:solicitud_id>/descargar-pdf')
 @login_required
 def descargar_pdf_solicitud(solicitud_id):

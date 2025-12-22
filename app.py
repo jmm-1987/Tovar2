@@ -325,15 +325,81 @@ def migrate_database():
             if 'facturas' in table_names:
                 columns_facturas = [col['name'] for col in inspector.get_columns('facturas')]
                 # Verificar si pedido_id existe y es NOT NULL
+                pedido_id_not_null = False
                 for col_info in inspector.get_columns('facturas'):
                     if col_info['name'] == 'pedido_id' and col_info.get('nullable') == False:
+                        pedido_id_not_null = True
+                        break
+                
+                # Si pedido_id es NOT NULL, necesitamos recrear la tabla para hacerla nullable
+                if pedido_id_not_null:
+                    try:
+                        with db.engine.connect() as conn:
+                            # Desactivar temporalmente las foreign keys para poder recrear la tabla
+                            conn.execute(text('PRAGMA foreign_keys = OFF'))
+                            
+                            # Crear tabla temporal con la estructura correcta
+                            conn.execute(text('''
+                                CREATE TABLE facturas_temp (
+                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                    pedido_id INTEGER,
+                                    presupuesto_id INTEGER,
+                                    serie VARCHAR(10) NOT NULL DEFAULT 'A',
+                                    numero VARCHAR(50) NOT NULL,
+                                    fecha_expedicion DATE NOT NULL,
+                                    tipo_factura VARCHAR(10) NOT NULL DEFAULT 'F1',
+                                    descripcion TEXT,
+                                    nif VARCHAR(20),
+                                    nombre VARCHAR(200) NOT NULL,
+                                    importe_total NUMERIC(10, 2) NOT NULL,
+                                    estado VARCHAR(50) NOT NULL DEFAULT 'pendiente',
+                                    huella_verifactu TEXT,
+                                    fecha_creacion TIMESTAMP,
+                                    fecha_confirmacion TIMESTAMP
+                                )
+                            '''))
+                            
+                            # Copiar datos de la tabla antigua a la nueva
+                            # Verificar si presupuesto_id existe en la tabla original
+                            if 'presupuesto_id' in columns_facturas:
+                                conn.execute(text('''
+                                    INSERT INTO facturas_temp 
+                                    SELECT id, pedido_id, presupuesto_id, serie, numero, fecha_expedicion, 
+                                           tipo_factura, descripcion, nif, nombre, importe_total, estado, 
+                                           huella_verifactu, fecha_creacion, fecha_confirmacion
+                                    FROM facturas
+                                '''))
+                            else:
+                                conn.execute(text('''
+                                    INSERT INTO facturas_temp 
+                                    SELECT id, pedido_id, NULL, serie, numero, fecha_expedicion, 
+                                           tipo_factura, descripcion, nif, nombre, importe_total, estado, 
+                                           huella_verifactu, fecha_creacion, fecha_confirmacion
+                                    FROM facturas
+                                '''))
+                            
+                            # Eliminar tabla antigua
+                            conn.execute(text('DROP TABLE facturas'))
+                            
+                            # Renombrar tabla temporal
+                            conn.execute(text('ALTER TABLE facturas_temp RENAME TO facturas'))
+                            
+                            # Reactivar foreign keys
+                            conn.execute(text('PRAGMA foreign_keys = ON'))
+                            
+                            conn.commit()
+                            print("Migración: Columna pedido_id en facturas ahora es nullable")
+                    except Exception as e:
+                        print(f"Error al migrar pedido_id a nullable en facturas: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        # Intentar reactivar foreign keys en caso de error
                         try:
-                            # SQLite no soporta MODIFY COLUMN directamente, pero podemos intentar recrear la tabla
-                            # Por ahora, simplemente intentamos hacer la columna nullable en el modelo
-                            # La migración real se hará cuando se cree una nueva factura sin pedido
-                            print("Migración: pedido_id en facturas puede ser nullable (se aplicará en nuevas facturas)")
-                        except Exception as e:
-                            print(f"Nota sobre migración de facturas: {e}")
+                            with db.engine.connect() as conn:
+                                conn.execute(text('PRAGMA foreign_keys = ON'))
+                                conn.commit()
+                        except:
+                            pass
                 
                 # Añadir columna presupuesto_id si no existe
                 if 'presupuesto_id' not in columns_facturas:
@@ -850,6 +916,28 @@ Saludos cordiales,
                         import traceback
                         traceback.print_exc()
                         # Intentar crear todas las tablas como fallback
+            
+            # Verificar si existe la tabla lineas_factura y agregar columnas de descuento si no existen
+            if 'lineas_factura' in table_names:
+                columns_lineas_factura = [col['name'] for col in inspector.get_columns('lineas_factura')]
+                
+                if 'descuento' not in columns_lineas_factura:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE lineas_factura ADD COLUMN descuento NUMERIC(5, 2) DEFAULT 0'))
+                            conn.commit()
+                            print("Migración: Columna descuento agregada exitosamente a lineas_factura")
+                    except Exception as e:
+                        print(f"Error al agregar columna descuento a lineas_factura: {e}")
+                
+                if 'precio_final' not in columns_lineas_factura:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE lineas_factura ADD COLUMN precio_final NUMERIC(10, 2)'))
+                            conn.commit()
+                            print("Migración: Columna precio_final agregada exitosamente a lineas_factura")
+                    except Exception as e:
+                        print(f"Error al agregar columna precio_final a lineas_factura: {e}")
             
             # Verificar si existe la tabla configuracion
             if 'configuracion' not in table_names:

@@ -444,7 +444,9 @@ class LineaFactura(db.Model):
     descripcion = db.Column(db.String(500), nullable=False)
     cantidad = db.Column(db.Numeric(10, 2), nullable=False, default=1)
     precio_unitario = db.Column(db.Numeric(10, 2), nullable=False)
-    importe = db.Column(db.Numeric(10, 2), nullable=False)  # cantidad * precio_unitario
+    descuento = db.Column(db.Numeric(5, 2), nullable=False, default=0)  # Porcentaje de descuento (0-100)
+    precio_final = db.Column(db.Numeric(10, 2), nullable=True)  # Precio unitario con descuento aplicado
+    importe = db.Column(db.Numeric(10, 2), nullable=False)  # cantidad * precio_unitario (o precio_final si existe)
     
     def __repr__(self):
         return f'<LineaFactura {self.id} - {self.descripcion} x{self.cantidad}>'
