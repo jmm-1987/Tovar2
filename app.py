@@ -134,7 +134,6 @@ from models import Comercial, Cliente, Prenda, Presupuesto, LineaPresupuesto, Ti
 # Importar y registrar blueprints
 from routes.index import index_bp
 from routes.auth import auth_bp
-from routes.presupuestos import presupuestos_bp
 from routes.solicitudes import solicitudes_bp
 from routes.clientes import clientes_bp
 # from routes.comerciales import comerciales_bp  # Ya no se usa
@@ -150,7 +149,6 @@ from routes.informes import informes_bp
 # Registrar blueprints
 app.register_blueprint(index_bp)
 app.register_blueprint(auth_bp)
-app.register_blueprint(presupuestos_bp)
 app.register_blueprint(solicitudes_bp)
 app.register_blueprint(clientes_bp)
 # app.register_blueprint(comerciales_bp)  # Ya no se usa

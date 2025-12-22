@@ -62,7 +62,7 @@
         
         <div class="pedido-card-actions">
             <a href="{{ url_for('solicitudes.ver_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-info">Ver</a>
-            <a href="{{ url_for('presupuestos.descargar_pdf_presupuesto', presupuesto_id=solicitud.id) }}" class="btn btn-warning" target="_blank">Imprimir</a>
+            <a href="{{ url_for('solicitudes.descargar_pdf_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-warning" target="_blank">Imprimir</a>
         </div>
     </div>
     {% endfor %}

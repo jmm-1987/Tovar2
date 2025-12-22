@@ -149,7 +149,7 @@
                         <td><span class="badge badge-{{ presupuesto.estado|lower|replace(' ', '-') }}">{{ presupuesto.estado }}</span></td>
                         <td>{{ presupuesto.tipo_pedido }}</td>
                         <td>
-                            <a href="{{ url_for('presupuestos.ver_presupuesto', presupuesto_id=presupuesto.id) }}" class="btn btn-sm btn-primary">Ver</a>
+                            <a href="{{ url_for('solicitudes.ver_solicitud', solicitud_id=presupuesto.id) }}" class="btn btn-sm btn-primary">Ver</a>
                         </td>
                     </tr>
                     {% endfor %}

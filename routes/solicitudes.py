@@ -1,5 +1,5 @@
 """Rutas para gestión de solicitudes (presupuestos y pedidos unificados)"""
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, make_response, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, make_response, jsonify, send_from_directory
 from flask_login import login_required
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
@@ -12,6 +12,8 @@ from sqlalchemy.orm import joinedload
 from flask import jsonify
 from playwright.sync_api import sync_playwright
 from decimal import Decimal
+import base64
+from utils.sftp_upload import upload_file_to_sftp, download_file_from_sftp, get_file_url, file_exists_on_sftp
 
 solicitudes_bp = Blueprint('solicitudes', __name__)
 
@@ -237,29 +239,61 @@ def nueva_solicitud():
             
             print(f"DEBUG: Total líneas procesadas: {len([l for l in db.session.new if isinstance(l, LineaPresupuesto)])}")
             
+            # Función auxiliar para subir imagen a SFTP
+            def subir_imagen_sftp(file, nombre_archivo):
+                """Subir imagen a SFTP y retornar ruta relativa"""
+                try:
+                    # Leer contenido del archivo
+                    file_content = file.read()
+                    file.seek(0)  # Resetear para posibles usos futuros
+                    
+                    # Construir ruta remota en SFTP
+                    config = os.environ.get('SFTP_DIR', '/')
+                    if config != '/':
+                        remote_path = f"{config.rstrip('/')}/solicitudes/{nombre_archivo}"
+                    else:
+                        remote_path = f"/solicitudes/{nombre_archivo}"
+                    
+                    # Subir a SFTP
+                    ruta_subida = upload_file_to_sftp(file_content, remote_path)
+                    if ruta_subida:
+                        return ruta_subida
+                    else:
+                        # Fallback: guardar localmente si SFTP falla
+                        print(f"Error al subir a SFTP, guardando localmente: {nombre_archivo}")
+                        upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'solicitudes')
+                        os.makedirs(upload_folder, exist_ok=True)
+                        filepath = os.path.join(upload_folder, nombre_archivo)
+                        file.seek(0)
+                        file.save(filepath)
+                        return os.path.join('solicitudes', nombre_archivo).replace('\\', '/')
+                except Exception as e:
+                    print(f"Error al procesar imagen {nombre_archivo}: {e}")
+                    # Fallback: guardar localmente
+                    upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'solicitudes')
+                    os.makedirs(upload_folder, exist_ok=True)
+                    filepath = os.path.join(upload_folder, nombre_archivo)
+                    file.seek(0)
+                    file.save(filepath)
+                    return os.path.join('solicitudes', nombre_archivo).replace('\\', '/')
+            
             # Procesar imagen de diseño
             if 'imagen_diseno' in request.files:
                 file = request.files['imagen_diseno']
                 if file and file.filename:
                     filename = secure_filename(file.filename)
-                    upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'solicitudes')
-                    os.makedirs(upload_folder, exist_ok=True)
-                    filepath = os.path.join(upload_folder, f"{solicitud.id}_diseno_{filename}")
-                    file.save(filepath)
-                    # Guardar solo la ruta relativa desde static/uploads/
-                    solicitud.imagen_diseno = os.path.join('solicitudes', f"{solicitud.id}_diseno_{filename}").replace('\\', '/')
+                    nombre_archivo = f"{solicitud.id}_diseno_{filename}"
+                    ruta_relativa = subir_imagen_sftp(file, nombre_archivo)
+                    solicitud.imagen_diseno = ruta_relativa
             
             # Procesar imagen de portada
             if 'imagen_portada' in request.files:
                 file = request.files['imagen_portada']
                 if file and file.filename:
                     filename = secure_filename(file.filename)
-                    upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'solicitudes')
-                    os.makedirs(upload_folder, exist_ok=True)
-                    filepath = os.path.join(upload_folder, f"{solicitud.id}_portada_{filename}")
-                    file.save(filepath)
-                    # Guardar solo la ruta relativa desde static/uploads/
-                    solicitud.imagen_portada = os.path.join('solicitudes', f"{solicitud.id}_portada_{filename}").replace('\\', '/')
+                    nombre_archivo = f"{solicitud.id}_portada_{filename}"
+                    ruta_relativa = subir_imagen_sftp(file, nombre_archivo)
+                    solicitud.imagen_portada = ruta_relativa
             
             # Procesar imágenes adicionales
             for i in range(1, 6):
@@ -270,12 +304,8 @@ def nueva_solicitud():
                     file = request.files[imagen_key]
                     if file and file.filename:
                         filename = secure_filename(file.filename)
-                        upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'solicitudes')
-                        os.makedirs(upload_folder, exist_ok=True)
-                        filepath = os.path.join(upload_folder, f"{solicitud.id}_adicional_{i}_{filename}")
-                        file.save(filepath)
-                        # Guardar solo la ruta relativa desde static/uploads/
-                        ruta_relativa = os.path.join('solicitudes', f"{solicitud.id}_adicional_{i}_{filename}").replace('\\', '/')
+                        nombre_archivo = f"{solicitud.id}_adicional_{i}_{filename}"
+                        ruta_relativa = subir_imagen_sftp(file, nombre_archivo)
                         setattr(solicitud, imagen_key, ruta_relativa)
                         setattr(solicitud, descripcion_key, request.form.get(descripcion_key, ''))
             
@@ -408,38 +438,55 @@ def editar_solicitud(solicitud_id):
             
             # Función auxiliar para actualizar imagen
             def actualizar_imagen(campo_file, campo_db):
-                """Actualizar imagen del formulario, eliminando la anterior si existe"""
+                """Actualizar imagen del formulario, subiendo a SFTP"""
                 if campo_file in request.files:
                     file = request.files[campo_file]
                     if file and file.filename:
-                        # Eliminar imagen anterior si existe
-                        imagen_anterior = getattr(solicitud, campo_db, None)
-                        if imagen_anterior:
-                            # La imagen anterior puede estar guardada como ruta relativa o absoluta
-                            if os.path.isabs(imagen_anterior):
-                                old_path = imagen_anterior
-                            else:
-                                old_path = os.path.join(current_app.config['UPLOAD_FOLDER'], imagen_anterior)
-                            if os.path.exists(old_path):
-                                try:
-                                    os.remove(old_path)
-                                except Exception as e:
-                                    print(f"Error al eliminar imagen anterior {imagen_anterior}: {e}")
-                        
                         filename = secure_filename(file.filename)
                         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S_')
-                        filename = timestamp + filename
-                        # Determinar subcarpeta según el tipo de imagen
-                        if 'diseno' in campo_db or 'portada' in campo_db or 'adicional' in campo_db:
-                            upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'solicitudes')
-                            os.makedirs(upload_folder, exist_ok=True)
-                            filepath = os.path.join(upload_folder, filename)
-                            ruta_relativa = os.path.join('solicitudes', filename).replace('\\', '/')
-                        else:
-                            filepath = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
-                            ruta_relativa = filename
-                        file.save(filepath)
+                        nombre_archivo = f"{solicitud.id}_{campo_db}_{timestamp}{filename}"
+                        
+                        # Subir a SFTP
+                        ruta_relativa = subir_imagen_sftp(file, nombre_archivo)
                         setattr(solicitud, campo_db, ruta_relativa)
+            
+            # Función auxiliar para subir imagen a SFTP (reutilizada)
+            def subir_imagen_sftp(file, nombre_archivo):
+                """Subir imagen a SFTP y retornar ruta relativa"""
+                try:
+                    # Leer contenido del archivo
+                    file_content = file.read()
+                    file.seek(0)
+                    
+                    # Construir ruta remota en SFTP
+                    config = os.environ.get('SFTP_DIR', '/')
+                    if config != '/':
+                        remote_path = f"{config.rstrip('/')}/solicitudes/{nombre_archivo}"
+                    else:
+                        remote_path = f"/solicitudes/{nombre_archivo}"
+                    
+                    # Subir a SFTP
+                    ruta_subida = upload_file_to_sftp(file_content, remote_path)
+                    if ruta_subida:
+                        return ruta_subida
+                    else:
+                        # Fallback: guardar localmente si SFTP falla
+                        print(f"Error al subir a SFTP, guardando localmente: {nombre_archivo}")
+                        upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'solicitudes')
+                        os.makedirs(upload_folder, exist_ok=True)
+                        filepath = os.path.join(upload_folder, nombre_archivo)
+                        file.seek(0)
+                        file.save(filepath)
+                        return os.path.join('solicitudes', nombre_archivo).replace('\\', '/')
+                except Exception as e:
+                    print(f"Error al procesar imagen {nombre_archivo}: {e}")
+                    # Fallback: guardar localmente
+                    upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'solicitudes')
+                    os.makedirs(upload_folder, exist_ok=True)
+                    filepath = os.path.join(upload_folder, nombre_archivo)
+                    file.seek(0)
+                    file.save(filepath)
+                    return os.path.join('solicitudes', nombre_archivo).replace('\\', '/')
             
             # Manejar actualización de imágenes
             actualizar_imagen('imagen_diseno', 'imagen_diseno')
@@ -465,7 +512,7 @@ def editar_solicitud(solicitud_id):
                 flash(f'Error al eliminar líneas anteriores: {str(e)}', 'error')
                 return redirect(url_for('solicitudes.editar_solicitud', solicitud_id=solicitud_id))
             
-            # Crear nuevas líneas (similar a editar_presupuesto)
+            # Crear nuevas líneas (similar a editar_solicitud)
             prenda_ids = request.form.getlist('prenda_id[]')
             nombres = request.form.getlist('nombre[]')
             nombres_mostrar = request.form.getlist('nombre_mostrar[]')
@@ -645,4 +692,285 @@ def crear_cliente_ajax():
             'success': False,
             'error': str(e)
         }), 400
+
+def preparar_datos_imprimir_solicitud(solicitud_id):
+    """Función auxiliar para preparar todos los datos necesarios para imprimir la solicitud"""
+    solicitud = Presupuesto.query.get_or_404(solicitud_id)
+    
+    # Calcular totales
+    tipo_iva = 21
+    base_imponible = Decimal('0.00')
+    
+    for linea in solicitud.lineas:
+        precio_unit = Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0.00')
+        cantidad = Decimal(str(linea.cantidad))
+        total_linea = precio_unit * cantidad
+        base_imponible += total_linea
+    
+    iva_total = base_imponible * Decimal(str(tipo_iva)) / Decimal('100')
+    total_con_iva = base_imponible + iva_total
+    
+    # Función auxiliar para convertir imagen a base64
+    def convertir_imagen_a_base64(ruta_imagen):
+        """Convertir imagen a base64, intentando primero localmente y luego desde SFTP"""
+        if not ruta_imagen:
+            return None
+        
+        imagen_data = None
+        
+        # Intentar leer localmente primero
+        if os.path.exists(ruta_imagen):
+            try:
+                with open(ruta_imagen, 'rb') as f:
+                    imagen_data = f.read()
+            except Exception as e:
+                print(f"Error al leer imagen local {ruta_imagen}: {e}")
+        
+        # Si no está localmente, intentar desde SFTP
+        if not imagen_data:
+            try:
+                # Construir ruta remota en SFTP
+                # La ruta puede ser relativa (ej: 'solicitudes/123_diseno.jpg') o absoluta
+                if ruta_imagen.startswith('/'):
+                    remote_path = ruta_imagen
+                else:
+                    # Si es relativa, construir ruta completa en SFTP
+                    config = os.environ.get('SFTP_DIR', '/')
+                    if config != '/':
+                        remote_path = f"{config.rstrip('/')}/{ruta_imagen}"
+                    else:
+                        remote_path = f"/{ruta_imagen}"
+                
+                imagen_data = download_file_from_sftp(remote_path)
+            except Exception as e:
+                print(f"Error al descargar imagen desde SFTP {ruta_imagen}: {e}")
+        
+        if not imagen_data:
+            return None
+        
+        try:
+            imagen_base64 = base64.b64encode(imagen_data).decode('utf-8')
+            # Detectar tipo MIME basado en extensión del archivo
+            ruta_lower = ruta_imagen.lower()
+            if ruta_lower.endswith('.png'):
+                return f'data:image/png;base64,{imagen_base64}'
+            elif ruta_lower.endswith(('.jpg', '.jpeg')):
+                return f'data:image/jpeg;base64,{imagen_base64}'
+            elif ruta_lower.endswith('.gif'):
+                return f'data:image/gif;base64,{imagen_base64}'
+            else:
+                return f'data:image/png;base64,{imagen_base64}'  # Por defecto PNG
+        except Exception as e:
+            print(f"Error al codificar imagen a base64 {ruta_imagen}: {e}")
+            return None
+    
+    # Convertir imágenes a base64
+    logo_base64 = None
+    imagen_diseno_base64 = None
+    imagen_portada_base64 = None
+    imagenes_adicionales_base64 = []
+    descripciones_imagenes = []
+    
+    # Convertir logo a base64
+    logo_path = os.path.join(current_app.static_folder, 'logo.png')
+    logo_base64 = convertir_imagen_a_base64(logo_path)
+    
+    # Convertir imagen de diseño a base64 si existe
+    if solicitud.imagen_diseno:
+        # Intentar primero localmente, luego desde SFTP
+        imagen_path_local = os.path.join(current_app.config['UPLOAD_FOLDER'], solicitud.imagen_diseno)
+        if os.path.exists(imagen_path_local):
+            imagen_diseno_base64 = convertir_imagen_a_base64(imagen_path_local)
+        else:
+            # Intentar desde SFTP usando la ruta relativa guardada
+            imagen_diseno_base64 = convertir_imagen_a_base64(solicitud.imagen_diseno)
+    
+    # Convertir imagen de portada a base64 si existe
+    if solicitud.imagen_portada:
+        imagen_path_local = os.path.join(current_app.config['UPLOAD_FOLDER'], solicitud.imagen_portada)
+        if os.path.exists(imagen_path_local):
+            imagen_portada_base64 = convertir_imagen_a_base64(imagen_path_local)
+        else:
+            imagen_portada_base64 = convertir_imagen_a_base64(solicitud.imagen_portada)
+    
+    # Convertir imágenes adicionales a base64 y obtener descripciones (5 imágenes)
+    for i in range(1, 6):
+        campo_imagen = f'imagen_adicional_{i}'
+        campo_descripcion = f'descripcion_imagen_{i}'
+        
+        if hasattr(solicitud, campo_imagen) and getattr(solicitud, campo_imagen):
+            imagen_nombre = getattr(solicitud, campo_imagen)
+            imagen_path_local = os.path.join(current_app.config['UPLOAD_FOLDER'], imagen_nombre)
+            if os.path.exists(imagen_path_local):
+                imagen_base64 = convertir_imagen_a_base64(imagen_path_local)
+            else:
+                # Intentar desde SFTP
+                imagen_base64 = convertir_imagen_a_base64(imagen_nombre)
+            imagenes_adicionales_base64.append(imagen_base64)
+        else:
+            imagenes_adicionales_base64.append(None)
+        
+        # Obtener descripción
+        descripcion = getattr(solicitud, campo_descripcion, '') if hasattr(solicitud, campo_descripcion) else ''
+        descripciones_imagenes.append(descripcion)
+    
+    return {
+        'presupuesto': solicitud,  # Mantener 'presupuesto' para compatibilidad con template
+        'solicitud': solicitud,  # Agregar 'solicitud' también
+        'base_imponible': float(base_imponible),
+        'iva_total': float(iva_total),
+        'total_con_iva': float(total_con_iva),
+        'tipo_iva': tipo_iva,
+        'logo_base64': logo_base64,
+        'imagen_diseno_base64': imagen_diseno_base64,
+        'imagen_portada_base64': imagen_portada_base64,
+        'imagenes_adicionales_base64': imagenes_adicionales_base64,
+        'descripciones_imagenes': descripciones_imagenes
+    }
+
+@solicitudes_bp.route('/solicitudes/<int:solicitud_id>/imprimir')
+@login_required
+def imprimir_solicitud(solicitud_id):
+    """Vista de impresión de la solicitud (HTML para imprimir desde navegador)"""
+    datos = preparar_datos_imprimir_solicitud(solicitud_id)
+    
+    return render_template('imprimir_presupuesto.html', 
+                         **datos,
+                         use_base64=True)
+
+@solicitudes_bp.route('/solicitudes/<int:solicitud_id>/descargar-pdf')
+@login_required
+def descargar_pdf_solicitud(solicitud_id):
+    """Descargar solicitud en formato PDF"""
+    try:
+        datos = preparar_datos_imprimir_solicitud(solicitud_id)
+        
+        # Renderizar el HTML de la solicitud
+        html = render_template('imprimir_presupuesto.html', 
+                             **datos,
+                             use_base64=True)
+        
+        # Crear el PDF en memoria usando playwright
+        pdf_buffer = BytesIO()
+        
+        try:
+            # Guardar HTML temporalmente para que playwright pueda acceder a él
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+                temp_file.write(html)
+                temp_html_path = temp_file.name
+            
+            # Usar playwright para generar el PDF
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                
+                # Cargar el HTML desde el archivo temporal
+                page.goto(f'file://{temp_html_path}')
+                
+                # Generar PDF
+                pdf_bytes = page.pdf(
+                    format='A4',
+                    print_background=True,
+                    margin={
+                        'top': '10mm',
+                        'right': '10mm',
+                        'bottom': '10mm',
+                        'left': '10mm'
+                    }
+                )
+                
+                browser.close()
+            
+            # Escribir el PDF al buffer
+            pdf_buffer.write(pdf_bytes)
+            
+            # Limpiar archivo temporal
+            try:
+                os.unlink(temp_html_path)
+            except:
+                pass
+            
+        except Exception as pdf_error:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error al crear PDF con playwright: {error_trace}")
+            flash(f'Error al generar PDF: {str(pdf_error)}', 'error')
+            return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
+        
+        # Preparar la respuesta con el PDF
+        pdf_buffer.seek(0)
+        response = make_response(pdf_buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=solicitud_{solicitud_id}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error completo al generar PDF: {error_trace}")
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
+
+@solicitudes_bp.route('/solicitudes/imagen/<path:ruta_imagen>')
+@login_required
+def servir_imagen_sftp(ruta_imagen):
+    """Servir imagen desde SFTP o localmente como fallback"""
+    try:
+        # Intentar primero localmente
+        imagen_path_local = os.path.join(current_app.config['UPLOAD_FOLDER'], ruta_imagen)
+        if os.path.exists(imagen_path_local):
+            return send_from_directory(
+                os.path.dirname(imagen_path_local),
+                os.path.basename(imagen_path_local)
+            )
+        
+        # Si no está localmente, descargar desde SFTP
+        config = os.environ.get('SFTP_DIR', '/')
+        if config != '/':
+            remote_path = f"{config.rstrip('/')}/{ruta_imagen}"
+        else:
+            remote_path = f"/{ruta_imagen}"
+        
+        imagen_data = download_file_from_sftp(remote_path)
+        if imagen_data:
+            # Determinar tipo MIME
+            ruta_lower = ruta_imagen.lower()
+            if ruta_lower.endswith('.png'):
+                mimetype = 'image/png'
+            elif ruta_lower.endswith(('.jpg', '.jpeg')):
+                mimetype = 'image/jpeg'
+            elif ruta_lower.endswith('.gif'):
+                mimetype = 'image/gif'
+            else:
+                mimetype = 'image/png'
+            
+            response = make_response(imagen_data)
+            response.headers['Content-Type'] = mimetype
+            return response
+        
+        # Si no se encuentra, retornar 404
+        flash('Imagen no encontrada', 'error')
+        return '', 404
+        
+    except Exception as e:
+        print(f"Error al servir imagen {ruta_imagen}: {e}")
+        return '', 404
+
+@solicitudes_bp.route('/solicitudes/<int:solicitud_id>/actualizar-seguimiento', methods=['POST'])
+@login_required
+def actualizar_seguimiento(solicitud_id):
+    """Actualizar el campo de seguimiento de la solicitud"""
+    solicitud = Presupuesto.query.get_or_404(solicitud_id)
+    nuevo_seguimiento = request.form.get('seguimiento', '')
+    
+    try:
+        solicitud.seguimiento = nuevo_seguimiento
+        db.session.commit()
+        flash('Seguimiento actualizado correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al actualizar seguimiento: {str(e)}', 'error')
+    
+    return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
 
