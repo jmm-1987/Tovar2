@@ -1,5 +1,5 @@
 """Rutas para el panel de control (index)"""
-from flask import Blueprint, render_template, flash
+from flask import Blueprint, render_template, flash, request
 from flask_login import login_required
 from datetime import datetime, timedelta
 from models import Presupuesto
@@ -11,19 +11,29 @@ index_bp = Blueprint('index', __name__)
 def index():
     """Página principal con lista de solicitudes (solo aceptadas hasta entregadas)"""
     try:
+        # Obtener filtro de la URL
+        filtro_activo = request.args.get('filtro', '')
+        
         # Obtener solicitudes con estado entre "aceptado" y "entregado al cliente"
         from sqlalchemy.orm import joinedload
         from models import LineaPresupuesto
         from sqlalchemy import or_
         
         # Estados que se muestran en el panel: desde aceptado hasta entregado al cliente
-        estados_mostrar = ['aceptado', 'diseño', 'diseño finalizado', 'en preparacion', 'todo listo', 'enviado']
+        estados_mostrar = ['aceptado', 'mockup', 'en preparacion', 'terminado', 'entregado al cliente']
         
-        solicitudes = Presupuesto.query.filter(
+        query = Presupuesto.query.filter(
             Presupuesto.estado.in_(estados_mostrar)
-        ).options(
-            joinedload(Presupuesto.cliente),
-            joinedload(Presupuesto.lineas).joinedload(LineaPresupuesto.prenda)
+        )
+        
+        # Aplicar filtro si está seleccionado
+        if filtro_activo == 'solo_mockup':
+            query = query.filter(Presupuesto.estado == 'mockup')
+        elif filtro_activo == 'solo_en_preparacion':
+            query = query.filter(Presupuesto.estado == 'en preparacion')
+        
+        solicitudes = query.options(
+            joinedload(Presupuesto.cliente)
         ).all()
         
         # Calcular fecha objetivo de entrega (20 días desde aceptación) y clasificar
@@ -68,11 +78,13 @@ def index():
             s.fecha_aceptado if s.fecha_aceptado else datetime.max.date()
         ))
         
-        return render_template('index.html', solicitudes=solicitudes)
+        return render_template('index.html', solicitudes=solicitudes, hoy=hoy, filtro_activo=filtro_activo)
     except Exception as e:
         import traceback
         error_msg = f"Error en index: {str(e)}\n{traceback.format_exc()}"
         print(error_msg)
         flash(f'Error al cargar el panel de control: {str(e)}', 'error')
-        return render_template('index.html', solicitudes=[])
+        hoy = datetime.now().date()
+        filtro_activo = request.args.get('filtro', '')
+        return render_template('index.html', solicitudes=[], hoy=hoy, filtro_activo=filtro_activo)
 

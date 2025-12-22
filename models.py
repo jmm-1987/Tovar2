@@ -222,7 +222,13 @@ class Presupuesto(db.Model):
     tipo_pedido = db.Column(db.String(50), nullable=False)  # confeccion, bordado, serigrafia, sublimacion, varios
     
     # Estado unificado de la solicitud (presupuesto/pedido)
-    estado = db.Column(db.String(50), nullable=False, default='presupuesto')  # presupuesto, aceptado, diseño, diseño finalizado, en preparacion, todo listo, enviado, entregado al cliente, pedido rechazado
+    estado = db.Column(db.String(50), nullable=False, default='presupuesto')  # presupuesto, aceptado, mockup, en preparacion, terminado, entregado al cliente
+    
+    # Subestado para estados que tienen subestados
+    subestado = db.Column(db.String(50), nullable=True)  # Para mockup: enviado a cliente, prueba 1, prueba 2, aceptado. Para en preparacion: hacer marcada, imprimir, calandra, corte, confeccion, sublimacion, bordado
+    
+    # Fecha límite para mockup (3 días desde que entra al estado)
+    fecha_limite_mockup = db.Column(db.Date, nullable=True)
     
     # Forma de pago
     forma_pago = db.Column(db.Text)
@@ -249,13 +255,17 @@ class Presupuesto(db.Model):
     # Fechas por estado (se guardan y no se sobrescriben)
     fecha_presupuesto = db.Column(db.Date)  # Fecha cuando se marcó como presupuesto (usa fecha_creacion si no existe)
     fecha_aceptado = db.Column(db.Date)  # Fecha cuando se aceptó
-    fecha_diseno = db.Column(db.Date)  # Fecha cuando se marcó como diseño
-    fecha_diseno_finalizado = db.Column(db.Date)  # Fecha cuando se finalizó el diseño
+    fecha_mockup = db.Column(db.Date)  # Fecha cuando entró en estado mockup
     fecha_en_preparacion = db.Column(db.Date)  # Fecha cuando se marcó como en preparación
-    fecha_todo_listo = db.Column(db.Date)  # Fecha cuando se marcó como todo listo
-    fecha_enviado = db.Column(db.Date)  # Fecha cuando se envió
+    fecha_terminado = db.Column(db.Date)  # Fecha cuando se marcó como terminado
     fecha_entregado_cliente = db.Column(db.Date)  # Fecha cuando se entregó al cliente
-    fecha_rechazado = db.Column(db.Date)  # Fecha cuando se rechazó
+    
+    # Fechas antiguas (mantener para compatibilidad)
+    fecha_diseno = db.Column(db.Date)  # Deprecated
+    fecha_diseno_finalizado = db.Column(db.Date)  # Deprecated
+    fecha_todo_listo = db.Column(db.Date)  # Deprecated
+    fecha_enviado = db.Column(db.Date)  # Deprecated
+    fecha_rechazado = db.Column(db.Date)  # Deprecated
     
     # Fechas adicionales del proceso (compatibilidad con pedidos)
     fecha_aceptacion = db.Column(db.Date)  # Alias de fecha_aceptado para compatibilidad
@@ -641,3 +651,27 @@ class Configuracion(db.Model):
     
     def __repr__(self):
         return f'<Configuracion {self.clave}={self.valor}>'
+
+class RegistroEstadoSolicitud(db.Model):
+    """Registro de cambios de estado y subestado en solicitudes con fechas"""
+    __tablename__ = 'registro_estado_solicitud'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Relación con presupuesto/solicitud
+    presupuesto_id = db.Column(db.Integer, db.ForeignKey('presupuestos.id'), nullable=False)
+    presupuesto = db.relationship('Presupuesto', backref='registros_estado', lazy=True)
+    
+    # Estado y subestado
+    estado = db.Column(db.String(50), nullable=False)
+    subestado = db.Column(db.String(50), nullable=True)
+    
+    # Fecha del cambio
+    fecha_cambio = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Usuario que realizó el cambio (opcional)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=True)
+    usuario = db.relationship('Usuario', backref='registros_estado_solicitud', lazy=True)
+    
+    def __repr__(self):
+        return f'<RegistroEstadoSolicitud {self.id} - {self.estado}/{self.subestado} - {self.fecha_cambio}>'

@@ -7,7 +7,7 @@ import os
 import tempfile
 from io import BytesIO
 from extensions import db
-from models import Comercial, Cliente, Prenda, Presupuesto, LineaPresupuesto, Usuario
+from models import Comercial, Cliente, Prenda, Presupuesto, LineaPresupuesto, Usuario, RegistroEstadoSolicitud
 from sqlalchemy.orm import joinedload
 from flask import jsonify
 from playwright.sync_api import sync_playwright
@@ -21,26 +21,39 @@ solicitudes_bp = Blueprint('solicitudes', __name__)
 ESTADOS_SOLICITUD = [
     'presupuesto',
     'aceptado',
-    'diseño',
-    'diseño finalizado',
+    'mockup',
     'en preparacion',
-    'todo listo',
-    'enviado',
-    'entregado al cliente',
-    'pedido rechazado'
+    'terminado',
+    'entregado al cliente'
 ]
+
+# Subestados por estado principal
+SUBESTADOS = {
+    'mockup': [
+        'enviado a cliente',
+        'prueba 1',
+        'prueba 2',
+        'aceptado'
+    ],
+    'en preparacion': [
+        'hacer marcada',
+        'imprimir',
+        'calandra',
+        'corte',
+        'confeccion',
+        'sublimacion',
+        'bordado'
+    ]
+}
 
 # Mapeo de estados a campos de fecha
 ESTADOS_FECHAS = {
     'presupuesto': 'fecha_presupuesto',
     'aceptado': 'fecha_aceptado',
-    'diseño': 'fecha_diseno',
-    'diseño finalizado': 'fecha_diseno_finalizado',
+    'mockup': 'fecha_mockup',
     'en preparacion': 'fecha_en_preparacion',
-    'todo listo': 'fecha_todo_listo',
-    'enviado': 'fecha_enviado',
-    'entregado al cliente': 'fecha_entregado_cliente',
-    'pedido rechazado': 'fecha_rechazado'
+    'terminado': 'fecha_terminado',
+    'entregado al cliente': 'fecha_entregado_cliente'
 }
 
 @solicitudes_bp.route('/solicitudes')
@@ -149,6 +162,17 @@ def nueva_solicitud():
             db.session.add(solicitud)
             db.session.flush()  # Para obtener el ID
             
+            # Crear registro inicial del estado
+            from flask_login import current_user
+            registro_inicial = RegistroEstadoSolicitud(
+                presupuesto_id=solicitud.id,
+                estado='presupuesto',
+                subestado=None,
+                fecha_cambio=datetime.now(),
+                usuario_id=current_user.id if current_user.is_authenticated else None
+            )
+            db.session.add(registro_inicial)
+            
             # Procesar líneas de solicitud (igual que en editar)
             prenda_ids = request.form.getlist('prenda_id[]')
             nombres = request.form.getlist('nombre[]')
@@ -164,7 +188,6 @@ def nueva_solicitud():
             precios_unitarios = request.form.getlist('precio_unitario[]')
             descuentos = request.form.getlist('descuento[]')
             precios_finales = request.form.getlist('precio_final[]')
-            estados_linea = request.form.getlist('estado_linea[]')
             
             print(f"DEBUG: Procesando líneas - prenda_ids: {len(prenda_ids)}, nombres_mostrar: {len(nombres_mostrar)}")
             
@@ -208,8 +231,6 @@ def nueva_solicitud():
                         else:
                             precio_final = precio_unitario
                     
-                    estado_linea = estados_linea[i] if i < len(estados_linea) and estados_linea[i] else 'pendiente'
-                    
                     # Convertir Decimal a float para SQLite
                     cantidad_val = float(Decimal(str(cantidades[i])) if i < len(cantidades) and cantidades[i] else Decimal('1'))
                     precio_unitario_val = float(precio_unitario) if precio_unitario else None
@@ -231,8 +252,7 @@ def nueva_solicitud():
                         tejido=tejidos[i] if i < len(tejidos) else '',
                         precio_unitario=precio_unitario_val,
                         descuento=descuento_val,
-                        precio_final=precio_final_val,
-                        estado=estado_linea
+                        precio_final=precio_final_val
                     )
                     db.session.add(linea)
                     print(f"DEBUG: Línea {i} añadida - nombre_mostrar: '{nombre_mostrar_val}', prenda_id: {prenda_ids[i]}")
@@ -364,18 +384,33 @@ def ver_solicitud(solicitud_id):
                 joinedload(Presupuesto.comercial)
             ).get(solicitud_id)
     
+    # Obtener registros de cambios de estado ordenados por fecha (con eager loading de usuario)
+    registros_estado = RegistroEstadoSolicitud.query.options(
+        joinedload(RegistroEstadoSolicitud.usuario)
+    ).filter_by(
+        presupuesto_id=solicitud_id
+    ).order_by(RegistroEstadoSolicitud.fecha_cambio.asc()).all()
+    
+    hoy = datetime.now().date()
+    
     return render_template('solicitudes/ver.html',
                          solicitud=solicitud,
                          estados=ESTADOS_SOLICITUD,
-                         estados_fechas=ESTADOS_FECHAS)
+                         subestados=SUBESTADOS,
+                         estados_fechas=ESTADOS_FECHAS,
+                         registros_estado=registros_estado,
+                         hoy=hoy)
 
 @solicitudes_bp.route('/solicitudes/<int:solicitud_id>/cambiar-estado', methods=['POST'])
 @login_required
 def cambiar_estado_solicitud(solicitud_id):
     """Cambiar el estado de una solicitud"""
+    from flask_login import current_user
     solicitud = Presupuesto.query.get_or_404(solicitud_id)
     nuevo_estado = request.form.get('estado')
+    nuevo_subestado = request.form.get('subestado', '')
     hoy = datetime.now().date()
+    ahora = datetime.now()
     
     if nuevo_estado not in ESTADOS_SOLICITUD:
         flash('Estado no válido', 'error')
@@ -383,33 +418,60 @@ def cambiar_estado_solicitud(solicitud_id):
     
     try:
         estado_anterior = solicitud.estado
-        solicitud.estado = nuevo_estado
+        subestado_anterior = solicitud.subestado
+        hubo_cambio = False
+        
+        # Si el estado cambia, resetear subestado
+        if nuevo_estado != estado_anterior:
+            solicitud.estado = nuevo_estado
+            solicitud.subestado = None
+            hubo_cambio = True
+        
+        # Si hay subestado y el estado lo permite
+        if nuevo_subestado and nuevo_estado in SUBESTADOS:
+            if nuevo_subestado in SUBESTADOS[nuevo_estado]:
+                # Solo actualizar si el subestado cambió
+                if nuevo_subestado != subestado_anterior:
+                    solicitud.subestado = nuevo_subestado
+                    hubo_cambio = True
         
         # Actualizar fecha correspondiente si no está establecida
         if nuevo_estado in ESTADOS_FECHAS:
             fecha_campo = ESTADOS_FECHAS[nuevo_estado]
-            fecha_actual = getattr(solicitud, fecha_campo)
+            fecha_actual = getattr(solicitud, fecha_campo, None)
             if not fecha_actual:
                 setattr(solicitud, fecha_campo, hoy)
         
-        # Si se rechaza, marcar fecha de rechazo
-        if nuevo_estado == 'pedido rechazado':
-            if not solicitud.fecha_rechazado:
-                solicitud.fecha_rechazado = hoy
+        # Si entra en mockup, establecer fecha límite (3 días)
+        if nuevo_estado == 'mockup' and estado_anterior != 'mockup':
+            solicitud.fecha_limite_mockup = hoy + timedelta(days=3)
         
         # Si se acepta, establecer fecha de aceptación y calcular fecha objetivo (20 días)
-        if nuevo_estado == 'aceptado':
+        if nuevo_estado == 'aceptado' and estado_anterior != 'aceptado':
             if not solicitud.fecha_aceptado:
                 solicitud.fecha_aceptado = hoy
                 solicitud.fecha_aceptacion = hoy  # Compatibilidad
                 solicitud.fecha_objetivo = hoy + timedelta(days=20)
         
+        # Crear registro del cambio solo si hubo cambio real
+        if hubo_cambio or (nuevo_estado == estado_anterior and nuevo_subestado and nuevo_subestado != subestado_anterior):
+            registro = RegistroEstadoSolicitud(
+                presupuesto_id=solicitud_id,
+                estado=nuevo_estado,
+                subestado=solicitud.subestado,
+                fecha_cambio=ahora,
+                usuario_id=current_user.id if current_user.is_authenticated else None
+            )
+            db.session.add(registro)
+        
         db.session.commit()
-        flash(f'Estado cambiado a "{nuevo_estado}"', 'success')
+        flash(f'Estado cambiado a "{nuevo_estado}"' + (f' - {solicitud.subestado}' if solicitud.subestado else ''), 'success')
         
     except Exception as e:
         db.session.rollback()
         flash(f'Error al cambiar el estado: {str(e)}', 'error')
+        import traceback
+        traceback.print_exc()
     
     return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
 
@@ -527,7 +589,6 @@ def editar_solicitud(solicitud_id):
             precios_unitarios = request.form.getlist('precio_unitario[]')
             descuentos = request.form.getlist('descuento[]')
             precios_finales = request.form.getlist('precio_final[]')
-            estados_linea = request.form.getlist('estado_linea[]')
             
             for i in range(len(prenda_ids)):
                 if prenda_ids[i] and (nombres_mostrar[i] if i < len(nombres_mostrar) else nombres[i] if i < len(nombres) else ''):
@@ -562,8 +623,6 @@ def editar_solicitud(solicitud_id):
                         else:
                             precio_final = precio_unitario
                     
-                    estado_linea = estados_linea[i] if i < len(estados_linea) and estados_linea[i] else 'pendiente'
-                    
                     # Convertir Decimal a float para SQLite
                     cantidad_val = float(Decimal(str(cantidades[i])) if i < len(cantidades) and cantidades[i] else Decimal('1'))
                     precio_unitario_val = float(precio_unitario) if precio_unitario else None
@@ -585,8 +644,7 @@ def editar_solicitud(solicitud_id):
                         tejido=tejidos[i] if i < len(tejidos) else '',
                         precio_unitario=precio_unitario_val,
                         descuento=descuento_val,
-                        precio_final=precio_final_val,
-                        estado=estado_linea
+                        precio_final=precio_final_val
                     )
                     db.session.add(linea)
             
@@ -609,33 +667,6 @@ def editar_solicitud(solicitud_id):
                          comerciales=comerciales,
                          prendas=prendas)
 
-@solicitudes_bp.route('/solicitudes/<int:solicitud_id>/lineas/<int:linea_id>/cambiar-estado', methods=['POST'])
-@login_required
-def cambiar_estado_linea(solicitud_id, linea_id):
-    """Cambiar el estado de una línea de solicitud"""
-    linea = LineaPresupuesto.query.get_or_404(linea_id)
-    nuevo_estado = request.form.get('estado')
-    
-    # Validar que la línea pertenece a la solicitud
-    if linea.presupuesto_id != solicitud_id:
-        flash('La línea no pertenece a esta solicitud', 'error')
-        return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
-    
-    # Validar estados permitidos
-    estados_permitidos = ['pendiente', 'en confección', 'en bordado', 'listo']
-    
-    try:
-        if nuevo_estado in estados_permitidos:
-            linea.estado = nuevo_estado
-            db.session.commit()
-            flash(f'Estado de la línea "{linea.nombre_mostrar or linea.nombre}" cambiado a "{nuevo_estado}"', 'success')
-        else:
-            flash('Estado no válido', 'error')
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error al cambiar el estado: {str(e)}', 'error')
-    
-    return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
 
 @solicitudes_bp.route('/solicitudes/crear-cliente-ajax', methods=['POST'])
 @login_required

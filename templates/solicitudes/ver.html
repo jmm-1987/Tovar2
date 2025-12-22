@@ -102,6 +102,111 @@
 
 <h2>Solicitud #{{ solicitud.id }}</h2>
 
+<!-- Esquema horizontal de estados y subestados -->
+<div style="margin-bottom: 30px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <h3 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-bottom: 20px;">Seguimiento de Estados</h3>
+    <div style="overflow-x: auto; padding: 10px 0;">
+        <div style="display: flex; gap: 15px; min-width: max-content; align-items: flex-start;">
+            {% set estados_completos = [
+                {'estado': 'presupuesto', 'subestados': []},
+                {'estado': 'aceptado', 'subestados': []},
+                {'estado': 'mockup', 'subestados': ['enviado a cliente', 'prueba 1', 'prueba 2', 'aceptado']},
+                {'estado': 'en preparacion', 'subestados': ['hacer marcada', 'imprimir', 'calandra', 'corte', 'confeccion', 'sublimacion', 'bordado']},
+                {'estado': 'terminado', 'subestados': []},
+                {'estado': 'entregado al cliente', 'subestados': []}
+            ] %}
+            
+            {% for estado_info in estados_completos %}
+            {% set estado_actual = estado_info.estado %}
+            {% set fecha_campo = estados_fechas.get(estado_actual, '') %}
+            {% set fecha_estado = None %}
+            {% if fecha_campo %}
+                {% if fecha_campo == 'fecha_presupuesto' %}
+                    {% set fecha_estado = solicitud.fecha_presupuesto %}
+                {% elif fecha_campo == 'fecha_aceptado' %}
+                    {% set fecha_estado = solicitud.fecha_aceptado %}
+                {% elif fecha_campo == 'fecha_mockup' %}
+                    {% set fecha_estado = solicitud.fecha_mockup %}
+                {% elif fecha_campo == 'fecha_en_preparacion' %}
+                    {% set fecha_estado = solicitud.fecha_en_preparacion %}
+                {% elif fecha_campo == 'fecha_terminado' %}
+                    {% set fecha_estado = solicitud.fecha_terminado %}
+                {% elif fecha_campo == 'fecha_entregado_cliente' %}
+                    {% set fecha_estado = solicitud.fecha_entregado_cliente %}
+                {% endif %}
+            {% endif %}
+            {% set registros_estado_actual = registros_estado|selectattr('estado', 'equalto', estado_actual)|list %}
+            {% set esta_activo = solicitud.estado == estado_actual %}
+            
+            <div style="display: flex; flex-direction: column; align-items: center; min-width: 150px;">
+                <!-- Estado principal -->
+                {% set registro_estado_principal = registros_estado_actual[0] if registros_estado_actual|length > 0 else None %}
+                {% set usuario_estado = registro_estado_principal.usuario.usuario if registro_estado_principal and registro_estado_principal.usuario else 'Sistema' %}
+                {% set fecha_hora_estado = registro_estado_principal.fecha_cambio if registro_estado_principal else (fecha_estado if fecha_estado else None) %}
+                <div style="padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; text-align: center; cursor: help;
+                            {% if esta_activo %}background: #007bff; color: white; font-weight: bold;{% else %}background: #f8f9fa; color: #6c757d;{% endif %}
+                            border: 2px solid {% if esta_activo %}#007bff{% else %}#dee2e6{% endif %};"
+                     title="{% if fecha_hora_estado %}Fecha: {{ fecha_hora_estado.strftime('%d/%m/%Y %H:%M') if fecha_hora_estado.__class__.__name__ == 'datetime' else fecha_hora_estado.strftime('%d/%m/%Y') }}{% endif %}{% if usuario_estado %} | Usuario: {{ usuario_estado }}{% endif %}">
+                    <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 5px;">{{ estado_actual|title }}</div>
+                    {% if fecha_estado %}
+                    <div style="font-size: 0.75rem; opacity: 0.9;">{{ fecha_estado.strftime('%d/%m/%Y') }}</div>
+                    {% elif registros_estado_actual|length > 0 %}
+                    <div style="font-size: 0.75rem; opacity: 0.9;">{{ registros_estado_actual[0].fecha_cambio.strftime('%d/%m/%Y') }}</div>
+                    {% else %}
+                    <div style="font-size: 0.75rem; opacity: 0.7;">-</div>
+                    {% endif %}
+                </div>
+                
+                <!-- Subestados -->
+                {% if estado_info.subestados|length > 0 %}
+                <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                    {% for subestado in estado_info.subestados %}
+                    {% set registros_subestado = registros_estado|selectattr('estado', 'equalto', estado_actual)|selectattr('subestado', 'equalto', subestado)|list %}
+                    {% set subestado_activo = esta_activo and solicitud.subestado == subestado %}
+                    {% set registro_subestado = registros_subestado[0] if registros_subestado|length > 0 else None %}
+                    {% set fecha_subestado = registro_subestado.fecha_cambio if registro_subestado else None %}
+                    {% set usuario_subestado = registro_subestado.usuario.usuario if registro_subestado and registro_subestado.usuario else 'Sistema' %}
+                    
+                    <div style="padding: 8px 12px; border-radius: 6px; text-align: center; font-size: 0.8rem; cursor: help;
+                                {% if subestado_activo %}background: #28a745; color: white; font-weight: bold;{% elif fecha_subestado %}background: #e9ecef; color: #495057;{% else %}background: #f8f9fa; color: #adb5bd;{% endif %}
+                                border: 1px solid {% if subestado_activo %}#28a745{% elif fecha_subestado %}#dee2e6{% else %}#e9ecef{% endif %};"
+                         title="{% if fecha_subestado %}Fecha: {{ fecha_subestado.strftime('%d/%m/%Y %H:%M') if fecha_subestado.__class__.__name__ == 'datetime' else fecha_subestado.strftime('%d/%m/%Y') }}{% endif %}{% if usuario_subestado %} | Usuario: {{ usuario_subestado }}{% endif %}">
+                        <div style="margin-bottom: 3px;">{{ subestado|title }}</div>
+                        {% if fecha_subestado %}
+                        <div style="font-size: 0.7rem; opacity: 0.8;">{{ fecha_subestado.strftime('%d/%m/%Y') }}</div>
+                        {% else %}
+                        <div style="font-size: 0.7rem; opacity: 0.5;">-</div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            
+            <!-- Flecha conectora (excepto en el último) -->
+            {% if not loop.last %}
+            <div style="display: flex; align-items: center; padding: 0 5px; color: #6c757d; font-size: 1.5rem;">→</div>
+            {% endif %}
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Información adicional de mockup -->
+    {% if solicitud.estado == 'mockup' and solicitud.fecha_limite_mockup and hoy is defined %}
+    <div style="margin-top: 15px; padding: 10px; background: {% if hoy > solicitud.fecha_limite_mockup %}#dc3545{% elif (solicitud.fecha_limite_mockup - hoy).days <= 1 %}#ffc107{% else %}#28a745{% endif %}; color: white; border-radius: 6px; text-align: center;">
+        <strong>Fecha límite Mockup:</strong> {{ solicitud.fecha_limite_mockup.strftime('%d/%m/%Y') }}
+        {% set dias_restantes = (solicitud.fecha_limite_mockup - hoy).days %}
+        {% if dias_restantes < 0 %}
+        <span style="margin-left: 10px;">(Vencido hace {{ -dias_restantes }} día{{ 's' if -dias_restantes != 1 else '' }})</span>
+        {% elif dias_restantes == 0 %}
+        <span style="margin-left: 10px;">(Vence hoy)</span>
+        {% else %}
+        <span style="margin-left: 10px;">({{ dias_restantes }} día{{ 's' if dias_restantes != 1 else '' }} restante{{ 's' if dias_restantes != 1 else '' }})</span>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 30px;">
     <!-- Columna 1: Datos del Cliente -->
     <div>
@@ -171,46 +276,22 @@
                 <h4 style="color: #2c3e50; margin-bottom: 10px; font-size: 14px;">Cambiar Estado</h4>
                 <p style="margin-bottom: 10px; color: #666; font-size: 12px;">Selecciona el nuevo estado de la solicitud:</p>
                 
-                <form method="POST" action="{{ url_for('solicitudes.cambiar_estado_solicitud', solicitud_id=solicitud.id) }}">
-                    <select name="estado" id="estado_select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; margin-bottom: 10px;" onchange="this.form.submit()">
+                <form method="POST" action="{{ url_for('solicitudes.cambiar_estado_solicitud', solicitud_id=solicitud.id) }}" id="form_cambiar_estado">
+                    <select name="estado" id="estado_select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; margin-bottom: 10px;" onchange="actualizarSubestados()">
                         {% for estado in estados %}
                         <option value="{{ estado }}" {% if solicitud.estado == estado %}selected{% endif %}>{{ estado|title }}</option>
                         {% endfor %}
                     </select>
+                    
+                    <div id="subestado_container" style="margin-bottom: 10px; display: none;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 12px; color: #666;">Subestado:</label>
+                        <select name="subestado" id="subestado_select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                            <option value="">-- Sin subestado --</option>
+                        </select>
+                    </div>
+                    
                     <button type="submit" class="btn btn-primary" style="width: 100%; padding: 8px 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Cambiar Estado</button>
                 </form>
-                
-                <!-- Mostrar fechas según el estado actual -->
-                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #e0e0e0;">
-                    <h4 style="color: #2c3e50; margin-bottom: 10px; font-size: 12px;">Fechas del Proceso</h4>
-                    {% if solicitud.fecha_presupuesto %}
-                    <p style="font-size: 11px; color: #666; margin: 3px 0;"><strong>Presupuesto:</strong> {{ solicitud.fecha_presupuesto.strftime('%d/%m/%Y') }}</p>
-                    {% endif %}
-                    {% if solicitud.fecha_aceptado %}
-                    <p style="font-size: 11px; color: #666; margin: 3px 0;"><strong>Aceptado:</strong> {{ solicitud.fecha_aceptado.strftime('%d/%m/%Y') }}</p>
-                    {% endif %}
-                    {% if solicitud.fecha_diseno %}
-                    <p style="font-size: 11px; color: #666; margin: 3px 0;"><strong>Diseño:</strong> {{ solicitud.fecha_diseno.strftime('%d/%m/%Y') }}</p>
-                    {% endif %}
-                    {% if solicitud.fecha_diseno_finalizado %}
-                    <p style="font-size: 11px; color: #666; margin: 3px 0;"><strong>Diseño Finalizado:</strong> {{ solicitud.fecha_diseno_finalizado.strftime('%d/%m/%Y') }}</p>
-                    {% endif %}
-                    {% if solicitud.fecha_en_preparacion %}
-                    <p style="font-size: 11px; color: #666; margin: 3px 0;"><strong>En Preparación:</strong> {{ solicitud.fecha_en_preparacion.strftime('%d/%m/%Y') }}</p>
-                    {% endif %}
-                    {% if solicitud.fecha_todo_listo %}
-                    <p style="font-size: 11px; color: #666; margin: 3px 0;"><strong>Todo Listo:</strong> {{ solicitud.fecha_todo_listo.strftime('%d/%m/%Y') }}</p>
-                    {% endif %}
-                    {% if solicitud.fecha_enviado %}
-                    <p style="font-size: 11px; color: #666; margin: 3px 0;"><strong>Enviado:</strong> {{ solicitud.fecha_enviado.strftime('%d/%m/%Y') }}</p>
-                    {% endif %}
-                    {% if solicitud.fecha_entregado_cliente %}
-                    <p style="font-size: 11px; color: #666; margin: 3px 0;"><strong>Entregado al Cliente:</strong> {{ solicitud.fecha_entregado_cliente.strftime('%d/%m/%Y') }}</p>
-                    {% endif %}
-                    {% if solicitud.fecha_rechazado %}
-                    <p style="font-size: 11px; color: #dc3545; margin: 3px 0;"><strong>Rechazado:</strong> {{ solicitud.fecha_rechazado.strftime('%d/%m/%Y') }}</p>
-                    {% endif %}
-                </div>
             </div>
         </div>
     </div>
@@ -326,23 +407,6 @@
                         <p style="margin: 5px 0 0 0; color: #212529;">{{ linea.cargo }}</p>
                     </div>
                     {% endif %}
-                </div>
-                
-                <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 10px; border-top: 1px solid #dee2e6; margin-top: 10px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <strong style="color: #495057;">Estado:</strong>
-                        <span class="badge badge-estado-linea-{{ (linea.estado or 'pendiente')|lower|replace(' ', '-') }}" style="padding: 6px 12px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">
-                            {{ (linea.estado or 'pendiente')|title }}
-                        </span>
-                    </div>
-                    <form method="POST" action="{{ url_for('solicitudes.cambiar_estado_linea', solicitud_id=solicitud.id, linea_id=linea.id) }}" style="display: inline-block;">
-                        <select name="estado" onchange="this.form.submit()" style="padding: 6px 12px; border-radius: 4px; border: 1px solid #ddd; font-size: 14px; background: white; cursor: pointer;">
-                            <option value="pendiente" {% if (linea.estado or 'pendiente') == 'pendiente' %}selected{% endif %}>Pendiente</option>
-                            <option value="en confección" {% if (linea.estado or 'pendiente') == 'en confección' %}selected{% endif %}>En confección</option>
-                            <option value="en bordado" {% if (linea.estado or 'pendiente') == 'en bordado' %}selected{% endif %}>En bordado</option>
-                            <option value="listo" {% if (linea.estado or 'pendiente') == 'listo' %}selected{% endif %}>Listo</option>
-                        </select>
-                    </form>
                 </div>
             </div>
             {% endfor %}
@@ -494,6 +558,45 @@ document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
         cerrarModalImagenes();
     }
+});
+
+// Función para actualizar subestados según el estado seleccionado
+function actualizarSubestados() {
+    const estadoSelect = document.getElementById('estado_select');
+    const subestadoContainer = document.getElementById('subestado_container');
+    const subestadoSelect = document.getElementById('subestado_select');
+    const estadoSeleccionado = estadoSelect.value;
+    
+    // Limpiar opciones anteriores
+    subestadoSelect.innerHTML = '<option value="">-- Sin subestado --</option>';
+    
+    // Definir subestados por estado
+    const subestados = {
+        'mockup': ['enviado a cliente', 'prueba 1', 'prueba 2', 'aceptado'],
+        'en preparacion': ['hacer marcada', 'imprimir', 'calandra', 'corte', 'confeccion', 'sublimacion', 'bordado']
+    };
+    
+    if (subestados[estadoSeleccionado]) {
+        subestadoContainer.style.display = 'block';
+        subestados[estadoSeleccionado].forEach(function(subestado) {
+            const option = document.createElement('option');
+            option.value = subestado;
+            option.textContent = subestado.charAt(0).toUpperCase() + subestado.slice(1);
+            {% if solicitud.subestado %}
+            if (subestado === '{{ solicitud.subestado }}') {
+                option.selected = true;
+            }
+            {% endif %}
+            subestadoSelect.appendChild(option);
+        });
+    } else {
+        subestadoContainer.style.display = 'none';
+    }
+}
+
+// Ejecutar al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    actualizarSubestados();
 });
 </script>
 {% endblock %}

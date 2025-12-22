@@ -25,3 +25,4 @@ ALTER TABLE presupuestos DROP COLUMN IF EXISTS imagen_adicional_6;
 
 
 
+

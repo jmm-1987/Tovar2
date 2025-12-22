@@ -5,7 +5,14 @@
 {% block content %}
 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
     <h2 style="font-size: 1.5rem; margin: 0;">PANEL DE CONTROL</h2>
-    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+        <form method="GET" action="{{ url_for('index.index') }}" style="display: inline-block; margin: 0;">
+            <select name="filtro" id="filtro" onchange="this.form.submit()" style="padding: 6px 10px; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.8rem; background: white; color: #495057; cursor: pointer; margin-right: 10px;">
+                <option value="">Todos</option>
+                <option value="solo_mockup" {% if filtro_activo == 'solo_mockup' %}selected{% endif %}>Solo Mockup</option>
+                <option value="solo_en_preparacion" {% if filtro_activo == 'solo_en_preparacion' %}selected{% endif %}>Solo En Preparación</option>
+            </select>
+        </form>
         <a href="{{ url_for('solicitudes.nueva_solicitud') }}" class="btn btn-primary" style="padding: 8px 16px; font-size: 0.85rem;">Nueva Solicitud</a>
     </div>
 </div>
@@ -45,17 +52,40 @@
                 </span>
             </div>
             
-            {% if solicitud.lineas %}
-            <div class="pedido-lineas-container">
-                <strong>Líneas de la Solicitud:</strong>
-                <ul class="pedido-lineas-list">
-                    {% for linea in solicitud.lineas %}
-                    <li class="linea-item">
-                        <span class="linea-nombre">{{ linea.prenda.nombre if linea.prenda else 'N/A' }}</span>
-                        <span class="badge badge-estado-linea badge-estado-{{ linea.estado|lower|replace(' ', '-') }}">{{ linea.estado|title }}</span>
-                    </li>
-                    {% endfor %}
-                </ul>
+            {% if solicitud.estado == 'mockup' and solicitud.fecha_limite_mockup and hoy is defined %}
+            <div class="pedido-info-item">
+                <strong>Fecha Límite Mockup:</strong>
+                <span>
+                    {% set dias_restantes = (solicitud.fecha_limite_mockup - hoy).days %}
+                    <span class="fecha-limite-mockup {% if dias_restantes < 0 %}urgente{% elif dias_restantes <= 1 %}proxima{% else %}ok{% endif %}">
+                        {{ solicitud.fecha_limite_mockup.strftime('%d/%m/%Y') }}
+                        {% if dias_restantes < 0 %}
+                            <span style="color: #dc3545; font-weight: bold;">(Vencido)</span>
+                        {% elif dias_restantes == 0 %}
+                            <span style="color: #ffc107; font-weight: bold;">(Hoy)</span>
+                        {% elif dias_restantes <= 1 %}
+                            <span style="color: #ffc107;">({{ dias_restantes }} día)</span>
+                        {% else %}
+                            <span style="color: #28a745;">({{ dias_restantes }} días)</span>
+                        {% endif %}
+                    </span>
+                </span>
+            </div>
+            {% endif %}
+            
+            <div class="pedido-info-item">
+                <strong>Estado:</strong>
+                <span class="badge badge-estado-{{ solicitud.estado|lower|replace(' ', '-') }}" style="padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: 600;">
+                    {{ solicitud.estado|title }}
+                </span>
+            </div>
+            
+            {% if solicitud.subestado %}
+            <div class="pedido-info-item">
+                <strong>Subestado:</strong>
+                <span class="badge badge-estado-{{ solicitud.subestado|lower|replace(' ', '-') }}" style="padding: 4px 10px; border-radius: 12px; font-size: 0.85rem; font-weight: 600; background: #28a745; color: white;">
+                    {{ solicitud.subestado|title }}
+                </span>
             </div>
             {% endif %}
         </div>

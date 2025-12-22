@@ -441,11 +441,16 @@ def migrate_database():
                 nuevas_fechas = {
                     'fecha_presupuesto': 'DATE',
                     'fecha_aceptado': 'DATE',
-                    'fecha_diseno_finalizado': 'DATE',
+                    'fecha_mockup': 'DATE',
                     'fecha_en_preparacion': 'DATE',
+                    'fecha_terminado': 'DATE',
+                    'fecha_entregado_cliente': 'DATE',
+                    'fecha_limite_mockup': 'DATE',
+                    # Fechas antiguas para compatibilidad
+                    'fecha_diseno': 'DATE',
+                    'fecha_diseno_finalizado': 'DATE',
                     'fecha_todo_listo': 'DATE',
                     'fecha_enviado': 'DATE',
-                    'fecha_entregado_cliente': 'DATE',
                     'fecha_rechazado': 'DATE',
                     'fecha_aceptacion': 'DATE',
                     'fecha_objetivo': 'DATE',
@@ -511,6 +516,16 @@ def migrate_database():
                             print(f"Error al agregar columna {columna}: {e}")
                             pass
                 
+                # Añadir columna subestado si no existe
+                if 'subestado' not in columns_presupuesto:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE presupuestos ADD COLUMN subestado VARCHAR(50)'))
+                            conn.commit()
+                            print("Migración: Columna subestado agregada exitosamente a presupuestos")
+                    except Exception as e:
+                        print(f"Error al agregar columna subestado: {e}")
+                
                 # Verificar y agregar columnas de fechas de estados
                 nuevas_fechas = {
                     'fecha_pendiente_enviar': 'DATE',
@@ -526,11 +541,22 @@ def migrate_database():
                         except Exception as e:
                             print(f"Error al agregar columna {columna}: {e}")
                             pass
-                
-                # Eliminar columna de imagen 6 si existe (ya no se usa, pero mantenemos imagen_adicional_5)
-                # Nota: SQLite no soporta DROP COLUMN directamente, se omite esta migración
-                # La columna se puede ignorar si existe
-                            pass
+            
+            # Crear tabla registro_estado_solicitud si no existe
+            if 'registro_estado_solicitud' not in table_names:
+                try:
+                    db.create_all()
+                    print("Migración: Tabla registro_estado_solicitud creada exitosamente")
+                except Exception as e:
+                    print(f"Error al crear tabla registro_estado_solicitud: {e}")
+            
+            # Crear tabla registro_estado_solicitud si no existe
+            if 'registro_estado_solicitud' not in table_names:
+                try:
+                    db.create_all()
+                    print("Migración: Tabla registro_estado_solicitud creada exitosamente")
+                except Exception as e:
+                    print(f"Error al crear tabla registro_estado_solicitud: {e}")
             
             # Verificar que todas las tablas necesarias existan
             tablas_requeridas = ['comerciales', 'clientes', 'prendas', 'pedidos', 'lineas_pedido', 'presupuestos', 'lineas_presupuesto', 'tickets', 'lineas_ticket', 'facturas', 'lineas_factura', 'usuarios', 'plantillas_email', 'proveedores', 'facturas_proveedor', 'empleados', 'nominas', 'registro_cambio_estado']

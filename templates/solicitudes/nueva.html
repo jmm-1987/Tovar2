@@ -394,12 +394,10 @@ function duplicarLinea(btn) {
     const prendaSelectOriginal = lineaRow.querySelector('select[name="prenda_id[]"]');
     const sexoSelectOriginal = lineaRow.querySelector('select[name="sexo[]"]');
     const tejidoSelectOriginal = lineaRow.querySelector('select[name="tejido[]"]');
-    const estadoSelectOriginal = lineaRow.querySelector('select[name="estado_linea[]"]');
     
     const prendaValue = prendaSelectOriginal ? prendaSelectOriginal.value : '';
     const sexoValue = sexoSelectOriginal ? sexoSelectOriginal.value : '';
     const tejidoValue = tejidoSelectOriginal ? tejidoSelectOriginal.value : '';
-    const estadoValue = estadoSelectOriginal ? estadoSelectOriginal.value : '';
     
     // Limpiar talla y unidades
     const tallaInput = nuevaLinea.querySelector('input[name="talla[]"]');
@@ -416,7 +414,6 @@ function duplicarLinea(btn) {
     const prendaSelectNuevo = nuevaLinea.querySelector('select[name="prenda_id[]"]');
     const sexoSelectNuevo = nuevaLinea.querySelector('select[name="sexo[]"]');
     const tejidoSelectNuevo = nuevaLinea.querySelector('select[name="tejido[]"]');
-    const estadoSelectNuevo = nuevaLinea.querySelector('select[name="estado_linea[]"]');
     
     if (prendaSelectNuevo && prendaValue) {
         prendaSelectNuevo.value = prendaValue;
