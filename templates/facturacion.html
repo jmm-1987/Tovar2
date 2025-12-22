@@ -160,7 +160,7 @@ function cambiarTipoVista(tipo) {
                            style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block; margin-right: 5px;">
                             Hacer Factura
                         </a>
-                        <a href="{{ url_for('solicitudes.descargar_pdf_solicitud', solicitud_id=prefactura.id) }}" 
+                        <a href="{{ url_for('presupuestos.descargar_pdf_presupuesto', presupuesto_id=prefactura.id) }}" 
                            class="btn btn-secondary" 
                            style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block;"
                            target="_blank">

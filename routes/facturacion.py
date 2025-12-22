@@ -11,7 +11,7 @@ import base64
 from io import BytesIO
 from sqlalchemy import not_
 from extensions import db
-from models import Pedido, LineaPedido, Factura, LineaFactura, Cliente, Presupuesto, LineaPresupuesto
+from models import Factura, LineaFactura, Cliente, Presupuesto, LineaPresupuesto
 from utils.numeracion import obtener_siguiente_numero_factura
 from playwright.sync_api import sync_playwright
 
@@ -35,41 +35,18 @@ def facturacion():
     facturas = []
     
     if tipo_vista == 'pendientes':
-        # Obtener prefacturas: pedidos y solicitudes aceptadas que aún no tienen factura formalizada
-        # Filtrar solo facturas con pedido_id o presupuesto_id (excluir facturas directas)
-        pedidos_con_factura_ids = [f.pedido_id for f in Factura.query.with_entities(Factura.pedido_id).filter(Factura.pedido_id.isnot(None)).all()]
+        # Obtener prefacturas: solicitudes aceptadas que aún no tienen factura formalizada
+        # Filtrar solo facturas con presupuesto_id (excluir facturas directas)
         presupuestos_con_factura_ids = [f.presupuesto_id for f in Factura.query.with_entities(Factura.presupuesto_id).filter(Factura.presupuesto_id.isnot(None)).all()]
-        
-        # Obtener pedidos sin factura
-        query_pedidos = Pedido.query
-        if pedidos_con_factura_ids:
-            query_pedidos = query_pedidos.filter(not_(Pedido.id.in_(pedidos_con_factura_ids)))
-        
-        # Aplicar filtro de estado a pedidos
-        if estado_filtro:
-            query_pedidos = query_pedidos.filter(Pedido.estado == estado_filtro)
-        
-        # Aplicar filtros de fecha a pedidos
-        if fecha_desde:
-            try:
-                fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
-                query_pedidos = query_pedidos.filter(Pedido.fecha_creacion >= datetime.combine(fecha_desde_obj, datetime.min.time()))
-            except ValueError:
-                pass
-        
-        if fecha_hasta:
-            try:
-                fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
-                query_pedidos = query_pedidos.filter(Pedido.fecha_creacion <= datetime.combine(fecha_hasta_obj, datetime.max.time()))
-            except ValueError:
-                pass
-        
-        pedidos = query_pedidos.order_by(Pedido.id.desc()).all()
         
         # Obtener solicitudes (presupuestos) aceptadas sin factura
         query_solicitudes = Presupuesto.query.filter(Presupuesto.estado == 'aceptado')
         if presupuestos_con_factura_ids:
             query_solicitudes = query_solicitudes.filter(not_(Presupuesto.id.in_(presupuestos_con_factura_ids)))
+        
+        # Aplicar filtro de estado a solicitudes
+        if estado_filtro:
+            query_solicitudes = query_solicitudes.filter(Presupuesto.estado == estado_filtro)
         
         # Aplicar filtros de fecha a solicitudes
         if fecha_desde:
@@ -88,15 +65,14 @@ def facturacion():
         
         solicitudes = query_solicitudes.order_by(Presupuesto.id.desc()).all()
         
-        # Combinar pedidos y solicitudes como prefacturas
-        prefacturas = list(pedidos) + list(solicitudes)
+        # Las solicitudes son las prefacturas
+        prefacturas = list(solicitudes)
         # Ordenar por fecha de creación descendente
         prefacturas.sort(key=lambda x: x.fecha_creacion if x.fecha_creacion else datetime.min, reverse=True)
         
-        # Obtener estados únicos de pedidos y presupuestos para el filtro
-        estados_pedidos = db.session.query(Pedido.estado).distinct().all()
+        # Obtener estados únicos de presupuestos para el filtro
         estados_presupuestos = db.session.query(Presupuesto.estado).distinct().all()
-        estados_list = list(set([estado[0] for estado in estados_pedidos + estados_presupuestos if estado[0]]))
+        estados_list = list(set([estado[0] for estado in estados_presupuestos if estado[0]]))
     else:
         # Obtener facturas formalizadas
         query = Factura.query

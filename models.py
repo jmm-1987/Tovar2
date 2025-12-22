@@ -209,7 +209,7 @@ class LineaPedido(db.Model):
         return f'<LineaPedido {self.id} - {self.nombre} x{self.cantidad}>'
     
 class Presupuesto(db.Model):
-    """Solicitudes del sistema (unifica presupuestos y pedidos)"""
+    """Presupuestos del sistema (pedidos en estado anterior)"""
     __tablename__ = 'presupuestos'
     
     id = db.Column(db.Integer, primary_key=True)

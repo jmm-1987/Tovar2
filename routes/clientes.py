@@ -4,7 +4,6 @@ from flask_login import login_required
 from extensions import db
 from models import Cliente, Presupuesto, Factura, Pedido, Comercial, Usuario
 from datetime import datetime
-from sqlalchemy import or_
 
 clientes_bp = Blueprint('clientes', __name__)
 
@@ -101,21 +100,20 @@ def ficha_cliente(id):
     """Ficha completa del cliente con historial"""
     cliente = Cliente.query.get_or_404(id)
     
-    # Obtener historial de solicitudes (presupuestos)
-    solicitudes = Presupuesto.query.filter_by(cliente_id=id).order_by(Presupuesto.fecha_creacion.desc()).limit(20).all()
+    # Obtener historial de presupuestos
+    presupuestos = Presupuesto.query.filter_by(cliente_id=id).order_by(Presupuesto.fecha_creacion.desc()).limit(20).all()
     
-    # Obtener historial de facturas (a través de presupuestos/solicitudes y pedidos antiguos)
-    from sqlalchemy import or_
-    facturas = Factura.query.filter(
-        or_(
-            Factura.presupuesto_id.in_(db.session.query(Presupuesto.id).filter_by(cliente_id=id)),
-            Factura.pedido_id.in_(db.session.query(Pedido.id).filter_by(cliente_id=id))
-        )
-    ).order_by(Factura.fecha_creacion.desc()).limit(20).all()
+    # Obtener historial de pedidos
+    # Obtener solicitudes (presupuestos) del cliente en lugar de pedidos
+    pedidos = Presupuesto.query.filter_by(cliente_id=id).order_by(Presupuesto.fecha_creacion.desc()).limit(20).all()
+    
+    # Obtener historial de facturas (a través de pedidos)
+    facturas = Factura.query.join(Pedido).filter(Pedido.cliente_id == id).order_by(Factura.fecha_creacion.desc()).limit(20).all()
     
     return render_template('ficha_cliente.html', 
                          cliente=cliente,
-                         solicitudes=solicitudes,
+                         presupuestos=presupuestos,
+                         pedidos=pedidos,
                          facturas=facturas)
 
 @clientes_bp.route('/clientes/<int:id>/editar', methods=['GET', 'POST'])

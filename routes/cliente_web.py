@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, session
 from flask_login import login_user, logout_user, login_required, current_user
 from extensions import db
-from models import Cliente, Pedido, Prenda, Comercial, Usuario, Factura
+from models import Cliente, Presupuesto, Prenda, Comercial, Usuario, Factura
 from datetime import datetime
 from werkzeug.utils import secure_filename
 import os
@@ -101,33 +101,33 @@ def dashboard():
 @cliente_web_bp.route('/pedidos')
 @login_required
 def ver_pedidos():
-    """Ver todos los pedidos del cliente"""
+    """Ver todas las solicitudes del cliente"""
     if not es_cliente():
         flash('Acceso no autorizado', 'error')
         return redirect(url_for('auth.login'))
     
     cliente = current_user
-    pedidos = Pedido.query.filter_by(cliente_id=cliente.id).order_by(Pedido.fecha_creacion.desc()).all()
+    solicitudes = Presupuesto.query.filter_by(cliente_id=cliente.id).order_by(Presupuesto.fecha_creacion.desc()).all()
     
-    return render_template('cliente_web/pedidos.html', pedidos=pedidos, cliente=cliente)
+    return render_template('cliente_web/pedidos.html', pedidos=solicitudes, cliente=cliente)
 
 @cliente_web_bp.route('/pedidos/<int:pedido_id>')
 @login_required
 def ver_pedido(pedido_id):
-    """Ver detalle de un pedido"""
+    """Ver detalle de una solicitud"""
     if not es_cliente():
         flash('Acceso no autorizado', 'error')
         return redirect(url_for('auth.login'))
     
     cliente = current_user
-    pedido = Pedido.query.get_or_404(pedido_id)
+    solicitud = Presupuesto.query.get_or_404(pedido_id)
     
-    # Verificar que el pedido pertenece al cliente
-    if pedido.cliente_id != cliente.id:
-        flash('No tienes permiso para ver este pedido', 'error')
+    # Verificar que la solicitud pertenece al cliente
+    if solicitud.cliente_id != cliente.id:
+        flash('No tienes permiso para ver esta solicitud', 'error')
         return redirect(url_for('cliente_web.ver_pedidos'))
     
-    return render_template('cliente_web/ver_pedido.html', pedido=pedido, cliente=cliente)
+    return render_template('cliente_web/ver_pedido.html', pedido=solicitud, cliente=cliente)
 
 @cliente_web_bp.route('/facturas')
 @login_required

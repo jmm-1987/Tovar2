@@ -129,13 +129,12 @@ def load_user(user_id):
         return Usuario.query.get(int(user_id))
 
 # Importar modelos (se crean automáticamente al importar models.py)
-from models import Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, Usuario, PlantillaEmail, Proveedor, FacturaProveedor, Empleado, Nomina, RegistroCambioEstado, Configuracion
+from models import Comercial, Cliente, Prenda, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, Usuario, PlantillaEmail, Proveedor, FacturaProveedor, Empleado, Nomina, RegistroCambioEstado, Configuracion
 
 # Importar y registrar blueprints
 from routes.index import index_bp
 from routes.auth import auth_bp
-# from routes.pedidos import pedidos_bp  # Desactivado: funcionalidad migrada a solicitudes
-# from routes.presupuestos import presupuestos_bp  # Desactivado: funcionalidad migrada a solicitudes
+from routes.presupuestos import presupuestos_bp
 from routes.solicitudes import solicitudes_bp
 from routes.clientes import clientes_bp
 # from routes.comerciales import comerciales_bp  # Ya no se usa
@@ -151,8 +150,7 @@ from routes.informes import informes_bp
 # Registrar blueprints
 app.register_blueprint(index_bp)
 app.register_blueprint(auth_bp)
-# app.register_blueprint(pedidos_bp)  # Desactivado: funcionalidad migrada a solicitudes
-# app.register_blueprint(presupuestos_bp)  # Desactivado: funcionalidad migrada a solicitudes
+app.register_blueprint(presupuestos_bp)
 app.register_blueprint(solicitudes_bp)
 app.register_blueprint(clientes_bp)
 # app.register_blueprint(comerciales_bp)  # Ya no se usa
@@ -265,6 +263,7 @@ def migrate_database():
                             print("Migración: Columna seguimiento agregada exitosamente a pedidos")
                     except Exception as e:
                         print(f"Error al agregar columna seguimiento a pedidos: {e}")
+                        pass
             else:
                 # Si no existe la tabla, crearla
                 db.create_all()
@@ -861,6 +860,7 @@ Saludos cordiales,
                     print("Migración: Tabla configuracion creada exitosamente")
                 except Exception as e:
                     print(f"Error al crear tabla configuracion: {e}")
+                    pass
             else:
                 # Verificar que existe la configuración de verifactu activado
                 from models import Configuracion
