@@ -10,6 +10,7 @@
     <p><strong>Variables disponibles para usar en las plantillas:</strong></p>
     <ul>
         <li><strong>Para presupuestos:</strong> {presupuesto_id}, {cliente_nombre}, {tipo_pedido}, {fecha_creacion}, {total_con_iva}, {empresa_nombre}</li>
+        <li><strong>Para cambios de estado de solicitudes:</strong> {solicitud_id}, {cliente_nombre}, {nuevo_estado}, {subestado}, {estado_anterior}, {fecha_actualizacion}, {tipo_pedido}, {fecha_aceptacion}, {fecha_objetivo}, {empresa_nombre}</li>
         <li><strong>Para cambios de estado de pedidos:</strong> {pedido_id}, {cliente_nombre}, {nuevo_estado}, {estado_anterior}, {fecha_actualizacion}, {tipo_pedido}, {fecha_aceptacion}, {fecha_objetivo}, {empresa_nombre}</li>
     </ul>
     <p style="margin-top: 10px;"><strong>Nota:</strong> Puedes activar/desactivar el envío de emails para cada estado usando el interruptor en la columna "Activo".</p>
@@ -32,6 +33,9 @@
                 <td>
                     {% if plantilla.tipo == 'presupuesto' %}
                         📄 Presupuesto
+                    {% elif plantilla.tipo.startswith('cambio_estado_solicitud_') %}
+                        {% set estado_nombre = plantilla.tipo.replace('cambio_estado_solicitud_', '').replace('_', ' ').title() %}
+                        📋 Estado: {{ estado_nombre }}
                     {% elif plantilla.tipo.startswith('cambio_estado_pedido_') %}
                         {% set estado_nombre = plantilla.tipo.replace('cambio_estado_pedido_', '').replace('_', ' ').title() %}
                         📦 Estado: {{ estado_nombre }}

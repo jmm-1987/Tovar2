@@ -368,10 +368,8 @@ def importar_bd():
 @supervisor_required
 def plantillas_email():
     """Gestión de plantillas de email"""
-    # Filtrar para excluir la plantilla genérica 'cambio_estado_pedido'
-    plantillas = PlantillaEmail.query.filter(
-        PlantillaEmail.tipo != 'cambio_estado_pedido'
-    ).all()
+    # Mostrar todas las plantillas (ya no hay plantillas de pedidos)
+    plantillas = PlantillaEmail.query.order_by(PlantillaEmail.tipo).all()
     return render_template('configuracion/plantillas_email.html', plantillas=plantillas)
 
 @configuracion_bp.route('/configuracion/plantillas-email/<int:id>/editar', methods=['GET', 'POST'])

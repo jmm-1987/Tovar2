@@ -638,49 +638,33 @@ Quedamos a su disposición para cualquier consulta.
 Saludos cordiales,
 {empresa_nombre}'''
                 },
-                # Plantillas específicas por estado de pedido
+                # Plantillas específicas por estado de solicitud
                 {
-                    'tipo': 'cambio_estado_pedido_pendiente',
-                    'asunto': 'Pedido #{pedido_id} recibido - Estado: Pendiente',
+                    'tipo': 'cambio_estado_solicitud_presupuesto',
+                    'asunto': 'Presupuesto #{solicitud_id} creado',
                     'cuerpo': '''Estimado/a {cliente_nombre},
 
-Hemos recibido su pedido #{pedido_id} y se encuentra en estado PENDIENTE.
+Se ha creado su presupuesto #{solicitud_id}.
 
-En breve empezaremos a trabajar en él. Le iremos informando de los siguientes pasos.
-
-Detalles del pedido:
+Detalles del presupuesto:
 - Tipo: {tipo_pedido}
-- Fecha de actualización: {fecha_actualizacion}
+- Fecha de creación: {fecha_actualizacion}
+
+En breve recibirá el presupuesto detallado para su revisión.
 
 Saludos cordiales,
 {empresa_nombre}'''
                 },
                 {
-                    'tipo': 'cambio_estado_pedido_diseno',
-                    'asunto': 'Pedido #{pedido_id} en fase de diseño',
+                    'tipo': 'cambio_estado_solicitud_aceptado',
+                    'asunto': 'Solicitud #{solicitud_id} aceptada',
                     'cuerpo': '''Estimado/a {cliente_nombre},
 
-Su pedido #{pedido_id} ha pasado al estado DISEÑO.
+Su solicitud #{solicitud_id} ha sido ACEPTADA.
 
-Nuestro equipo está trabajando en las propuestas de diseño. En cuanto estén listas se las enviaremos para su revisión.
+Procederemos con la producción de su pedido.
 
-Detalles del pedido:
-- Tipo: {tipo_pedido}
-- Fecha de actualización: {fecha_actualizacion}
-
-Saludos cordiales,
-{empresa_nombre}'''
-                },
-                {
-                    'tipo': 'cambio_estado_pedido_en_preparacion',
-                    'asunto': 'Pedido #{pedido_id} en preparación',
-                    'cuerpo': '''Estimado/a {cliente_nombre},
-
-Su pedido #{pedido_id} ha pasado al estado EN PREPARACIÓN.
-
-Estamos preparando la producción de su pedido.
-
-Detalles del pedido:
+Detalles de la solicitud:
 - Tipo: {tipo_pedido}
 - Fecha de aceptación: {fecha_aceptacion}
 - Fecha objetivo de entrega: {fecha_objetivo}
@@ -689,15 +673,184 @@ Saludos cordiales,
 {empresa_nombre}'''
                 },
                 {
-                    'tipo': 'cambio_estado_pedido_todo_listo',
-                    'asunto': 'Pedido #{pedido_id} listo',
+                    'tipo': 'cambio_estado_solicitud_mockup',
+                    'asunto': 'Solicitud #{solicitud_id} - Mockup en proceso',
                     'cuerpo': '''Estimado/a {cliente_nombre},
 
-Su pedido #{pedido_id} se encuentra en estado TODO LISTO.
+Su solicitud #{solicitud_id} ha pasado al estado MOCKUP.
+
+Nuestro equipo está trabajando en el diseño. En breve recibirá las propuestas para su revisión.
+
+Detalles de la solicitud:
+- Tipo: {tipo_pedido}
+- Fecha de actualización: {fecha_actualizacion}
+{subestado_info}
+
+Saludos cordiales,
+{empresa_nombre}'''
+                },
+                {
+                    'tipo': 'cambio_estado_solicitud_en_preparacion',
+                    'asunto': 'Solicitud #{solicitud_id} en preparación',
+                    'cuerpo': '''Estimado/a {cliente_nombre},
+
+Su solicitud #{solicitud_id} ha pasado al estado EN PREPARACIÓN.
+
+Estamos preparando la producción de su pedido.
+
+Detalles de la solicitud:
+- Tipo: {tipo_pedido}
+- Fecha de aceptación: {fecha_aceptacion}
+- Fecha objetivo de entrega: {fecha_objetivo}
+{subestado_info}
+
+Saludos cordiales,
+{empresa_nombre}'''
+                },
+                # Plantillas para subestados de "en preparacion"
+                {
+                    'tipo': 'cambio_subestado_en_preparacion_hacer_marcada',
+                    'asunto': 'Solicitud #{solicitud_id} - Hacer Marcada',
+                    'cuerpo': '''Estimado/a {cliente_nombre},
+
+Su solicitud #{solicitud_id} ha avanzado en el proceso de preparación.
+
+Estado actual: EN PREPARACIÓN
+Subestado: HACER MARCADA
+
+Estamos realizando la marcada de los patrones para su pedido.
+
+Detalles de la solicitud:
+- Tipo: {tipo_pedido}
+- Fecha objetivo de entrega: {fecha_objetivo}
+
+Saludos cordiales,
+{empresa_nombre}'''
+                },
+                {
+                    'tipo': 'cambio_subestado_en_preparacion_imprimir',
+                    'asunto': 'Solicitud #{solicitud_id} - Impresión',
+                    'cuerpo': '''Estimado/a {cliente_nombre},
+
+Su solicitud #{solicitud_id} ha avanzado en el proceso de preparación.
+
+Estado actual: EN PREPARACIÓN
+Subestado: IMPRIMIR
+
+Estamos realizando la impresión de los diseños para su pedido.
+
+Detalles de la solicitud:
+- Tipo: {tipo_pedido}
+- Fecha objetivo de entrega: {fecha_objetivo}
+
+Saludos cordiales,
+{empresa_nombre}'''
+                },
+                {
+                    'tipo': 'cambio_subestado_en_preparacion_calandra',
+                    'asunto': 'Solicitud #{solicitud_id} - Calandra',
+                    'cuerpo': '''Estimado/a {cliente_nombre},
+
+Su solicitud #{solicitud_id} ha avanzado en el proceso de preparación.
+
+Estado actual: EN PREPARACIÓN
+Subestado: CALANDRA
+
+Estamos realizando el proceso de calandra para su pedido.
+
+Detalles de la solicitud:
+- Tipo: {tipo_pedido}
+- Fecha objetivo de entrega: {fecha_objetivo}
+
+Saludos cordiales,
+{empresa_nombre}'''
+                },
+                {
+                    'tipo': 'cambio_subestado_en_preparacion_corte',
+                    'asunto': 'Solicitud #{solicitud_id} - Corte',
+                    'cuerpo': '''Estimado/a {cliente_nombre},
+
+Su solicitud #{solicitud_id} ha avanzado en el proceso de preparación.
+
+Estado actual: EN PREPARACIÓN
+Subestado: CORTE
+
+Estamos realizando el corte de las prendas para su pedido.
+
+Detalles de la solicitud:
+- Tipo: {tipo_pedido}
+- Fecha objetivo de entrega: {fecha_objetivo}
+
+Saludos cordiales,
+{empresa_nombre}'''
+                },
+                {
+                    'tipo': 'cambio_subestado_en_preparacion_confeccion',
+                    'asunto': 'Solicitud #{solicitud_id} - Confección',
+                    'cuerpo': '''Estimado/a {cliente_nombre},
+
+Su solicitud #{solicitud_id} ha avanzado en el proceso de preparación.
+
+Estado actual: EN PREPARACIÓN
+Subestado: CONFECCIÓN
+
+Estamos realizando la confección de las prendas para su pedido.
+
+Detalles de la solicitud:
+- Tipo: {tipo_pedido}
+- Fecha objetivo de entrega: {fecha_objetivo}
+
+Saludos cordiales,
+{empresa_nombre}'''
+                },
+                {
+                    'tipo': 'cambio_subestado_en_preparacion_sublimacion',
+                    'asunto': 'Solicitud #{solicitud_id} - Sublimación',
+                    'cuerpo': '''Estimado/a {cliente_nombre},
+
+Su solicitud #{solicitud_id} ha avanzado en el proceso de preparación.
+
+Estado actual: EN PREPARACIÓN
+Subestado: SUBLIMACIÓN
+
+Estamos realizando el proceso de sublimación para su pedido.
+
+Detalles de la solicitud:
+- Tipo: {tipo_pedido}
+- Fecha objetivo de entrega: {fecha_objetivo}
+
+Saludos cordiales,
+{empresa_nombre}'''
+                },
+                {
+                    'tipo': 'cambio_subestado_en_preparacion_bordado',
+                    'asunto': 'Solicitud #{solicitud_id} - Bordado',
+                    'cuerpo': '''Estimado/a {cliente_nombre},
+
+Su solicitud #{solicitud_id} ha avanzado en el proceso de preparación.
+
+Estado actual: EN PREPARACIÓN
+Subestado: BORDADO
+
+Estamos realizando el proceso de bordado para su pedido.
+
+Detalles de la solicitud:
+- Tipo: {tipo_pedido}
+- Fecha objetivo de entrega: {fecha_objetivo}
+
+Saludos cordiales,
+{empresa_nombre}'''
+                },
+                {
+                    'tipo': 'cambio_estado_solicitud_terminado',
+                    'asunto': 'Solicitud #{solicitud_id} terminada',
+                    'cuerpo': '''Estimado/a {cliente_nombre},
+
+Su solicitud #{solicitud_id} se encuentra en estado TERMINADO.
 
 Estamos ultimando los detalles para su envío o recogida.
 
-Detalles del pedido:
+Detalles de la solicitud:
 - Tipo: {tipo_pedido}
 - Fecha objetivo de entrega: {fecha_objetivo}
 
@@ -705,31 +858,15 @@ Saludos cordiales,
 {empresa_nombre}'''
                 },
                 {
-                    'tipo': 'cambio_estado_pedido_enviado',
-                    'asunto': 'Pedido #{pedido_id} enviado',
+                    'tipo': 'cambio_estado_solicitud_entregado_al_cliente',
+                    'asunto': 'Solicitud #{solicitud_id} entregada',
                     'cuerpo': '''Estimado/a {cliente_nombre},
 
-Su pedido #{pedido_id} ha sido ENVIADO.
-
-En breve lo recibirá en la dirección acordada.
-
-Detalles del pedido:
-- Tipo: {tipo_pedido}
-- Fecha objetivo de entrega: {fecha_objetivo}
-
-Saludos cordiales,
-{empresa_nombre}'''
-                },
-                {
-                    'tipo': 'cambio_estado_pedido_entregado_al_cliente',
-                    'asunto': 'Pedido #{pedido_id} entregado',
-                    'cuerpo': '''Estimado/a {cliente_nombre},
-
-Su pedido #{pedido_id} ha sido ENTREGADO.
+Su solicitud #{solicitud_id} ha sido ENTREGADA.
 
 Esperamos que quede satisfecho con el trabajo realizado.
 
-Detalles del pedido:
+Detalles de la solicitud:
 - Tipo: {tipo_pedido}
 - Fecha de entrega: {fecha_actualizacion}
 
@@ -754,6 +891,61 @@ Saludos cordiales,
                 db.session.commit()
             except Exception:
                 db.session.rollback()
+            
+            # Limpiar plantillas obsoletas que no corresponden a estados actuales
+            try:
+                # Estados válidos actuales
+                estados_validos = ['presupuesto', 'aceptado', 'mockup', 'en preparacion', 'terminado', 'entregado al cliente']
+                subestados_validos = ['hacer marcada', 'imprimir', 'calandra', 'corte', 'confeccion', 'sublimacion', 'bordado']
+                
+                # Plantillas válidas
+                plantillas_validas = [
+                    'presupuesto',  # Plantilla genérica
+                    'cambio_estado_solicitud_presupuesto',
+                    'cambio_estado_solicitud_aceptado',
+                    'cambio_estado_solicitud_mockup',
+                    'cambio_estado_solicitud_en_preparacion',
+                    'cambio_estado_solicitud_terminado',
+                    'cambio_estado_solicitud_entregado_al_cliente',
+                    'cambio_subestado_en_preparacion_hacer_marcada',
+                    'cambio_subestado_en_preparacion_imprimir',
+                    'cambio_subestado_en_preparacion_calandra',
+                    'cambio_subestado_en_preparacion_corte',
+                    'cambio_subestado_en_preparacion_confeccion',
+                    'cambio_subestado_en_preparacion_sublimacion',
+                    'cambio_subestado_en_preparacion_bordado'
+                ]
+                
+                # Obtener todas las plantillas
+                todas_plantillas = PlantillaEmail.query.all()
+                plantillas_obsoletas = []
+                
+                for plantilla in todas_plantillas:
+                    # Si la plantilla no está en la lista de válidas
+                    if plantilla.tipo not in plantillas_validas:
+                        # Eliminar plantillas obsoletas de solicitudes o pedidos
+                        if (plantilla.tipo.startswith('cambio_estado_solicitud_') or 
+                            plantilla.tipo.startswith('cambio_subestado_') or
+                            plantilla.tipo.startswith('cambio_estado_pedido')):
+                            plantillas_obsoletas.append(plantilla)
+                
+                # Eliminar plantillas obsoletas
+                if plantillas_obsoletas:
+                    tipos_eliminados = []
+                    for plantilla in plantillas_obsoletas:
+                        tipos_eliminados.append(plantilla.tipo)
+                        print(f"Migración: Eliminando plantilla obsoleta: {plantilla.tipo} (ID: {plantilla.id})")
+                        db.session.delete(plantilla)
+                    db.session.commit()
+                    print(f"Migración: Se eliminaron {len(plantillas_obsoletas)} plantillas obsoletas:")
+                    for tipo in tipos_eliminados:
+                        print(f"  - {tipo}")
+                else:
+                    print("Migración: No se encontraron plantillas obsoletas para eliminar")
+                    
+            except Exception as e:
+                db.session.rollback()
+                print(f"Error al limpiar plantillas obsoletas: {e}")
             
             # Verificar y agregar columnas nuevas en clientes
             if 'clientes' in table_names:

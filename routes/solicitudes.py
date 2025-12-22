@@ -465,6 +465,33 @@ def cambiar_estado_solicitud(solicitud_id):
             db.session.add(registro)
         
         db.session.commit()
+        
+        # Enviar email si cambió el estado o el subestado
+        debe_enviar_email = False
+        if nuevo_estado != estado_anterior:
+            # Cambió el estado principal
+            debe_enviar_email = True
+        elif nuevo_estado == 'en preparacion' and nuevo_subestado and nuevo_subestado != subestado_anterior:
+            # Cambió el subestado dentro de "en preparacion"
+            debe_enviar_email = True
+        
+        if debe_enviar_email:
+            from utils.email import enviar_email_cambio_estado_solicitud
+            try:
+                exito, mensaje = enviar_email_cambio_estado_solicitud(
+                    solicitud, 
+                    nuevo_estado, 
+                    subestado=solicitud.subestado,
+                    estado_anterior=estado_anterior,
+                    subestado_anterior=subestado_anterior
+                )
+                if not exito:
+                    # No mostrar error al usuario, solo log
+                    print(f"Email no enviado: {mensaje}")
+            except Exception as e:
+                # No mostrar error al usuario, solo log
+                print(f"Error al intentar enviar email: {str(e)}")
+        
         flash(f'Estado cambiado a "{nuevo_estado}"' + (f' - {solicitud.subestado}' if solicitud.subestado else ''), 'success')
         
     except Exception as e:

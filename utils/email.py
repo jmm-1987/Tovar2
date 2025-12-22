@@ -56,10 +56,18 @@ Saludos cordiales,
 def formatear_texto(texto, variables):
     """Formatear texto con variables"""
     try:
-        return texto.format(**variables)
-    except KeyError as e:
-        # Si falta una variable, usar valor por defecto
-        return texto.format(**{k: variables.get(k, f'{{{k}}}') for k in variables})
+        # Formatear el texto con las variables disponibles
+        # Si una variable no está en el texto, simplemente se ignora
+        resultado = texto
+        for key, value in variables.items():
+            resultado = resultado.replace(f'{{{key}}}', str(value))
+        return resultado
+    except Exception as e:
+        # Si hay algún error, intentar formateo estándar
+        try:
+            return texto.format(**variables)
+        except:
+            return texto
 
 def enviar_email_presupuesto(presupuesto, pdf_data=None):
     """Enviar presupuesto por email al cliente"""
@@ -158,6 +166,87 @@ def enviar_email_cambio_estado_pedido(pedido, nuevo_estado, estado_anterior=None
         return True, 'Email enviado correctamente'
         
     except Exception as e:
+        return False, f'Error al enviar email: {str(e)}'
+
+def enviar_email_cambio_estado_solicitud(solicitud, nuevo_estado, subestado=None, estado_anterior=None, subestado_anterior=None):
+    """Enviar email al cliente cuando cambia el estado o subestado de una solicitud (presupuesto)"""
+    try:
+        cliente = solicitud.cliente
+        if not cliente or not cliente.email:
+            return False, 'El cliente no tiene email configurado'
+        
+        # Si hay subestado y el estado es "en preparacion", intentar usar plantilla específica del subestado
+        tipo_plantilla = None
+        if subestado and nuevo_estado == 'en preparacion':
+            tipo_plantilla = f'cambio_subestado_en_preparacion_{subestado.replace(" ", "_")}'
+            plantilla = obtener_plantilla(tipo_plantilla)
+            # Si existe plantilla específica del subestado, usarla
+            if plantilla and plantilla.get('asunto'):
+                plantilla_db = PlantillaEmail.query.filter_by(tipo=tipo_plantilla).first()
+                if plantilla_db and not plantilla_db.enviar_activo:
+                    print(f"DEBUG: Plantilla {tipo_plantilla} está desactivada")
+                    return False, f'La plantilla para el subestado {subestado} está desactivada'
+            else:
+                # Si no hay plantilla específica del subestado, usar la del estado
+                tipo_plantilla = f'cambio_estado_solicitud_{nuevo_estado.replace(" ", "_")}'
+        else:
+            # Determinar el tipo de plantilla según el estado
+            tipo_plantilla = f'cambio_estado_solicitud_{nuevo_estado.replace(" ", "_")}'
+        
+        # Obtener plantilla
+        plantilla = obtener_plantilla(tipo_plantilla)
+        
+        # Si no existe plantilla específica, no enviar email
+        if not plantilla or not plantilla.get('asunto'):
+            print(f"DEBUG: No hay plantilla para {tipo_plantilla}")
+            return False, f'No hay plantilla configurada para el estado {nuevo_estado}'
+        
+        # Verificar si la plantilla está activa
+        plantilla_db = PlantillaEmail.query.filter_by(tipo=tipo_plantilla).first()
+        if plantilla_db and not plantilla_db.enviar_activo:
+            print(f"DEBUG: Plantilla {tipo_plantilla} está desactivada")
+            return False, f'La plantilla para {nuevo_estado} está desactivada'
+        
+        # Variables para la plantilla
+        subestado_info = f'- Subestado: {subestado.title()}' if subestado else ''
+        variables = {
+            'solicitud_id': solicitud.id,
+            'cliente_nombre': cliente.nombre,
+            'nuevo_estado': nuevo_estado.title(),
+            'subestado': subestado.title() if subestado else '',
+            'subestado_info': subestado_info,
+            'estado_anterior': estado_anterior.title() if estado_anterior else 'N/A',
+            'fecha_actualizacion': datetime.now().strftime('%d/%m/%Y %H:%M'),
+            'tipo_pedido': solicitud.tipo_pedido.title(),
+            'fecha_aceptacion': solicitud.fecha_aceptado.strftime('%d/%m/%Y') if solicitud.fecha_aceptado else 'N/A',
+            'fecha_objetivo': solicitud.fecha_objetivo.strftime('%d/%m/%Y') if solicitud.fecha_objetivo else 'N/A',
+            'empresa_nombre': current_app.config.get('MAIL_DEFAULT_SENDER', 'Nuestra Empresa')
+        }
+        
+        # Formatear asunto y cuerpo
+        asunto = formatear_texto(plantilla['asunto'], variables)
+        cuerpo = formatear_texto(plantilla['cuerpo'], variables)
+        
+        # Crear mensaje
+        msg = Message(
+            subject=asunto,
+            recipients=[cliente.email],
+            body=cuerpo
+        )
+        
+        # Enviar email
+        try:
+            mail.send(msg)
+            print(f"DEBUG: Email enviado correctamente a {cliente.email} (plantilla: {tipo_plantilla})")
+            return True, 'Email enviado correctamente'
+        except Exception as e:
+            print(f"DEBUG: Error al enviar email: {str(e)}")
+            return False, f'Error al enviar email: {str(e)}'
+        
+    except Exception as e:
+        import traceback
+        print(f"DEBUG: Excepción en enviar_email_cambio_estado_solicitud: {str(e)}")
+        print(traceback.format_exc())
         return False, f'Error al enviar email: {str(e)}'
 
 
