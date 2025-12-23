@@ -30,6 +30,7 @@ ESTADOS_SOLICITUD = [
 # Subestados por estado principal
 SUBESTADOS = {
     'mockup': [
+        'encargado a',
         'enviado a cliente',
         'prueba 1',
         'prueba 2',
@@ -361,7 +362,8 @@ def ver_solicitud(solicitud_id):
     solicitud = Presupuesto.query.options(
         joinedload(Presupuesto.lineas).joinedload(LineaPresupuesto.prenda),
         joinedload(Presupuesto.cliente),
-        joinedload(Presupuesto.comercial)
+        joinedload(Presupuesto.comercial),
+        joinedload(Presupuesto.mockup_encargado_a)
     ).get_or_404(solicitud_id)
     
     # Debug: verificar si hay líneas
@@ -391,6 +393,9 @@ def ver_solicitud(solicitud_id):
         presupuesto_id=solicitud_id
     ).order_by(RegistroEstadoSolicitud.fecha_cambio.asc()).all()
     
+    # Obtener usuarios activos para asignar mockup
+    usuarios = Usuario.query.filter_by(activo=True).order_by(Usuario.usuario).all()
+    
     hoy = datetime.now().date()
     
     return render_template('solicitudes/ver.html',
@@ -399,6 +404,7 @@ def ver_solicitud(solicitud_id):
                          subestados=SUBESTADOS,
                          estados_fechas=ESTADOS_FECHAS,
                          registros_estado=registros_estado,
+                         usuarios=usuarios,
                          hoy=hoy)
 
 @solicitudes_bp.route('/solicitudes/<int:solicitud_id>/cambiar-estado', methods=['POST'])
@@ -434,6 +440,19 @@ def cambiar_estado_solicitud(solicitud_id):
                 if nuevo_subestado != subestado_anterior:
                     solicitud.subestado = nuevo_subestado
                     hubo_cambio = True
+                    
+                    # Si el subestado es "encargado a", asignar el usuario
+                    if nuevo_subestado == 'encargado a':
+                        usuario_encargado_id = request.form.get('usuario_encargado', '')
+                        if usuario_encargado_id:
+                            try:
+                                solicitud.mockup_encargado_a_id = int(usuario_encargado_id)
+                            except (ValueError, TypeError):
+                                flash('Usuario no válido', 'error')
+                                return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
+                        else:
+                            flash('Debe seleccionar un usuario para encargar el mockup', 'error')
+                            return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
         
         # Actualizar fecha correspondiente si no está establecida
         if nuevo_estado in ESTADOS_FECHAS:

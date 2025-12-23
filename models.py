@@ -230,6 +230,9 @@ class Presupuesto(db.Model):
     # Fecha límite para mockup (3 días desde que entra al estado)
     fecha_limite_mockup = db.Column(db.Date, nullable=True)
     
+    # Usuario al que se encarga el mockup
+    mockup_encargado_a_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=True)
+    
     # Forma de pago
     forma_pago = db.Column(db.Text)
     
@@ -285,6 +288,9 @@ class Presupuesto(db.Model):
     
     # Relación con líneas de presupuesto
     lineas = db.relationship('LineaPresupuesto', backref='presupuesto', lazy=True, cascade='all, delete-orphan')
+    
+    # Relación con usuario al que se encarga el mockup
+    mockup_encargado_a = db.relationship('Usuario', foreign_keys=[mockup_encargado_a_id], backref='mockups_encargados')
     
     def __repr__(self):
         return f'<Presupuesto {self.id} - {self.cliente.nombre if self.cliente else "Sin cliente"}>'

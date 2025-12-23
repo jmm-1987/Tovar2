@@ -182,7 +182,7 @@
                         <td><span class="badge badge-{{ pedido.estado|lower|replace(' ', '-') }}">{{ pedido.estado }}</span></td>
                         <td>{{ pedido.tipo_pedido }}</td>
                         <td>
-                            <a href="{{ url_for('pedidos.ver_pedido', pedido_id=pedido.id) }}" class="btn btn-sm btn-primary">Ver</a>
+                            <a href="{{ url_for('solicitudes.ver_solicitud', solicitud_id=pedido.id) }}" class="btn btn-sm btn-primary">Ver</a>
                         </td>
                     </tr>
                     {% endfor %}

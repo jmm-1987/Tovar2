@@ -526,6 +526,16 @@ def migrate_database():
                     except Exception as e:
                         print(f"Error al agregar columna subestado: {e}")
                 
+                # Añadir columna mockup_encargado_a_id si no existe
+                if 'mockup_encargado_a_id' not in columns_presupuesto:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE presupuestos ADD COLUMN mockup_encargado_a_id INTEGER'))
+                            conn.commit()
+                            print("Migración: Columna mockup_encargado_a_id agregada exitosamente a presupuestos")
+                    except Exception as e:
+                        print(f"Error al agregar columna mockup_encargado_a_id: {e}")
+                
                 # Verificar y agregar columnas de fechas de estados
                 nuevas_fechas = {
                     'fecha_pendiente_enviar': 'DATE',

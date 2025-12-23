@@ -114,7 +114,7 @@
             {% set estados_completos = [
                 {'estado': 'presupuesto', 'subestados': []},
                 {'estado': 'aceptado', 'subestados': []},
-                {'estado': 'mockup', 'subestados': ['enviado a cliente', 'prueba 1', 'prueba 2', 'aceptado']},
+                {'estado': 'mockup', 'subestados': ['encargado a', 'enviado a cliente', 'prueba 1', 'prueba 2', 'aceptado']},
                 {'estado': 'en preparacion', 'subestados': ['hacer marcada', 'imprimir', 'calandra', 'corte', 'confeccion', 'sublimacion', 'bordado']},
                 {'estado': 'terminado', 'subestados': []},
                 {'estado': 'entregado al cliente', 'subestados': []}
@@ -174,14 +174,34 @@
                     <div style="padding: 4px 8px; border-radius: 4px; text-align: center; font-size: 0.7rem; cursor: help;
                                 {% if subestado_activo %}background: #28a745; color: white; font-weight: bold;{% elif fecha_subestado %}background: #e9ecef; color: #495057;{% else %}background: #f8f9fa; color: #adb5bd;{% endif %}
                                 border: 1px solid {% if subestado_activo %}#28a745{% elif fecha_subestado %}#dee2e6{% else %}#e9ecef{% endif %};"
-                         title="{% if fecha_subestado %}Fecha: {{ fecha_subestado.strftime('%d/%m/%Y %H:%M') if fecha_subestado.__class__.__name__ == 'datetime' else fecha_subestado.strftime('%d/%m/%Y') }}{% endif %}{% if usuario_subestado %} | Usuario: {{ usuario_subestado }}{% endif %}">
+                         title="{% if fecha_subestado %}Fecha: {{ fecha_subestado.strftime('%d/%m/%Y %H:%M') if fecha_subestado.__class__.__name__ == 'datetime' else fecha_subestado.strftime('%d/%m/%Y') }}{% endif %}{% if usuario_subestado %} | Usuario: {{ usuario_subestado }}{% endif %}{% if estado_actual == 'mockup' and subestado == 'encargado a' and solicitud.mockup_encargado_a %} | Encargado a: {{ solicitud.mockup_encargado_a.usuario }}{% endif %}">
                         <div style="line-height: 1.2;">{{ subestado|title }}</div>
                         {% if fecha_subestado %}
                         <div style="font-size: 0.6rem; opacity: 0.8; line-height: 1.1;">{{ fecha_subestado.strftime('%d/%m/%Y') }}</div>
                         {% else %}
                         <div style="font-size: 0.6rem; opacity: 0.5; line-height: 1.1;">-</div>
                         {% endif %}
+                        {% if estado_actual == 'mockup' and subestado == 'encargado a' and solicitud.mockup_encargado_a %}
+                        <div style="font-size: 0.6rem; opacity: 0.9; line-height: 1.1; margin-top: 2px; font-weight: 600;">{{ solicitud.mockup_encargado_a.usuario }}</div>
+                        {% endif %}
                     </div>
+                    
+                    <!-- Fecha límite Mockup debajo del subestado "aceptado" -->
+                    {% if estado_actual == 'mockup' and subestado == 'aceptado' and solicitud.fecha_limite_mockup and hoy is defined %}
+                    {% set dias_restantes_mockup = (solicitud.fecha_limite_mockup - hoy).days %}
+                    <div style="padding: 6px 10px; border-radius: 4px; text-align: center; font-size: 0.7rem; margin-top: 4px;
+                                background: #fff3cd; color: #856404; border: 2px solid #ffc107;">
+                        <div style="font-weight: 600; margin-bottom: 2px; font-size: 0.65rem;">Fecha Límite</div>
+                        <div style="font-size: 0.65rem; opacity: 0.9;">{{ solicitud.fecha_limite_mockup.strftime('%d/%m/%Y') }}</div>
+                        {% if dias_restantes_mockup < 0 %}
+                        <div style="font-size: 0.6rem; opacity: 0.8; margin-top: 2px; color: #dc3545;">Vencido hace {{ -dias_restantes_mockup }} día{{ 's' if -dias_restantes_mockup != 1 else '' }}</div>
+                        {% elif dias_restantes_mockup == 0 %}
+                        <div style="font-size: 0.6rem; opacity: 0.8; margin-top: 2px; color: #ffc107;">Vence hoy</div>
+                        {% else %}
+                        <div style="font-size: 0.6rem; opacity: 0.8; margin-top: 2px;">{{ dias_restantes_mockup }} día{{ 's' if dias_restantes_mockup != 1 else '' }} restante{{ 's' if dias_restantes_mockup != 1 else '' }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
                     {% endfor %}
                 </div>
                 {% endif %}
@@ -216,21 +236,6 @@
             {% endif %}
         </div>
     </div>
-    
-    <!-- Información adicional de mockup -->
-    {% if solicitud.estado == 'mockup' and solicitud.fecha_limite_mockup and hoy is defined %}
-    <div style="margin-top: 10px; padding: 8px; background: {% if hoy > solicitud.fecha_limite_mockup %}#dc3545{% elif (solicitud.fecha_limite_mockup - hoy).days <= 1 %}#ffc107{% else %}#28a745{% endif %}; color: white; border-radius: 5px; text-align: center; font-size: 0.85rem;">
-        <strong>Fecha límite Mockup:</strong> {{ solicitud.fecha_limite_mockup.strftime('%d/%m/%Y') }}
-        {% set dias_restantes = (solicitud.fecha_limite_mockup - hoy).days %}
-        {% if dias_restantes < 0 %}
-        <span style="margin-left: 8px;">(Vencido hace {{ -dias_restantes }} día{{ 's' if -dias_restantes != 1 else '' }})</span>
-        {% elif dias_restantes == 0 %}
-        <span style="margin-left: 8px;">(Vence hoy)</span>
-        {% else %}
-        <span style="margin-left: 8px;">({{ dias_restantes }} día{{ 's' if dias_restantes != 1 else '' }} restante{{ 's' if dias_restantes != 1 else '' }})</span>
-        {% endif %}
-    </div>
-    {% endif %}
 </div>
 
 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 30px;">
@@ -311,8 +316,18 @@
                     
                     <div id="subestado_container" style="margin-bottom: 10px; display: none;">
                         <label style="display: block; margin-bottom: 5px; font-size: 12px; color: #666;">Subestado:</label>
-                        <select name="subestado" id="subestado_select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                        <select name="subestado" id="subestado_select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;" onchange="mostrarSelectorUsuario()">
                             <option value="">-- Sin subestado --</option>
+                        </select>
+                    </div>
+                    
+                    <div id="usuario_encargado_container" style="margin-bottom: 10px; display: none;">
+                        <label style="display: block; margin-bottom: 5px; font-size: 12px; color: #666;">Encargar a:</label>
+                        <select name="usuario_encargado" id="usuario_encargado_select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
+                            <option value="">-- Seleccionar usuario --</option>
+                            {% for usuario in usuarios %}
+                            <option value="{{ usuario.id }}" {% if solicitud.mockup_encargado_a_id == usuario.id %}selected{% endif %}>{{ usuario.usuario }} ({{ usuario.rol }})</option>
+                            {% endfor %}
                         </select>
                     </div>
                     
@@ -598,7 +613,7 @@ function actualizarSubestados() {
     
     // Definir subestados por estado
     const subestados = {
-        'mockup': ['enviado a cliente', 'prueba 1', 'prueba 2', 'aceptado'],
+        'mockup': ['encargado a', 'enviado a cliente', 'prueba 1', 'prueba 2', 'aceptado'],
         'en preparacion': ['hacer marcada', 'imprimir', 'calandra', 'corte', 'confeccion', 'sublimacion', 'bordado']
     };
     
@@ -615,14 +630,32 @@ function actualizarSubestados() {
             {% endif %}
             subestadoSelect.appendChild(option);
         });
+        // Verificar si debe mostrar el selector de usuario
+        mostrarSelectorUsuario();
     } else {
         subestadoContainer.style.display = 'none';
+        document.getElementById('usuario_encargado_container').style.display = 'none';
+    }
+}
+
+// Función para mostrar/ocultar selector de usuario cuando se selecciona "encargado a"
+function mostrarSelectorUsuario() {
+    const subestadoSelect = document.getElementById('subestado_select');
+    const usuarioContainer = document.getElementById('usuario_encargado_container');
+    
+    if (subestadoSelect && usuarioContainer) {
+        if (subestadoSelect.value === 'encargado a') {
+            usuarioContainer.style.display = 'block';
+        } else {
+            usuarioContainer.style.display = 'none';
+        }
     }
 }
 
 // Ejecutar al cargar la página
 document.addEventListener('DOMContentLoaded', function() {
     actualizarSubestados();
+    mostrarSelectorUsuario();
 });
 </script>
 {% endblock %}

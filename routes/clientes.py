@@ -3,6 +3,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_required
 from extensions import db
 from models import Cliente, Presupuesto, Factura, Pedido, Comercial, Usuario
+from sqlalchemy import or_
 from datetime import datetime
 
 clientes_bp = Blueprint('clientes', __name__)
@@ -103,12 +104,22 @@ def ficha_cliente(id):
     # Obtener historial de presupuestos
     presupuestos = Presupuesto.query.filter_by(cliente_id=id).order_by(Presupuesto.fecha_creacion.desc()).limit(20).all()
     
-    # Obtener historial de pedidos
+    # Obtener historial de pedidos (ahora son presupuestos/solicitudes)
     # Obtener solicitudes (presupuestos) del cliente en lugar de pedidos
     pedidos = Presupuesto.query.filter_by(cliente_id=id).order_by(Presupuesto.fecha_creacion.desc()).limit(20).all()
     
-    # Obtener historial de facturas (a través de pedidos)
-    facturas = Factura.query.join(Pedido).filter(Pedido.cliente_id == id).order_by(Factura.fecha_creacion.desc()).limit(20).all()
+    # Obtener historial de facturas (a través de presupuestos/solicitudes o pedidos antiguos)
+    # Las facturas pueden venir de presupuestos (nuevo sistema) o de pedidos (sistema antiguo)
+    facturas = Factura.query.filter(
+        or_(
+            Factura.presupuesto_id.in_(
+                db.session.query(Presupuesto.id).filter_by(cliente_id=id)
+            ),
+            Factura.pedido_id.in_(
+                db.session.query(Pedido.id).filter_by(cliente_id=id)
+            )
+        )
+    ).order_by(Factura.fecha_creacion.desc()).limit(20).all()
     
     return render_template('ficha_cliente.html', 
                          cliente=cliente,
