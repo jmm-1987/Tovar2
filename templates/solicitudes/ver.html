@@ -4,6 +4,9 @@
 
 {% block content %}
 <style>
+.container {
+    padding-top: 5px;
+}
 /* Estilos para el modal de imágenes */
 .modal-imagenes {
     display: none;
@@ -94,19 +97,20 @@
     font-style: italic;
 }
 </style>
-<div style="margin-bottom: 20px;">
-    <a href="{{ url_for('solicitudes.listado_solicitudes') }}" class="btn btn-primary">← Volver a la lista</a>
-    <a href="{{ url_for('solicitudes.editar_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-warning">Editar</a>
-    <a href="{{ url_for('solicitudes.descargar_pdf_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-success" target="_blank">📄 Descargar PDF</a>
-</div>
-
-<h2>Solicitud #{{ solicitud.id }}</h2>
+<h2 style="margin-top: 0; margin-bottom: 10px; font-size: 1.3rem;">Solicitud #{{ solicitud.id }} - {{ solicitud.cliente.nombre if solicitud.cliente else 'Cliente N/A' }}</h2>
 
 <!-- Esquema horizontal de estados y subestados -->
-<div style="margin-bottom: 30px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-    <h3 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-bottom: 20px;">Seguimiento de Estados</h3>
-    <div style="overflow-x: auto; padding: 10px 0;">
-        <div style="display: flex; gap: 15px; min-width: max-content; align-items: flex-start;">
+<div style="margin-bottom: 30px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h3 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 8px; margin: 0; font-size: 1.1rem; flex: 1;">Seguimiento de Estados</h3>
+        <div style="display: flex; gap: 10px; margin-left: 20px;">
+            <a href="{{ url_for('solicitudes.listado_solicitudes') }}" class="btn btn-primary" style="padding: 6px 12px; font-size: 0.85rem;">← Volver</a>
+            <a href="{{ url_for('solicitudes.editar_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-warning" style="padding: 6px 12px; font-size: 0.85rem;">Editar</a>
+            <a href="{{ url_for('solicitudes.descargar_pdf_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-success" target="_blank" style="padding: 6px 12px; font-size: 0.85rem;">📄 PDF</a>
+        </div>
+    </div>
+    <div style="overflow-x: auto; padding: 5px 0;">
+        <div style="display: flex; gap: 10px; min-width: max-content; align-items: flex-start;">
             {% set estados_completos = [
                 {'estado': 'presupuesto', 'subestados': []},
                 {'estado': 'aceptado', 'subestados': []},
@@ -138,28 +142,28 @@
             {% set registros_estado_actual = registros_estado|selectattr('estado', 'equalto', estado_actual)|list %}
             {% set esta_activo = solicitud.estado == estado_actual %}
             
-            <div style="display: flex; flex-direction: column; align-items: center; min-width: 150px;">
+            <div style="display: flex; flex-direction: column; align-items: center; min-width: 120px;">
                 <!-- Estado principal -->
                 {% set registro_estado_principal = registros_estado_actual[0] if registros_estado_actual|length > 0 else None %}
                 {% set usuario_estado = registro_estado_principal.usuario.usuario if registro_estado_principal and registro_estado_principal.usuario else 'Sistema' %}
                 {% set fecha_hora_estado = registro_estado_principal.fecha_cambio if registro_estado_principal else (fecha_estado if fecha_estado else None) %}
-                <div style="padding: 12px 20px; border-radius: 8px; margin-bottom: 10px; text-align: center; cursor: help;
+                <div style="padding: 8px 14px; border-radius: 6px; margin-bottom: 6px; text-align: center; cursor: help;
                             {% if esta_activo %}background: #007bff; color: white; font-weight: bold;{% else %}background: #f8f9fa; color: #6c757d;{% endif %}
                             border: 2px solid {% if esta_activo %}#007bff{% else %}#dee2e6{% endif %};"
                      title="{% if fecha_hora_estado %}Fecha: {{ fecha_hora_estado.strftime('%d/%m/%Y %H:%M') if fecha_hora_estado.__class__.__name__ == 'datetime' else fecha_hora_estado.strftime('%d/%m/%Y') }}{% endif %}{% if usuario_estado %} | Usuario: {{ usuario_estado }}{% endif %}">
-                    <div style="font-size: 0.9rem; font-weight: 600; margin-bottom: 5px;">{{ estado_actual|title }}</div>
+                    <div style="font-size: 0.8rem; font-weight: 600; margin-bottom: 2px;">{{ estado_actual|title }}</div>
                     {% if fecha_estado %}
-                    <div style="font-size: 0.75rem; opacity: 0.9;">{{ fecha_estado.strftime('%d/%m/%Y') }}</div>
+                    <div style="font-size: 0.65rem; opacity: 0.9;">{{ fecha_estado.strftime('%d/%m/%Y') }}</div>
                     {% elif registros_estado_actual|length > 0 %}
-                    <div style="font-size: 0.75rem; opacity: 0.9;">{{ registros_estado_actual[0].fecha_cambio.strftime('%d/%m/%Y') }}</div>
+                    <div style="font-size: 0.65rem; opacity: 0.9;">{{ registros_estado_actual[0].fecha_cambio.strftime('%d/%m/%Y') }}</div>
                     {% else %}
-                    <div style="font-size: 0.75rem; opacity: 0.7;">-</div>
+                    <div style="font-size: 0.65rem; opacity: 0.7;">-</div>
                     {% endif %}
                 </div>
                 
                 <!-- Subestados -->
                 {% if estado_info.subestados|length > 0 %}
-                <div style="display: flex; flex-direction: column; gap: 8px; width: 100%;">
+                <div style="display: flex; flex-direction: column; gap: 4px; width: 100%;">
                     {% for subestado in estado_info.subestados %}
                     {% set registros_subestado = registros_estado|selectattr('estado', 'equalto', estado_actual)|selectattr('subestado', 'equalto', subestado)|list %}
                     {% set subestado_activo = esta_activo and solicitud.subestado == subestado %}
@@ -167,15 +171,15 @@
                     {% set fecha_subestado = registro_subestado.fecha_cambio if registro_subestado else None %}
                     {% set usuario_subestado = registro_subestado.usuario.usuario if registro_subestado and registro_subestado.usuario else 'Sistema' %}
                     
-                    <div style="padding: 8px 12px; border-radius: 6px; text-align: center; font-size: 0.8rem; cursor: help;
+                    <div style="padding: 4px 8px; border-radius: 4px; text-align: center; font-size: 0.7rem; cursor: help;
                                 {% if subestado_activo %}background: #28a745; color: white; font-weight: bold;{% elif fecha_subestado %}background: #e9ecef; color: #495057;{% else %}background: #f8f9fa; color: #adb5bd;{% endif %}
                                 border: 1px solid {% if subestado_activo %}#28a745{% elif fecha_subestado %}#dee2e6{% else %}#e9ecef{% endif %};"
                          title="{% if fecha_subestado %}Fecha: {{ fecha_subestado.strftime('%d/%m/%Y %H:%M') if fecha_subestado.__class__.__name__ == 'datetime' else fecha_subestado.strftime('%d/%m/%Y') }}{% endif %}{% if usuario_subestado %} | Usuario: {{ usuario_subestado }}{% endif %}">
-                        <div style="margin-bottom: 3px;">{{ subestado|title }}</div>
+                        <div style="line-height: 1.2;">{{ subestado|title }}</div>
                         {% if fecha_subestado %}
-                        <div style="font-size: 0.7rem; opacity: 0.8;">{{ fecha_subestado.strftime('%d/%m/%Y') }}</div>
+                        <div style="font-size: 0.6rem; opacity: 0.8; line-height: 1.1;">{{ fecha_subestado.strftime('%d/%m/%Y') }}</div>
                         {% else %}
-                        <div style="font-size: 0.7rem; opacity: 0.5;">-</div>
+                        <div style="font-size: 0.6rem; opacity: 0.5; line-height: 1.1;">-</div>
                         {% endif %}
                     </div>
                     {% endfor %}
@@ -185,23 +189,45 @@
             
             <!-- Flecha conectora (excepto en el último) -->
             {% if not loop.last %}
-            <div style="display: flex; align-items: center; padding: 0 5px; color: #6c757d; font-size: 1.5rem;">→</div>
+            <div style="display: flex; align-items: center; padding: 0 3px; color: #6c757d; font-size: 1.2rem;">→</div>
             {% endif %}
             {% endfor %}
+            
+            <!-- Cuadro de fecha objetivo -->
+            {% if solicitud.fecha_objetivo %}
+            <!-- Flecha conectora antes del cuadro de fecha objetivo -->
+            <div style="display: flex; align-items: center; padding: 0 3px; color: #6c757d; font-size: 1.2rem;">→</div>
+            <div style="display: flex; flex-direction: column; align-items: center; min-width: 120px;">
+                <div style="padding: 8px 14px; border-radius: 6px; text-align: center; background: #fff3cd; color: #856404; border: 2px solid #ffc107; margin-top: 0;">
+                    <div style="font-size: 0.8rem; font-weight: 600; margin-bottom: 2px;">Fecha Objetivo</div>
+                    <div style="font-size: 0.65rem; opacity: 0.9;">{{ solicitud.fecha_objetivo.strftime('%d/%m/%Y') }}</div>
+                    {% if hoy is defined %}
+                        {% set dias_restantes = (solicitud.fecha_objetivo - hoy).days %}
+                        {% if dias_restantes < 0 %}
+                        <div style="font-size: 0.6rem; opacity: 0.8; margin-top: 2px; color: #dc3545;">Vencido hace {{ -dias_restantes }} día{{ 's' if -dias_restantes != 1 else '' }}</div>
+                        {% elif dias_restantes == 0 %}
+                        <div style="font-size: 0.6rem; opacity: 0.8; margin-top: 2px; color: #ffc107;">Vence hoy</div>
+                        {% else %}
+                        <div style="font-size: 0.6rem; opacity: 0.8; margin-top: 2px;">{{ dias_restantes }} día{{ 's' if dias_restantes != 1 else '' }} restante{{ 's' if dias_restantes != 1 else '' }}</div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
     
     <!-- Información adicional de mockup -->
     {% if solicitud.estado == 'mockup' and solicitud.fecha_limite_mockup and hoy is defined %}
-    <div style="margin-top: 15px; padding: 10px; background: {% if hoy > solicitud.fecha_limite_mockup %}#dc3545{% elif (solicitud.fecha_limite_mockup - hoy).days <= 1 %}#ffc107{% else %}#28a745{% endif %}; color: white; border-radius: 6px; text-align: center;">
+    <div style="margin-top: 10px; padding: 8px; background: {% if hoy > solicitud.fecha_limite_mockup %}#dc3545{% elif (solicitud.fecha_limite_mockup - hoy).days <= 1 %}#ffc107{% else %}#28a745{% endif %}; color: white; border-radius: 5px; text-align: center; font-size: 0.85rem;">
         <strong>Fecha límite Mockup:</strong> {{ solicitud.fecha_limite_mockup.strftime('%d/%m/%Y') }}
         {% set dias_restantes = (solicitud.fecha_limite_mockup - hoy).days %}
         {% if dias_restantes < 0 %}
-        <span style="margin-left: 10px;">(Vencido hace {{ -dias_restantes }} día{{ 's' if -dias_restantes != 1 else '' }})</span>
+        <span style="margin-left: 8px;">(Vencido hace {{ -dias_restantes }} día{{ 's' if -dias_restantes != 1 else '' }})</span>
         {% elif dias_restantes == 0 %}
-        <span style="margin-left: 10px;">(Vence hoy)</span>
+        <span style="margin-left: 8px;">(Vence hoy)</span>
         {% else %}
-        <span style="margin-left: 10px;">({{ dias_restantes }} día{{ 's' if dias_restantes != 1 else '' }} restante{{ 's' if dias_restantes != 1 else '' }})</span>
+        <span style="margin-left: 8px;">({{ dias_restantes }} día{{ 's' if dias_restantes != 1 else '' }} restante{{ 's' if dias_restantes != 1 else '' }})</span>
         {% endif %}
     </div>
     {% endif %}
