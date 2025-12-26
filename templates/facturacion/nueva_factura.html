@@ -3,60 +3,81 @@
 {% block title %}Nueva Factura Directa{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container" style="max-width: 1400px;">
     <h2>Nueva Factura Directa</h2>
     
     <form method="POST" id="facturaForm">
-        <div class="form-group">
-            <label for="fecha_expedicion">Fecha de Expedición *</label>
-            <input type="date" name="fecha_expedicion" id="fecha_expedicion" value="{{ fecha_hoy }}" required class="form-control">
+        <!-- Campos principales en fila compacta -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
+            <div class="form-group">
+                <label for="fecha_expedicion">Fecha de Expedición *</label>
+                <input type="date" name="fecha_expedicion" id="fecha_expedicion" value="{{ fecha_hoy }}" required class="form-control" style="width: 100%;">
+            </div>
+            
+            <div class="form-group">
+                <label for="tipo_factura">Tipo de Factura *</label>
+                <select name="tipo_factura" id="tipo_factura" required class="form-control" style="width: 100%;">
+                    <option value="F1">F1 - Factura Completa</option>
+                    <option value="F2">F2 - Factura Simplificada</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="cliente_id">Cliente (opcional)</label>
+                <select name="cliente_id" id="cliente_id" class="form-control" onchange="cargarDatosCliente()" style="width: 100%;">
+                    <option value="">Seleccionar cliente...</option>
+                    {% for cliente in clientes %}
+                    <option value="{{ cliente.id }}" 
+                            data-nombre="{{ cliente.nombre }}" 
+                            data-nif="{{ cliente.nif or '' }}">{{ cliente.nombre }}{% if cliente.nif %} - {{ cliente.nif }}{% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
         
-        <div class="form-group">
-            <label for="tipo_factura">Tipo de Factura *</label>
-            <select name="tipo_factura" id="tipo_factura" required class="form-control">
-                <option value="F1">F1 - Factura Completa</option>
-                <option value="F2">F2 - Factura Simplificada</option>
-            </select>
+        <!-- Datos del cliente en fila compacta -->
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 15px; margin-bottom: 20px;">
+            <div class="form-group">
+                <label for="nombre_cliente">Nombre del Cliente *</label>
+                <input type="text" name="nombre_cliente" id="nombre_cliente" required class="form-control" placeholder="Nombre completo del cliente" style="width: 100%;">
+            </div>
+            
+            <div class="form-group">
+                <label for="nif_cliente">NIF/CIF del Cliente</label>
+                <input type="text" name="nif_cliente" id="nif_cliente" class="form-control" placeholder="NIF o CIF" style="width: 100%;">
+            </div>
         </div>
         
-        <div class="form-group">
-            <label for="cliente_id">Cliente (opcional - para autocompletar datos)</label>
-            <select name="cliente_id" id="cliente_id" class="form-control" onchange="cargarDatosCliente()">
-                <option value="">Seleccionar cliente...</option>
-                {% for cliente in clientes %}
-                <option value="{{ cliente.id }}" 
-                        data-nombre="{{ cliente.nombre }}" 
-                        data-nif="{{ cliente.nif or '' }}">{{ cliente.nombre }}{% if cliente.nif %} - {{ cliente.nif }}{% endif %}</option>
-                {% endfor %}
-            </select>
-        </div>
-        
-        <div class="form-group">
-            <label for="nombre_cliente">Nombre del Cliente *</label>
-            <input type="text" name="nombre_cliente" id="nombre_cliente" required class="form-control" placeholder="Nombre completo del cliente">
-        </div>
-        
-        <div class="form-group">
-            <label for="nif_cliente">NIF/CIF del Cliente</label>
-            <input type="text" name="nif_cliente" id="nif_cliente" class="form-control" placeholder="NIF o CIF">
-        </div>
-        
-        <div class="form-group">
+        <div class="form-group" style="margin-bottom: 20px;">
             <label for="descripcion">Descripción de la Operación</label>
-            <textarea name="descripcion" id="descripcion" rows="3" class="form-control" placeholder="Descripción general de la factura"></textarea>
+            <textarea name="descripcion" id="descripcion" rows="2" class="form-control" placeholder="Descripción general de la factura" style="width: 100%; max-width: 1200px;"></textarea>
         </div>
         
         <h3>Líneas de la Factura</h3>
+        <!-- Cabeceras de las columnas -->
+        <div class="linea-factura-header">
+            <div class="linea-factura-numero-header">#</div>
+            <div class="linea-factura-campos-header">
+                <div class="header-col" style="flex: 4; min-width: 300px;">Descripción</div>
+                <div class="header-col" style="flex: 0 0 80px; width: 80px;">Cant.</div>
+                <div class="header-col" style="flex: 0 0 100px; width: 100px;">P. Unit.</div>
+                <div class="header-col" style="flex: 0 0 80px; width: 80px;">Desc. %</div>
+                <div class="header-col" style="flex: 0 0 100px; width: 100px;">P. Final</div>
+                <div class="header-col" style="flex: 0 0 100px; width: 100px; text-align: right;">Importe</div>
+                <div class="header-col" style="flex: 0 0 30px; width: 30px;"></div>
+            </div>
+        </div>
         <div id="lineas-container">
             <div class="linea-factura-row">
                 <div class="linea-factura-numero">#1</div>
                 <div class="linea-factura-campos">
-                    <input type="text" name="descripcion_linea[]" placeholder="Descripción del producto/servicio" required style="flex: 2;">
-                    <input type="number" name="cantidad[]" placeholder="Cantidad" step="0.01" min="0" value="1" required style="flex: 1;" class="linea-cantidad">
-                    <input type="number" name="precio_unitario[]" placeholder="Precio unitario" step="0.01" min="0" required style="flex: 1;" class="precio-unitario">
-                    <span class="importe-linea" style="flex: 1; padding: 8px; text-align: right; font-weight: bold;">0.00 €</span>
-                    <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; display: none;">×</button>
+                    <input type="text" name="descripcion_linea[]" placeholder="Descripción" required class="linea-campo-compact" style="flex: 4; min-width: 300px;">
+                    <input type="number" name="cantidad[]" placeholder="Cant." step="0.01" min="0" value="1" required class="linea-campo-compact linea-cantidad" style="flex: 0 0 80px; width: 80px;">
+                    <input type="number" name="precio_unitario[]" placeholder="P. Unit." step="0.01" min="0" required class="linea-campo-compact precio-unitario" style="flex: 0 0 100px; width: 100px;">
+                    <input type="number" name="descuento[]" class="linea-campo-compact descuento-input" step="0.01" min="0" max="100" value="0" placeholder="Desc. %" title="Descuento (%)" style="flex: 0 0 80px; width: 80px;">
+                    <input type="number" name="precio_final[]" class="linea-campo-compact precio-final-input" step="0.01" min="0" placeholder="P. Final" title="Precio Final" readonly style="flex: 0 0 100px; width: 100px; background: #f0f0f0;">
+                    <span class="importe-linea" style="flex: 0 0 100px; padding: 8px; text-align: right; font-weight: bold;">0.00 €</span>
+                    <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; display: none; flex: 0 0 30px;">×</button>
                 </div>
             </div>
         </div>
@@ -65,7 +86,7 @@
             <button type="button" id="agregar-linea" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">+ Agregar Línea</button>
         </div>
         
-        <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+        <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 6px; max-width: 400px;">
             <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                 <strong>Base Imponible:</strong>
                 <span id="base-imponible">0.00</span> €
@@ -73,6 +94,18 @@
             <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                 <strong>IVA (21%):</strong>
                 <span id="iva-total">0.00</span> €
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding-top: 10px; border-top: 1px solid #dee2e6;">
+                <strong>Subtotal:</strong>
+                <span id="subtotal">0.00</span> €
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center;">
+                <label for="descuento_pronto_pago" style="margin: 0; font-weight: 500;">Descuento por pronto pago (%):</label>
+                <input type="number" name="descuento_pronto_pago" id="descuento_pronto_pago" step="0.01" min="0" max="100" value="0" placeholder="0" style="width: 80px; padding: 4px 8px; border: 1px solid #dee2e6; border-radius: 4px; text-align: right;">
+            </div>
+            <div style="display: none; justify-content: space-between; margin-bottom: 10px;" id="descuento-pronto-pago-row">
+                <strong style="color: #28a745;">Descuento aplicado:</strong>
+                <span id="descuento-aplicado" style="color: #28a745;">0.00</span> €
             </div>
             <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #dee2e6;">
                 <strong style="font-size: 1.2rem;">Total:</strong>
@@ -96,35 +129,90 @@ document.addEventListener('DOMContentLoaded', function() {
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('fecha_expedicion').value = today;
     
+    // Función para calcular precio final con descuento
+    function calcularPrecioFinal(lineaRow) {
+        const precioUnitarioInput = lineaRow.querySelector('.precio-unitario');
+        const descuentoInput = lineaRow.querySelector('.descuento-input');
+        const precioFinalInput = lineaRow.querySelector('.precio-final-input');
+        
+        if (!precioUnitarioInput || !descuentoInput || !precioFinalInput) return;
+        
+        const precioUnitario = parseFloat(precioUnitarioInput.value) || 0;
+        const descuento = parseFloat(descuentoInput.value) || 0;
+        
+        if (precioUnitario > 0 && descuento > 0) {
+            const precioFinal = precioUnitario * (1 - descuento / 100);
+            precioFinalInput.value = precioFinal.toFixed(2);
+        } else {
+            precioFinalInput.value = precioUnitario.toFixed(2);
+        }
+        
+        calcularImporteLinea(lineaRow);
+    }
+    
     // Función para calcular importe de línea
     function calcularImporteLinea(lineaRow) {
         const cantidadInput = lineaRow.querySelector('.linea-cantidad');
-        const precioInput = lineaRow.querySelector('.precio-unitario');
+        const precioFinalInput = lineaRow.querySelector('.precio-final-input');
+        const precioUnitarioInput = lineaRow.querySelector('.precio-unitario');
         const importeSpan = lineaRow.querySelector('.importe-linea');
         
         const cantidad = parseFloat(cantidadInput.value) || 0;
-        const precio = parseFloat(precioInput.value) || 0;
-        const importe = cantidad * precio;
+        // Usar precio final si existe y tiene valor, sino usar precio unitario
+        let precio = 0;
+        if (precioFinalInput && precioFinalInput.value) {
+            precio = parseFloat(precioFinalInput.value) || 0;
+        } else if (precioUnitarioInput) {
+            precio = parseFloat(precioUnitarioInput.value) || 0;
+        }
         
+        const importe = cantidad * precio;
         importeSpan.textContent = importe.toFixed(2) + ' €';
         actualizarTotales();
     }
     
     // Función para actualizar totales
     function actualizarTotales() {
-        let total = 0;
+        // Sumar todas las líneas (sin IVA)
+        let baseImponible = 0;
         document.querySelectorAll('.importe-linea').forEach(span => {
             const texto = span.textContent.replace(' €', '').trim();
-            total += parseFloat(texto) || 0;
+            baseImponible += parseFloat(texto) || 0;
         });
         
-        const baseImponible = total / 1.21;
-        const iva = total - baseImponible;
+        // Calcular IVA (21% sobre la base imponible)
+        const iva = baseImponible * 0.21;
+        
+        // Subtotal (base + IVA)
+        const subtotal = baseImponible + iva;
+        
+        // Calcular descuento por pronto pago sobre el subtotal
+        const descuentoProntoPago = parseFloat(document.getElementById('descuento_pronto_pago').value) || 0;
+        const descuentoAplicado = subtotal * (descuentoProntoPago / 100);
+        const total = subtotal - descuentoAplicado;
         
         document.getElementById('base-imponible').textContent = baseImponible.toFixed(2);
         document.getElementById('iva-total').textContent = iva.toFixed(2);
+        document.getElementById('subtotal').textContent = subtotal.toFixed(2);
+        
+        // Mostrar/ocultar fila de descuento aplicado
+        const descuentoRow = document.getElementById('descuento-pronto-pago-row');
+        const descuentoAplicadoSpan = document.getElementById('descuento-aplicado');
+        if (descuentoProntoPago > 0) {
+            descuentoRow.style.display = 'flex';
+            descuentoAplicadoSpan.textContent = descuentoAplicado.toFixed(2);
+        } else {
+            descuentoRow.style.display = 'none';
+            descuentoAplicadoSpan.textContent = '0.00';
+        }
+        
         document.getElementById('importe-total').textContent = total.toFixed(2);
     }
+    
+    // Event listener para descuento por pronto pago
+    document.getElementById('descuento_pronto_pago').addEventListener('input', function() {
+        actualizarTotales();
+    });
     
     // Agregar nueva línea
     document.getElementById('agregar-linea').addEventListener('click', function() {
@@ -137,6 +225,10 @@ document.addEventListener('DOMContentLoaded', function() {
             if (input.type === 'number') {
                 if (input.classList.contains('linea-cantidad')) {
                     input.value = '1';
+                } else if (input.classList.contains('descuento-input')) {
+                    input.value = '0';
+                } else if (input.classList.contains('precio-final-input')) {
+                    input.value = '';
                 } else {
                     input.value = '';
                 }
@@ -153,10 +245,24 @@ document.addEventListener('DOMContentLoaded', function() {
         nuevaLinea.querySelector('.btn-eliminar-linea').style.display = 'block';
         
         // Añadir event listeners
-        nuevaLinea.querySelector('.linea-cantidad').addEventListener('input', function() {
+        const cantidadInput = nuevaLinea.querySelector('.linea-cantidad');
+        const precioUnitarioInput = nuevaLinea.querySelector('.precio-unitario');
+        const descuentoInput = nuevaLinea.querySelector('.descuento-input');
+        const precioFinalInput = nuevaLinea.querySelector('.precio-final-input');
+        
+        cantidadInput.addEventListener('input', function() {
             calcularImporteLinea(nuevaLinea);
         });
-        nuevaLinea.querySelector('.precio-unitario').addEventListener('input', function() {
+        
+        precioUnitarioInput.addEventListener('input', function() {
+            calcularPrecioFinal(nuevaLinea);
+        });
+        
+        descuentoInput.addEventListener('input', function() {
+            calcularPrecioFinal(nuevaLinea);
+        });
+        
+        precioFinalInput.addEventListener('input', function() {
             calcularImporteLinea(nuevaLinea);
         });
         
@@ -182,9 +288,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Event listeners para la primera línea
-    document.querySelectorAll('.linea-cantidad, .precio-unitario').forEach(input => {
+    document.querySelectorAll('.linea-cantidad, .precio-unitario, .descuento-input').forEach(input => {
         input.addEventListener('input', function() {
-            calcularImporteLinea(input.closest('.linea-factura-row'));
+            const lineaRow = input.closest('.linea-factura-row');
+            if (input.classList.contains('precio-unitario') || input.classList.contains('descuento-input')) {
+                calcularPrecioFinal(lineaRow);
+            } else {
+                calcularImporteLinea(lineaRow);
+            }
         });
     });
     
@@ -209,12 +320,55 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-.linea-factura-row {
+.linea-factura-header {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 8px;
+    background: #e9ecef;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #495057;
+}
+
+.linea-factura-numero-header {
+    font-weight: bold;
+    min-width: 35px;
+    width: 35px;
+    text-align: center;
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
-    padding: 10px;
+    justify-content: center;
+}
+
+.linea-factura-campos-header {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+    align-items: stretch;
+}
+
+.header-col {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #495057;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    display: flex;
+    align-items: center;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: transparent;
+}
+
+.linea-factura-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 8px;
     background: #f8f9fa;
     border-radius: 6px;
 }
@@ -222,30 +376,52 @@ document.addEventListener('DOMContentLoaded', function() {
 .linea-factura-numero {
     font-weight: bold;
     color: #495057;
-    min-width: 30px;
+    min-width: 35px;
+    width: 35px;
+    font-size: 0.9rem;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .linea-factura-campos {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     flex: 1;
-    align-items: center;
+    align-items: stretch;
 }
 
-.linea-factura-campos input {
-    padding: 8px;
+.linea-campo-compact {
+    padding: 6px 8px;
     border: 1px solid #dee2e6;
     border-radius: 4px;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
+    box-sizing: border-box;
+}
+
+.linea-factura-campos input[type="text"] {
+    min-width: 300px;
 }
 
 .importe-linea {
-    min-width: 100px;
+    font-size: 0.9rem;
 }
 
 .btn-eliminar-linea:hover {
     background: #c82333 !important;
 }
+
+.form-group {
+    margin-bottom: 0;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: #495057;
+}
 </style>
 {% endblock %}
-

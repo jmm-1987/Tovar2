@@ -29,7 +29,7 @@ def gestion_prendas():
             db.session.rollback()
             flash(f'Error: {str(e)}', 'error')
     
-    prendas = Prenda.query.all()
+    prendas = Prenda.query.order_by(Prenda.nombre).all()
     return render_template('prendas.html', prendas=prendas)
 
 @prendas_bp.route('/prendas/<int:id>/editar', methods=['POST'])

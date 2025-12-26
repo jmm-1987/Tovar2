@@ -119,7 +119,7 @@
                     {% endfor %}
                 </select>
                 <input type="text" name="color[]" class="linea-campo-compact" placeholder="Color" title="Color">
-                <input type="text" name="forma[]" class="linea-campo-compact" placeholder="Forma" title="Forma">
+                <input type="text" name="forma[]" class="linea-campo-compact" placeholder="Forma" title="Forma" list="formas-list">
                 <select name="sexo[]" class="linea-campo-compact" title="Sexo">
                     <option value="">Sexo</option>
                     <option value="cro">Cro</option>
@@ -156,6 +156,76 @@
     </div>
 
     <button type="button" class="btn btn-primary" onclick="agregarLinea()">Agregar Prenda</button>
+
+    <!-- Datalist para formas (disponible para todos los inputs de forma) -->
+    <datalist id="formas-list">
+        <option value="Recta">
+        <option value="Ajustada">
+        <option value="Holgada">
+        <option value="Oversize">
+        <option value="Slim">
+        <option value="Regular">
+        <option value="Relaxed">
+        <option value="Tapered">
+        <option value="Straight">
+        <option value="Skinny">
+        <option value="POLAR">
+        <option value="POLAR.NARANJ.">
+        <option value="POLAR.VERDE">
+        <option value="POLAR.NEGRO">
+        <option value="POLAR.AZ.MARIN">
+        <option value="POLAR.BLANC.">
+        <option value="POLAR.AZ.CELES">
+        <option value="POLAR.OTRO">
+        <option value="ABRIGO">
+        <option value="BAT.AMERICANA">
+        <option value="BAT.MAO TRAJANO">
+        <option value="BAT.BRUTUS">
+        <option value="BAT.GEMINA">
+        <option value="BAT.JULIA">
+        <option value="BAT.DIANA">
+        <option value="BAT.ALAUDAE">
+        <option value="GORRO.GOMA">
+        <option value="GORRO.CUERDA">
+        <option value="CAPA PELUQUERO">
+        <option value="CAMISETA WEARK">
+        <option value="CAM. AZ.CEL.">
+        <option value="CAM. ROJA">
+        <option value="CAM. VERDE">
+        <option value="CAM.BURD.">
+        <option value="CAM.GRIS">
+        <option value="CAM. OTRO">
+        <option value="CAM. NEGRA">
+        <option value="CAM.NARAN.">
+        <option value="CAM.AZ.MAR.">
+        <option value="CAM. AMARL.">
+        <option value="POLO.BLAN.">
+        <option value="POLO.VERD.">
+        <option value="POLO.AZ.CEL.">
+        <option value="POLO.ROJO">
+        <option value="POLO AMAR.">
+        <option value="POLO.AZ.MARI">
+        <option value="POLO.MARON">
+        <option value="POL.GRIS">
+        <option value="POL.NEG.">
+        <option value="POLO.OTRO">
+        <option value="T1">
+        <option value="T2">
+        <option value="T3">
+        <option value="T4">
+        <option value="T5">
+        <option value="T201">
+        <option value="T301">
+        <option value="T401">
+        <option value="COCINA">
+        <option value="CHAQ. COCINA">
+        <option value="MAD.CORTO">
+        <option value="MAD.PETO">
+        <option value="MAD.FRANCES">
+        <option value="CAMISA.CELEST">
+        <option value="CAMISA.BLANC.">
+        <option value="CAMISA OTRO">
+    </datalist>
 
     <div class="actions">
         <button type="submit" class="btn btn-success">Guardar Solicitud</button>

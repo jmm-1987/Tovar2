@@ -324,6 +324,16 @@ def migrate_database():
             # Verificar si existe la tabla facturas y hacer pedido_id nullable si no lo es
             if 'facturas' in table_names:
                 columns_facturas = [col['name'] for col in inspector.get_columns('facturas')]
+                
+                # Verificar y agregar columna descuento_pronto_pago
+                if 'descuento_pronto_pago' not in columns_facturas:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE facturas ADD COLUMN descuento_pronto_pago NUMERIC(5, 2) DEFAULT 0"))
+                            conn.commit()
+                            print("Migración: Columna descuento_pronto_pago agregada exitosamente a facturas")
+                    except Exception as e:
+                        print(f"Error al agregar columna descuento_pronto_pago a facturas: {e}")
                 # Verificar si pedido_id existe y es NOT NULL
                 pedido_id_not_null = False
                 for col_info in inspector.get_columns('facturas'):

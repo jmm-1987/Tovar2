@@ -536,11 +536,14 @@ def nueva_factura():
             nombre_cliente = request.form.get('nombre_cliente', '')
             nif_cliente = request.form.get('nif_cliente', '')
             cliente_id = request.form.get('cliente_id', '')
+            descuento_pronto_pago = request.form.get('descuento_pronto_pago', '0') or '0'
             
             # Obtener líneas de factura
             descripciones = request.form.getlist('descripcion_linea[]')
             cantidades = request.form.getlist('cantidad[]')
             precios_unitarios = request.form.getlist('precio_unitario[]')
+            descuentos = request.form.getlist('descuento[]')
+            precios_finales = request.form.getlist('precio_final[]')
             
             if not fecha_expedicion_str:
                 flash('La fecha de expedición es obligatoria', 'error')
@@ -576,14 +579,61 @@ def nueva_factura():
                 if descripciones[i]:
                     cantidad = Decimal(str(cantidades[i])) if i < len(cantidades) and cantidades[i] else Decimal('1')
                     precio_unitario = Decimal(str(precios_unitarios[i])) if i < len(precios_unitarios) and precios_unitarios[i] else Decimal('0')
-                    importe = cantidad * precio_unitario
+                    
+                    # Procesar descuento
+                    descuento = Decimal('0')
+                    if i < len(descuentos) and descuentos[i]:
+                        try:
+                            descuento = Decimal(str(descuentos[i]))
+                        except:
+                            descuento = Decimal('0')
+                    
+                    # Procesar precio final (si existe, usar ese; sino calcular con descuento)
+                    precio_final = None
+                    if i < len(precios_finales) and precios_finales[i]:
+                        try:
+                            precio_final = Decimal(str(precios_finales[i]))
+                        except:
+                            precio_final = None
+                    
+                    # Si no hay precio_final pero hay descuento, calcularlo
+                    if precio_final is None and descuento > 0:
+                        precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+                    elif precio_final is None:
+                        precio_final = precio_unitario
+                    
+                    # Calcular importe usando precio_final si existe
+                    importe = cantidad * precio_final
                     importe_total += importe
+                    
                     lineas_data.append({
                         'descripcion': descripciones[i],
                         'cantidad': cantidad,
                         'precio_unitario': precio_unitario,
+                        'descuento': descuento,
+                        'precio_final': precio_final,
                         'importe': importe
                     })
+            
+            # Calcular IVA (21% sobre la base imponible)
+            # Los precios unitarios son sin IVA, así que importe_total es la base imponible
+            base_imponible = importe_total
+            iva = base_imponible * Decimal('0.21')
+            subtotal = base_imponible + iva
+            
+            # Procesar descuento por pronto pago
+            descuento_pronto_pago_decimal = Decimal('0')
+            try:
+                descuento_pronto_pago_decimal = Decimal(str(descuento_pronto_pago))
+            except:
+                descuento_pronto_pago_decimal = Decimal('0')
+            
+            # Aplicar descuento por pronto pago al subtotal (base + IVA)
+            if descuento_pronto_pago_decimal > 0:
+                descuento_aplicado = subtotal * (descuento_pronto_pago_decimal / Decimal('100'))
+                importe_total = subtotal - descuento_aplicado
+            else:
+                importe_total = subtotal
             
             # Crear factura sin pedido
             factura = Factura(
@@ -596,6 +646,7 @@ def nueva_factura():
                 nif=nif_cliente,
                 nombre=nombre_cliente,
                 importe_total=importe_total,
+                descuento_pronto_pago=descuento_pronto_pago_decimal,
                 estado='pendiente'
             )
             
@@ -610,6 +661,8 @@ def nueva_factura():
                     descripcion=linea_data['descripcion'],
                     cantidad=linea_data['cantidad'],
                     precio_unitario=linea_data['precio_unitario'],
+                    descuento=linea_data['descuento'],
+                    precio_final=linea_data['precio_final'],
                     importe=linea_data['importe']
                 )
                 db.session.add(linea_factura)
