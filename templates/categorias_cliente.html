@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block title %}Categorías de Clientes - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<div class="categorias-container">
+    <div class="categorias-header">
+        <h2>Categorías de Clientes</h2>
+        <a href="{{ url_for('clientes.gestion_clientes') }}" class="btn btn-secondary">← Volver a Clientes</a>
+    </div>
+
+    <!-- Formulario para crear nueva categoría -->
+    <div class="form-section" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px;">
+        <h3 style="margin-top: 0;">Crear Nueva Categoría</h3>
+        <form method="POST" style="display: flex; gap: 10px; align-items: flex-end;">
+            <input type="hidden" name="accion" value="crear">
+            <div style="flex: 1;">
+                <label for="nombre" style="display: block; margin-bottom: 5px; font-weight: 500;">Nombre de la Categoría</label>
+                <input type="text" name="nombre" id="nombre" required placeholder="Ej: Hostelería, Clínica..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+            <button type="submit" class="btn btn-primary">➕ Crear Categoría</button>
+        </form>
+    </div>
+
+    <!-- Lista de categorías -->
+    <div class="table-container" style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <table class="categorias-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f8f9fa;">
+                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e0e0e0;">ID</th>
+                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e0e0e0;">Nombre</th>
+                    <th style="padding: 12px; text-align: center; border-bottom: 2px solid #e0e0e0;">Estado</th>
+                    <th style="padding: 12px; text-align: center; border-bottom: 2px solid #e0e0e0;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for categoria in categorias %}
+                <tr style="border-bottom: 1px solid #e0e0e0;">
+                    <td style="padding: 12px;">{{ categoria.id }}</td>
+                    <td style="padding: 12px;">
+                        <form method="POST" style="display: inline;" id="form-editar-{{ categoria.id }}">
+                            <input type="hidden" name="accion" value="editar">
+                            <input type="hidden" name="categoria_id" value="{{ categoria.id }}">
+                            <input type="text" name="nombre" value="{{ categoria.nombre }}" required style="padding: 6px; border: 1px solid #ddd; border-radius: 4px; width: 200px;">
+                            <button type="submit" class="btn btn-sm btn-primary" style="padding: 6px 12px; margin-left: 5px;">Guardar</button>
+                        </form>
+                    </td>
+                    <td style="padding: 12px; text-align: center;">
+                        {% if categoria.activo %}
+                            <span style="color: #28a745; font-weight: 600;">✓ Activa</span>
+                        {% else %}
+                            <span style="color: #dc3545; font-weight: 600;">✗ Inactiva</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 12px; text-align: center;">
+                        <div style="display: flex; gap: 5px; justify-content: center;">
+                            {% if categoria.activo %}
+                            <form method="POST" style="display: inline;">
+                                <input type="hidden" name="accion" value="desactivar">
+                                <input type="hidden" name="categoria_id" value="{{ categoria.id }}">
+                                <button type="submit" class="btn btn-sm btn-warning" style="padding: 6px 12px;">Desactivar</button>
+                            </form>
+                            {% else %}
+                            <form method="POST" style="display: inline;">
+                                <input type="hidden" name="accion" value="activar">
+                                <input type="hidden" name="categoria_id" value="{{ categoria.id }}">
+                                <button type="submit" class="btn btn-sm btn-success" style="padding: 6px 12px;">Activar</button>
+                            </form>
+                            {% endif %}
+                            <form method="POST" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar esta categoría? Solo se puede eliminar si no hay clientes asignados.');">
+                                <input type="hidden" name="accion" value="eliminar">
+                                <input type="hidden" name="categoria_id" value="{{ categoria.id }}">
+                                <button type="submit" class="btn btn-sm btn-danger" style="padding: 6px 12px;">Eliminar</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+.categorias-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.categorias-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.categorias-header h2 {
+    margin: 0;
+}
+
+.categorias-table tbody tr:hover {
+    background: #f8f9fa;
+}
+</style>
+{% endblock %}
+

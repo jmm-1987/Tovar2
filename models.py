@@ -35,6 +35,23 @@ class Comercial(db.Model):
     def __repr__(self):
         return f'<Comercial {self.nombre}>'
 
+class CategoriaCliente(db.Model):
+    """Categorías de clientes configurables"""
+    __tablename__ = 'categorias_cliente'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(50), nullable=False, unique=True)
+    activo = db.Column(db.Boolean, nullable=False, default=True)
+    
+    # Timestamp
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Relación con clientes
+    clientes = db.relationship('Cliente', backref='categoria_obj', lazy=True, foreign_keys='Cliente.categoria_id')
+    
+    def __repr__(self):
+        return f'<CategoriaCliente {self.nombre}>'
+
 class Cliente(db.Model, UserMixin):
     """Clientes del sistema con acceso web"""
     __tablename__ = 'clientes'
@@ -50,8 +67,11 @@ class Cliente(db.Model, UserMixin):
     pais = db.Column(db.String(100), default='España')  # País
     telefono = db.Column(db.String(50))  # Teléfono fijo
     movil = db.Column(db.String(50))  # Teléfono móvil
-    email = db.Column(db.String(100))
-    categoria = db.Column(db.String(50))  # Categoría: hosteleria, clinica, colegio, emerita, carnaval, transporte, varios
+    email = db.Column(db.String(100))  # Email general (mantener para compatibilidad)
+    email_general = db.Column(db.String(100))  # Email general
+    email_comunicaciones = db.Column(db.String(100))  # Email para avisos de estados
+    categoria = db.Column(db.String(50))  # Categoría antigua (mantener para compatibilidad)
+    categoria_id = db.Column(db.Integer, db.ForeignKey('categorias_cliente.id'), nullable=True)  # Nueva categoría desde tabla
     personas_contacto = db.Column(db.Text)  # Personas de contacto
     anotaciones = db.Column(db.Text)  # Anotaciones adicionales
     
@@ -72,6 +92,8 @@ class Cliente(db.Model, UserMixin):
     pedidos = db.relationship('Pedido', backref='cliente', lazy=True)
     # Relación con presupuestos
     presupuestos = db.relationship('Presupuesto', backref='cliente', lazy=True)
+    # Relación con direcciones de envío
+    direcciones_envio = db.relationship('DireccionEnvio', backref='cliente', lazy=True, cascade='all, delete-orphan')
     
     def set_password(self, password):
         """Establecer contraseña con hash"""
@@ -660,6 +682,25 @@ class Configuracion(db.Model):
     
     def __repr__(self):
         return f'<Configuracion {self.clave}={self.valor}>'
+
+class DireccionEnvio(db.Model):
+    """Direcciones de envío alternativas para clientes"""
+    __tablename__ = 'direcciones_envio'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False)
+    nombre = db.Column(db.String(200), nullable=False)  # Nombre de la dirección (ej: "Dirección envío 2")
+    direccion = db.Column(db.Text)
+    poblacion = db.Column(db.String(100))
+    provincia = db.Column(db.String(100))
+    codigo_postal = db.Column(db.String(10))
+    pais = db.Column(db.String(100), default='España')
+    
+    # Timestamp
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<DireccionEnvio {self.nombre} - {self.cliente.nombre if self.cliente else "Sin cliente"}>'
 
 class RegistroEstadoSolicitud(db.Model):
     """Registro de cambios de estado y subestado en solicitudes con fechas"""

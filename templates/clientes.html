@@ -6,7 +6,10 @@
 <div class="clientes-container">
     <div class="clientes-header">
         <h2>Gestión de Clientes</h2>
-        <button onclick="abrirModalCrear()" class="btn btn-success">➕ Crear Cliente</button>
+        <div style="display: flex; gap: 10px;">
+            <a href="{{ url_for('clientes.gestion_categorias') }}" class="btn btn-secondary">📁 Gestionar Categorías</a>
+            <button onclick="abrirModalCrear()" class="btn btn-success">➕ Crear Cliente</button>
+        </div>
     </div>
 
     <!-- Barra de búsqueda y ordenamiento -->
@@ -16,9 +19,17 @@
                 <input type="text" name="busqueda" id="busqueda" value="{{ busqueda }}" placeholder="Buscar por nombre, alias, NIF, población..." style="width: 100%; padding: 10px 40px 10px 15px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 14px;">
                 <span style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #6c757d; font-size: 18px;">🔍</span>
             </div>
+            <div style="min-width: 200px;">
+                <select name="categoria_filtro" id="categoria_filtro" style="width: 100%; padding: 10px 12px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 14px; cursor: pointer;">
+                    <option value="">Todas las categorías</option>
+                    {% for categoria in categorias %}
+                    <option value="{{ categoria.id }}" {% if categoria_filtro == categoria.id|string %}selected{% endif %}>{{ categoria.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
             <input type="hidden" name="orden" value="{{ orden }}">
             <button type="submit" class="btn btn-primary" style="padding: 10px 20px; border-radius: 8px;">Buscar</button>
-            {% if busqueda %}
+            {% if busqueda or categoria_filtro %}
             <a href="{{ url_for('clientes.gestion_clientes', orden=orden) }}" class="btn btn-secondary" style="padding: 10px 20px; border-radius: 8px;">Limpiar</a>
             {% endif %}
         </form>
@@ -40,6 +51,7 @@
                     <th>ID</th>
                     <th>Nombre</th>
                     <th>Alias</th>
+                    <th>Categoría</th>
                     <th>Población</th>
                     <th>Acciones</th>
                 </tr>
@@ -50,6 +62,7 @@
                     <td>{{ cliente.id }}</td>
                     <td>{{ cliente.nombre }}</td>
                     <td>{{ cliente.alias or '-' }}</td>
+                    <td>{{ cliente.categoria_obj.nombre if cliente.categoria_obj else '-' }}</td>
                     <td>{{ cliente.poblacion or '-' }}</td>
                     <td class="acciones-cell">
                         <a href="{{ url_for('clientes.ficha_cliente', id=cliente.id) }}" class="btn btn-sm btn-primary">Ver Ficha</a>
@@ -99,16 +112,12 @@
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="categoria">Categoría</label>
-                        <select name="categoria" id="categoria">
+                        <label for="categoria_id">Categoría</label>
+                        <select name="categoria_id" id="categoria_id">
                             <option value="">Sin categoría</option>
-                            <option value="hosteleria">Hostelería</option>
-                            <option value="clinica">Clínica</option>
-                            <option value="colegio">Colegio</option>
-                            <option value="emerita">Emerita</option>
-                            <option value="carnaval">Carnaval</option>
-                            <option value="transporte">Transporte</option>
-                            <option value="varios">Varios</option>
+                            {% for categoria in categorias %}
+                            <option value="{{ categoria.id }}">{{ categoria.nombre }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     <div class="form-group">
@@ -135,9 +144,16 @@
                         <input type="text" name="movil" id="movil" placeholder="Teléfono móvil">
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" name="email" id="email" placeholder="email@ejemplo.com">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="email_general">Email General</label>
+                        <input type="email" name="email_general" id="email_general" placeholder="email@ejemplo.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="email_comunicaciones">Email Comunicaciones</label>
+                        <input type="email" name="email_comunicaciones" id="email_comunicaciones" placeholder="email@ejemplo.com">
+                        <small style="color: #666; font-size: 11px;">Para avisos de estados</small>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="personas_contacto">Personas de Contacto</label>
@@ -171,6 +187,16 @@
                         <input type="text" name="pais" id="pais" placeholder="España" value="España">
                     </div>
                 </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Direcciones de Envío Alternativas</h4>
+                <div id="direcciones-envio-container">
+                    <!-- Las direcciones se añadirán dinámicamente aquí -->
+                </div>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="añadirDireccionEnvio()" style="margin-top: 10px;">
+                    ➕ Añadir Dirección de Envío
+                </button>
             </div>
 
             <div class="form-section">
@@ -430,7 +456,64 @@ function cambiarOrden(nuevoOrden) {
     } else {
         url.searchParams.delete('busqueda');
     }
+    // Mantener el filtro de categoría si existe
+    const categoriaFiltro = document.getElementById('categoria_filtro');
+    if (categoriaFiltro && categoriaFiltro.value) {
+        url.searchParams.set('categoria_filtro', categoriaFiltro.value);
+    } else {
+        url.searchParams.delete('categoria_filtro');
+    }
     window.location.href = url.toString();
+}
+
+// Contador para direcciones de envío
+let contadorDirecciones = 0;
+
+function añadirDireccionEnvio() {
+    const container = document.getElementById('direcciones-envio-container');
+    const index = contadorDirecciones++;
+    
+    const direccionDiv = document.createElement('div');
+    direccionDiv.className = 'direccion-envio-item';
+    direccionDiv.style.cssText = 'border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 5px; background: #f9f9f9;';
+    direccionDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h5 style="margin: 0; font-size: 14px; color: #555;">Dirección Envío ${index + 2}</h5>
+            <button type="button" class="btn btn-sm btn-danger" onclick="eliminarDireccionEnvio(this)" style="padding: 4px 8px; font-size: 12px;">✕ Eliminar</button>
+        </div>
+        <input type="hidden" name="direcciones_envio[]" value="1">
+        <input type="hidden" name="direcciones_envio_nombre_${index}" value="Dirección envío ${index + 2}">
+        <div class="form-group" style="margin-bottom: 10px;">
+            <label>Dirección</label>
+            <textarea name="direcciones_envio_direccion_${index}" rows="2" placeholder="Dirección completa" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div class="form-group">
+                <label>Población</label>
+                <input type="text" name="direcciones_envio_poblacion_${index}" placeholder="Ciudad" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div class="form-group">
+                <label>Provincia</label>
+                <input type="text" name="direcciones_envio_provincia_${index}" placeholder="Provincia" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+                <label>Código Postal</label>
+                <input type="text" name="direcciones_envio_codigo_postal_${index}" placeholder="28001" maxlength="10" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div class="form-group">
+                <label>País</label>
+                <input type="text" name="direcciones_envio_pais_${index}" placeholder="España" value="España" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(direccionDiv);
+}
+
+function eliminarDireccionEnvio(button) {
+    button.closest('.direccion-envio-item').remove();
 }
 </script>
 {% endblock %}

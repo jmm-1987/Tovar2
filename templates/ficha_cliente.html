@@ -42,10 +42,24 @@
                     <strong>Móvil:</strong>
                     <span>{{ cliente.movil or '-' }}</span>
                 </div>
+                {% if cliente.email_general %}
                 <div class="info-item">
-                    <strong>Email:</strong>
-                    <span>{{ cliente.email or '-' }}</span>
+                    <strong>Email General:</strong>
+                    <span>{{ cliente.email_general }}</span>
                 </div>
+                {% endif %}
+                {% if cliente.email_comunicaciones %}
+                <div class="info-item">
+                    <strong>Email Comunicaciones:</strong>
+                    <span>{{ cliente.email_comunicaciones }}</span>
+                </div>
+                {% endif %}
+                {% if cliente.categoria_obj %}
+                <div class="info-item">
+                    <strong>Categoría:</strong>
+                    <span>{{ cliente.categoria_obj.nombre }}</span>
+                </div>
+                {% endif %}
                 {% if cliente.comercial %}
                 <div class="info-item">
                     <strong>Comercial Asignado:</strong>
@@ -55,9 +69,9 @@
             </div>
         </div>
 
-        <!-- Dirección -->
+        <!-- Dirección Principal -->
         <div class="ficha-section">
-            <h3>Dirección</h3>
+            <h3>Dirección Principal</h3>
             <div class="info-grid">
                 <div class="info-item full-width">
                     <strong>Dirección:</strong>
@@ -81,6 +95,50 @@
                 </div>
             </div>
         </div>
+
+        <!-- Direcciones de Envío Alternativas -->
+        {% if cliente.direcciones_envio %}
+        <div class="ficha-section">
+            <h3>Direcciones de Envío Alternativas</h3>
+            {% for direccion in cliente.direcciones_envio %}
+            <div style="border: 1px solid #e0e0e0; padding: 12px; margin-bottom: 10px; border-radius: 5px; background: #f9f9f9;">
+                <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #555;">{{ direccion.nombre }}</h4>
+                <div class="info-grid">
+                    {% if direccion.direccion %}
+                    <div class="info-item full-width">
+                        <strong>Dirección:</strong>
+                        <span>{{ direccion.direccion }}</span>
+                    </div>
+                    {% endif %}
+                    {% if direccion.poblacion %}
+                    <div class="info-item">
+                        <strong>Población:</strong>
+                        <span>{{ direccion.poblacion }}</span>
+                    </div>
+                    {% endif %}
+                    {% if direccion.provincia %}
+                    <div class="info-item">
+                        <strong>Provincia:</strong>
+                        <span>{{ direccion.provincia }}</span>
+                    </div>
+                    {% endif %}
+                    {% if direccion.codigo_postal %}
+                    <div class="info-item">
+                        <strong>Código Postal:</strong>
+                        <span>{{ direccion.codigo_postal }}</span>
+                    </div>
+                    {% endif %}
+                    {% if direccion.pais %}
+                    <div class="info-item">
+                        <strong>País:</strong>
+                        <span>{{ direccion.pais }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
 
         <!-- Anotaciones -->
         <div class="ficha-section">

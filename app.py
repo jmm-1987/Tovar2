@@ -129,7 +129,7 @@ def load_user(user_id):
         return Usuario.query.get(int(user_id))
 
 # Importar modelos (se crean automáticamente al importar models.py)
-from models import Comercial, Cliente, Prenda, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, Usuario, PlantillaEmail, Proveedor, FacturaProveedor, Empleado, Nomina, RegistroCambioEstado, Configuracion
+from models import Comercial, Cliente, Prenda, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, Usuario, PlantillaEmail, Proveedor, FacturaProveedor, Empleado, Nomina, RegistroCambioEstado, Configuracion, CategoriaCliente, DireccionEnvio
 
 # Importar y registrar blueprints
 from routes.index import index_bp
@@ -1074,6 +1074,53 @@ Saludos cordiales,
                     except Exception as e:
                         print(f"Error al agregar columna categoria a clientes: {e}")
                         pass
+                
+                # Agregar nuevas columnas para emails y categoría
+                nuevas_columnas_cliente = {
+                    'email_general': 'VARCHAR(100)',
+                    'email_comunicaciones': 'VARCHAR(100)',
+                    'categoria_id': 'INTEGER'
+                }
+                for columna, tipo in nuevas_columnas_cliente.items():
+                    if columna not in columns_clientes:
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(text(f'ALTER TABLE clientes ADD COLUMN {columna} {tipo}'))
+                                conn.commit()
+                                print(f"Migración: Columna {columna} agregada exitosamente a clientes")
+                        except Exception as e:
+                            print(f"Error al agregar columna {columna} a clientes: {e}")
+                            pass
+            
+            # Crear tabla categorias_cliente si no existe
+            if 'categorias_cliente' not in table_names:
+                try:
+                    db.create_all()
+                    print("Migración: Tabla categorias_cliente creada exitosamente")
+                    # Inicializar categorías por defecto
+                    from models import CategoriaCliente
+                    categorias_por_defecto = [
+                        'Hostelería', 'Clínica', 'Colegio', 'Emerita', 
+                        'Carnaval', 'Transporte', 'Varios'
+                    ]
+                    for cat_nombre in categorias_por_defecto:
+                        categoria_existente = CategoriaCliente.query.filter_by(nombre=cat_nombre).first()
+                        if not categoria_existente:
+                            nueva_categoria = CategoriaCliente(nombre=cat_nombre, activo=True)
+                            db.session.add(nueva_categoria)
+                    db.session.commit()
+                    print("Migración: Categorías por defecto creadas exitosamente")
+                except Exception as e:
+                    print(f"Error al crear tabla categorias_cliente: {e}")
+                    db.session.rollback()
+            
+            # Crear tabla direcciones_envio si no existe
+            if 'direcciones_envio' not in table_names:
+                try:
+                    db.create_all()
+                    print("Migración: Tabla direcciones_envio creada exitosamente")
+                except Exception as e:
+                    print(f"Error al crear tabla direcciones_envio: {e}")
             
             # Verificar y crear tabla clientes_tienda si no existe
             if 'clientes_tienda' not in table_names:
