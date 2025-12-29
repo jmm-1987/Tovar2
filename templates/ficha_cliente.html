@@ -42,24 +42,18 @@
                     <strong>Móvil:</strong>
                     <span>{{ cliente.movil or '-' }}</span>
                 </div>
-                {% if cliente.email_general %}
                 <div class="info-item">
                     <strong>Email General:</strong>
-                    <span>{{ cliente.email_general }}</span>
+                    <span>{{ cliente.email_general or '-' }}</span>
                 </div>
-                {% endif %}
-                {% if cliente.email_comunicaciones %}
                 <div class="info-item">
                     <strong>Email Comunicaciones:</strong>
-                    <span>{{ cliente.email_comunicaciones }}</span>
+                    <span>{{ cliente.email_comunicaciones or '-' }}</span>
                 </div>
-                {% endif %}
-                {% if cliente.categoria_obj %}
                 <div class="info-item">
                     <strong>Categoría:</strong>
-                    <span>{{ cliente.categoria_obj.nombre }}</span>
+                    <span>{{ cliente.categoria_obj.nombre if cliente.categoria_obj else '-' }}</span>
                 </div>
-                {% endif %}
                 {% if cliente.comercial %}
                 <div class="info-item">
                     <strong>Comercial Asignado:</strong>
@@ -97,48 +91,53 @@
         </div>
 
         <!-- Direcciones de Envío Alternativas -->
-        {% if cliente.direcciones_envio %}
         <div class="ficha-section">
-            <h3>Direcciones de Envío Alternativas</h3>
-            {% for direccion in cliente.direcciones_envio %}
-            <div style="border: 1px solid #e0e0e0; padding: 12px; margin-bottom: 10px; border-radius: 5px; background: #f9f9f9;">
-                <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #555;">{{ direccion.nombre }}</h4>
-                <div class="info-grid">
-                    {% if direccion.direccion %}
-                    <div class="info-item full-width">
-                        <strong>Dirección:</strong>
-                        <span>{{ direccion.direccion }}</span>
-                    </div>
-                    {% endif %}
-                    {% if direccion.poblacion %}
-                    <div class="info-item">
-                        <strong>Población:</strong>
-                        <span>{{ direccion.poblacion }}</span>
-                    </div>
-                    {% endif %}
-                    {% if direccion.provincia %}
-                    <div class="info-item">
-                        <strong>Provincia:</strong>
-                        <span>{{ direccion.provincia }}</span>
-                    </div>
-                    {% endif %}
-                    {% if direccion.codigo_postal %}
-                    <div class="info-item">
-                        <strong>Código Postal:</strong>
-                        <span>{{ direccion.codigo_postal }}</span>
-                    </div>
-                    {% endif %}
-                    {% if direccion.pais %}
-                    <div class="info-item">
-                        <strong>País:</strong>
-                        <span>{{ direccion.pais }}</span>
-                    </div>
-                    {% endif %}
-                </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="margin: 0;">Direcciones de Envío Alternativas</h3>
+                <button onclick="abrirModalDirecciones()" class="btn btn-sm btn-primary">➕ Gestionar Direcciones</button>
             </div>
-            {% endfor %}
+            {% if cliente.direcciones_envio %}
+                {% for direccion in cliente.direcciones_envio %}
+                <div style="border: 1px solid #e0e0e0; padding: 12px; margin-bottom: 10px; border-radius: 5px; background: #f9f9f9;">
+                    <h4 style="margin: 0 0 10px 0; font-size: 14px; color: #555;">{{ direccion.nombre }}</h4>
+                    <div class="info-grid">
+                        {% if direccion.direccion %}
+                        <div class="info-item full-width">
+                            <strong>Dirección:</strong>
+                            <span>{{ direccion.direccion }}</span>
+                        </div>
+                        {% endif %}
+                        {% if direccion.poblacion %}
+                        <div class="info-item">
+                            <strong>Población:</strong>
+                            <span>{{ direccion.poblacion }}</span>
+                        </div>
+                        {% endif %}
+                        {% if direccion.provincia %}
+                        <div class="info-item">
+                            <strong>Provincia:</strong>
+                            <span>{{ direccion.provincia }}</span>
+                        </div>
+                        {% endif %}
+                        {% if direccion.codigo_postal %}
+                        <div class="info-item">
+                            <strong>Código Postal:</strong>
+                            <span>{{ direccion.codigo_postal }}</span>
+                        </div>
+                        {% endif %}
+                        {% if direccion.pais %}
+                        <div class="info-item">
+                            <strong>País:</strong>
+                            <span>{{ direccion.pais }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p style="color: #999; font-style: italic; margin: 0;">No hay direcciones de envío alternativas registradas.</p>
+            {% endif %}
         </div>
-        {% endif %}
 
         <!-- Anotaciones -->
         <div class="ficha-section">
@@ -456,6 +455,246 @@
 .btn-sm {
     padding: 6px 12px;
     font-size: 14px;
+}
+</style>
+
+<!-- Modal para gestionar direcciones de envío -->
+<div id="modalDirecciones" class="modal">
+    <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-header">
+            <h3>Gestionar Direcciones de Envío</h3>
+            <span class="close" onclick="cerrarModalDirecciones()">&times;</span>
+        </div>
+        <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+            <div id="direcciones-lista">
+                {% for direccion in cliente.direcciones_envio %}
+                <div class="direccion-item" data-id="{{ direccion.id }}" style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 5px; background: #f9f9f9;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h4 style="margin: 0; font-size: 14px; color: #555;">{{ direccion.nombre }}</h4>
+                        <div>
+                            <button onclick="editarDireccion({{ direccion.id }})" class="btn btn-sm btn-primary" style="margin-right: 5px;">✏️ Editar</button>
+                            <form method="POST" action="{{ url_for('clientes.gestionar_direcciones_envio', cliente_id=cliente.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar esta dirección?');">
+                                <input type="hidden" name="accion" value="eliminar">
+                                <input type="hidden" name="direccion_id" value="{{ direccion.id }}">
+                                <button type="submit" class="btn btn-sm btn-danger">🗑️ Eliminar</button>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-item full-width">
+                            <strong>Dirección:</strong>
+                            <span>{{ direccion.direccion or '-' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <strong>Población:</strong>
+                            <span>{{ direccion.poblacion or '-' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <strong>Provincia:</strong>
+                            <span>{{ direccion.provincia or '-' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <strong>Código Postal:</strong>
+                            <span>{{ direccion.codigo_postal or '-' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <strong>País:</strong>
+                            <span>{{ direccion.pais or 'España' }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Formulario para añadir/editar dirección -->
+            <div id="form-direccion" style="border-top: 2px solid #e0e0e0; padding-top: 20px; margin-top: 20px;">
+                <h4 id="form-titulo" style="margin-bottom: 15px;">Añadir Nueva Dirección</h4>
+                <form method="POST" action="{{ url_for('clientes.gestionar_direcciones_envio', cliente_id=cliente.id) }}" id="formDireccion">
+                    <input type="hidden" name="accion" id="accion_form" value="crear">
+                    <input type="hidden" name="direccion_id" id="direccion_id_form">
+                    
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="nombre_direccion">Nombre de la Dirección *</label>
+                        <input type="text" name="nombre" id="nombre_direccion" required placeholder="Ej: Dirección envío 2" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="direccion_texto">Dirección</label>
+                        <textarea name="direccion" id="direccion_texto" rows="2" placeholder="Dirección completa" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div class="form-group">
+                            <label for="poblacion_direccion">Población</label>
+                            <input type="text" name="poblacion" id="poblacion_direccion" placeholder="Ciudad" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        <div class="form-group">
+                            <label for="provincia_direccion">Provincia</label>
+                            <input type="text" name="provincia" id="provincia_direccion" placeholder="Provincia" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div class="form-group">
+                            <label for="codigo_postal_direccion">Código Postal</label>
+                            <input type="text" name="codigo_postal" id="codigo_postal_direccion" placeholder="28001" maxlength="10" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        <div class="form-group">
+                            <label for="pais_direccion">País</label>
+                            <input type="text" name="pais" id="pais_direccion" placeholder="España" value="España" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                        <button type="submit" class="btn btn-primary" id="btn-submit-form">Añadir Dirección</button>
+                        <button type="button" class="btn btn-secondary" onclick="cancelarEdicion()" id="btn-cancelar" style="display: none;">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const direcciones = {
+    {% for direccion in cliente.direcciones_envio %}
+    {{ direccion.id }}: {
+        nombre: {{ direccion.nombre|tojson }},
+        direccion: {{ direccion.direccion|tojson if direccion.direccion else '""' }},
+        poblacion: {{ direccion.poblacion|tojson if direccion.poblacion else '""' }},
+        provincia: {{ direccion.provincia|tojson if direccion.provincia else '""' }},
+        codigo_postal: {{ direccion.codigo_postal|tojson if direccion.codigo_postal else '""' }},
+        pais: {{ direccion.pais|tojson if direccion.pais else '"España"' }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+};
+
+function abrirModalDirecciones() {
+    document.getElementById('modalDirecciones').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    cancelarEdicion();
+}
+
+function cerrarModalDirecciones() {
+    document.getElementById('modalDirecciones').style.display = 'none';
+    document.body.style.overflow = 'auto';
+    cancelarEdicion();
+}
+
+function editarDireccion(id) {
+    const direccion = direcciones[id];
+    if (!direccion) return;
+    
+    document.getElementById('accion_form').value = 'editar';
+    document.getElementById('direccion_id_form').value = id;
+    document.getElementById('nombre_direccion').value = direccion.nombre;
+    document.getElementById('direccion_texto').value = direccion.direccion || '';
+    document.getElementById('poblacion_direccion').value = direccion.poblacion || '';
+    document.getElementById('provincia_direccion').value = direccion.provincia || '';
+    document.getElementById('codigo_postal_direccion').value = direccion.codigo_postal || '';
+    document.getElementById('pais_direccion').value = direccion.pais || 'España';
+    document.getElementById('form-titulo').textContent = 'Editar Dirección';
+    document.getElementById('btn-submit-form').textContent = 'Guardar Cambios';
+    document.getElementById('btn-cancelar').style.display = 'block';
+    
+    // Scroll al formulario
+    document.getElementById('form-direccion').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function cancelarEdicion() {
+    document.getElementById('accion_form').value = 'crear';
+    document.getElementById('direccion_id_form').value = '';
+    document.getElementById('formDireccion').reset();
+    document.getElementById('pais_direccion').value = 'España';
+    document.getElementById('form-titulo').textContent = 'Añadir Nueva Dirección';
+    document.getElementById('btn-submit-form').textContent = 'Añadir Dirección';
+    document.getElementById('btn-cancelar').style.display = 'none';
+}
+
+// Cerrar modal al hacer clic fuera
+window.onclick = function(event) {
+    const modal = document.getElementById('modalDirecciones');
+    if (event.target == modal) {
+        cerrarModalDirecciones();
+    }
+}
+
+// Cerrar modal con ESC
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        cerrarModalDirecciones();
+    }
+});
+</script>
+
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    overflow-y: auto;
+}
+
+.modal-content {
+    background-color: white;
+    margin: 3% auto;
+    padding: 0;
+    border-radius: 10px;
+    max-width: 700px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 2px solid #e0e0e0;
+    background: #f8f9fa;
+    border-radius: 10px 10px 0 0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 18px;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.close {
+    color: #aaa;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 500;
+    color: #555;
+    font-size: 13px;
 }
 </style>
 {% endblock %}

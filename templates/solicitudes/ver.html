@@ -114,7 +114,7 @@
             {% set estados_completos = [
                 {'estado': 'presupuesto', 'subestados': []},
                 {'estado': 'aceptado', 'subestados': []},
-                {'estado': 'mockup', 'subestados': ['encargado a', 'enviado a cliente', 'prueba 1', 'prueba 2', 'aceptado']},
+                {'estado': 'mockup', 'subestados': ['encargado a', 'REVISIÓN CLIENTE', 'CAMBIOS 1', 'CAMBIOS 2', 'RECHAZADO', 'aceptado']},
                 {'estado': 'en preparacion', 'subestados': ['hacer marcada', 'imprimir', 'calandra', 'corte', 'confeccion', 'sublimacion', 'bordado']},
                 {'estado': 'terminado', 'subestados': []},
                 {'estado': 'entregado al cliente', 'subestados': []}
@@ -613,7 +613,7 @@ function actualizarSubestados() {
     
     // Definir subestados por estado
     const subestados = {
-        'mockup': ['encargado a', 'enviado a cliente', 'prueba 1', 'prueba 2', 'aceptado'],
+        'mockup': ['encargado a', 'REVISIÓN CLIENTE', 'CAMBIOS 1', 'CAMBIOS 2', 'RECHAZADO', 'aceptado'],
         'en preparacion': ['hacer marcada', 'imprimir', 'calandra', 'corte', 'confeccion', 'sublimacion', 'bordado']
     };
     

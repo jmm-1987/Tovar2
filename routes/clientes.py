@@ -4,6 +4,7 @@ from flask_login import login_required
 from extensions import db
 from models import Cliente, Presupuesto, Factura, Pedido, Comercial, Usuario, CategoriaCliente, DireccionEnvio
 from sqlalchemy import or_
+from sqlalchemy.orm import joinedload
 from datetime import datetime
 
 clientes_bp = Blueprint('clientes', __name__)
@@ -145,7 +146,11 @@ def gestion_clientes():
 @login_required
 def ficha_cliente(id):
     """Ficha completa del cliente con historial"""
-    cliente = Cliente.query.get_or_404(id)
+    cliente = Cliente.query.options(
+        joinedload(Cliente.categoria_obj),
+        joinedload(Cliente.direcciones_envio),
+        joinedload(Cliente.comercial)
+    ).get_or_404(id)
     
     # Obtener historial de presupuestos
     presupuestos = Presupuesto.query.filter_by(cliente_id=id).order_by(Presupuesto.fecha_creacion.desc()).limit(20).all()
@@ -286,6 +291,69 @@ def eliminar_cliente(id):
         db.session.rollback()
         flash(f'Error al eliminar cliente: {str(e)}', 'error')
     return redirect(url_for('clientes.gestion_clientes'))
+
+@clientes_bp.route('/clientes/<int:cliente_id>/direcciones-envio', methods=['POST'])
+@login_required
+def gestionar_direcciones_envio(cliente_id):
+    """Gestionar direcciones de envío de un cliente (añadir, editar, eliminar)"""
+    cliente = Cliente.query.get_or_404(cliente_id)
+    accion = request.form.get('accion')
+    
+    try:
+        if accion == 'crear':
+            nombre = request.form.get('nombre', '').strip()
+            direccion = request.form.get('direccion', '').strip()
+            poblacion = request.form.get('poblacion', '').strip()
+            provincia = request.form.get('provincia', '').strip()
+            codigo_postal = request.form.get('codigo_postal', '').strip()
+            pais = request.form.get('pais', 'España').strip()
+            
+            if not nombre:
+                # Generar nombre automático si no se proporciona
+                num_direcciones = len(cliente.direcciones_envio)
+                nombre = f'Dirección envío {num_direcciones + 2}'
+            
+            nueva_direccion = DireccionEnvio(
+                cliente_id=cliente.id,
+                nombre=nombre,
+                direccion=direccion,
+                poblacion=poblacion,
+                provincia=provincia,
+                codigo_postal=codigo_postal,
+                pais=pais
+            )
+            db.session.add(nueva_direccion)
+            db.session.commit()
+            flash('Dirección de envío creada correctamente', 'success')
+        
+        elif accion == 'editar':
+            direccion_id = request.form.get('direccion_id')
+            direccion = DireccionEnvio.query.filter_by(id=direccion_id, cliente_id=cliente.id).first_or_404()
+            
+            direccion.nombre = request.form.get('nombre', '').strip()
+            direccion.direccion = request.form.get('direccion', '').strip()
+            direccion.poblacion = request.form.get('poblacion', '').strip()
+            direccion.provincia = request.form.get('provincia', '').strip()
+            direccion.codigo_postal = request.form.get('codigo_postal', '').strip()
+            direccion.pais = request.form.get('pais', 'España').strip()
+            
+            db.session.commit()
+            flash('Dirección de envío actualizada correctamente', 'success')
+        
+        elif accion == 'eliminar':
+            direccion_id = request.form.get('direccion_id')
+            direccion = DireccionEnvio.query.filter_by(id=direccion_id, cliente_id=cliente.id).first_or_404()
+            
+            db.session.delete(direccion)
+            db.session.commit()
+            flash('Dirección de envío eliminada correctamente', 'success')
+        
+        return redirect(url_for('clientes.ficha_cliente', id=cliente_id))
+    
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error: {str(e)}', 'error')
+        return redirect(url_for('clientes.ficha_cliente', id=cliente_id))
 
 @clientes_bp.route('/clientes/categorias', methods=['GET', 'POST'])
 @login_required

@@ -31,9 +31,10 @@ ESTADOS_SOLICITUD = [
 SUBESTADOS = {
     'mockup': [
         'encargado a',
-        'enviado a cliente',
-        'prueba 1',
-        'prueba 2',
+        'REVISIÓN CLIENTE',
+        'CAMBIOS 1',
+        'CAMBIOS 2',
+        'RECHAZADO',
         'aceptado'
     ],
     'en preparacion': [

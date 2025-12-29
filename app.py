@@ -1122,6 +1122,24 @@ Saludos cordiales,
                 except Exception as e:
                     print(f"Error al crear tabla direcciones_envio: {e}")
             
+            # Migrar subestados de mockup a los nuevos nombres
+            if 'presupuestos' in table_names:
+                try:
+                    with db.engine.connect() as conn:
+                        # Mapeo de subestados antiguos a nuevos
+                        mapeo_subestados = {
+                            'enviado a cliente': 'REVISIÓN CLIENTE',
+                            'prueba 1': 'CAMBIOS 1',
+                            'prueba 2': 'CAMBIOS 2'
+                        }
+                        for subestado_antiguo, subestado_nuevo in mapeo_subestados.items():
+                            conn.execute(text("UPDATE presupuestos SET subestado = :subestado_nuevo WHERE subestado = :subestado_antiguo"), 
+                                       {'subestado_nuevo': subestado_nuevo, 'subestado_antiguo': subestado_antiguo})
+                        conn.commit()
+                        print("Migración: Subestados de mockup actualizados a nuevos nombres")
+                except Exception as e:
+                    print(f"Error al migrar subestados de mockup: {e}")
+            
             # Verificar y crear tabla clientes_tienda si no existe
             if 'clientes_tienda' not in table_names:
                 try:

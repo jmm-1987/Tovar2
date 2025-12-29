@@ -247,7 +247,7 @@ class Presupuesto(db.Model):
     estado = db.Column(db.String(50), nullable=False, default='presupuesto')  # presupuesto, aceptado, mockup, en preparacion, terminado, entregado al cliente
     
     # Subestado para estados que tienen subestados
-    subestado = db.Column(db.String(50), nullable=True)  # Para mockup: enviado a cliente, prueba 1, prueba 2, aceptado. Para en preparacion: hacer marcada, imprimir, calandra, corte, confeccion, sublimacion, bordado
+    subestado = db.Column(db.String(50), nullable=True)  # Para mockup: encargado a, REVISIÓN CLIENTE, CAMBIOS 1, CAMBIOS 2, RECHAZADO, aceptado. Para en preparacion: hacer marcada, imprimir, calandra, corte, confeccion, sublimacion, bordado
     
     # Fecha límite para mockup (3 días desde que entra al estado)
     fecha_limite_mockup = db.Column(db.Date, nullable=True)
