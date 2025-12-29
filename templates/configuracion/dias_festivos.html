@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block title %}Días Festivos - Configuración{% endblock %}
+
+{% block content %}
+<div class="dias-festivos-container">
+    <div class="header-section">
+        <h2>📅 Días Festivos</h2>
+        <a href="{{ url_for('configuracion.index') }}" class="btn btn-secondary">← Volver a Configuración</a>
+    </div>
+
+    <div class="config-section" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px;">
+        <h3 style="margin-top: 0; margin-bottom: 15px; color: #2c3e50; border-bottom: 2px solid #667eea; padding-bottom: 10px;">
+            Días que no se tendrán en cuenta para los cálculos de fechas
+        </h3>
+        
+        <form method="POST" style="margin-bottom: 20px;">
+            <input type="hidden" name="accion" value="guardar_configuracion">
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" name="excluir_sabados" id="excluir_sabados" {% if excluir_sabados %}checked{% endif %}>
+                    <label for="excluir_sabados" style="font-size: 15px; font-weight: 500; cursor: pointer;">No tener en cuenta sábados</label>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="checkbox" name="excluir_domingos" id="excluir_domingos" {% if excluir_domingos %}checked{% endif %}>
+                    <label for="excluir_domingos" style="font-size: 15px; font-weight: 500; cursor: pointer;">No tener en cuenta domingos</label>
+                </div>
+            </div>
+            <div style="margin-top: 15px;">
+                <button type="submit" class="btn btn-primary">Guardar Configuración</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Formulario para añadir nuevo día festivo -->
+    <div class="form-section" style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px;">
+        <h3 style="margin-top: 0; margin-bottom: 15px; color: #2c3e50; border-bottom: 2px solid #667eea; padding-bottom: 10px;">
+            Añadir Día Festivo
+        </h3>
+        <form method="POST" id="formNuevoDia">
+            <input type="hidden" name="accion" value="crear">
+            <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 15px; align-items: end;">
+                <div>
+                    <label for="fecha" style="display: block; margin-bottom: 5px; font-weight: 500;">Fecha *</label>
+                    <input type="date" name="fecha" id="fecha" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+                <div>
+                    <label for="nombre" style="display: block; margin-bottom: 5px; font-weight: 500;">Nombre/Explicación *</label>
+                    <input type="text" name="nombre" id="nombre" required placeholder="Ej: Navidad, Día de la Constitución..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                </div>
+            </div>
+            <div style="margin-top: 15px;">
+                <button type="submit" class="btn btn-primary">➕ Añadir Día Festivo</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Lista de días festivos -->
+    <div class="table-container" style="background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <h3 style="margin: 0; padding: 20px 20px 10px 20px; color: #2c3e50; border-bottom: 2px solid #667eea; padding-bottom: 10px;">
+            Días Festivos Registrados
+        </h3>
+        {% if dias_festivos %}
+        <table class="dias-festivos-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #f8f9fa;">
+                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e0e0e0;">Fecha</th>
+                    <th style="padding: 12px; text-align: left; border-bottom: 2px solid #e0e0e0;">Nombre</th>
+                    <th style="padding: 12px; text-align: center; border-bottom: 2px solid #e0e0e0;">Estado</th>
+                    <th style="padding: 12px; text-align: center; border-bottom: 2px solid #e0e0e0;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dia in dias_festivos %}
+                <tr style="border-bottom: 1px solid #e0e0e0;" data-id="{{ dia.id }}">
+                    <td style="padding: 12px;">
+                        <form method="POST" style="display: inline;" id="form-editar-{{ dia.id }}">
+                            <input type="hidden" name="accion" value="editar">
+                            <input type="hidden" name="dia_id" value="{{ dia.id }}">
+                            <input type="date" name="fecha" value="{{ dia.fecha.strftime('%Y-%m-%d') }}" required style="padding: 6px; border: 1px solid #ddd; border-radius: 4px; width: 150px;">
+                            <button type="submit" class="btn btn-sm btn-primary" style="padding: 6px 12px; margin-left: 5px;">Guardar</button>
+                        </form>
+                    </td>
+                    <td style="padding: 12px;">
+                        <input type="text" form="form-editar-{{ dia.id }}" name="nombre" value="{{ dia.nombre }}" required style="padding: 6px; border: 1px solid #ddd; border-radius: 4px; width: 100%; max-width: 300px;">
+                    </td>
+                    <td style="padding: 12px; text-align: center;">
+                        {% if dia.activo %}
+                            <span style="color: #28a745; font-weight: 600;">✓ Activo</span>
+                        {% else %}
+                            <span style="color: #dc3545; font-weight: 600;">✗ Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 12px; text-align: center;">
+                        <div style="display: flex; gap: 5px; justify-content: center;">
+                            {% if dia.activo %}
+                            <form method="POST" style="display: inline;">
+                                <input type="hidden" name="accion" value="desactivar">
+                                <input type="hidden" name="dia_id" value="{{ dia.id }}">
+                                <button type="submit" class="btn btn-sm btn-warning" style="padding: 6px 12px;">Desactivar</button>
+                            </form>
+                            {% else %}
+                            <form method="POST" style="display: inline;">
+                                <input type="hidden" name="accion" value="activar">
+                                <input type="hidden" name="dia_id" value="{{ dia.id }}">
+                                <button type="submit" class="btn btn-sm btn-success" style="padding: 6px 12px;">Activar</button>
+                            </form>
+                            {% endif %}
+                            <form method="POST" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar este día festivo?');">
+                                <input type="hidden" name="accion" value="eliminar">
+                                <input type="hidden" name="dia_id" value="{{ dia.id }}">
+                                <button type="submit" class="btn btn-sm btn-danger" style="padding: 6px 12px;">Eliminar</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div style="padding: 40px; text-align: center; color: #999;">
+            <p>No hay días festivos registrados.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<style>
+.dias-festivos-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.header-section {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.dias-festivos-table tbody tr:hover {
+    background: #f8f9fa;
+}
+</style>
+{% endblock %}
+

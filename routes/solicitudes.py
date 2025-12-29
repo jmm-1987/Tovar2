@@ -462,16 +462,19 @@ def cambiar_estado_solicitud(solicitud_id):
             if not fecha_actual:
                 setattr(solicitud, fecha_campo, hoy)
         
-        # Si entra en mockup, establecer fecha límite (3 días)
+        # Si entra en mockup, establecer fecha límite (3 días hábiles)
         if nuevo_estado == 'mockup' and estado_anterior != 'mockup':
-            solicitud.fecha_limite_mockup = hoy + timedelta(days=3)
+            from utils.fechas import calcular_fecha_saltando_festivos
+            solicitud.fecha_limite_mockup = calcular_fecha_saltando_festivos(hoy, 3)
         
-        # Si se acepta, establecer fecha de aceptación y calcular fecha objetivo (20 días)
+        # Si se acepta, establecer fecha de aceptación y calcular fecha objetivo (20 días hábiles)
         if nuevo_estado == 'aceptado' and estado_anterior != 'aceptado':
             if not solicitud.fecha_aceptado:
                 solicitud.fecha_aceptado = hoy
                 solicitud.fecha_aceptacion = hoy  # Compatibilidad
-                solicitud.fecha_objetivo = hoy + timedelta(days=20)
+                # Calcular fecha objetivo saltando días festivos
+                from utils.fechas import calcular_fecha_saltando_festivos
+                solicitud.fecha_objetivo = calcular_fecha_saltando_festivos(hoy, 20)
         
         # Crear registro del cambio solo si hubo cambio real
         if hubo_cambio or (nuevo_estado == estado_anterior and nuevo_subestado and nuevo_subestado != subestado_anterior):

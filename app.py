@@ -129,7 +129,7 @@ def load_user(user_id):
         return Usuario.query.get(int(user_id))
 
 # Importar modelos (se crean automáticamente al importar models.py)
-from models import Comercial, Cliente, Prenda, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, Usuario, PlantillaEmail, Proveedor, FacturaProveedor, Empleado, Nomina, RegistroCambioEstado, Configuracion, CategoriaCliente, DireccionEnvio
+from models import Comercial, Cliente, Prenda, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, Usuario, PlantillaEmail, Proveedor, FacturaProveedor, Empleado, Nomina, RegistroCambioEstado, Configuracion, CategoriaCliente, DireccionEnvio, DiaFestivo
 
 # Importar y registrar blueprints
 from routes.index import index_bp
@@ -1121,6 +1121,14 @@ Saludos cordiales,
                     print("Migración: Tabla direcciones_envio creada exitosamente")
                 except Exception as e:
                     print(f"Error al crear tabla direcciones_envio: {e}")
+            
+            # Crear tabla dias_festivos si no existe
+            if 'dias_festivos' not in table_names:
+                try:
+                    db.create_all()
+                    print("Migración: Tabla dias_festivos creada exitosamente")
+                except Exception as e:
+                    print(f"Error al crear tabla dias_festivos: {e}")
             
             # Migrar subestados de mockup a los nuevos nombres
             if 'presupuestos' in table_names:

@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, jsonify, current_app
 from flask_login import login_required, current_user
 from extensions import db
-from models import Usuario, Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, PlantillaEmail, Proveedor, Configuracion
+from models import Usuario, Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, PlantillaEmail, Proveedor, Configuracion, DiaFestivo
 from utils.auth import supervisor_required
 from datetime import datetime
 import io
@@ -914,4 +914,123 @@ def importar_proveedores():
             return redirect(url_for('configuracion.importar_proveedores'))
     
     return render_template('configuracion/importar_proveedores.html')
+
+@configuracion_bp.route('/configuracion/dias-festivos', methods=['GET', 'POST'])
+@login_required
+@supervisor_required
+def gestion_dias_festivos():
+    """Gestión de días festivos para cálculos de fechas"""
+    if request.method == 'POST':
+        accion = request.form.get('accion')
+        
+        if accion == 'guardar_configuracion':
+            # Guardar configuración de sábados y domingos
+            excluir_sabados = request.form.get('excluir_sabados') == 'on'
+            excluir_domingos = request.form.get('excluir_domingos') == 'on'
+            
+            # Guardar en Configuracion
+            config_sabados = Configuracion.query.filter_by(clave='excluir_sabados').first()
+            if not config_sabados:
+                config_sabados = Configuracion(clave='excluir_sabados', descripcion='Excluir sábados de cálculos de fechas')
+                db.session.add(config_sabados)
+            config_sabados.valor = 'true' if excluir_sabados else 'false'
+            config_sabados.fecha_actualizacion = datetime.utcnow()
+            
+            config_domingos = Configuracion.query.filter_by(clave='excluir_domingos').first()
+            if not config_domingos:
+                config_domingos = Configuracion(clave='excluir_domingos', descripcion='Excluir domingos de cálculos de fechas')
+                db.session.add(config_domingos)
+            config_domingos.valor = 'true' if excluir_domingos else 'false'
+            config_domingos.fecha_actualizacion = datetime.utcnow()
+            
+            db.session.commit()
+            flash('Configuración guardada correctamente', 'success')
+        
+        elif accion == 'crear':
+            fecha_str = request.form.get('fecha', '').strip()
+            nombre = request.form.get('nombre', '').strip()
+            
+            if fecha_str and nombre:
+                try:
+                    fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+                    # Verificar si ya existe
+                    dia_existente = DiaFestivo.query.filter_by(fecha=fecha).first()
+                    if dia_existente:
+                        flash('Ya existe un día festivo para esa fecha', 'error')
+                    else:
+                        nuevo_dia = DiaFestivo(fecha=fecha, nombre=nombre, activo=True)
+                        db.session.add(nuevo_dia)
+                        db.session.commit()
+                        flash('Día festivo creado correctamente', 'success')
+                except ValueError:
+                    flash('Fecha no válida', 'error')
+                except Exception as e:
+                    db.session.rollback()
+                    flash(f'Error: {str(e)}', 'error')
+        
+        elif accion == 'editar':
+            dia_id = request.form.get('dia_id')
+            fecha_str = request.form.get('fecha', '').strip()
+            nombre = request.form.get('nombre', '').strip()
+            
+            if dia_id and fecha_str and nombre:
+                try:
+                    dia = DiaFestivo.query.get_or_404(dia_id)
+                    fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+                    
+                    # Verificar si la nueva fecha ya existe en otro registro
+                    dia_existente = DiaFestivo.query.filter_by(fecha=fecha).filter(DiaFestivo.id != dia_id).first()
+                    if dia_existente:
+                        flash('Ya existe un día festivo para esa fecha', 'error')
+                    else:
+                        dia.fecha = fecha
+                        dia.nombre = nombre
+                        db.session.commit()
+                        flash('Día festivo actualizado correctamente', 'success')
+                except ValueError:
+                    flash('Fecha no válida', 'error')
+                except Exception as e:
+                    db.session.rollback()
+                    flash(f'Error: {str(e)}', 'error')
+        
+        elif accion == 'eliminar':
+            dia_id = request.form.get('dia_id')
+            if dia_id:
+                try:
+                    dia = DiaFestivo.query.get_or_404(dia_id)
+                    db.session.delete(dia)
+                    db.session.commit()
+                    flash('Día festivo eliminado correctamente', 'success')
+                except Exception as e:
+                    db.session.rollback()
+                    flash(f'Error: {str(e)}', 'error')
+        
+        elif accion == 'activar' or accion == 'desactivar':
+            dia_id = request.form.get('dia_id')
+            if dia_id:
+                try:
+                    dia = DiaFestivo.query.get_or_404(dia_id)
+                    dia.activo = (accion == 'activar')
+                    db.session.commit()
+                    flash('Día festivo actualizado correctamente', 'success')
+                except Exception as e:
+                    db.session.rollback()
+                    flash(f'Error: {str(e)}', 'error')
+        
+        return redirect(url_for('configuracion.gestion_dias_festivos'))
+    
+    # Obtener configuración de sábados y domingos
+    config_sabados = Configuracion.query.filter_by(clave='excluir_sabados').first()
+    excluir_sabados = config_sabados.valor.lower() == 'true' if config_sabados else False
+    
+    config_domingos = Configuracion.query.filter_by(clave='excluir_domingos').first()
+    excluir_domingos = config_domingos.valor.lower() == 'true' if config_domingos else False
+    
+    # Obtener días festivos
+    dias_festivos = DiaFestivo.query.order_by(DiaFestivo.fecha).all()
+    
+    return render_template('configuracion/dias_festivos.html', 
+                         dias_festivos=dias_festivos,
+                         excluir_sabados=excluir_sabados,
+                         excluir_domingos=excluir_domingos)
 

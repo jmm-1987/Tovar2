@@ -42,9 +42,10 @@ def index():
         necesita_commit = False
         
         for solicitud in solicitudes:
-            # Si no tiene fecha objetivo pero tiene fecha de aceptación, calcularla (20 días)
+            # Si no tiene fecha objetivo pero tiene fecha de aceptación, calcularla (20 días hábiles)
             if solicitud.fecha_aceptado and not solicitud.fecha_objetivo:
-                solicitud.fecha_objetivo = solicitud.fecha_aceptado + timedelta(days=20)
+                from utils.fechas import calcular_fecha_saltando_festivos
+                solicitud.fecha_objetivo = calcular_fecha_saltando_festivos(solicitud.fecha_aceptado, 20)
                 necesita_commit = True
             
             if solicitud.fecha_objetivo:

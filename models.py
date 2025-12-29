@@ -702,6 +702,21 @@ class DireccionEnvio(db.Model):
     def __repr__(self):
         return f'<DireccionEnvio {self.nombre} - {self.cliente.nombre if self.cliente else "Sin cliente"}>'
 
+class DiaFestivo(db.Model):
+    """Días festivos que no se tienen en cuenta para cálculos de fechas"""
+    __tablename__ = 'dias_festivos'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    fecha = db.Column(db.Date, nullable=False)
+    nombre = db.Column(db.String(200), nullable=False)  # Nombre/explicación del día festivo
+    activo = db.Column(db.Boolean, nullable=False, default=True)
+    
+    # Timestamp
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<DiaFestivo {self.fecha} - {self.nombre}>'
+
 class RegistroEstadoSolicitud(db.Model):
     """Registro de cambios de estado y subestado en solicitudes con fechas"""
     __tablename__ = 'registro_estado_solicitud'
