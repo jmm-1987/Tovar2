@@ -406,9 +406,10 @@
             </div>
             {% if factura.descuento_pronto_pago and factura.descuento_pronto_pago > 0 %}
             {% set subtotal = base_imponible + iva_total %}
-            {% set descuento_pronto_pago_aplicado = subtotal * (factura.descuento_pronto_pago / 100) %}
+            {% set descuento_pronto_pago_float = factura.descuento_pronto_pago|float %}
+            {% set descuento_pronto_pago_aplicado = subtotal * (descuento_pronto_pago_float / 100.0) %}
             <div class="total-row" style="background: #fff3cd; color: #856404;">
-                <span class="total-label">Descuento Pronto Pago ({{ "%.2f"|format(factura.descuento_pronto_pago) }}%):</span>
+                <span class="total-label">Descuento Pronto Pago ({{ "%.2f"|format(descuento_pronto_pago_float) }}%):</span>
                 <span style="color: #856404;">-{{ "%.2f"|format(descuento_pronto_pago_aplicado) }} €</span>
             </div>
             {% endif %}

@@ -859,7 +859,9 @@ def preparar_datos_imprimir_factura(factura_id):
     descuento_pronto_pago = Decimal(str(factura.descuento_pronto_pago)) if factura.descuento_pronto_pago else Decimal('0')
     if descuento_pronto_pago > 0:
         descuento_aplicado = subtotal * (descuento_pronto_pago / Decimal('100'))
+        descuento_aplicado = descuento_aplicado.quantize(Decimal('0.01'))
         total_con_iva = subtotal - descuento_aplicado
+        total_con_iva = total_con_iva.quantize(Decimal('0.01'))
     else:
         total_con_iva = subtotal
     
