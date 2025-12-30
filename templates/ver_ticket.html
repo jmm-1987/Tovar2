@@ -7,6 +7,12 @@
     <a href="{{ url_for('tickets.listado_tickets') }}" class="btn btn-primary" style="padding: 10px 20px; text-decoration: none; display: inline-block;">
         ← Volver al Listado
     </a>
+    <a href="{{ url_for('tickets.imprimir_ticket', ticket_id=ticket.id) }}" target="_blank" class="btn btn-success" style="padding: 10px 20px; text-decoration: none; display: inline-block; margin-left: 10px;">
+        🖨️ Imprimir
+    </a>
+    <a href="{{ url_for('tickets.descargar_pdf_ticket', ticket_id=ticket.id) }}" class="btn btn-info" style="padding: 10px 20px; text-decoration: none; display: inline-block; margin-left: 10px;">
+        📄 Descargar PDF
+    </a>
     {% if ticket.estado != 'confirmado' %}
     <form method="POST" action="{{ url_for('tickets.reenviar_ticket', ticket_id=ticket.id) }}" style="display: inline; margin-left: 10px;">
         <button type="submit" class="btn btn-warning" style="padding: 10px 20px;">Reenviar a Verifactu</button>
@@ -104,8 +110,8 @@
                     <tr style="background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); border-bottom: 2px solid #dee2e6;">
                         <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Descripción</th>
                         <th style="padding: 15px; text-align: center; color: #ffffff; font-weight: 600;">Cantidad</th>
-                        <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Precio Unitario (€)</th>
-                        <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Total (€)</th>
+                        <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Precio Unitario (sin IVA) (€)</th>
+                        <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Total (sin IVA) (€)</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -113,20 +119,34 @@
                     <tr class="linea-ticket" style="border-bottom: 1px solid #e9ecef;">
                         <td style="padding: 15px; color: #495057;">{{ linea.descripcion }}</td>
                         <td style="padding: 15px; text-align: center; color: #495057; font-weight: 500;">{{ "%.2f"|format(linea.cantidad) }}</td>
-                        <td style="padding: 15px; text-align: right; color: #495057;">{{ "%.2f"|format(linea.precio_unitario) }}</td>
-                        <td style="padding: 15px; text-align: right; color: #495057; font-weight: bold;">{{ "%.2f"|format(linea.importe) }}</td>
+                        <td style="padding: 15px; text-align: right; color: #495057;">
+                            {# Mostrar precio sin IVA - para tickets antiguos con desglosar, calcular sin IVA #}
+                            {% if ticket.tipo_calculo_iva == 'desglosar' %}
+                                {# Para tickets antiguos, puede que el precio incluya IVA #}
+                                {% set precio_sin_iva = (linea.precio_unitario|float / 1.21)|round(2) %}
+                                {{ "%.2f"|format(precio_sin_iva) }}
+                            {% else %}
+                                {# Precio ya es sin IVA #}
+                                {{ "%.2f"|format(linea.precio_unitario) }}
+                            {% endif %}
+                        </td>
+                        <td style="padding: 15px; text-align: right; color: #495057; font-weight: bold;">
+                            {# Mostrar importe sin IVA - para tickets antiguos con desglosar, calcular sin IVA #}
+                            {% if ticket.tipo_calculo_iva == 'desglosar' %}
+                                {# Para tickets antiguos, puede que el importe incluya IVA #}
+                                {% set importe_sin_iva = (linea.importe|float / 1.21)|round(2) %}
+                                {{ "%.2f"|format(importe_sin_iva) }}
+                            {% else %}
+                                {# Importe ya es sin IVA #}
+                                {{ "%.2f"|format(linea.importe) }}
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                     <tr style="border-top: 2px solid #2c3e50; background: #f8f9fa;">
                         <td colspan="3" style="padding: 15px; text-align: right; font-weight: bold; color: #2c3e50;">Base Imponible (€):</td>
                         <td style="padding: 15px; text-align: right;">
-                            {% if ticket.tipo_calculo_iva == 'incrementar' %}
-                                {# Si es incrementar, el importe_total ya incluye IVA, calcular base #}
-                                {% set base_imponible = (ticket.importe_total|float / 1.21)|round(2) %}
-                            {% else %}
-                                {# Si es desglosar, el importe_total ya incluye IVA, calcular base #}
-                                {% set base_imponible = (ticket.importe_total|float / 1.21)|round(2) %}
-                            {% endif %}
+                            {% set base_imponible = (ticket.importe_total|float / 1.21)|round(2) %}
                             <span style="font-weight: bold; color: #2c3e50;">{{ "%.2f"|format(base_imponible) }}</span>
                         </td>
                     </tr>

@@ -1,15 +1,19 @@
 """Rutas para gestión de tickets de tienda (Facturas simplificadas)"""
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, send_file
 from flask_login import login_required
 from datetime import datetime
 from decimal import Decimal
 import os
 import requests
 import json
+import base64
+import tempfile
+from io import BytesIO
 from extensions import db
 from models import Ticket, LineaTicket, ClienteTienda
 from flask import jsonify
 from utils.numeracion import obtener_siguiente_numero_ticket
+from playwright.sync_api import sync_playwright
 
 tickets_bp = Blueprint('tickets', __name__)
 
@@ -72,7 +76,7 @@ def nuevo_ticket():
             fecha_expedicion = datetime.strptime(request.form.get('fecha_expedicion'), '%Y-%m-%d').date()
             
             # Generar número de ticket automáticamente
-            serie = 'A'  # Serie fija
+            serie = 'T'  # Serie fija
             numero = obtener_siguiente_numero_ticket(fecha_expedicion)
             
             # Obtener datos del cliente
@@ -136,25 +140,26 @@ def nuevo_ticket():
             for i in range(len(descripciones)):
                 if descripciones[i] and cantidades[i] and precios_unitarios[i]:
                     cantidad = Decimal(cantidades[i])
-                    precio_unitario = Decimal(precios_unitarios[i])
+                    precio_unitario_input = Decimal(precios_unitarios[i])
                     
-                    # Calcular importe según el tipo de cálculo de IVA
-                    if tipo_calculo_iva == 'incrementar':
-                        # Precio unitario es sin IVA, calcular con IVA
-                        precio_con_iva = precio_unitario * (Decimal('1') + tipo_iva / Decimal('100'))
-                        importe = cantidad * precio_con_iva
-                    else:  # desglosar
-                        # Precio unitario ya incluye IVA
-                        importe = cantidad * precio_unitario
+                    # Siempre guardar precio sin IVA
+                    # El precio que viene del formulario ya es sin IVA (después de los cambios en el frontend)
+                    precio_unitario_sin_iva = precio_unitario_input
                     
-                    importe_total += importe
+                    # Calcular importe sin IVA
+                    importe_sin_iva = cantidad * precio_unitario_sin_iva
                     
+                    # Calcular importe con IVA para el total del ticket
+                    importe_con_iva = importe_sin_iva * (Decimal('1') + tipo_iva / Decimal('100'))
+                    importe_total += importe_con_iva
+                    
+                    # Guardar precio sin IVA e importe sin IVA en la línea
                     linea = LineaTicket(
                         ticket_id=ticket.id,
                         descripcion=descripciones[i],
                         cantidad=cantidad,
-                        precio_unitario=precio_unitario,
-                        importe=importe
+                        precio_unitario=precio_unitario_sin_iva,
+                        importe=importe_sin_iva  # Guardar importe sin IVA
                     )
                     db.session.add(linea)
             
@@ -270,6 +275,136 @@ def ver_ticket(ticket_id):
     """Ver detalles de un ticket"""
     ticket = Ticket.query.get_or_404(ticket_id)
     return render_template('ver_ticket.html', ticket=ticket)
+
+def preparar_datos_imprimir_ticket(ticket_id):
+    """Preparar datos del ticket para impresión en PDF"""
+    ticket = Ticket.query.get_or_404(ticket_id)
+    
+    # Calcular base imponible e IVA
+    if ticket.tipo_calculo_iva == 'incrementar':
+        # El importe_total es base + IVA
+        base_imponible = float(ticket.importe_total) / 1.21
+        iva_total = float(ticket.importe_total) - base_imponible
+    else:
+        # El importe_total ya incluye IVA
+        base_imponible = float(ticket.importe_total) / 1.21
+        iva_total = float(ticket.importe_total) - base_imponible
+    
+    # Función auxiliar para convertir imagen a base64
+    def convertir_imagen_a_base64(ruta_imagen):
+        """Convertir imagen a base64"""
+        if not ruta_imagen or not os.path.exists(ruta_imagen):
+            return None
+        try:
+            with open(ruta_imagen, 'rb') as f:
+                imagen_data = f.read()
+                imagen_base64 = base64.b64encode(imagen_data).decode('utf-8')
+                # Detectar tipo MIME
+                if ruta_imagen.lower().endswith('.png'):
+                    return f'data:image/png;base64,{imagen_base64}'
+                elif ruta_imagen.lower().endswith(('.jpg', '.jpeg')):
+                    return f'data:image/jpeg;base64,{imagen_base64}'
+                elif ruta_imagen.lower().endswith('.gif'):
+                    return f'data:image/gif;base64,{imagen_base64}'
+                else:
+                    return f'data:image/png;base64,{imagen_base64}'  # Por defecto PNG
+        except Exception as e:
+            print(f"Error al leer imagen {ruta_imagen}: {e}")
+            return None
+    
+    # Convertir logo a base64
+    logo_base64 = None
+    logo_path = os.path.join(current_app.static_folder, 'logo1.png')
+    logo_base64 = convertir_imagen_a_base64(logo_path)
+    
+    return {
+        'ticket': ticket,
+        'base_imponible': float(base_imponible),
+        'iva_total': float(iva_total),
+        'total_con_iva': float(ticket.importe_total),
+        'logo_base64': logo_base64
+    }
+
+@tickets_bp.route('/tickets/<int:ticket_id>/imprimir')
+@login_required
+def imprimir_ticket(ticket_id):
+    """Vista previa del ticket para imprimir"""
+    datos = preparar_datos_imprimir_ticket(ticket_id)
+    return render_template('imprimir_ticket_pdf.html', **datos, use_base64=False)
+
+@tickets_bp.route('/tickets/<int:ticket_id>/descargar-pdf')
+@login_required
+def descargar_pdf_ticket(ticket_id):
+    """Descargar ticket en formato PDF"""
+    try:
+        datos = preparar_datos_imprimir_ticket(ticket_id)
+        
+        # Renderizar el HTML como ticket
+        html = render_template('imprimir_ticket_pdf.html', 
+                             **datos,
+                             use_base64=True)
+        
+        # Crear el PDF en memoria usando playwright
+        pdf_buffer = BytesIO()
+        
+        try:
+            # Guardar HTML temporalmente para que playwright pueda acceder a él
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+                temp_file.write(html)
+                temp_html_path = temp_file.name
+            
+            # Usar playwright para generar el PDF
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                
+                # Cargar el HTML desde el archivo temporal
+                page.goto(f'file://{temp_html_path}')
+                
+                # Generar PDF
+                pdf_bytes = page.pdf(
+                    format='A4',
+                    print_background=True,
+                    margin={
+                        'top': '10mm',
+                        'right': '10mm',
+                        'bottom': '10mm',
+                        'left': '10mm'
+                    }
+                )
+                
+                browser.close()
+            
+            # Escribir el PDF al buffer
+            pdf_buffer.write(pdf_bytes)
+            pdf_buffer.seek(0)
+            
+            # Limpiar archivo temporal
+            try:
+                os.unlink(temp_html_path)
+            except:
+                pass
+            
+            # Devolver el PDF
+            return send_file(
+                pdf_buffer,
+                mimetype='application/pdf',
+                as_attachment=True,
+                download_name=f'ticket_{datos["ticket"].serie}_{datos["ticket"].numero}.pdf'
+            )
+            
+        except Exception as e:
+            # Limpiar archivo temporal en caso de error
+            try:
+                if 'temp_html_path' in locals():
+                    os.unlink(temp_html_path)
+            except:
+                pass
+            raise e
+            
+    except Exception as e:
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        return redirect(url_for('tickets.ver_ticket', ticket_id=ticket_id))
 
 @tickets_bp.route('/tickets/<int:ticket_id>/eliminar', methods=['POST'])
 @login_required

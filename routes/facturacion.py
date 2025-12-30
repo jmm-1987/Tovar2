@@ -139,6 +139,7 @@ def formalizar_factura_solicitud(presupuesto_id):
         
         fecha_expedicion_str = data.get('fecha_expedicion', '')
         descripcion = data.get('descripcion', '')
+        descuento_pronto_pago = data.get('descuento_pronto_pago', 0)
         lineas_data = data.get('lineas', [])
         
         if not fecha_expedicion_str:
@@ -154,11 +155,30 @@ def formalizar_factura_solicitud(presupuesto_id):
         serie = 'A'  # Serie fija
         numero = obtener_siguiente_numero_factura(fecha_expedicion)
         
-        # Calcular importe total
-        importe_total = Decimal('0.00')
+        # Calcular base imponible (suma de importes de líneas sin IVA)
+        base_imponible = Decimal('0.00')
         for linea_data in lineas_data:
             importe = Decimal(str(linea_data.get('importe', 0)))
-            importe_total += importe
+            base_imponible += importe
+        
+        # Calcular IVA (21% sobre la base imponible)
+        tipo_iva = Decimal('21')
+        iva_total = base_imponible * (tipo_iva / Decimal('100'))
+        subtotal = base_imponible + iva_total
+        
+        # Procesar descuento por pronto pago
+        descuento_pronto_pago_decimal = Decimal('0')
+        try:
+            descuento_pronto_pago_decimal = Decimal(str(descuento_pronto_pago))
+        except:
+            descuento_pronto_pago_decimal = Decimal('0')
+        
+        # Aplicar descuento por pronto pago al subtotal (base + IVA)
+        if descuento_pronto_pago_decimal > 0:
+            descuento_aplicado = subtotal * (descuento_pronto_pago_decimal / Decimal('100'))
+            importe_total = subtotal - descuento_aplicado
+        else:
+            importe_total = subtotal
         
         # Crear factura
         cliente = presupuesto.cliente if presupuesto.cliente else None
@@ -173,6 +193,7 @@ def formalizar_factura_solicitud(presupuesto_id):
             nif=cliente.nif if cliente and cliente.nif else '',
             nombre=cliente.nombre if cliente else 'Sin cliente',
             importe_total=importe_total,
+            descuento_pronto_pago=descuento_pronto_pago_decimal,
             estado='pendiente'
         )
         
@@ -187,14 +208,21 @@ def formalizar_factura_solicitud(presupuesto_id):
             precio_unitario = Decimal(str(linea_data.get('precio_unitario', 0)))
             importe = Decimal(str(linea_data.get('importe', 0)))
             
-            # Obtener descuento y precio_final de la línea de presupuesto si existe
+            # Obtener descuento del formulario o de la línea de presupuesto
             descuento = Decimal('0')
-            precio_final = None
-            if linea_presupuesto_id:
+            if 'descuento' in linea_data:
+                descuento = Decimal(str(linea_data.get('descuento', 0)))
+            elif linea_presupuesto_id:
                 linea_presupuesto = LineaPresupuesto.query.get(linea_presupuesto_id)
                 if linea_presupuesto:
                     descuento = Decimal(str(linea_presupuesto.descuento)) if linea_presupuesto.descuento else Decimal('0')
-                    precio_final = Decimal(str(linea_presupuesto.precio_final)) if linea_presupuesto.precio_final else None
+            
+            # Calcular precio final con descuento
+            precio_final = None
+            if descuento > 0:
+                precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+            else:
+                precio_final = precio_unitario
             
             linea_factura = LineaFactura(
                 factura_id=factura.id,
@@ -269,11 +297,8 @@ def formalizar_factura_solicitud(presupuesto_id):
                     factura.estado = 'confirmado'
                     factura.fecha_confirmacion = datetime.utcnow()
                     db.session.commit()
-                    return jsonify({
-                        'success': True,
-                        'message': 'Factura formalizada y enviada a Verifactu correctamente.',
-                        'factura_id': factura.id
-                    })
+                    flash('Factura formalizada y enviada a Verifactu correctamente.', 'success')
+                    return redirect(url_for('facturacion.facturacion'))
                 else:
                     factura.estado = 'error'
                     factura.huella_verifactu = json.dumps({
@@ -296,19 +321,13 @@ def formalizar_factura_solicitud(presupuesto_id):
         elif not verifactu_enviar_activo:
             factura.estado = 'pendiente'
             db.session.commit()
-            return jsonify({
-                'success': True,
-                'message': 'Factura creada. El envío automático a Verifactu está desactivado.',
-                'factura_id': factura.id
-            })
+            flash('Factura creada. El envío automático a Verifactu está desactivado.', 'success')
+            return redirect(url_for('facturacion.facturacion'))
         else:
             factura.estado = 'pendiente'
             db.session.commit()
-            return jsonify({
-                'success': True,
-                'message': 'Factura creada. Configure VERIFACTU_TOKEN para enviar automáticamente.',
-                'factura_id': factura.id
-            })
+            flash('Factura creada. Configure VERIFACTU_TOKEN para enviar automáticamente.', 'success')
+            return redirect(url_for('facturacion.facturacion'))
             
     except Exception as e:
         db.session.rollback()
@@ -535,6 +554,12 @@ def nueva_factura():
             descripcion = request.form.get('descripcion', '')
             nombre_cliente = request.form.get('nombre_cliente', '')
             nif_cliente = request.form.get('nif_cliente', '')
+            direccion_cliente = request.form.get('direccion_cliente', '')
+            poblacion_cliente = request.form.get('poblacion_cliente', '')
+            provincia_cliente = request.form.get('provincia_cliente', '')
+            codigo_postal_cliente = request.form.get('codigo_postal_cliente', '')
+            telefono_cliente = request.form.get('telefono_cliente', '')
+            email_cliente = request.form.get('email_cliente', '')
             cliente_id = request.form.get('cliente_id', '')
             descuento_pronto_pago = request.form.get('descuento_pronto_pago', '0') or '0'
             
@@ -553,6 +578,26 @@ def nueva_factura():
                 flash('El nombre del cliente es obligatorio', 'error')
                 return redirect(url_for('facturacion.nueva_factura'))
             
+            if not nif_cliente:
+                flash('El NIF/CIF del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.nueva_factura'))
+            
+            if not direccion_cliente:
+                flash('La dirección del cliente es obligatoria', 'error')
+                return redirect(url_for('facturacion.nueva_factura'))
+            
+            if not poblacion_cliente:
+                flash('La población del cliente es obligatoria', 'error')
+                return redirect(url_for('facturacion.nueva_factura'))
+            
+            if not provincia_cliente:
+                flash('La provincia del cliente es obligatoria', 'error')
+                return redirect(url_for('facturacion.nueva_factura'))
+            
+            if not codigo_postal_cliente:
+                flash('El código postal del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.nueva_factura'))
+            
             if not descripciones or not any(descripciones):
                 flash('Debe haber al menos una línea en la factura', 'error')
                 return redirect(url_for('facturacion.nueva_factura'))
@@ -560,13 +605,26 @@ def nueva_factura():
             # Procesar fecha
             fecha_expedicion = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d').date()
             
-            # Si hay cliente_id, obtener datos del cliente
+            # Si hay cliente_id, obtener datos del cliente (pero permitir sobrescribir con los del formulario)
             if cliente_id:
                 cliente = Cliente.query.get(cliente_id)
                 if cliente:
-                    nombre_cliente = cliente.nombre
+                    if not nombre_cliente:
+                        nombre_cliente = cliente.nombre
                     if not nif_cliente and cliente.nif:
                         nif_cliente = cliente.nif
+                    if not direccion_cliente and cliente.direccion:
+                        direccion_cliente = cliente.direccion
+                    if not poblacion_cliente and cliente.poblacion:
+                        poblacion_cliente = cliente.poblacion
+                    if not provincia_cliente and cliente.provincia:
+                        provincia_cliente = cliente.provincia
+                    if not codigo_postal_cliente and cliente.codigo_postal:
+                        codigo_postal_cliente = cliente.codigo_postal
+                    if not telefono_cliente and cliente.telefono:
+                        telefono_cliente = cliente.telefono
+                    if not email_cliente and cliente.email:
+                        email_cliente = cliente.email
             
             # Generar número de factura automáticamente
             serie = 'A'
@@ -795,7 +853,15 @@ def preparar_datos_imprimir_factura(factura_id):
     
     iva_total = base_imponible * Decimal(str(tipo_iva)) / Decimal('100')
     iva_total = iva_total.quantize(Decimal('0.01'))
-    total_con_iva = base_imponible + iva_total
+    subtotal = base_imponible + iva_total
+    
+    # Aplicar descuento por pronto pago si existe
+    descuento_pronto_pago = Decimal(str(factura.descuento_pronto_pago)) if factura.descuento_pronto_pago else Decimal('0')
+    if descuento_pronto_pago > 0:
+        descuento_aplicado = subtotal * (descuento_pronto_pago / Decimal('100'))
+        total_con_iva = subtotal - descuento_aplicado
+    else:
+        total_con_iva = subtotal
     
     # Función auxiliar para convertir imagen a base64
     def convertir_imagen_a_base64(ruta_imagen):
@@ -821,7 +887,7 @@ def preparar_datos_imprimir_factura(factura_id):
     
     # Convertir logo a base64
     logo_base64 = None
-    logo_path = os.path.join(current_app.static_folder, 'logo.png')
+    logo_path = os.path.join(current_app.static_folder, 'logo1.png')
     logo_base64 = convertir_imagen_a_base64(logo_path)
     
     return {
@@ -882,7 +948,7 @@ def preparar_datos_imprimir_albaran(factura_id=None, pedido_id=None):
     
     # Convertir logo a base64
     logo_base64 = None
-    logo_path = os.path.join(current_app.static_folder, 'logo.png')
+    logo_path = os.path.join(current_app.static_folder, 'logo1.png')
     logo_base64 = convertir_imagen_a_base64(logo_path)
     
     return {

@@ -519,9 +519,9 @@
                 {% if use_base64 is defined and use_base64 and logo_base64 %}
                 <img src="{{ logo_base64 }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
                 {% elif base_url is defined and base_url %}
-                <img src="{{ base_url }}{{ url_for('static', filename='logo.png') }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
+                <img src="{{ base_url }}{{ url_for('static', filename='logo1.png') }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
                 {% else %}
-                <img src="{{ url_for('static', filename='logo.png', _external=True) }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
+                <img src="{{ url_for('static', filename='logo1.png', _external=True) }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
                 {% endif %}
             </div>
             <div class="presupuesto-title">
@@ -591,11 +591,12 @@
         <table class="lineas-table">
             <thead>
                 <tr>
-                    <th style="width: 65%;">Nombre</th>
-                    <th style="width: 8%; text-align: center;">Cantidad</th>
+                    <th style="width: 55%;">Nombre</th>
+                    <th style="width: 7%; text-align: center;">Cantidad</th>
+                    <th style="width: 8%; text-align: center;">Talla</th>
                     {% if not (es_albaran is defined and es_albaran) %}
-                    <th style="width: 13%; text-align: right;">Precio Unit.</th>
-                    <th style="width: 14%; text-align: right;">Total</th>
+                    <th style="width: 12%; text-align: right;">Precio Unit.</th>
+                    <th style="width: 18%; text-align: right;">Total</th>
                     {% endif %}
                 </tr>
             </thead>
@@ -629,6 +630,7 @@
                 <tr>
                     <td>{{ nombre_prenda }}{% if texto_personalizacion %} - {{ texto_personalizacion }}{% endif %}</td>
                     <td style="text-align: center;">{{ cantidad }}</td>
+                    <td style="text-align: center;">{{ linea.talla or '-' }}</td>
                     {% if not (es_albaran is defined and es_albaran) %}
                     <td style="text-align: right;">
                         {% if tiene_descuento %}
@@ -807,6 +809,7 @@
     </div>
     {% endif %}
     
+    {% if not (es_albaran is defined and es_albaran) %}
     <!-- PÁGINA 3: CONDICIONADO -->
     <div class="page condicionado-page">
         <div class="condicionado-header">
@@ -904,6 +907,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 
     <div class="no-print">
         <button onclick="window.print()" class="btn btn-primary">Imprimir</button>

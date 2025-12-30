@@ -853,7 +853,7 @@ def preparar_datos_imprimir_solicitud(solicitud_id):
     descripciones_imagenes = []
     
     # Convertir logo a base64
-    logo_path = os.path.join(current_app.static_folder, 'logo.png')
+    logo_path = os.path.join(current_app.static_folder, 'logo1.png')
     logo_base64 = convertir_imagen_a_base64(logo_path)
     
     # Convertir imagen de diseño a base64 si existe

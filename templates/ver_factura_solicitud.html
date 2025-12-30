@@ -3,20 +3,19 @@
 {% block title %}Factura Solicitud #{{ solicitud.id }} - Gestión de Pedidos{% endblock %}
 
 {% block content %}
-<div style="margin-bottom: 20px;">
-    <a href="{{ url_for('facturacion.facturacion') }}" class="btn btn-primary" style="padding: 10px 20px; text-decoration: none; display: inline-block;">
-        ← Volver al Listado
-    </a>
-</div>
-
 <div class="factura-card" style="background: white; border-radius: 8px; padding: 30px; margin-bottom: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); animation: slideUp 0.5s ease-out;">
-    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 25px; border-bottom: 2px solid #e0e0e0; padding-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 2px solid #e0e0e0; padding-bottom: 20px;">
         <div>
             <h2 style="margin: 0 0 10px 0; color: #2c3e50;">Factura Solicitud #{{ solicitud.id }}</h2>
             <p style="margin: 5px 0; color: #666;"><strong>Estado:</strong> 
                 <span class="badge badge-estado-{{ solicitud.estado.lower()|replace(' ', '-') }}">{{ solicitud.estado }}</span>
             </p>
             <p style="margin: 5px 0; color: #666;"><strong>Tipo:</strong> {{ solicitud.tipo_pedido if solicitud.tipo_pedido else 'N/A' }}</p>
+        </div>
+        <div>
+            <a href="{{ url_for('facturacion.facturacion') }}" class="btn btn-primary" style="padding: 10px 20px; text-decoration: none; display: inline-block;">
+                ← Volver al Listado
+            </a>
         </div>
     </div>
 
@@ -60,9 +59,9 @@
             <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; background: white;">
                 <thead>
                     <tr style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); border-bottom: 2px solid #1a252f;">
-                        <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Prenda</th>
                         <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Nombre</th>
                         <th style="padding: 15px; text-align: center; color: #ffffff; font-weight: 600;">Cantidad</th>
+                        <th style="padding: 15px; text-align: center; color: #ffffff; font-weight: 600;">Talla</th>
                         <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Precio Unit. (€)</th>
                         <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Descuento (%)</th>
                         <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Precio Final (€)</th>
@@ -72,10 +71,13 @@
                 <tbody>
                     {% for linea in solicitud.lineas %}
                     <tr class="linea-factura" style="border-bottom: 1px solid #e9ecef; transition: background 0.2s;">
-                        <td style="padding: 15px; color: #495057;">{{ linea.prenda.nombre if linea.prenda else 'N/A' }}</td>
                         <td style="padding: 15px; color: #495057;" class="descripcion-linea">{{ linea.nombre_mostrar or linea.nombre or 'N/A' }}</td>
                         <td style="padding: 15px; text-align: center; color: #495057; font-weight: 500;">{{ linea.cantidad }}</td>
+                        <td style="padding: 15px; text-align: center; color: #495057;">{{ linea.talla or '-' }}</td>
                         <td style="padding: 15px; text-align: right;">
+                            {% if factura_existente %}
+                            <span style="color: #495057; font-weight: 500;">{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '0.00' }} €</span>
+                            {% else %}
                             <input type="number" 
                                    step="0.01" 
                                    min="0" 
@@ -87,20 +89,26 @@
                                    value="{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '' }}"
                                    style="width: 120px; padding: 10px; border: 2px solid #ddd; border-radius: 6px; text-align: right; font-size: 1rem; transition: all 0.3s ease;"
                                    placeholder="0.00">
+                            {% endif %}
                         </td>
-                        <td style="padding: 15px; text-align: right; color: #495057;">
-                            {% if linea.descuento and linea.descuento > 0 %}
-                                <span style="color: #d32f2f; font-weight: bold;">{{ "%.0f"|format(linea.descuento) }}%</span>
+                        <td style="padding: 15px; text-align: right;">
+                            {% if factura_existente %}
+                            <span style="color: #495057; font-weight: 500;">{{ "%.0f"|format(linea.descuento) if linea.descuento and linea.descuento > 0 else '0' }}%</span>
                             {% else %}
-                                <span style="color: #999;">0%</span>
+                            <input type="number" 
+                                   step="0.01" 
+                                   min="0" 
+                                   max="100"
+                                   class="descuento-linea" 
+                                   data-linea-id="{{ linea.id }}"
+                                   data-solicitud-id="{{ solicitud.id }}"
+                                   value="{{ "%.0f"|format(linea.descuento) if linea.descuento and linea.descuento > 0 else '0' }}"
+                                   style="width: 80px; padding: 8px; border: 2px solid #856404; border-radius: 4px; text-align: right; font-size: 1rem; font-weight: bold; color: #856404; transition: all 0.3s ease;"
+                                   placeholder="0">
                             {% endif %}
                         </td>
                         <td style="padding: 15px; text-align: right; color: #495057; font-weight: 500;">
-                            {% if linea.precio_final %}
-                                <span style="color: #d32f2f; font-weight: bold;">{{ "%.2f"|format(linea.precio_final) }} €</span>
-                            {% else %}
-                                <span style="color: #999;">{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '0.00' }} €</span>
-                            {% endif %}
+                            <span class="precio-final-linea" data-linea-id="{{ linea.id }}" style="color: #d32f2f; font-weight: bold;">0.00 €</span>
                         </td>
                         <td style="padding: 15px; text-align: right;">
                             <span class="total-linea" data-linea-id="{{ linea.id }}" style="font-weight: bold; color: #2c3e50; font-size: 1.1rem;">0.00</span>
@@ -117,6 +125,30 @@
                         <td colspan="5" style="padding: 15px; text-align: right; font-weight: bold; color: #2c3e50;">IVA (21%) (€):</td>
                         <td colspan="2" style="padding: 15px; text-align: right;">
                             <span class="iva-total" data-solicitud-id="{{ solicitud.id }}" style="font-weight: bold; color: #2c3e50;">0.00</span>
+                        </td>
+                    </tr>
+                    <tr style="background: #f8f9fa;">
+                        <td colspan="5" style="padding: 15px; text-align: right; font-weight: bold; color: #2c3e50;">Subtotal (€):</td>
+                        <td colspan="2" style="padding: 15px; text-align: right;">
+                            <span class="subtotal" data-solicitud-id="{{ solicitud.id }}" style="font-weight: bold; color: #2c3e50;">0.00</span>
+                        </td>
+                    </tr>
+                    <tr style="background: #fff3cd;">
+                        <td colspan="4" style="padding: 15px; text-align: right; font-weight: bold; color: #856404;">Descuento Pronto Pago:</td>
+                        <td style="padding: 15px; text-align: center;">
+                            <input type="number" 
+                                   id="descuento-pronto-pago" 
+                                   step="0.01" 
+                                   min="0" 
+                                   max="100"
+                                   value="0"
+                                   data-solicitud-id="{{ solicitud.id }}"
+                                   style="width: 80px; padding: 8px; border: 2px solid #856404; border-radius: 4px; text-align: right; font-size: 1rem; font-weight: bold; color: #856404;"
+                                   placeholder="0">
+                            <span style="margin-left: 5px; color: #856404; font-weight: bold;">%</span>
+                        </td>
+                        <td colspan="2" style="padding: 15px; text-align: right;">
+                            <span class="descuento-pronto-pago" data-solicitud-id="{{ solicitud.id }}" style="font-weight: bold; color: #856404;">0.00 €</span>
                         </td>
                     </tr>
                     <tr style="border-top: 3px solid #2c3e50; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
@@ -182,9 +214,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // Función para calcular el total de una línea
     function calcularTotalLinea(input) {
         const lineaId = input.dataset.lineaId;
+        const solicitudId = input.dataset.solicitudId;
         const cantidad = parseFloat(input.dataset.cantidad) || 0;
         const importe = parseFloat(input.value) || 0;
-        const descuento = parseFloat(input.dataset.descuento) || 0;
+        
+        // Obtener descuento del input de descuento
+        const descuentoInput = document.querySelector(`.descuento-linea[data-linea-id="${lineaId}"]`);
+        const descuento = parseFloat(descuentoInput ? descuentoInput.value : 0) || 0;
         
         // Calcular precio final con descuento
         let precioFinal = importe;
@@ -194,13 +230,20 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const total = cantidad * precioFinal;
         
+        // Actualizar precio final
+        const precioFinalSpan = document.querySelector(`.precio-final-linea[data-linea-id="${lineaId}"]`);
+        if (precioFinalSpan) {
+            precioFinalSpan.textContent = precioFinal.toFixed(2) + ' €';
+        }
+        
+        // Actualizar total de línea
         const totalLineaSpan = document.querySelector(`.total-linea[data-linea-id="${lineaId}"]`);
         if (totalLineaSpan) {
             totalLineaSpan.textContent = total.toFixed(2);
         }
         
-        // Recalcular total de la factura (con IVA)
-        calcularTotalFactura(input.dataset.solicitudId);
+        // Recalcular total de la factura (con IVA y descuento por pronto pago)
+        calcularTotalFactura(solicitudId);
     }
     
     // Calcular totales iniciales si hay precios predefinidos
@@ -212,16 +255,20 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    // Función para calcular el total de una factura con IVA
+    // Función para calcular el total de una factura con IVA y descuento por pronto pago
     function calcularTotalFactura(solicitudId) {
         const inputs = document.querySelectorAll(`.importe-unitario[data-solicitud-id="${solicitudId}"]`);
         let baseImponible = 0;
         const tipoIva = 21; // IVA al 21%
         
         inputs.forEach(input => {
+            const lineaId = input.dataset.lineaId;
             const cantidad = parseFloat(input.dataset.cantidad) || 0;
             const importe = parseFloat(input.value) || 0;
-            const descuento = parseFloat(input.dataset.descuento) || 0;
+            
+            // Obtener descuento del input de descuento
+            const descuentoInput = document.querySelector(`.descuento-linea[data-linea-id="${lineaId}"]`);
+            const descuento = parseFloat(descuentoInput ? descuentoInput.value : 0) || 0;
             
             // Calcular precio final con descuento
             let precioFinal = importe;
@@ -234,7 +281,15 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Calcular IVA
         const ivaTotal = baseImponible * (tipoIva / 100);
-        const totalFactura = baseImponible + ivaTotal;
+        const subtotal = baseImponible + ivaTotal;
+        
+        // Obtener descuento por pronto pago
+        const descuentoProntoPagoInput = document.getElementById('descuento-pronto-pago');
+        const descuentoProntoPago = parseFloat(descuentoProntoPagoInput ? descuentoProntoPagoInput.value : 0) || 0;
+        
+        // Calcular descuento por pronto pago sobre el subtotal
+        const descuentoProntoPagoAplicado = subtotal * (descuentoProntoPago / 100);
+        const totalFactura = subtotal - descuentoProntoPagoAplicado;
         
         // Actualizar base imponible
         const baseImponibleSpan = document.querySelector(`.base-imponible[data-solicitud-id="${solicitudId}"]`);
@@ -246,6 +301,23 @@ document.addEventListener('DOMContentLoaded', function() {
         const ivaTotalSpan = document.querySelector(`.iva-total[data-solicitud-id="${solicitudId}"]`);
         if (ivaTotalSpan) {
             ivaTotalSpan.textContent = ivaTotal.toFixed(2);
+        }
+        
+        // Actualizar subtotal
+        const subtotalSpan = document.querySelector(`.subtotal[data-solicitud-id="${solicitudId}"]`);
+        if (subtotalSpan) {
+            subtotalSpan.textContent = subtotal.toFixed(2);
+        }
+        
+        // Actualizar descuento por pronto pago
+        const descuentoProntoPagoSpan = document.querySelector(`.descuento-pronto-pago[data-solicitud-id="${solicitudId}"]`);
+        if (descuentoProntoPagoSpan) {
+            descuentoProntoPagoSpan.textContent = descuentoProntoPagoAplicado.toFixed(2);
+        }
+        
+        const descuentoProntoPagoPorcentajeSpan = document.querySelector(`.descuento-pronto-pago-porcentaje[data-solicitud-id="${solicitudId}"]`);
+        if (descuentoProntoPagoPorcentajeSpan) {
+            descuentoProntoPagoPorcentajeSpan.textContent = descuentoProntoPago.toFixed(2);
         }
         
         // Actualizar total
@@ -274,6 +346,40 @@ document.addEventListener('DOMContentLoaded', function() {
             this.style.boxShadow = 'none';
         });
     });
+    
+    // Event listeners para inputs de descuento de línea
+    document.querySelectorAll('.descuento-linea').forEach(input => {
+        input.addEventListener('input', function() {
+            const lineaId = this.dataset.lineaId;
+            const solicitudId = this.dataset.solicitudId;
+            const precioInput = document.querySelector(`.importe-unitario[data-linea-id="${lineaId}"]`);
+            if (precioInput) {
+                calcularTotalLinea(precioInput);
+            }
+        });
+        
+        input.addEventListener('focus', function() {
+            this.style.borderColor = '#3498db';
+            this.style.boxShadow = '0 0 0 3px rgba(52, 152, 219, 0.1)';
+        });
+        
+        input.addEventListener('blur', function() {
+            if (this.value && parseFloat(this.value) >= 0) {
+                this.value = parseFloat(this.value).toFixed(2);
+            }
+            this.style.borderColor = '#ddd';
+            this.style.boxShadow = 'none';
+        });
+    });
+    
+    // Event listener para descuento por pronto pago
+    const descuentoProntoPagoInput = document.getElementById('descuento-pronto-pago');
+    if (descuentoProntoPagoInput) {
+        descuentoProntoPagoInput.addEventListener('input', function() {
+            const solicitudId = this.dataset.solicitudId;
+            calcularTotalFactura(solicitudId);
+        });
+    }
     
     // Event listeners para botones de formalizar factura
     document.querySelectorAll('.formalizar-factura').forEach(button => {
@@ -310,21 +416,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // Obtener base imponible e IVA
+            // Obtener base imponible, IVA, subtotal y descuento por pronto pago
             const baseImponibleSpan = document.querySelector(`.base-imponible[data-solicitud-id="${solicitudId}"]`);
             const ivaTotalSpan = document.querySelector(`.iva-total[data-solicitud-id="${solicitudId}"]`);
+            const subtotalSpan = document.querySelector(`.subtotal[data-solicitud-id="${solicitudId}"]`);
+            const descuentoProntoPagoSpan = document.querySelector(`.descuento-pronto-pago[data-solicitud-id="${solicitudId}"]`);
             const baseImponible = parseFloat(baseImponibleSpan.textContent) || 0;
             const ivaTotal = parseFloat(ivaTotalSpan.textContent) || 0;
+            const subtotal = parseFloat(subtotalSpan.textContent) || 0;
+            const descuentoProntoPago = parseFloat(descuentoProntoPagoSpan.textContent) || 0;
+            
+            // Obtener descuento por pronto pago porcentaje
+            const descuentoProntoPagoInput = document.getElementById('descuento-pronto-pago');
+            const descuentoProntoPagoPorcentaje = parseFloat(descuentoProntoPagoInput ? descuentoProntoPagoInput.value : 0) || 0;
             
             // Confirmar formalización
-            if (confirm(`¿Está seguro de que desea formalizar la factura de la solicitud #${solicitudId}?\n\nBase Imponible: ${baseImponible.toFixed(2)}€\nIVA (21%): ${ivaTotal.toFixed(2)}€\nTotal: ${totalFactura.toFixed(2)}€\n\nEl número de factura se generará automáticamente.`)) {
+            let mensajeConfirmacion = `¿Está seguro de que desea formalizar la factura de la solicitud #${solicitudId}?\n\nBase Imponible: ${baseImponible.toFixed(2)}€\nIVA (21%): ${ivaTotal.toFixed(2)}€\nSubtotal: ${subtotal.toFixed(2)}€`;
+            if (descuentoProntoPagoPorcentaje > 0) {
+                mensajeConfirmacion += `\nDescuento Pronto Pago (${descuentoProntoPagoPorcentaje.toFixed(2)}%): -${descuentoProntoPago.toFixed(2)}€`;
+            }
+            mensajeConfirmacion += `\nTotal: ${totalFactura.toFixed(2)}€\n\nEl número de factura se generará automáticamente.`;
+            
+            if (confirm(mensajeConfirmacion)) {
                 // Preparar datos de las líneas (el importe incluye IVA)
                 const lineas = [];
                 inputs.forEach(input => {
                     const lineaId = input.dataset.lineaId;
                     const cantidad = parseFloat(input.dataset.cantidad) || 0;
                     const precioUnitario = parseFloat(input.value) || 0;
-                    const descuento = parseFloat(input.dataset.descuento) || 0;
+                    
+                    // Obtener descuento del input de descuento
+                    const descuentoInput = document.querySelector(`.descuento-linea[data-linea-id="${lineaId}"]`);
+                    const descuento = parseFloat(descuentoInput ? descuentoInput.value : 0) || 0;
                     
                     // Calcular precio final con descuento
                     let precioFinal = precioUnitario;
@@ -345,6 +468,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             descripcion: descripcionLinea,
                             cantidad: cantidad,
                             precio_unitario: precioUnitario,
+                            descuento: descuento,
                             importe: importe  // Este importe usa precio final con descuento aplicado
                         });
                     }
@@ -355,6 +479,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 button.disabled = true;
                 button.textContent = 'Procesando...';
                 
+                // Obtener descuento por pronto pago
+                const descuentoProntoPago = parseFloat(descuentoProntoPagoInput ? descuentoProntoPagoInput.value : 0) || 0;
+                
                 // Enviar datos al servidor
                 fetch(`/facturacion/solicitud/${solicitudId}/formalizar`, {
                     method: 'POST',
@@ -364,18 +491,25 @@ document.addEventListener('DOMContentLoaded', function() {
                     body: JSON.stringify({
                         fecha_expedicion: fechaExpedicion,
                         descripcion: descripcion,
+                        descuento_pronto_pago: descuentoProntoPago,
                         lineas: lineas
                     })
                 })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        alert(data.message);
-                        window.location.reload();
+                .then(response => {
+                    if (response.redirected) {
+                        // Si hay redirección, seguirla
+                        window.location.href = response.url;
                     } else {
-                        alert('Error: ' + data.error);
-                        button.disabled = false;
-                        button.textContent = 'Formalizar Factura';
+                        return response.json().then(data => {
+                            if (data.success) {
+                                // Redirigir al listado
+                                window.location.href = '/facturacion';
+                            } else {
+                                alert('Error: ' + data.error);
+                                button.disabled = false;
+                                button.textContent = 'Formalizar Factura';
+                            }
+                        });
                     }
                 })
                 .catch(error => {

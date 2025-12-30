@@ -67,8 +67,11 @@
         </div>
     </div>
 
-    <h3>Imágenes para el PDF del Presupuesto</h3>
-    <div style="margin-bottom: 20px;">
+    <h3 style="cursor: pointer; user-select: none; display: flex; align-items: center; gap: 10px;" onclick="toggleSeccionImagenes()">
+        <span id="icono-imagenes" style="font-size: 1.2rem; transition: transform 0.3s;">▶</span>
+        Imágenes para el PDF del Presupuesto
+    </h3>
+    <div id="seccion-imagenes" style="margin-bottom: 20px; display: none;">
         <label style="display: block; margin-bottom: 10px; font-weight: 500;">Imágenes Adicionales (Página 2) - Máximo 5 imágenes</label>
         <div style="display: flex; gap: 20px; flex-wrap: wrap;">
             {% for i in range(1, 6) %}
@@ -109,9 +112,10 @@
         <div class="linea-pedido-row">
             <div class="linea-pedido-numero">#1</div>
             <div class="linea-pedido-campos">
-                <!-- Orden: nombre_mostrar, unidades, modelo, color, forma, sexo, talla, tejido, precio -->
-                <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 0 0 750px; width: 750px;">
+                <!-- Orden: nombre_mostrar, unidades, talla, modelo, color, forma, sexo, tejido, precio -->
+                <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 0 0 1200px; width: 1200px;">
                 <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="1" min="1" required placeholder="Unidades *" title="Unidades">
+                <input type="text" name="talla[]" class="linea-campo-compact" placeholder="Talla" title="Talla">
                 <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo">
                     <option value="">Modelo *</option>
                     {% for prenda in prendas %}
@@ -126,7 +130,6 @@
                     <option value="sra">Sra</option>
                     <option value="unisex">Unisex</option>
                 </select>
-                <input type="text" name="talla[]" class="linea-campo-compact" placeholder="Talla" title="Talla">
                 <select name="tejido[]" class="linea-campo-compact" title="Tejido">
                     <option value="">Tejido</option>
                     <option value="SARGA">SARGA</option>
@@ -169,62 +172,6 @@
         <option value="Tapered">
         <option value="Straight">
         <option value="Skinny">
-        <option value="POLAR">
-        <option value="POLAR.NARANJ.">
-        <option value="POLAR.VERDE">
-        <option value="POLAR.NEGRO">
-        <option value="POLAR.AZ.MARIN">
-        <option value="POLAR.BLANC.">
-        <option value="POLAR.AZ.CELES">
-        <option value="POLAR.OTRO">
-        <option value="ABRIGO">
-        <option value="BAT.AMERICANA">
-        <option value="BAT.MAO TRAJANO">
-        <option value="BAT.BRUTUS">
-        <option value="BAT.GEMINA">
-        <option value="BAT.JULIA">
-        <option value="BAT.DIANA">
-        <option value="BAT.ALAUDAE">
-        <option value="GORRO.GOMA">
-        <option value="GORRO.CUERDA">
-        <option value="CAPA PELUQUERO">
-        <option value="CAMISETA WEARK">
-        <option value="CAM. AZ.CEL.">
-        <option value="CAM. ROJA">
-        <option value="CAM. VERDE">
-        <option value="CAM.BURD.">
-        <option value="CAM.GRIS">
-        <option value="CAM. OTRO">
-        <option value="CAM. NEGRA">
-        <option value="CAM.NARAN.">
-        <option value="CAM.AZ.MAR.">
-        <option value="CAM. AMARL.">
-        <option value="POLO.BLAN.">
-        <option value="POLO.VERD.">
-        <option value="POLO.AZ.CEL.">
-        <option value="POLO.ROJO">
-        <option value="POLO AMAR.">
-        <option value="POLO.AZ.MARI">
-        <option value="POLO.MARON">
-        <option value="POL.GRIS">
-        <option value="POL.NEG.">
-        <option value="POLO.OTRO">
-        <option value="T1">
-        <option value="T2">
-        <option value="T3">
-        <option value="T4">
-        <option value="T5">
-        <option value="T201">
-        <option value="T301">
-        <option value="T401">
-        <option value="COCINA">
-        <option value="CHAQ. COCINA">
-        <option value="MAD.CORTO">
-        <option value="MAD.PETO">
-        <option value="MAD.FRANCES">
-        <option value="CAMISA.CELEST">
-        <option value="CAMISA.BLANC.">
-        <option value="CAMISA OTRO">
     </datalist>
 
     <div class="actions">
@@ -247,6 +194,20 @@
 </style>
 
 <script>
+// Función para mostrar/ocultar sección de imágenes
+function toggleSeccionImagenes() {
+    const seccion = document.getElementById('seccion-imagenes');
+    const icono = document.getElementById('icono-imagenes');
+    
+    if (seccion.style.display === 'none') {
+        seccion.style.display = 'block';
+        icono.textContent = '▼';
+    } else {
+        seccion.style.display = 'none';
+        icono.textContent = '▶';
+    }
+}
+
 // Funciones para drag & drop
 function allowDrop(ev) {
     ev.preventDefault();
@@ -494,9 +455,12 @@ function duplicarLinea(btn) {
     if (tejidoSelectNuevo && tejidoValue) {
         tejidoSelectNuevo.value = tejidoValue;
     }
-    if (estadoSelectNuevo && estadoValue) {
-        estadoSelectNuevo.value = estadoValue;
-    }
+    
+    // Limpiar descuento y precio final
+    const descuentoInputNuevo = nuevaLinea.querySelector('.descuento-input');
+    const precioFinalInputNuevo = nuevaLinea.querySelector('.precio-final-input');
+    if (descuentoInputNuevo) descuentoInputNuevo.value = '0';
+    if (precioFinalInputNuevo) precioFinalInputNuevo.value = '';
     
     // Mantener el estado de los campos personalizados
     const camposPersonalizados = nuevaLinea.querySelectorAll('.campo-personalizado');
@@ -523,12 +487,30 @@ function duplicarLinea(btn) {
         }
     }
     
+    // Insertar después de la línea actual
+    if (container && lineaRow.parentNode) {
+        lineaRow.parentNode.insertBefore(nuevaLinea, lineaRow.nextSibling);
+    } else if (container) {
+        container.appendChild(nuevaLinea);
+    }
+    
     // Actualizar número
     renumerarPrendas();
     
-    // Insertar después de la línea actual
-    lineaRow.parentNode.insertBefore(nuevaLinea, lineaRow.nextSibling);
-    renumerarPrendas();
+    // Añadir event listeners a los nuevos campos
+    const cantidadInputNuevo = nuevaLinea.querySelector('.cantidad');
+    const precioUnitarioInputNuevo = nuevaLinea.querySelector('.precio-unitario-input');
+    const descuentoInputListener = nuevaLinea.querySelector('.descuento-input');
+    const precioFinalInputListener = nuevaLinea.querySelector('.precio-final-input');
+    
+    // Añadir listeners para calcular precio final
+    if (precioUnitarioInputNuevo) {
+        precioUnitarioInputNuevo.addEventListener('input', calcularPrecioFinal);
+    }
+    
+    if (descuentoInputListener) {
+        descuentoInputListener.addEventListener('input', calcularPrecioFinal);
+    }
 }
 
 // Buscador de clientes

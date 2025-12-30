@@ -89,7 +89,7 @@
             <div class="linea-ticket-campos">
                 <input type="text" name="descripcion_linea[]" placeholder="Descripción del producto" required style="flex: 2;">
                 <input type="number" name="cantidad[]" placeholder="Cantidad" step="0.01" min="0" required style="flex: 1;">
-                <input type="number" name="precio_unitario[]" placeholder="Precio unitario" step="0.01" min="0" required style="flex: 1;" class="precio-unitario">
+                <input type="number" name="precio_unitario[]" placeholder="Precio unitario (sin IVA)" step="0.01" min="0" required style="flex: 1;" class="precio-unitario">
                 <span class="importe-linea" style="flex: 1; padding: 8px; text-align: right; font-weight: bold;">0.00 €</span>
             </div>
         </div>
@@ -139,7 +139,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="linea-ticket-campos">
                 <input type="text" name="descripcion_linea[]" placeholder="Descripción del producto" required style="flex: 2;">
                 <input type="number" name="cantidad[]" placeholder="Cantidad" step="0.01" min="0" required style="flex: 1;" class="linea-cantidad">
-                <input type="number" name="precio_unitario[]" placeholder="Precio unitario" step="0.01" min="0" required style="flex: 1;" class="precio-unitario">
+                <input type="number" name="precio_unitario[]" placeholder="Precio unitario (sin IVA)" step="0.01" min="0" required style="flex: 1;" class="precio-unitario">
                 <span class="importe-linea" style="flex: 1; padding: 8px; text-align: right; font-weight: bold;">0.00 €</span>
                 <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>
             </div>
@@ -164,10 +164,8 @@ document.addEventListener('DOMContentLoaded', function() {
     function calcularImporte() {
         const rows = document.querySelectorAll('.linea-ticket-row');
         const tipoIva = 21; // IVA al 21%
-        const tipoCalculo = document.getElementById('tipo_calculo_iva').value;
         
         let baseImponible = 0;
-        let totalConIva = 0;
 
         rows.forEach(row => {
             const cantidadInput = row.querySelector('input[name="cantidad[]"]');
@@ -178,27 +176,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 const cantidad = parseFloat(cantidadInput.value) || 0;
                 const precio = parseFloat(precioInput.value) || 0;
                 
-                let importe = 0;
-                let baseLinea = 0;
+                // Siempre calcular como precio sin IVA
+                const importeSinIva = cantidad * precio;
                 
-                if (tipoCalculo === 'incrementar') {
-                    // Precio unitario es sin IVA, calcular con IVA
-                    baseLinea = cantidad * precio;
-                    importe = baseLinea * (1 + tipoIva / 100);
-                } else {
-                    // Precio unitario ya incluye IVA (desglosar)
-                    importe = cantidad * precio;
-                    baseLinea = importe / (1 + tipoIva / 100);
-                }
-                
-                importeSpan.textContent = importe.toFixed(2) + ' €';
-                baseImponible += baseLinea;
-                totalConIva += importe;
+                // Mostrar importe sin IVA en la línea
+                importeSpan.textContent = importeSinIva.toFixed(2) + ' €';
+                baseImponible += importeSinIva;
             }
         });
 
-        // Calcular IVA total
-        const ivaTotal = totalConIva - baseImponible;
+        // Calcular IVA total (21% sobre la base imponible)
+        const ivaTotal = baseImponible * (tipoIva / 100);
+        const totalConIva = baseImponible + ivaTotal;
 
         document.getElementById('base-imponible').textContent = baseImponible.toFixed(2);
         document.getElementById('iva-total').textContent = ivaTotal.toFixed(2);
