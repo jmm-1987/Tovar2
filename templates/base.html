@@ -21,43 +21,49 @@
             <nav id="mainNav">
                 {% if current_user.is_authenticated %}
                     <a href="{{ url_for('index.index') }}">PANEL DE CONTROL</a>
-                    <div class="dropdown">
-                        <a href="#" class="dropdown-toggle">💰 Ventas <span class="dropdown-arrow">▼</span></a>
-                        <div class="dropdown-menu">
-                            <a href="{{ url_for('solicitudes.listado_solicitudes') }}">Solicitudes</a>
-                            <a href="{{ url_for('facturacion.facturacion') }}">Facturación</a>
-                            <a href="{{ url_for('clientes.gestion_clientes') }}">Clientes</a>
-                            <a href="{{ url_for('prendas.gestion_prendas') }}">Prendas</a>
+                    {% if current_user.rol == 'usuario' %}
+                        {# Usuarios con rol "usuario" solo ven Panel de Control y Solicitudes #}
+                        <a href="{{ url_for('solicitudes.listado_solicitudes') }}">SOLICITUDES</a>
+                    {% else %}
+                        {# Otros usuarios ven el menú completo #}
+                        <div class="dropdown">
+                            <a href="#" class="dropdown-toggle">💰 Ventas <span class="dropdown-arrow">▼</span></a>
+                            <div class="dropdown-menu">
+                                <a href="{{ url_for('solicitudes.listado_solicitudes') }}">Solicitudes</a>
+                                <a href="{{ url_for('facturacion.facturacion') }}">Facturación</a>
+                                <a href="{{ url_for('clientes.gestion_clientes') }}">Clientes</a>
+                                <a href="{{ url_for('prendas.gestion_prendas') }}">Prendas</a>
+                            </div>
                         </div>
-                    </div>
-                    <div class="dropdown">
-                        <a href="#" class="dropdown-toggle">🛒 Tickets Tienda <span class="dropdown-arrow">▼</span></a>
-                        <div class="dropdown-menu">
-                            <a href="{{ url_for('tickets.listado_tickets') }}">Tickets</a>
-                            <a href="{{ url_for('tickets.listado_clientes_tienda') }}">Clientes de Tienda</a>
-                            <a href="{{ url_for('tickets.cuadre_caja') }}">Cuadre de Caja</a>
+                        <div class="dropdown">
+                            <a href="#" class="dropdown-toggle">🛒 Tickets Tienda <span class="dropdown-arrow">▼</span></a>
+                            <div class="dropdown-menu">
+                                <a href="{{ url_for('tickets.listado_tickets') }}">Tickets</a>
+                                <a href="{{ url_for('tickets.listado_clientes_tienda') }}">Clientes de Tienda</a>
+                                <a href="{{ url_for('tickets.cuadre_caja') }}">Cuadre de Caja</a>
+                            </div>
                         </div>
-                    </div>
-                    <div class="dropdown">
-                        <a href="#" class="dropdown-toggle">📊 Informes <span class="dropdown-arrow">▼</span></a>
-                        <div class="dropdown-menu">
-                            <a href="{{ url_for('informes.facturacion_emitida') }}">Facturación Emitida</a>
-                            <a href="{{ url_for('informes.facturacion_soportada') }}">Facturación Soportada</a>
-                            <a href="{{ url_for('informes.nominas') }}">Nóminas</a>
-                            <a href="{{ url_for('informes.iva') }}">IVA</a>
+                        <div class="dropdown">
+                            <a href="#" class="dropdown-toggle">📊 Informes <span class="dropdown-arrow">▼</span></a>
+                            <div class="dropdown-menu">
+                                <a href="{{ url_for('informes.facturacion_emitida') }}">Facturación Emitida</a>
+                                <a href="{{ url_for('informes.facturacion_soportada') }}">Facturación Soportada</a>
+                                <a href="{{ url_for('informes.nominas') }}">Nóminas</a>
+                                <a href="{{ url_for('informes.iva') }}">IVA</a>
+                            </div>
                         </div>
-                    </div>
-                    <div class="dropdown">
-                        <a href="#" class="dropdown-toggle">💰 Gastos <span class="dropdown-arrow">▼</span></a>
-                        <div class="dropdown-menu">
-                            <a href="{{ url_for('gastos.listado_proveedores') }}">Proveedores</a>
-                            <a href="{{ url_for('gastos.listado_facturas_proveedor') }}">Facturas Proveedor</a>
-                            <a href="{{ url_for('gastos.listado_empleados') }}">Empleados</a>
-                            <a href="{{ url_for('gastos.listado_nominas') }}">Nóminas</a>
+                        <div class="dropdown">
+                            <a href="#" class="dropdown-toggle">💰 Gastos <span class="dropdown-arrow">▼</span></a>
+                            <div class="dropdown-menu">
+                                <a href="{{ url_for('gastos.listado_proveedores') }}">Proveedores</a>
+                                <a href="{{ url_for('gastos.listado_facturas_proveedor') }}">Facturas Proveedor</a>
+                                <a href="{{ url_for('gastos.listado_empleados') }}">Empleados</a>
+                                <a href="{{ url_for('gastos.listado_nominas') }}">Nóminas</a>
+                            </div>
                         </div>
-                    </div>
-                    {% if current_user.is_supervisor() %}
-                        <a href="{{ url_for('configuracion.index') }}">⚙️ Configuración</a>
+                        {% if current_user.is_supervisor() %}
+                            <a href="{{ url_for('configuracion.index') }}">⚙️ Configuración</a>
+                        {% endif %}
                     {% endif %}
                     <div class="user-menu">
                         <span class="user-name">{{ current_user.usuario }}</span>

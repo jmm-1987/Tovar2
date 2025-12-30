@@ -39,6 +39,19 @@ def administracion_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def not_usuario_required(f):
+    """Decorador para bloquear acceso a usuarios con rol 'usuario' (solo pueden ver panel de control y solicitudes)"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+            flash('Debes iniciar sesión para acceder a esta página', 'error')
+            return redirect(url_for('auth.login'))
+        if current_user.rol == 'usuario':
+            flash('No tienes permisos para acceder a esta página', 'error')
+            return redirect(url_for('index.index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 
 

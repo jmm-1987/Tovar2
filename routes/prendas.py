@@ -4,11 +4,13 @@ from flask_login import login_required
 from extensions import db
 from models import Prenda
 from decimal import Decimal
+from utils.auth import not_usuario_required
 
 prendas_bp = Blueprint('prendas', __name__)
 
 @prendas_bp.route('/prendas', methods=['GET', 'POST'])
 @login_required
+@not_usuario_required
 def gestion_prendas():
     if request.method == 'POST':
         try:
@@ -34,6 +36,7 @@ def gestion_prendas():
 
 @prendas_bp.route('/prendas/<int:id>/editar', methods=['POST'])
 @login_required
+@not_usuario_required
 def editar_prenda(id):
     prenda = Prenda.query.get_or_404(id)
     try:
@@ -52,6 +55,7 @@ def editar_prenda(id):
 
 @prendas_bp.route('/prendas/<int:id>/eliminar', methods=['POST'])
 @login_required
+@not_usuario_required
 def eliminar_prenda(id):
     prenda = Prenda.query.get_or_404(id)
     try:

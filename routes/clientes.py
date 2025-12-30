@@ -6,11 +6,13 @@ from models import Cliente, Presupuesto, Factura, Pedido, Comercial, Usuario, Ca
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 from datetime import datetime
+from utils.auth import not_usuario_required
 
 clientes_bp = Blueprint('clientes', __name__)
 
 @clientes_bp.route('/clientes', methods=['GET', 'POST'])
 @login_required
+@not_usuario_required
 def gestion_clientes():
     if request.method == 'POST':
         try:
@@ -144,6 +146,7 @@ def gestion_clientes():
 
 @clientes_bp.route('/clientes/<int:id>')
 @login_required
+@not_usuario_required
 def ficha_cliente(id):
     """Ficha completa del cliente con historial"""
     cliente = Cliente.query.options(
@@ -180,6 +183,7 @@ def ficha_cliente(id):
 
 @clientes_bp.route('/clientes/<int:id>/editar', methods=['GET', 'POST'])
 @login_required
+@not_usuario_required
 def editar_cliente(id):
     """Editar cliente"""
     cliente = Cliente.query.get_or_404(id)
@@ -281,6 +285,7 @@ def editar_cliente(id):
 
 @clientes_bp.route('/clientes/<int:id>/eliminar', methods=['POST'])
 @login_required
+@not_usuario_required
 def eliminar_cliente(id):
     cliente = Cliente.query.get_or_404(id)
     try:
@@ -294,6 +299,7 @@ def eliminar_cliente(id):
 
 @clientes_bp.route('/clientes/<int:cliente_id>/direcciones-envio', methods=['POST'])
 @login_required
+@not_usuario_required
 def gestionar_direcciones_envio(cliente_id):
     """Gestionar direcciones de envío de un cliente (añadir, editar, eliminar)"""
     cliente = Cliente.query.get_or_404(cliente_id)
@@ -357,6 +363,7 @@ def gestionar_direcciones_envio(cliente_id):
 
 @clientes_bp.route('/clientes/categorias', methods=['GET', 'POST'])
 @login_required
+@not_usuario_required
 def gestion_categorias():
     """Gestión de categorías de clientes"""
     if request.method == 'POST':

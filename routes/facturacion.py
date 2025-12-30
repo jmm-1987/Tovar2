@@ -14,11 +14,13 @@ from extensions import db
 from models import Factura, LineaFactura, Cliente, Presupuesto, LineaPresupuesto
 from utils.numeracion import obtener_siguiente_numero_factura
 from playwright.sync_api import sync_playwright
+from utils.auth import not_usuario_required
 
 facturacion_bp = Blueprint('facturacion', __name__)
 
 @facturacion_bp.route('/facturacion')
 @login_required
+@not_usuario_required
 def facturacion():
     """Página de facturación con prefacturas (pendientes) y facturas (formalizadas)"""
     # Tipo de vista: 'pendientes' o 'formalizadas'
@@ -113,6 +115,7 @@ def facturacion():
 
 @facturacion_bp.route('/facturacion/solicitud/<int:presupuesto_id>')
 @login_required
+@not_usuario_required
 def ver_factura_solicitud(presupuesto_id):
     """Vista detallada de una factura para introducir importes desde una solicitud"""
     presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
@@ -124,6 +127,7 @@ def ver_factura_solicitud(presupuesto_id):
 
 @facturacion_bp.route('/facturacion/solicitud/<int:presupuesto_id>/formalizar', methods=['POST'])
 @login_required
+@not_usuario_required
 def formalizar_factura_solicitud(presupuesto_id):
     """Formalizar una factura desde una solicitud y enviarla a Verifactu"""
     try:
@@ -338,6 +342,7 @@ def formalizar_factura_solicitud(presupuesto_id):
 
 @facturacion_bp.route('/facturacion/<int:pedido_id>')
 @login_required
+@not_usuario_required
 def ver_factura(pedido_id):
     """Vista detallada de una factura para introducir importes"""
     pedido = Pedido.query.get_or_404(pedido_id)
@@ -349,6 +354,7 @@ def ver_factura(pedido_id):
 
 @facturacion_bp.route('/facturacion/<int:pedido_id>/formalizar', methods=['POST'])
 @login_required
+@not_usuario_required
 def formalizar_factura(pedido_id):
     """Formalizar una factura y enviarla a Verifactu"""
     try:
@@ -544,6 +550,7 @@ def formalizar_factura(pedido_id):
 
 @facturacion_bp.route('/facturacion/nueva', methods=['GET', 'POST'])
 @login_required
+@not_usuario_required
 def nueva_factura():
     """Crear una factura directamente sin pedido"""
     if request.method == 'POST':
@@ -904,6 +911,7 @@ def preparar_datos_imprimir_factura(factura_id):
 
 @facturacion_bp.route('/facturacion/factura/<int:factura_id>/imprimir')
 @login_required
+@not_usuario_required
 def imprimir_factura(factura_id):
     """Vista de impresión de una factura formalizada"""
     datos = preparar_datos_imprimir_factura(factura_id)
@@ -962,6 +970,7 @@ def preparar_datos_imprimir_albaran(factura_id=None, pedido_id=None):
 
 @facturacion_bp.route('/facturacion/factura/<int:factura_id>/descargar-pdf')
 @login_required
+@not_usuario_required
 def descargar_pdf_factura(factura_id):
     """Descargar factura en formato PDF (con precios)"""
     try:
@@ -1038,6 +1047,7 @@ def descargar_pdf_factura(factura_id):
 
 @facturacion_bp.route('/facturacion/factura/<int:factura_id>/descargar-albaran')
 @login_required
+@not_usuario_required
 def descargar_pdf_albaran_factura(factura_id):
     """Descargar albarán en formato PDF desde una factura formalizada"""
     try:
@@ -1113,6 +1123,7 @@ def descargar_pdf_albaran_factura(factura_id):
 
 @facturacion_bp.route('/facturacion/pedido/<int:pedido_id>/descargar-albaran')
 @login_required
+@not_usuario_required
 def descargar_pdf_albaran_pedido(pedido_id):
     """Descargar albarán en formato PDF desde un pedido (prefactura)"""
     try:

@@ -5,6 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from extensions import db
 from models import Proveedor, FacturaProveedor, Empleado, Nomina
+from utils.auth import not_usuario_required
 
 gastos_bp = Blueprint('gastos', __name__)
 
@@ -12,6 +13,7 @@ gastos_bp = Blueprint('gastos', __name__)
 
 @gastos_bp.route('/gastos/proveedores')
 @login_required
+@not_usuario_required
 def listado_proveedores():
     """Listado de proveedores"""
     proveedores = Proveedor.query.order_by(Proveedor.nombre).all()
@@ -19,6 +21,7 @@ def listado_proveedores():
 
 @gastos_bp.route('/gastos/proveedores/nuevo', methods=['GET', 'POST'])
 @login_required
+@not_usuario_required
 def nuevo_proveedor():
     """Crear nuevo proveedor"""
     if request.method == 'POST':
@@ -64,6 +67,7 @@ def nuevo_proveedor():
 
 @gastos_bp.route('/gastos/proveedores/<int:proveedor_id>/editar', methods=['GET', 'POST'])
 @login_required
+@not_usuario_required
 def editar_proveedor(proveedor_id):
     """Editar proveedor existente"""
     proveedor = Proveedor.query.get_or_404(proveedor_id)
@@ -87,6 +91,7 @@ def editar_proveedor(proveedor_id):
 
 @gastos_bp.route('/gastos/proveedores/<int:proveedor_id>/toggle', methods=['POST'])
 @login_required
+@not_usuario_required
 def toggle_proveedor(proveedor_id):
     """Activar/Desactivar proveedor"""
     proveedor = Proveedor.query.get_or_404(proveedor_id)
@@ -105,6 +110,7 @@ def toggle_proveedor(proveedor_id):
 
 @gastos_bp.route('/gastos/facturas-proveedor')
 @login_required
+@not_usuario_required
 def listado_facturas_proveedor():
     """Listado de facturas de proveedor"""
     query = FacturaProveedor.query
@@ -147,6 +153,7 @@ def listado_facturas_proveedor():
 
 @gastos_bp.route('/gastos/facturas-proveedor/nueva', methods=['GET', 'POST'])
 @login_required
+@not_usuario_required
 def nueva_factura_proveedor():
     """Crear nueva factura de proveedor"""
     if request.method == 'POST':
@@ -193,6 +200,7 @@ def nueva_factura_proveedor():
 
 @gastos_bp.route('/gastos/facturas-proveedor/<int:factura_id>/editar', methods=['GET', 'POST'])
 @login_required
+@not_usuario_required
 def editar_factura_proveedor(factura_id):
     """Editar factura de proveedor existente"""
     factura = FacturaProveedor.query.get_or_404(factura_id)
@@ -231,6 +239,7 @@ def editar_factura_proveedor(factura_id):
 
 @gastos_bp.route('/gastos/facturas-proveedor/<int:factura_id>/eliminar', methods=['POST'])
 @login_required
+@not_usuario_required
 def eliminar_factura_proveedor(factura_id):
     """Eliminar factura de proveedor"""
     factura = FacturaProveedor.query.get_or_404(factura_id)
@@ -248,6 +257,7 @@ def eliminar_factura_proveedor(factura_id):
 
 @gastos_bp.route('/gastos/empleados')
 @login_required
+@not_usuario_required
 def listado_empleados():
     """Listado de empleados"""
     empleados = Empleado.query.order_by(Empleado.nombre).all()
@@ -255,6 +265,7 @@ def listado_empleados():
 
 @gastos_bp.route('/gastos/empleados/nuevo', methods=['GET', 'POST'])
 @login_required
+@not_usuario_required
 def nuevo_empleado():
     """Crear nuevo empleado"""
     if request.method == 'POST':
@@ -298,6 +309,7 @@ def nuevo_empleado():
 
 @gastos_bp.route('/gastos/empleados/<int:empleado_id>/editar', methods=['GET', 'POST'])
 @login_required
+@not_usuario_required
 def editar_empleado(empleado_id):
     """Editar empleado existente"""
     empleado = Empleado.query.get_or_404(empleado_id)
@@ -319,6 +331,7 @@ def editar_empleado(empleado_id):
 
 @gastos_bp.route('/gastos/empleados/<int:empleado_id>/eliminar', methods=['POST'])
 @login_required
+@not_usuario_required
 def eliminar_empleado(empleado_id):
     """Eliminar empleado"""
     empleado = Empleado.query.get_or_404(empleado_id)
@@ -341,6 +354,7 @@ def eliminar_empleado(empleado_id):
 
 @gastos_bp.route('/gastos/nominas')
 @login_required
+@not_usuario_required
 def listado_nominas():
     """Listado de nóminas"""
     query = Nomina.query
@@ -401,6 +415,7 @@ def listado_nominas():
 
 @gastos_bp.route('/gastos/nominas/nueva', methods=['GET', 'POST'])
 @login_required
+@not_usuario_required
 def nueva_nomina():
     """Crear nueva nómina"""
     if request.method == 'POST':
@@ -427,6 +442,7 @@ def nueva_nomina():
 
 @gastos_bp.route('/gastos/nominas/<int:nomina_id>/editar', methods=['GET', 'POST'])
 @login_required
+@not_usuario_required
 def editar_nomina(nomina_id):
     """Editar nómina existente"""
     nomina = Nomina.query.get_or_404(nomina_id)
@@ -450,6 +466,7 @@ def editar_nomina(nomina_id):
 
 @gastos_bp.route('/gastos/nominas/<int:nomina_id>/eliminar', methods=['POST'])
 @login_required
+@not_usuario_required
 def eliminar_nomina(nomina_id):
     """Eliminar nómina"""
     nomina = Nomina.query.get_or_404(nomina_id)

@@ -6,17 +6,20 @@ from decimal import Decimal
 from extensions import db
 from models import Factura, FacturaProveedor, Nomina, Empleado, LineaFactura
 from sqlalchemy import func, extract
+from utils.auth import not_usuario_required
 
 informes_bp = Blueprint('informes', __name__)
 
 @informes_bp.route('/informes')
 @login_required
+@not_usuario_required
 def index():
     """Página principal de informes"""
     return render_template('informes/index.html')
 
 @informes_bp.route('/informes/facturacion-emitida')
 @login_required
+@not_usuario_required
 def facturacion_emitida():
     """Informe de facturación emitida con filtros por mes o trimestre"""
     # Obtener parámetros de filtro
@@ -68,6 +71,7 @@ def facturacion_emitida():
 
 @informes_bp.route('/informes/facturacion-soportada')
 @login_required
+@not_usuario_required
 def facturacion_soportada():
     """Informe de facturación soportada (facturas de proveedor) con filtros por mes o trimestre"""
     # Obtener parámetros de filtro
@@ -109,6 +113,7 @@ def facturacion_soportada():
 
 @informes_bp.route('/informes/nominas')
 @login_required
+@not_usuario_required
 def nominas():
     """Informe de nóminas por empleado y global"""
     # Obtener parámetros de filtro
@@ -147,6 +152,7 @@ def nominas():
 
 @informes_bp.route('/informes/iva')
 @login_required
+@not_usuario_required
 def iva():
     """Informe de IVA: contrastar IVA repercutido vs IVA soportado"""
     # Obtener parámetros de filtro
@@ -217,6 +223,7 @@ def iva():
 
 @informes_bp.route('/informes/facturacion-emitida/detalle')
 @login_required
+@not_usuario_required
 def facturacion_emitida_detalle():
     """Detalle de facturación emitida con listado completo de facturas"""
     # Obtener parámetros de filtro (mismos que en el informe principal)
@@ -250,6 +257,7 @@ def facturacion_emitida_detalle():
 
 @informes_bp.route('/informes/facturacion-soportada/detalle')
 @login_required
+@not_usuario_required
 def facturacion_soportada_detalle():
     """Detalle de facturación soportada con listado completo de facturas de proveedor"""
     # Obtener parámetros de filtro
@@ -283,6 +291,7 @@ def facturacion_soportada_detalle():
 
 @informes_bp.route('/informes/nominas/detalle')
 @login_required
+@not_usuario_required
 def nominas_detalle():
     """Detalle de nóminas con listado completo"""
     # Obtener parámetros de filtro
@@ -310,6 +319,7 @@ def nominas_detalle():
 
 @informes_bp.route('/informes/iva/detalle')
 @login_required
+@not_usuario_required
 def iva_detalle():
     """Detalle de IVA con listado completo de facturas emitidas y de proveedor"""
     # Obtener parámetros de filtro

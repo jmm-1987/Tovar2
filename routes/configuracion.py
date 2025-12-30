@@ -3,7 +3,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 from extensions import db
 from models import Usuario, Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, PlantillaEmail, Proveedor, Configuracion, DiaFestivo
-from utils.auth import supervisor_required
+from utils.auth import supervisor_required, not_usuario_required
 from datetime import datetime
 import io
 import csv

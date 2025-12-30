@@ -14,11 +14,13 @@ from models import Ticket, LineaTicket, ClienteTienda
 from flask import jsonify
 from utils.numeracion import obtener_siguiente_numero_ticket
 from playwright.sync_api import sync_playwright
+from utils.auth import not_usuario_required
 
 tickets_bp = Blueprint('tickets', __name__)
 
 @tickets_bp.route('/tickets/clientes-tienda')
 @login_required
+@not_usuario_required
 def listado_clientes_tienda():
     """Listado de clientes de tienda"""
     clientes = ClienteTienda.query.order_by(ClienteTienda.nombre).all()
@@ -26,6 +28,7 @@ def listado_clientes_tienda():
 
 @tickets_bp.route('/tickets')
 @login_required
+@not_usuario_required
 def listado_tickets():
     """Listado de tickets con opciones de ver y eliminar"""
     query = Ticket.query
@@ -68,6 +71,7 @@ def listado_tickets():
 
 @tickets_bp.route('/tickets/nuevo', methods=['GET', 'POST'])
 @login_required
+@not_usuario_required
 def nuevo_ticket():
     """Crear nuevo ticket (factura simplificada)"""
     if request.method == 'POST':
@@ -271,6 +275,7 @@ def nuevo_ticket():
 
 @tickets_bp.route('/tickets/<int:ticket_id>')
 @login_required
+@not_usuario_required
 def ver_ticket(ticket_id):
     """Ver detalles de un ticket"""
     ticket = Ticket.query.get_or_404(ticket_id)
@@ -327,6 +332,7 @@ def preparar_datos_imprimir_ticket(ticket_id):
 
 @tickets_bp.route('/tickets/<int:ticket_id>/imprimir')
 @login_required
+@not_usuario_required
 def imprimir_ticket(ticket_id):
     """Vista previa del ticket para imprimir"""
     datos = preparar_datos_imprimir_ticket(ticket_id)
@@ -334,6 +340,7 @@ def imprimir_ticket(ticket_id):
 
 @tickets_bp.route('/tickets/<int:ticket_id>/descargar-pdf')
 @login_required
+@not_usuario_required
 def descargar_pdf_ticket(ticket_id):
     """Descargar ticket en formato PDF"""
     try:
@@ -408,6 +415,7 @@ def descargar_pdf_ticket(ticket_id):
 
 @tickets_bp.route('/tickets/<int:ticket_id>/eliminar', methods=['POST'])
 @login_required
+@not_usuario_required
 def eliminar_ticket(ticket_id):
     """Eliminar un ticket"""
     try:
@@ -423,6 +431,7 @@ def eliminar_ticket(ticket_id):
 
 @tickets_bp.route('/tickets/cuadre-caja')
 @login_required
+@not_usuario_required
 def cuadre_caja():
     """Cuadre de caja diario - mostrar totales por forma de pago"""
     # Obtener fecha del filtro o usar hoy por defecto
@@ -493,6 +502,7 @@ def cuadre_caja():
 
 @tickets_bp.route('/tickets/<int:ticket_id>/reenviar', methods=['POST'])
 @login_required
+@not_usuario_required
 def reenviar_ticket(ticket_id):
     """Reenviar un ticket a Verifactu"""
     try:

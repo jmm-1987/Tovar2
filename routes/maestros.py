@@ -3,11 +3,13 @@ from flask import Blueprint, render_template
 from flask_login import login_required
 from extensions import db
 from models import Comercial, Cliente, Prenda, Usuario
+from utils.auth import not_usuario_required
 
 maestros_bp = Blueprint('maestros', __name__)
 
 @maestros_bp.route('/maestros')
 @login_required
+@not_usuario_required
 def maestros():
     """Página índice de maestros con acceso a comerciales, clientes y prendas"""
     # Obtener conteos para mostrar en las tarjetas
