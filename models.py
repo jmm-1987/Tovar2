@@ -328,7 +328,7 @@ class LineaPresupuesto(db.Model):
     
     # Relaciones
     presupuesto_id = db.Column(db.Integer, db.ForeignKey('presupuestos.id'), nullable=False)
-    prenda_id = db.Column(db.Integer, db.ForeignKey('prendas.id'), nullable=False)
+    prenda_id = db.Column(db.Integer, db.ForeignKey('prendas.id'), nullable=True)  # Nullable para permitir texto libre
     
     # Campos específicos de la línea
     nombre = db.Column(db.String(200), nullable=False)  # Mantenido para compatibilidad, no se usa en la UI

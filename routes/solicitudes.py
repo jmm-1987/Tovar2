@@ -178,6 +178,7 @@ def nueva_solicitud():
             
             # Procesar líneas de solicitud (igual que en editar)
             prenda_ids = request.form.getlist('prenda_id[]')
+            prenda_nombres = request.form.getlist('prenda_nombre[]')  # Texto libre del modelo
             nombres = request.form.getlist('nombre[]')
             nombres_mostrar = request.form.getlist('nombre_mostrar[]')
             cargos = request.form.getlist('cargo[]')
@@ -192,17 +193,22 @@ def nueva_solicitud():
             descuentos = request.form.getlist('descuento[]')
             precios_finales = request.form.getlist('precio_final[]')
             
-            print(f"DEBUG: Procesando líneas - prenda_ids: {len(prenda_ids)}, nombres_mostrar: {len(nombres_mostrar)}")
+            # Usar la longitud del array más largo para iterar
+            max_len = max(len(prenda_ids), len(nombres_mostrar), len(cantidades))
             
-            for i in range(len(prenda_ids)):
+            print(f"DEBUG: Procesando líneas - prenda_ids: {len(prenda_ids)}, nombres_mostrar: {len(nombres_mostrar)}, max_len: {max_len}")
+            
+            for i in range(max_len):
                 # Verificar si hay datos para crear la línea
+                prenda_id_val = prenda_ids[i] if i < len(prenda_ids) and prenda_ids[i] else None
+                prenda_nombre_val = prenda_nombres[i] if i < len(prenda_nombres) and prenda_nombres[i] else ''
                 nombre_mostrar_val = nombres_mostrar[i] if i < len(nombres_mostrar) and nombres_mostrar[i] else ''
                 nombre_val = nombres[i] if i < len(nombres) and nombres[i] else ''
                 
-                print(f"DEBUG: Línea {i} - prenda_id: {prenda_ids[i]}, nombre_mostrar: '{nombre_mostrar_val}', nombre: '{nombre_val}'")
+                print(f"DEBUG: Línea {i} - prenda_id: {prenda_id_val}, prenda_nombre: '{prenda_nombre_val}', nombre_mostrar: '{nombre_mostrar_val}', nombre: '{nombre_val}'")
                 
-                # Crear línea si tiene prenda_id y algún nombre
-                if prenda_ids[i] and (nombre_mostrar_val or nombre_val):
+                # Crear línea si tiene nombre_mostrar (prenda_id puede ser None para texto libre)
+                if nombre_mostrar_val or nombre_val:
                     precio_unitario = None
                     if i < len(precios_unitarios) and precios_unitarios[i]:
                         try:
@@ -240,9 +246,17 @@ def nueva_solicitud():
                     descuento_val = float(descuento) if descuento else 0.0
                     precio_final_val = float(precio_final) if precio_final else None
                     
+                    # Convertir prenda_id a int si existe, sino None (texto libre)
+                    prenda_id_final = None
+                    if prenda_id_val:
+                        try:
+                            prenda_id_final = int(prenda_id_val)
+                        except (ValueError, TypeError):
+                            prenda_id_final = None
+                    
                     linea = LineaPresupuesto(
                         presupuesto_id=solicitud.id,
-                        prenda_id=prenda_ids[i],
+                        prenda_id=prenda_id_final,  # Puede ser None para texto libre
                         nombre=nombres[i] if i < len(nombres) else '',  # Mantenido para compatibilidad
                         nombre_mostrar=nombre_mostrar_val,
                         cargo=cargos[i] if i < len(cargos) else '',
@@ -258,7 +272,7 @@ def nueva_solicitud():
                         precio_final=precio_final_val
                     )
                     db.session.add(linea)
-                    print(f"DEBUG: Línea {i} añadida - nombre_mostrar: '{nombre_mostrar_val}', prenda_id: {prenda_ids[i]}")
+                    print(f"DEBUG: Línea {i} añadida - nombre_mostrar: '{nombre_mostrar_val}', prenda_id: {prenda_id_final}")
             
             print(f"DEBUG: Total líneas procesadas: {len([l for l in db.session.new if isinstance(l, LineaPresupuesto)])}")
             
@@ -627,6 +641,7 @@ def editar_solicitud(solicitud_id):
             
             # Crear nuevas líneas (similar a editar_solicitud)
             prenda_ids = request.form.getlist('prenda_id[]')
+            prenda_nombres = request.form.getlist('prenda_nombre[]')  # Texto libre del modelo
             nombres = request.form.getlist('nombre[]')
             nombres_mostrar = request.form.getlist('nombre_mostrar[]')
             cargos = request.form.getlist('cargo[]')
@@ -641,8 +656,14 @@ def editar_solicitud(solicitud_id):
             descuentos = request.form.getlist('descuento[]')
             precios_finales = request.form.getlist('precio_final[]')
             
-            for i in range(len(prenda_ids)):
-                if prenda_ids[i] and (nombres_mostrar[i] if i < len(nombres_mostrar) else nombres[i] if i < len(nombres) else ''):
+            max_len = max(len(prenda_ids), len(nombres_mostrar), len(cantidades))
+            
+            for i in range(max_len):
+                prenda_id_val = prenda_ids[i] if i < len(prenda_ids) and prenda_ids[i] else None
+                nombre_mostrar_val = nombres_mostrar[i] if i < len(nombres_mostrar) and nombres_mostrar[i] else ''
+                nombre_val = nombres[i] if i < len(nombres) and nombres[i] else ''
+                
+                if nombre_mostrar_val or nombre_val:
                     precio_unitario = None
                     if i < len(precios_unitarios) and precios_unitarios[i]:
                         try:

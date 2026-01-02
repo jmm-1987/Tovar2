@@ -116,12 +116,13 @@
                 <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 0 0 1200px; width: 1200px;">
                 <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="1" min="1" required placeholder="Unidades *" title="Unidades">
                 <input type="text" name="talla[]" class="linea-campo-compact" placeholder="Talla" title="Talla">
-                <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo">
-                    <option value="">Modelo *</option>
+                <input type="text" name="prenda_nombre[]" class="linea-campo-compact prenda-input" placeholder="Modelo (seleccione o escriba texto libre)" title="Modelo" list="prendas-list" autocomplete="off">
+                <input type="hidden" name="prenda_id[]" class="prenda-id-hidden">
+                <datalist id="prendas-list">
                     {% for prenda in prendas %}
-                    <option value="{{ prenda.id }}">{{ prenda.nombre }}</option>
+                    <option value="{{ prenda.nombre }}" data-id="{{ prenda.id }}">{{ prenda.nombre }}</option>
                     {% endfor %}
-                </select>
+                </datalist>
                 <input type="text" name="color[]" class="linea-campo-compact" placeholder="Color" title="Color">
                 <input type="text" name="forma[]" class="linea-campo-compact" placeholder="Forma" title="Forma" list="formas-list">
                 <select name="sexo[]" class="linea-campo-compact" title="Sexo">
@@ -302,6 +303,12 @@ function agregarLinea() {
     nuevaLinea.querySelectorAll('select').forEach(select => {
         select.selectedIndex = 0;
     });
+    
+    // Limpiar campos de prenda
+    const prendaInputNuevo = nuevaLinea.querySelector('input[name="prenda_nombre[]"]');
+    const prendaIdHiddenNuevo = nuevaLinea.querySelector('input[name="prenda_id[]"].prenda-id-hidden');
+    if (prendaInputNuevo) prendaInputNuevo.value = '';
+    if (prendaIdHiddenNuevo) prendaIdHiddenNuevo.value = '';
     
     // Resetear descuento y precio final
     const descuentoInput = nuevaLinea.querySelector('.descuento-input');
@@ -512,6 +519,58 @@ function duplicarLinea(btn) {
         descuentoInputListener.addEventListener('input', calcularPrecioFinal);
     }
 }
+
+// Manejar input de prenda con datalist
+document.addEventListener('DOMContentLoaded', function() {
+    // Función para sincronizar prenda_id desde prenda_nombre
+    function sincronizarPrendaId(input) {
+        const prendaNombre = input.value.trim();
+        const prendaIdHidden = input.closest('.linea-pedido-campos')?.querySelector('input[name="prenda_id[]"].prenda-id-hidden');
+        if (!prendaIdHidden) return;
+        
+        if (prendaNombre === '') {
+            prendaIdHidden.value = '';
+            return;
+        }
+        
+        // Buscar en el datalist si el nombre coincide con alguna opción
+        const datalist = document.getElementById('prendas-list');
+        if (datalist) {
+            const options = datalist.querySelectorAll('option');
+            for (const option of options) {
+                if (option.value === prendaNombre) {
+                    const prendaId = option.getAttribute('data-id');
+                    if (prendaId) {
+                        prendaIdHidden.value = prendaId;
+                        return;
+                    }
+                }
+            }
+        }
+        
+        // Si no coincide, es texto libre, dejar prenda_id vacío
+        prendaIdHidden.value = '';
+    }
+    
+    // Añadir listeners a todos los inputs de prenda existentes
+    document.querySelectorAll('input[name="prenda_nombre[]"]').forEach(input => {
+        input.addEventListener('input', function() {
+            sincronizarPrendaId(this);
+        });
+        input.addEventListener('change', function() {
+            sincronizarPrendaId(this);
+        });
+        // Inicializar
+        sincronizarPrendaId(input);
+    });
+    
+    // Añadir listeners cuando se añaden nuevas líneas (mediante delegación de eventos)
+    document.addEventListener('input', function(e) {
+        if (e.target && e.target.name === 'prenda_nombre[]') {
+            sincronizarPrendaId(e.target);
+        }
+    });
+});
 
 // Buscador de clientes
 document.addEventListener('DOMContentLoaded', function() {

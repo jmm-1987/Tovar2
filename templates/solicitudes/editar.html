@@ -142,12 +142,13 @@
                     <!-- Orden: nombre_mostrar, unidades, modelo, color, forma, sexo, talla, tejido, precio -->
                     <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" value="{{ linea.nombre_mostrar or '' }}" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 0 0 750px; width: 750px;">
                     <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="{{ linea.cantidad }}" min="1" required placeholder="Unidades *" title="Unidades">
-                    <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo">
-                        <option value="">Modelo *</option>
+                    <input type="text" name="prenda_nombre[]" class="linea-campo-compact prenda-input" value="{% if linea.prenda %}{{ linea.prenda.nombre }}{% endif %}" placeholder="Modelo (seleccione o escriba texto libre)" title="Modelo" list="prendas-list" autocomplete="off">
+                    <input type="hidden" name="prenda_id[]" class="prenda-id-hidden" value="{{ linea.prenda_id or '' }}">
+                    <datalist id="prendas-list">
                         {% for prenda in prendas %}
-                        <option value="{{ prenda.id }}" {% if linea.prenda_id == prenda.id %}selected{% endif %}>{{ prenda.nombre }}</option>
+                        <option value="{{ prenda.nombre }}" data-id="{{ prenda.id }}">{{ prenda.nombre }}</option>
                         {% endfor %}
-                    </select>
+                    </datalist>
                     <input type="text" name="color[]" class="linea-campo-compact" value="{{ linea.color or '' }}" placeholder="Color" title="Color">
                     <input type="text" name="forma[]" class="linea-campo-compact" value="{{ linea.forma or '' }}" placeholder="Forma" title="Forma" list="formas-list">
                     <select name="sexo[]" class="linea-campo-compact" title="Sexo">
@@ -192,12 +193,13 @@
                 <!-- Orden: nombre_mostrar, unidades, modelo, color, forma, sexo, talla, tejido, precio -->
                 <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 0 0 750px; width: 750px;">
                 <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="1" min="1" required placeholder="Unidades *" title="Unidades">
-                <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo">
-                    <option value="">Modelo *</option>
+                <input type="text" name="prenda_nombre[]" class="linea-campo-compact prenda-input" placeholder="Modelo (seleccione o escriba texto libre)" title="Modelo" list="prendas-list" autocomplete="off">
+                <input type="hidden" name="prenda_id[]" class="prenda-id-hidden">
+                <datalist id="prendas-list">
                     {% for prenda in prendas %}
-                    <option value="{{ prenda.id }}">{{ prenda.nombre }}</option>
+                    <option value="{{ prenda.nombre }}" data-id="{{ prenda.id }}">{{ prenda.nombre }}</option>
                     {% endfor %}
-                </select>
+                </datalist>
                 <input type="text" name="color[]" class="linea-campo-compact" placeholder="Color" title="Color">
                 <input type="text" name="forma[]" class="linea-campo-compact" placeholder="Forma" title="Forma" list="formas-list">
                 <select name="sexo[]" class="linea-campo-compact" title="Sexo">
@@ -429,6 +431,12 @@ function agregarLinea() {
         select.selectedIndex = 0;
     });
     
+    // Limpiar campos de prenda
+    const prendaInputNuevo = nuevaLinea.querySelector('input[name="prenda_nombre[]"]');
+    const prendaIdHiddenNuevo = nuevaLinea.querySelector('input[name="prenda_id[]"].prenda-id-hidden');
+    if (prendaInputNuevo) prendaInputNuevo.value = '';
+    if (prendaIdHiddenNuevo) prendaIdHiddenNuevo.value = '';
+    
     // Resetear descuento y precio final
     const descuentoInput = nuevaLinea.querySelector('.descuento-input');
     const precioFinalInput = nuevaLinea.querySelector('.precio-final-input');
@@ -445,6 +453,56 @@ function agregarLinea() {
     if (precioUnitarioInput && descuentoInput && precioFinalInput) {
         precioUnitarioInput.addEventListener('input', calcularPrecioFinal);
         descuentoInput.addEventListener('input', calcularPrecioFinal);
+    }
+    
+    // Añadir listener para sincronizar prenda_id
+    const prendaInputNuevo = nuevaLinea.querySelector('input[name="prenda_nombre[]"]');
+    if (prendaInputNuevo) {
+        prendaInputNuevo.addEventListener('input', function() {
+            const prendaNombre = this.value.trim();
+            const prendaIdHidden = nuevaLinea.querySelector('input[name="prenda_id[]"].prenda-id-hidden');
+            if (!prendaIdHidden) return;
+            
+            if (prendaNombre === '') {
+                prendaIdHidden.value = '';
+                return;
+            }
+            
+            const datalist = document.getElementById('prendas-list');
+            if (datalist) {
+                const options = datalist.querySelectorAll('option');
+                for (const option of options) {
+                    if (option.value === prendaNombre) {
+                        const prendaId = option.getAttribute('data-id');
+                        if (prendaId) {
+                            prendaIdHidden.value = prendaId;
+                            return;
+                        }
+                    }
+                }
+            }
+            prendaIdHidden.value = '';
+        });
+        prendaInputNuevo.addEventListener('change', function() {
+            const prendaNombre = this.value.trim();
+            const prendaIdHidden = nuevaLinea.querySelector('input[name="prenda_id[]"].prenda-id-hidden');
+            if (!prendaIdHidden) return;
+            
+            const datalist = document.getElementById('prendas-list');
+            if (datalist) {
+                const options = datalist.querySelectorAll('option');
+                for (const option of options) {
+                    if (option.value === prendaNombre) {
+                        const prendaId = option.getAttribute('data-id');
+                        if (prendaId) {
+                            prendaIdHidden.value = prendaId;
+                            return;
+                        }
+                    }
+                }
+            }
+            prendaIdHidden.value = '';
+        });
     }
     
     // Resetear botón de personalizar
@@ -470,6 +528,58 @@ function renumerarPrendas() {
         }
     });
 }
+
+// Manejar input de prenda con datalist
+document.addEventListener('DOMContentLoaded', function() {
+    // Función para sincronizar prenda_id desde prenda_nombre
+    function sincronizarPrendaId(input) {
+        const prendaNombre = input.value.trim();
+        const prendaIdHidden = input.closest('.linea-pedido-campos')?.querySelector('input[name="prenda_id[]"].prenda-id-hidden');
+        if (!prendaIdHidden) return;
+        
+        if (prendaNombre === '') {
+            prendaIdHidden.value = '';
+            return;
+        }
+        
+        // Buscar en el datalist si el nombre coincide con alguna opción
+        const datalist = document.getElementById('prendas-list');
+        if (datalist) {
+            const options = datalist.querySelectorAll('option');
+            for (const option of options) {
+                if (option.value === prendaNombre) {
+                    const prendaId = option.getAttribute('data-id');
+                    if (prendaId) {
+                        prendaIdHidden.value = prendaId;
+                        return;
+                    }
+                }
+            }
+        }
+        
+        // Si no coincide, es texto libre, dejar prenda_id vacío
+        prendaIdHidden.value = '';
+    }
+    
+    // Añadir listeners a todos los inputs de prenda existentes
+    document.querySelectorAll('input[name="prenda_nombre[]"]').forEach(input => {
+        input.addEventListener('input', function() {
+            sincronizarPrendaId(this);
+        });
+        input.addEventListener('change', function() {
+            sincronizarPrendaId(this);
+        });
+        // Inicializar
+        sincronizarPrendaId(input);
+    });
+    
+    // Añadir listeners cuando se añaden nuevas líneas (mediante delegación de eventos)
+    document.addEventListener('input', function(e) {
+        if (e.target && e.target.name === 'prenda_nombre[]') {
+            sincronizarPrendaId(e.target);
+        }
+    });
+});
 
 // Función para calcular el precio final con descuento
 function calcularPrecioFinal(event) {
@@ -549,11 +659,13 @@ function duplicarLinea(btn) {
     const container = document.getElementById('prendas-container');
     
     // Obtener valores de los selects originales antes de limpiar
-    const prendaSelectOriginal = lineaRow.querySelector('select[name="prenda_id[]"]');
+    const prendaInputOriginal = lineaRow.querySelector('input[name="prenda_nombre[]"]');
+    const prendaIdHiddenOriginal = lineaRow.querySelector('input[name="prenda_id[]"].prenda-id-hidden');
     const sexoSelectOriginal = lineaRow.querySelector('select[name="sexo[]"]');
     const tejidoSelectOriginal = lineaRow.querySelector('select[name="tejido[]"]');
     
-    const prendaValue = prendaSelectOriginal ? prendaSelectOriginal.value : '';
+    const prendaNombreValue = prendaInputOriginal ? prendaInputOriginal.value : '';
+    const prendaIdValue = prendaIdHiddenOriginal ? prendaIdHiddenOriginal.value : '';
     const sexoValue = sexoSelectOriginal ? sexoSelectOriginal.value : '';
     const tejidoValue = tejidoSelectOriginal ? tejidoSelectOriginal.value : '';
     
@@ -568,13 +680,17 @@ function duplicarLinea(btn) {
         unidadesInput.value = '1';
     }
     
-    // Establecer valores de los selects en la línea duplicada
-    const prendaSelectNuevo = nuevaLinea.querySelector('select[name="prenda_id[]"]');
+    // Establecer valores en la línea duplicada
+    const prendaInputNuevo = nuevaLinea.querySelector('input[name="prenda_nombre[]"]');
+    const prendaIdHiddenNuevo = nuevaLinea.querySelector('input[name="prenda_id[]"].prenda-id-hidden');
     const sexoSelectNuevo = nuevaLinea.querySelector('select[name="sexo[]"]');
     const tejidoSelectNuevo = nuevaLinea.querySelector('select[name="tejido[]"]');
     
-    if (prendaSelectNuevo && prendaValue) {
-        prendaSelectNuevo.value = prendaValue;
+    if (prendaInputNuevo && prendaNombreValue) {
+        prendaInputNuevo.value = prendaNombreValue;
+    }
+    if (prendaIdHiddenNuevo && prendaIdValue) {
+        prendaIdHiddenNuevo.value = prendaIdValue;
     }
     if (sexoSelectNuevo && sexoValue) {
         sexoSelectNuevo.value = sexoValue;
