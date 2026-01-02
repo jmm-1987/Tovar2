@@ -1,19 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}Prendas - Gestión de Pedidos{% endblock %}
+{% block title %}Productos - Gestión de Pedidos{% endblock %}
 
 {% block content %}
-<h2>Gestión de Prendas</h2>
+<h2>Gestión de Productos</h2>
 
 <div style="margin-bottom: 30px;">
-    <h3>Crear Nueva Prenda</h3>
+    <h3>Crear Nuevo Producto</h3>
     <form method="POST" style="max-width: 500px;">
         <div class="form-group">
             <label for="nombre">Nombre del Modelo *</label>
             <input type="text" name="nombre" id="nombre" required placeholder="Ej: Camiseta Básica">
         </div>
         <div class="form-group">
-            <label for="tipo">Tipo de Prenda *</label>
+            <label for="tipo">Tipo de Producto *</label>
             <select name="tipo" id="tipo" required>
                 <option value="">Seleccione un tipo</option>
                 <option value="pantalon">Pantalón</option>
@@ -34,11 +34,11 @@
             <label for="precio_venta">Precio de Venta (€)</label>
             <input type="number" name="precio_venta" id="precio_venta" step="0.01" min="0" value="0" placeholder="0.00">
         </div>
-        <button type="submit" class="btn btn-success">Crear Prenda</button>
+        <button type="submit" class="btn btn-success">Crear Producto</button>
     </form>
 </div>
 
-<h3>Lista de Prendas</h3>
+<h3>Lista de Productos</h3>
 {% if prendas %}
 <table>
     <thead>
@@ -61,7 +61,7 @@
             <td>{{ "%.2f"|format(prenda.precio_venta|float) if prenda.precio_venta else "0.00" }}</td>
             <td>
                 <button onclick="abrirModalEditar({{ prenda.id }}, '{{ prenda.nombre }}', '{{ prenda.tipo }}', {{ "%.2f"|format(prenda.precio_coste|float) if prenda.precio_coste else 0 }}, {{ "%.2f"|format(prenda.precio_venta|float) if prenda.precio_venta else 0 }})" class="btn btn-primary" style="margin-right: 5px;">Editar</button>
-                <form method="POST" action="{{ url_for('prendas.eliminar_prenda', id=prenda.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar esta prenda?');">
+                <form method="POST" action="{{ url_for('prendas.eliminar_prenda', id=prenda.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar este producto?');">
                     <button type="submit" class="btn btn-danger">Eliminar</button>
                 </form>
             </td>
@@ -70,14 +70,14 @@
     </tbody>
 </table>
 {% else %}
-<p>No hay prendas registradas.</p>
+<p>No hay productos registrados.</p>
 {% endif %}
 
-<!-- Modal para editar prenda -->
+<!-- Modal para editar producto -->
 <div id="modalEditarPrenda" class="modal" style="display: none;">
     <div class="modal-content">
         <div class="modal-header">
-            <h3>Editar Prenda</h3>
+            <h3>Editar Producto</h3>
             <span class="close" onclick="cerrarModalEditar()">&times;</span>
         </div>
         <form method="POST" id="formEditarPrenda" class="modal-form" action="">
@@ -87,7 +87,7 @@
                 <input type="text" name="nombre" id="edit_nombre" required placeholder="Ej: Camiseta Básica">
             </div>
             <div class="form-group">
-                <label for="edit_tipo">Tipo de Prenda *</label>
+                <label for="edit_tipo">Tipo de Producto *</label>
                 <select name="tipo" id="edit_tipo" required>
                     <option value="">Seleccione un tipo</option>
                     <option value="pantalon">Pantalón</option>

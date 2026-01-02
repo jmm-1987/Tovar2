@@ -20,6 +20,7 @@ solicitudes_bp = Blueprint('solicitudes', __name__)
 # Estados unificados
 ESTADOS_SOLICITUD = [
     'presupuesto',
+    'rechazado',
     'aceptado',
     'mockup',
     'en preparacion',
@@ -746,7 +747,6 @@ def crear_cliente_ajax():
             telefono=request.form.get('telefono', ''),
             movil=request.form.get('movil', ''),
             email=request.form.get('email', ''),
-            personas_contacto=request.form.get('personas_contacto', ''),
             anotaciones=request.form.get('anotaciones', ''),
             usuario_web=request.form.get('usuario_web', '').strip() or None,
             fecha_alta=fecha_alta,

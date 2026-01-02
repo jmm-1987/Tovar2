@@ -2,7 +2,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required
 from extensions import db
-from models import Cliente, Presupuesto, Factura, Pedido, Comercial, Usuario, CategoriaCliente, DireccionEnvio
+from models import Cliente, Presupuesto, Factura, Pedido, Comercial, Usuario, CategoriaCliente, DireccionEnvio, PersonaContacto
 from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 from datetime import datetime
@@ -47,8 +47,8 @@ def gestion_clientes():
                 email_general=request.form.get('email_general', ''),
                 email_comunicaciones=request.form.get('email_comunicaciones', ''),
                 categoria_id=categoria_id,
-                personas_contacto=request.form.get('personas_contacto', ''),
                 anotaciones=request.form.get('anotaciones', ''),
+                numero_cuenta=request.form.get('numero_cuenta', '').strip(),
                 usuario_web=request.form.get('usuario_web', '').strip() or None,
                 fecha_alta=fecha_alta,
                 comercial_id=comercial_id
@@ -85,6 +85,26 @@ def gestion_clientes():
                             pais=pais
                         )
                         db.session.add(direccion_envio)
+            
+            # Procesar personas de contacto
+            personas_data = request.form.getlist('personas_contacto[]')
+            if personas_data:
+                for i, persona_data in enumerate(personas_data):
+                    if persona_data.strip():  # Si hay datos
+                        nombre = request.form.get(f'personas_contacto_nombre_{i}', '').strip()
+                        cargo = request.form.get(f'personas_contacto_cargo_{i}', '').strip()
+                        movil = request.form.get(f'personas_contacto_movil_{i}', '').strip()
+                        email = request.form.get(f'personas_contacto_email_{i}', '').strip()
+                        
+                        if nombre:  # Solo crear si tiene nombre
+                            persona_contacto = PersonaContacto(
+                                cliente_id=cliente.id,
+                                nombre=nombre,
+                                cargo=cargo,
+                                movil=movil,
+                                email=email
+                            )
+                            db.session.add(persona_contacto)
             
             db.session.commit()
             flash('Cliente creado correctamente', 'success')
@@ -208,8 +228,8 @@ def editar_cliente(id):
             categoria_id = request.form.get('categoria_id', '').strip()
             cliente.categoria_id = int(categoria_id) if categoria_id else None
             
-            cliente.personas_contacto = request.form.get('personas_contacto', '')
             cliente.anotaciones = request.form.get('anotaciones', '')
+            cliente.numero_cuenta = request.form.get('numero_cuenta', '').strip()
             
             # Procesar comercial asignado
             comercial_id = request.form.get('comercial_id', '').strip()
@@ -353,6 +373,63 @@ def gestionar_direcciones_envio(cliente_id):
             db.session.delete(direccion)
             db.session.commit()
             flash('Dirección de envío eliminada correctamente', 'success')
+        
+        return redirect(url_for('clientes.ficha_cliente', id=cliente_id))
+    
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error: {str(e)}', 'error')
+        return redirect(url_for('clientes.ficha_cliente', id=cliente_id))
+
+@clientes_bp.route('/clientes/<int:cliente_id>/personas-contacto', methods=['POST'])
+@login_required
+@not_usuario_required
+def gestionar_personas_contacto(cliente_id):
+    """Gestionar personas de contacto de un cliente (añadir, editar, eliminar)"""
+    cliente = Cliente.query.get_or_404(cliente_id)
+    accion = request.form.get('accion')
+    
+    try:
+        if accion == 'crear':
+            nombre = request.form.get('nombre', '').strip()
+            cargo = request.form.get('cargo', '').strip()
+            movil = request.form.get('movil', '').strip()
+            email = request.form.get('email', '').strip()
+            
+            if not nombre:
+                flash('El nombre es obligatorio', 'error')
+                return redirect(url_for('clientes.ficha_cliente', id=cliente_id))
+            
+            nueva_persona = PersonaContacto(
+                cliente_id=cliente.id,
+                nombre=nombre,
+                cargo=cargo,
+                movil=movil,
+                email=email
+            )
+            db.session.add(nueva_persona)
+            db.session.commit()
+            flash('Persona de contacto creada correctamente', 'success')
+        
+        elif accion == 'editar':
+            persona_id = request.form.get('persona_id')
+            persona = PersonaContacto.query.filter_by(id=persona_id, cliente_id=cliente.id).first_or_404()
+            
+            persona.nombre = request.form.get('nombre', '').strip()
+            persona.cargo = request.form.get('cargo', '').strip()
+            persona.movil = request.form.get('movil', '').strip()
+            persona.email = request.form.get('email', '').strip()
+            
+            db.session.commit()
+            flash('Persona de contacto actualizada correctamente', 'success')
+        
+        elif accion == 'eliminar':
+            persona_id = request.form.get('persona_id')
+            persona = PersonaContacto.query.filter_by(id=persona_id, cliente_id=cliente.id).first_or_404()
+            
+            db.session.delete(persona)
+            db.session.commit()
+            flash('Persona de contacto eliminada correctamente', 'success')
         
         return redirect(url_for('clientes.ficha_cliente', id=cliente_id))
     

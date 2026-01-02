@@ -88,6 +88,13 @@
                 </span>
             </div>
             {% endif %}
+            
+            {% if solicitud.estado == 'mockup' and solicitud.subestado and solicitud.mockup_encargado_a %}
+            <div class="pedido-info-item">
+                <strong>Encargado a:</strong>
+                <span style="font-weight: 500; color: #2c3e50;">{{ solicitud.mockup_encargado_a.usuario }}</span>
+            </div>
+            {% endif %}
         </div>
         
         <div class="pedido-card-actions">

@@ -33,7 +33,8 @@ def index():
             query = query.filter(Presupuesto.estado == 'en preparacion')
         
         solicitudes = query.options(
-            joinedload(Presupuesto.cliente)
+            joinedload(Presupuesto.cliente),
+            joinedload(Presupuesto.mockup_encargado_a)
         ).all()
         
         # Calcular fecha objetivo de entrega (20 días desde aceptación) y clasificar

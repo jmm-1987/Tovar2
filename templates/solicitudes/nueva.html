@@ -107,7 +107,7 @@
         <textarea name="seguimiento" id="seguimiento" rows="3" placeholder="Escribe aquí las actualizaciones y seguimiento del presupuesto..."></textarea>
     </div>
 
-    <h3>Prendas del Presupuesto</h3>
+    <h3>Productos del Presupuesto</h3>
     <div id="prendas-container">
         <div class="linea-pedido-row">
             <div class="linea-pedido-numero">#1</div>
@@ -674,12 +674,12 @@ window.onclick = function(event) {
                 <h4>Información Principal</h4>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="nombre_cliente_modal">Nombre *</label>
-                        <input type="text" name="nombre" id="nombre_cliente_modal" required placeholder="Nombre o razón social">
+                        <label for="nombre_cliente_modal">Nombre Fiscal *</label>
+                        <input type="text" name="nombre" id="nombre_cliente_modal" required placeholder="Razón social o nombre fiscal">
                     </div>
                     <div class="form-group">
-                        <label for="alias_cliente_modal">Alias</label>
-                        <input type="text" name="alias" id="alias_cliente_modal" placeholder="Alias">
+                        <label for="alias_cliente_modal">Nombre Comercial</label>
+                        <input type="text" name="alias" id="alias_cliente_modal" placeholder="Nombre comercial">
                     </div>
                 </div>
                 <div class="form-row">
@@ -735,8 +735,6 @@ window.onclick = function(event) {
                     <input type="email" name="email" id="email_cliente_modal" placeholder="email@ejemplo.com">
                 </div>
                 <div class="form-group">
-                    <label for="personas_contacto_cliente_modal">Personas de Contacto</label>
-                    <textarea name="personas_contacto" id="personas_contacto_cliente_modal" rows="2" placeholder="Nombre, teléfono, email"></textarea>
                 </div>
             </div>
 
@@ -744,7 +742,7 @@ window.onclick = function(event) {
                 <h4>Dirección</h4>
                 <div class="form-group">
                     <label for="direccion_cliente_modal">Dirección</label>
-                    <textarea name="direccion" id="direccion_cliente_modal" rows="2" placeholder="Dirección completa"></textarea>
+                    <input type="text" name="direccion" id="direccion_cliente_modal" placeholder="Dirección completa">
                 </div>
                 <div class="form-row">
                     <div class="form-group">

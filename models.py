@@ -74,6 +74,7 @@ class Cliente(db.Model, UserMixin):
     categoria_id = db.Column(db.Integer, db.ForeignKey('categorias_cliente.id'), nullable=True)  # Nueva categoría desde tabla
     personas_contacto = db.Column(db.Text)  # Personas de contacto
     anotaciones = db.Column(db.Text)  # Anotaciones adicionales
+    numero_cuenta = db.Column(db.String(29))  # Número de cuenta bancaria (24 dígitos con guiones: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX)
     
     # Campos de autenticación web
     usuario_web = db.Column(db.String(80), unique=True, nullable=True)  # Usuario para acceso web
@@ -94,6 +95,8 @@ class Cliente(db.Model, UserMixin):
     presupuestos = db.relationship('Presupuesto', backref='cliente', lazy=True)
     # Relación con direcciones de envío
     direcciones_envio = db.relationship('DireccionEnvio', backref='cliente', lazy=True, cascade='all, delete-orphan')
+    # Relación con personas de contacto
+    personas_contacto_list = db.relationship('PersonaContacto', backref='cliente', lazy=True, cascade='all, delete-orphan')
     
     def set_password(self, password):
         """Establecer contraseña con hash"""
@@ -244,7 +247,7 @@ class Presupuesto(db.Model):
     tipo_pedido = db.Column(db.String(50), nullable=False)  # confeccion, bordado, serigrafia, sublimacion, varios
     
     # Estado unificado de la solicitud (presupuesto/pedido)
-    estado = db.Column(db.String(50), nullable=False, default='presupuesto')  # presupuesto, aceptado, mockup, en preparacion, terminado, entregado al cliente
+    estado = db.Column(db.String(50), nullable=False, default='presupuesto')  # presupuesto, rechazado, aceptado, mockup, en preparacion, terminado, entregado al cliente
     
     # Subestado para estados que tienen subestados
     subestado = db.Column(db.String(50), nullable=True)  # Para mockup: encargado a, REVISIÓN CLIENTE, CAMBIOS 1, CAMBIOS 2, RECHAZADO, aceptado. Para en preparacion: hacer marcada, imprimir, calandra, corte, confeccion, sublimacion, bordado
@@ -701,6 +704,23 @@ class DireccionEnvio(db.Model):
     
     def __repr__(self):
         return f'<DireccionEnvio {self.nombre} - {self.cliente.nombre if self.cliente else "Sin cliente"}>'
+
+class PersonaContacto(db.Model):
+    """Personas de contacto para clientes"""
+    __tablename__ = 'personas_contacto'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False)
+    nombre = db.Column(db.String(200), nullable=False)
+    cargo = db.Column(db.String(200))
+    movil = db.Column(db.String(50))
+    email = db.Column(db.String(100))
+    
+    # Timestamp
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<PersonaContacto {self.nombre} - {self.cliente.nombre if self.cliente else "Sin cliente"}>'
 
 class DiaFestivo(db.Model):
     """Días festivos que no se tienen en cuenta para cálculos de fechas"""

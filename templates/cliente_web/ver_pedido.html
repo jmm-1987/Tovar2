@@ -38,7 +38,7 @@
 </div>
 
 <div class="card">
-    <h2>Prendas del Pedido</h2>
+    <h2>Productos del Pedido</h2>
     {% if pedido.lineas %}
     <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
         <thead>
@@ -67,7 +67,7 @@
         </tbody>
     </table>
     {% else %}
-    <p style="color: #666; margin-top: 20px;">No hay prendas en este pedido.</p>
+    <p style="color: #666; margin-top: 20px;">No hay productos en este pedido.</p>
     {% endif %}
 </div>
 {% endblock %}

@@ -21,12 +21,12 @@
             <h3>Información Principal</h3>
             <div class="info-grid">
                 <div class="info-item">
-                    <strong>Nombre:</strong>
+                    <strong>Nombre Fiscal:</strong>
                     <span>{{ cliente.nombre }}</span>
                 </div>
                 {% if cliente.alias %}
                 <div class="info-item">
-                    <strong>Alias:</strong>
+                    <strong>Nombre Comercial:</strong>
                     <span>{{ cliente.alias }}</span>
                 </div>
                 {% endif %}
@@ -58,6 +58,12 @@
                 <div class="info-item">
                     <strong>Comercial Asignado:</strong>
                     <span>{{ cliente.comercial.nombre }}</span>
+                </div>
+                {% endif %}
+                {% if cliente.numero_cuenta %}
+                <div class="info-item">
+                    <strong>Número de Cuenta:</strong>
+                    <span>{{ cliente.numero_cuenta }}</span>
                 </div>
                 {% endif %}
             </div>
@@ -139,17 +145,41 @@
             {% endif %}
         </div>
 
+        <!-- Personas de Contacto -->
+        <div class="ficha-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 style="margin: 0;">Personas de Contacto</h3>
+                <button onclick="abrirModalPersonasContacto()" class="btn btn-sm btn-primary">➕ Gestionar Personas</button>
+            </div>
+            {% if cliente.personas_contacto_list %}
+            <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                <thead>
+                    <tr style="background: #f8f9fa; border-bottom: 2px solid #e0e0e0;">
+                        <th style="padding: 8px; text-align: left; font-size: 12px; color: #555;">Nombre</th>
+                        <th style="padding: 8px; text-align: left; font-size: 12px; color: #555;">Cargo</th>
+                        <th style="padding: 8px; text-align: left; font-size: 12px; color: #555;">Móvil</th>
+                        <th style="padding: 8px; text-align: left; font-size: 12px; color: #555;">Email</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for persona in cliente.personas_contacto_list %}
+                    <tr style="border-bottom: 1px solid #e0e0e0;">
+                        <td style="padding: 8px; font-size: 13px;">{{ persona.nombre }}</td>
+                        <td style="padding: 8px; font-size: 13px;">{{ persona.cargo or '-' }}</td>
+                        <td style="padding: 8px; font-size: 13px;">{{ persona.movil or '-' }}</td>
+                        <td style="padding: 8px; font-size: 13px;">{{ persona.email or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color: #999; font-style: italic; margin: 0;">No hay personas de contacto registradas.</p>
+            {% endif %}
+        </div>
+
         <!-- Anotaciones -->
         <div class="ficha-section">
             <h3>Anotaciones</h3>
-            {% if cliente.personas_contacto %}
-            <div style="margin-bottom: 12px;">
-                <strong style="color: #555; font-size: 12px; font-weight: 600; display: block; margin-bottom: 5px;">Personas de Contacto:</strong>
-                <div class="info-text-enmarcado">
-                    {{ cliente.personas_contacto | nl2br }}
-                </div>
-            </div>
-            {% endif %}
             {% if cliente.anotaciones %}
             <div class="info-text-enmarcado">
                 {{ cliente.anotaciones | nl2br }}
@@ -289,7 +319,7 @@
 .ficha-cliente-container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 15px;
+    padding: 15px 4px;
 }
 
 .ficha-header {
@@ -613,9 +643,12 @@ function cancelarEdicion() {
 
 // Cerrar modal al hacer clic fuera
 window.onclick = function(event) {
-    const modal = document.getElementById('modalDirecciones');
-    if (event.target == modal) {
+    const modalDirecciones = document.getElementById('modalDirecciones');
+    const modalPersonas = document.getElementById('modalPersonasContacto');
+    if (event.target == modalDirecciones) {
         cerrarModalDirecciones();
+    } else if (event.target == modalPersonas) {
+        cerrarModalPersonasContacto();
     }
 }
 
@@ -623,8 +656,140 @@ window.onclick = function(event) {
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
         cerrarModalDirecciones();
+        cerrarModalPersonasContacto();
     }
 });
+</script>
+
+<!-- Modal para gestionar personas de contacto -->
+<div id="modalPersonasContacto" class="modal">
+    <div class="modal-content" style="max-width: 800px;">
+        <div class="modal-header">
+            <h3>Gestionar Personas de Contacto</h3>
+            <span class="close" onclick="cerrarModalPersonasContacto()">&times;</span>
+        </div>
+        <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+            <div id="personas-lista">
+                {% for persona in cliente.personas_contacto_list %}
+                <div class="persona-item" data-id="{{ persona.id }}" style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 5px; background: #f9f9f9;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h4 style="margin: 0; font-size: 14px; color: #555;">{{ persona.nombre }}</h4>
+                        <div>
+                            <button onclick="editarPersonaContacto({{ persona.id }})" class="btn btn-sm btn-primary" style="margin-right: 5px;">✏️ Editar</button>
+                            <form method="POST" action="{{ url_for('clientes.gestionar_personas_contacto', cliente_id=cliente.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar esta persona de contacto?');">
+                                <input type="hidden" name="accion" value="eliminar">
+                                <input type="hidden" name="persona_id" value="{{ persona.id }}">
+                                <button type="submit" class="btn btn-sm btn-danger">🗑️ Eliminar</button>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <strong>Cargo:</strong>
+                            <span>{{ persona.cargo or '-' }}</span>
+                        </div>
+                        <div class="info-item">
+                            <strong>Móvil:</strong>
+                            <span>{{ persona.movil or '-' }}</span>
+                        </div>
+                        <div class="info-item full-width">
+                            <strong>Email:</strong>
+                            <span>{{ persona.email or '-' }}</span>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Formulario para añadir/editar persona -->
+            <div id="form-persona" style="border-top: 2px solid #e0e0e0; padding-top: 20px; margin-top: 20px;">
+                <h4 id="form-titulo-persona" style="margin-bottom: 15px;">Añadir Nueva Persona de Contacto</h4>
+                <form method="POST" action="{{ url_for('clientes.gestionar_personas_contacto', cliente_id=cliente.id) }}" id="formPersonaContacto">
+                    <input type="hidden" name="accion" id="accion_form_persona" value="crear">
+                    <input type="hidden" name="persona_id" id="persona_id_form">
+                    
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="nombre_persona">Nombre *</label>
+                        <input type="text" name="nombre" id="nombre_persona" required placeholder="Nombre completo" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                        <div class="form-group">
+                            <label for="cargo_persona">Cargo</label>
+                            <input type="text" name="cargo" id="cargo_persona" placeholder="Cargo o puesto" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        <div class="form-group">
+                            <label for="movil_persona">Móvil</label>
+                            <input type="text" name="movil" id="movil_persona" placeholder="Teléfono móvil" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <label for="email_persona">Email</label>
+                        <input type="email" name="email" id="email_persona" placeholder="email@ejemplo.com" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    </div>
+                    
+                    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                        <button type="submit" class="btn btn-primary" id="btn-submit-form-persona">Añadir Persona</button>
+                        <button type="button" class="btn btn-secondary" onclick="cancelarEdicionPersona()" id="btn-cancelar-persona" style="display: none;">Cancelar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const personas = {
+    {% for persona in cliente.personas_contacto_list %}
+    {{ persona.id }}: {
+        nombre: {{ persona.nombre|tojson }},
+        cargo: {{ persona.cargo|tojson if persona.cargo else '""' }},
+        movil: {{ persona.movil|tojson if persona.movil else '""' }},
+        email: {{ persona.email|tojson if persona.email else '""' }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+};
+
+function abrirModalPersonasContacto() {
+    document.getElementById('modalPersonasContacto').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    cancelarEdicionPersona();
+}
+
+function cerrarModalPersonasContacto() {
+    document.getElementById('modalPersonasContacto').style.display = 'none';
+    document.body.style.overflow = 'auto';
+    cancelarEdicionPersona();
+}
+
+function editarPersonaContacto(id) {
+    const persona = personas[id];
+    if (!persona) return;
+    
+    document.getElementById('accion_form_persona').value = 'editar';
+    document.getElementById('persona_id_form').value = id;
+    document.getElementById('nombre_persona').value = persona.nombre;
+    document.getElementById('cargo_persona').value = persona.cargo || '';
+    document.getElementById('movil_persona').value = persona.movil || '';
+    document.getElementById('email_persona').value = persona.email || '';
+    document.getElementById('form-titulo-persona').textContent = 'Editar Persona de Contacto';
+    document.getElementById('btn-submit-form-persona').textContent = 'Guardar Cambios';
+    document.getElementById('btn-cancelar-persona').style.display = 'block';
+    
+    // Scroll al formulario
+    document.getElementById('form-persona').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function cancelarEdicionPersona() {
+    document.getElementById('accion_form_persona').value = 'crear';
+    document.getElementById('persona_id_form').value = '';
+    document.getElementById('formPersonaContacto').reset();
+    document.getElementById('form-titulo-persona').textContent = 'Añadir Nueva Persona de Contacto';
+    document.getElementById('btn-submit-form-persona').textContent = 'Añadir Persona';
+    document.getElementById('btn-cancelar-persona').style.display = 'none';
+}
+
 </script>
 
 <style>

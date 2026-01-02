@@ -10,13 +10,13 @@
         <div class="form-section">
             <h3>Información Principal</h3>
             <div class="form-group">
-                <label for="nombre">Nombre del Cliente *</label>
+                <label for="nombre">Nombre Fiscal *</label>
                 <input type="text" name="nombre" id="nombre" value="{{ cliente.nombre }}" required>
             </div>
             <div class="form-row">
                 <div class="form-group">
-                    <label for="alias">Alias</label>
-                    <input type="text" name="alias" id="alias" value="{{ cliente.alias or '' }}" placeholder="Nombre alternativo o alias">
+                    <label for="alias">Nombre Comercial</label>
+                    <input type="text" name="alias" id="alias" value="{{ cliente.alias or '' }}" placeholder="Nombre comercial">
                 </div>
                 <div class="form-group">
                     <label for="nif">NIF/CIF</label>
@@ -49,6 +49,11 @@
                     </select>
                 </div>
             </div>
+            <div class="form-group">
+                <label for="numero_cuenta">Número de Cuenta</label>
+                <input type="text" name="numero_cuenta" id="numero_cuenta" value="{{ cliente.numero_cuenta or '' }}" placeholder="ES24-3456-3456-3456-3456-3456-34" maxlength="29" pattern="ES[0-9]{2}-[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{2}">
+                <small style="color: #666; font-size: 12px;">Formato: ES seguido de 22 dígitos (ESXX-XXXX-XXXX-XXXX-XXXX-XX)</small>
+            </div>
         </div>
 
         <div class="form-section">
@@ -74,9 +79,36 @@
                     <small style="color: #666; font-size: 12px;">Para avisos de estados</small>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="personas_contacto">Personas de Contacto</label>
-                <textarea name="personas_contacto" id="personas_contacto" rows="3">{{ cliente.personas_contacto or '' }}</textarea>
+        </div>
+
+        <div class="form-section">
+            <h3>Personas de Contacto</h3>
+            {% if cliente.personas_contacto_list %}
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                <thead>
+                    <tr style="background: #f8f9fa; border-bottom: 2px solid #e0e0e0;">
+                        <th style="padding: 8px; text-align: left; font-size: 12px; color: #555;">Nombre</th>
+                        <th style="padding: 8px; text-align: left; font-size: 12px; color: #555;">Cargo</th>
+                        <th style="padding: 8px; text-align: left; font-size: 12px; color: #555;">Móvil</th>
+                        <th style="padding: 8px; text-align: left; font-size: 12px; color: #555;">Email</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for persona in cliente.personas_contacto_list %}
+                    <tr style="border-bottom: 1px solid #e0e0e0;">
+                        <td style="padding: 8px; font-size: 13px;">{{ persona.nombre }}</td>
+                        <td style="padding: 8px; font-size: 13px;">{{ persona.cargo or '-' }}</td>
+                        <td style="padding: 8px; font-size: 13px;">{{ persona.movil or '-' }}</td>
+                        <td style="padding: 8px; font-size: 13px;">{{ persona.email or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color: #999; font-style: italic; margin-bottom: 15px;">No hay personas de contacto registradas.</p>
+            {% endif %}
+            <div style="padding: 10px; background: #e3f2fd; border-radius: 5px; color: #1565c0; font-size: 14px;">
+                💡 Las personas de contacto se gestionan desde la <a href="{{ url_for('clientes.ficha_cliente', id=cliente.id) }}" style="color: #1976d2; font-weight: 600; text-decoration: underline;">ficha del cliente</a>.
             </div>
         </div>
 
@@ -193,7 +225,7 @@
 .editar-cliente-container {
     max-width: 900px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 20px 4px;
 }
 
 .cliente-form {
@@ -311,6 +343,129 @@ function añadirDireccionEnvio() {
 function eliminarDireccionEnvio(button) {
     button.closest('.direccion-envio-item').remove();
 }
+
+// Formatear número de cuenta automáticamente
+document.addEventListener('DOMContentLoaded', function() {
+    const numeroCuentaInput = document.getElementById('numero_cuenta');
+    if (numeroCuentaInput) {
+        // Si el campo está vacío o no empieza con ES, inicializar con ES
+        if (!numeroCuentaInput.value || !numeroCuentaInput.value.toUpperCase().startsWith('ES')) {
+            if (!numeroCuentaInput.value) {
+                numeroCuentaInput.value = 'ES';
+            } else {
+                // Si hay un valor existente que empieza con números, formatearlo
+                const numbers = numeroCuentaInput.value.replace(/\D/g, '').substring(0, 22);
+                if (numbers.length > 0) {
+                    let formatted = 'ES';
+                    // Primeros 2 dígitos sin guión
+                    if (numbers.length > 0) {
+                        formatted += numbers.substring(0, 2);
+                        // Añadir guión después de los 2 primeros dígitos
+                        if (numbers.length > 2) {
+                            formatted += '-';
+                            // Resto de dígitos en grupos de 4
+                            const rest = numbers.substring(2);
+                            for (let i = 0; i < rest.length; i++) {
+                                if (i > 0 && i % 4 === 0) {
+                                    formatted += '-';
+                                }
+                                formatted += rest[i];
+                            }
+                        }
+                    }
+                    numeroCuentaInput.value = formatted;
+                } else {
+                    numeroCuentaInput.value = 'ES';
+                }
+            }
+        }
+        
+        numeroCuentaInput.addEventListener('input', function(e) {
+            let value = e.target.value.toUpperCase();
+            
+            // Forzar que empiece con ES
+            if (!value.startsWith('ES')) {
+                // Si hay números al inicio, añadir ES al principio
+                const numbers = value.replace(/\D/g, '');
+                if (numbers.length > 0) {
+                    value = 'ES' + numbers.substring(0, 22);
+                } else {
+                    value = 'ES';
+                }
+            } else {
+                // Extraer solo los números después de ES
+                const afterES = value.substring(2).replace(/\D/g, '');
+                
+                // Limitar a 22 dígitos
+                const numbers = afterES.substring(0, 22);
+                
+                // Formatear: ES + 2 dígitos + guión + resto en grupos de 4
+                let formatted = 'ES';
+                if (numbers.length > 0) {
+                    // Primeros 2 dígitos sin guión
+                    formatted += numbers.substring(0, 2);
+                    // Añadir guión después de los 2 primeros dígitos
+                    if (numbers.length > 2) {
+                        formatted += '-';
+                        // Resto de dígitos en grupos de 4
+                        const rest = numbers.substring(2);
+                        for (let i = 0; i < rest.length; i++) {
+                            if (i > 0 && i % 4 === 0) {
+                                formatted += '-';
+                            }
+                            formatted += rest[i];
+                        }
+                    }
+                }
+                value = formatted;
+            }
+            
+            e.target.value = value;
+        });
+        
+        // Manejar el evento de pegar
+        numeroCuentaInput.addEventListener('paste', function(e) {
+            e.preventDefault();
+            const paste = (e.clipboardData || window.clipboardData).getData('text').toUpperCase();
+            
+            // Extraer solo números (y ES si está al inicio)
+            let numbers = '';
+            if (paste.startsWith('ES')) {
+                numbers = paste.substring(2).replace(/\D/g, '');
+            } else {
+                numbers = paste.replace(/\D/g, '');
+            }
+            
+            // Limitar a 22 dígitos
+            numbers = numbers.substring(0, 22);
+            
+            // Formatear: ES + 2 dígitos + guión + resto en grupos de 4
+            let formatted = 'ES';
+            if (numbers.length > 0) {
+                formatted += numbers.substring(0, 2);
+                if (numbers.length > 2) {
+                    formatted += '-';
+                    const rest = numbers.substring(2);
+                    for (let i = 0; i < rest.length; i++) {
+                        if (i > 0 && i % 4 === 0) {
+                            formatted += '-';
+                        }
+                        formatted += rest[i];
+                    }
+                }
+            }
+            
+            e.target.value = formatted;
+        });
+        
+        // Manejar el evento de focus para asegurar que siempre tenga ES
+        numeroCuentaInput.addEventListener('focus', function(e) {
+            if (!e.target.value || !e.target.value.toUpperCase().startsWith('ES')) {
+                e.target.value = 'ES';
+            }
+        });
+    }
+});
 </script>
 {% endblock %}
 

@@ -25,7 +25,7 @@ body {
 .container {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 20px;
+    padding: 20px 4px;
     animation: slideUp 0.6s ease-out;
 }
 
@@ -58,7 +58,7 @@ header {
     align-items: center;
     justify-content: space-between;
     gap: 20px;
-    padding: 0 20px;
+    padding: 0 4px;
     position: relative;
 }
 

@@ -579,10 +579,36 @@ def migrate_database():
                     print(f"Error al crear tabla registro_estado_solicitud: {e}")
             
             # Verificar que todas las tablas necesarias existan
-            tablas_requeridas = ['comerciales', 'clientes', 'prendas', 'pedidos', 'lineas_pedido', 'presupuestos', 'lineas_presupuesto', 'tickets', 'lineas_ticket', 'facturas', 'lineas_factura', 'usuarios', 'plantillas_email', 'proveedores', 'facturas_proveedor', 'empleados', 'nominas', 'registro_cambio_estado']
+            tablas_requeridas = ['comerciales', 'clientes', 'prendas', 'pedidos', 'lineas_pedido', 'presupuestos', 'lineas_presupuesto', 'tickets', 'lineas_ticket', 'facturas', 'lineas_factura', 'usuarios', 'plantillas_email', 'proveedores', 'facturas_proveedor', 'empleados', 'nominas', 'registro_cambio_estado', 'personas_contacto', 'direcciones_envio']
             tablas_faltantes = [t for t in tablas_requeridas if t not in table_names]
             if tablas_faltantes:
                 db.create_all()
+            
+            # Verificar si existe la tabla personas_contacto y crearla si no existe
+            if 'personas_contacto' not in table_names:
+                try:
+                    with db.engine.connect() as conn:
+                        conn.execute(text('''
+                            CREATE TABLE personas_contacto (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                cliente_id INTEGER NOT NULL,
+                                nombre VARCHAR(200) NOT NULL,
+                                cargo VARCHAR(200),
+                                movil VARCHAR(50),
+                                email VARCHAR(100),
+                                fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                FOREIGN KEY (cliente_id) REFERENCES clientes(id) ON DELETE CASCADE
+                            )
+                        '''))
+                        conn.commit()
+                        print("Migración: Tabla personas_contacto creada exitosamente")
+                except Exception as e:
+                    print(f"Error al crear tabla personas_contacto: {e}")
+                    # Intentar con db.create_all() como fallback
+                    try:
+                        db.create_all()
+                    except Exception:
+                        pass
             
             # Verificar si existe la tabla proveedores y agregar columnas faltantes
             if 'proveedores' in table_names:
@@ -915,7 +941,7 @@ Saludos cordiales,
             # Limpiar plantillas obsoletas que no corresponden a estados actuales
             try:
                 # Estados válidos actuales
-                estados_validos = ['presupuesto', 'aceptado', 'mockup', 'en preparacion', 'terminado', 'entregado al cliente']
+                estados_validos = ['presupuesto', 'rechazado', 'aceptado', 'mockup', 'en preparacion', 'terminado', 'entregado al cliente']
                 subestados_validos = ['hacer marcada', 'imprimir', 'calandra', 'corte', 'confeccion', 'sublimacion', 'bordado']
                 
                 # Plantillas válidas
@@ -979,6 +1005,7 @@ Saludos cordiales,
                     'pais': 'VARCHAR(100)',
                     'personas_contacto': 'TEXT',
                     'anotaciones': 'TEXT',
+                    'numero_cuenta': 'VARCHAR(29)',
                     'usuario_web': 'VARCHAR(80)',
                     'password_hash': 'VARCHAR(255)',
                     'fecha_creacion': 'TIMESTAMP',
