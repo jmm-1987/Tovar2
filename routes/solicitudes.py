@@ -14,6 +14,7 @@ from playwright.sync_api import sync_playwright
 from decimal import Decimal
 import base64
 from utils.sftp_upload import upload_file_to_sftp, download_file_from_sftp, get_file_url, file_exists_on_sftp
+from utils.numeracion import obtener_siguiente_numero_solicitud
 
 solicitudes_bp = Blueprint('solicitudes', __name__)
 
@@ -24,7 +25,7 @@ ESTADOS_SOLICITUD = [
     'aceptado',
     'mockup',
     'en preparacion',
-    'terminado',
+    'revision y empaquetado',
     'entregado al cliente'
 ]
 
@@ -55,7 +56,7 @@ ESTADOS_FECHAS = {
     'aceptado': 'fecha_aceptado',
     'mockup': 'fecha_mockup',
     'en preparacion': 'fecha_en_preparacion',
-    'terminado': 'fecha_terminado',
+    'revision y empaquetado': 'fecha_terminado',
     'entregado al cliente': 'fecha_entregado_cliente'
 }
 
@@ -136,9 +137,21 @@ def nueva_solicitud():
             seguimiento = request.form.get('seguimiento', '')
             fecha_objetivo_str = request.form.get('fecha_objetivo', '')
             
+            # Información para la fabricación
+            tipo_producto = request.form.get('tipo_producto', '')
+            colores_principales = request.form.get('colores_principales', '')
+            colores_secundarios = request.form.get('colores_secundarios', '')
+            ubicacion_logo = request.form.get('ubicacion_logo', '')
+            referencias_web = request.form.get('referencias_web', '')
+            datos_adicionales = request.form.get('datos_adicionales', '')
+            
             # Validaciones
             if not comercial_id or not cliente_id or not tipo_pedido:
                 flash('Debe completar todos los campos obligatorios', 'error')
+                return redirect(url_for('solicitudes.nueva_solicitud'))
+            
+            if not tipo_producto or not colores_principales or not colores_secundarios or not ubicacion_logo or not referencias_web or not datos_adicionales:
+                flash('Debe completar todos los campos de información para la fabricación', 'error')
                 return redirect(url_for('solicitudes.nueva_solicitud'))
             
             # Crear solicitud (presupuesto)
@@ -148,12 +161,22 @@ def nueva_solicitud():
                 tipo_pedido=tipo_pedido,
                 forma_pago=forma_pago,
                 seguimiento=seguimiento,
+                tipo_producto=tipo_producto,
+                colores_principales=colores_principales,
+                colores_secundarios=colores_secundarios,
+                ubicacion_logo=ubicacion_logo,
+                referencias_web=referencias_web,
+                datos_adicionales=datos_adicionales,
                 estado='presupuesto'  # Estado inicial
             )
             
             # Establecer fecha_presupuesto si no existe
             if not solicitud.fecha_presupuesto:
                 solicitud.fecha_presupuesto = datetime.now().date()
+            
+            # Generar número de solicitud automáticamente
+            fecha_creacion = solicitud.fecha_presupuesto or datetime.now().date()
+            solicitud.numero_solicitud = obtener_siguiente_numero_solicitud(fecha_creacion)
             
             # Procesar fecha objetivo si se proporciona
             if fecha_objetivo_str:
@@ -379,7 +402,8 @@ def ver_solicitud(solicitud_id):
         joinedload(Presupuesto.lineas).joinedload(LineaPresupuesto.prenda),
         joinedload(Presupuesto.cliente),
         joinedload(Presupuesto.comercial),
-        joinedload(Presupuesto.mockup_encargado_a)
+        joinedload(Presupuesto.mockup_encargado_a),
+        joinedload(Presupuesto.marcada_encargado_a)
     ).get_or_404(solicitud_id)
     
     # Debug: verificar si hay líneas
@@ -469,6 +493,31 @@ def cambiar_estado_solicitud(solicitud_id):
                         else:
                             flash('Debe seleccionar un usuario para encargar el mockup', 'error')
                             return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
+                    
+                    # Si el subestado es "hacer marcada", asignar el usuario
+                    if nuevo_subestado == 'hacer marcada':
+                        usuario_encargado_id = request.form.get('usuario_encargado', '')
+                        if usuario_encargado_id:
+                            try:
+                                solicitud.marcada_encargado_a_id = int(usuario_encargado_id)
+                            except (ValueError, TypeError):
+                                flash('Usuario no válido', 'error')
+                                return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
+                        else:
+                            flash('Debe seleccionar un usuario para encargar hacer marcada', 'error')
+                            return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
+                    
+                    # Si el mockup se acepta, calcular las fechas objetivo (25 y 17 días hábiles)
+                    if nuevo_estado == 'mockup' and nuevo_subestado == 'aceptado':
+                        if not solicitud.fecha_aceptado:
+                            solicitud.fecha_aceptado = hoy
+                            solicitud.fecha_aceptacion = hoy  # Compatibilidad
+                        # Calcular ambas fechas objetivo saltando días festivos
+                        from utils.fechas import calcular_fecha_saltando_festivos
+                        if not solicitud.fecha_objetivo_25:
+                            solicitud.fecha_objetivo_25 = calcular_fecha_saltando_festivos(hoy, 25)
+                        if not solicitud.fecha_objetivo_17:
+                            solicitud.fecha_objetivo_17 = calcular_fecha_saltando_festivos(hoy, 17)
         
         # Actualizar fecha correspondiente si no está establecida
         if nuevo_estado in ESTADOS_FECHAS:
@@ -554,6 +603,25 @@ def editar_solicitud(solicitud_id):
             solicitud.tipo_pedido = request.form.get('tipo_pedido')
             solicitud.forma_pago = request.form.get('forma_pago', '')
             solicitud.seguimiento = request.form.get('seguimiento', '')
+            
+            # Actualizar información para la fabricación
+            tipo_producto = request.form.get('tipo_producto', '')
+            colores_principales = request.form.get('colores_principales', '')
+            colores_secundarios = request.form.get('colores_secundarios', '')
+            ubicacion_logo = request.form.get('ubicacion_logo', '')
+            referencias_web = request.form.get('referencias_web', '')
+            datos_adicionales = request.form.get('datos_adicionales', '')
+            
+            if not tipo_producto or not colores_principales or not colores_secundarios or not ubicacion_logo or not referencias_web or not datos_adicionales:
+                flash('Debe completar todos los campos de información para la fabricación', 'error')
+                return redirect(url_for('solicitudes.editar_solicitud', solicitud_id=solicitud_id))
+            
+            solicitud.tipo_producto = tipo_producto
+            solicitud.colores_principales = colores_principales
+            solicitud.colores_secundarios = colores_secundarios
+            solicitud.ubicacion_logo = ubicacion_logo
+            solicitud.referencias_web = referencias_web
+            solicitud.datos_adicionales = datos_adicionales
             
             # Actualizar fecha objetivo si se proporciona
             fecha_objetivo_str = request.form.get('fecha_objetivo', '')

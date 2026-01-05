@@ -20,7 +20,7 @@ def index():
         from sqlalchemy import or_
         
         # Estados que se muestran en el panel: desde aceptado hasta entregado al cliente
-        estados_mostrar = ['aceptado', 'mockup', 'en preparacion', 'terminado', 'entregado al cliente']
+        estados_mostrar = ['aceptado', 'mockup', 'en preparacion', 'revision y empaquetado', 'entregado al cliente']
         
         query = Presupuesto.query.filter(
             Presupuesto.estado.in_(estados_mostrar)
@@ -34,24 +34,31 @@ def index():
         
         solicitudes = query.options(
             joinedload(Presupuesto.cliente),
-            joinedload(Presupuesto.mockup_encargado_a)
+            joinedload(Presupuesto.mockup_encargado_a),
+            joinedload(Presupuesto.marcada_encargado_a)
         ).all()
         
-        # Calcular fecha objetivo de entrega (20 días desde aceptación) y clasificar
+        # Calcular fechas objetivo de entrega (25 y 17 días desde aceptación del mockup) y clasificar
         hoy = datetime.now().date()
         from extensions import db
         necesita_commit = False
         
         for solicitud in solicitudes:
-            # Si no tiene fecha objetivo pero tiene fecha de aceptación, calcularla (20 días hábiles)
-            if solicitud.fecha_aceptado and not solicitud.fecha_objetivo:
+            # Si tiene fecha de aceptación pero no tiene fechas objetivo, calcularlas
+            # Esto puede pasar si el mockup fue aceptado antes de implementar las nuevas fechas
+            if solicitud.fecha_aceptado:
                 from utils.fechas import calcular_fecha_saltando_festivos
-                solicitud.fecha_objetivo = calcular_fecha_saltando_festivos(solicitud.fecha_aceptado, 20)
-                necesita_commit = True
+                if not solicitud.fecha_objetivo_25:
+                    solicitud.fecha_objetivo_25 = calcular_fecha_saltando_festivos(solicitud.fecha_aceptado, 25)
+                    necesita_commit = True
+                if not solicitud.fecha_objetivo_17:
+                    solicitud.fecha_objetivo_17 = calcular_fecha_saltando_festivos(solicitud.fecha_aceptado, 17)
+                    necesita_commit = True
             
-            if solicitud.fecha_objetivo:
-                # Calcular días restantes hasta la fecha objetivo
-                dias_restantes = (solicitud.fecha_objetivo - hoy).days
+            # Clasificar según la fecha objetivo más próxima (17 días)
+            if solicitud.fecha_objetivo_17:
+                # Calcular días restantes hasta la fecha objetivo de 17 días
+                dias_restantes = (solicitud.fecha_objetivo_17 - hoy).days
                 
                 # Clasificar fecha objetivo según días restantes
                 if dias_restantes <= 5:
@@ -62,6 +69,15 @@ def index():
                     solicitud.fecha_class = 'proxima'
                 else:
                     # Más de 10 días: Verde
+                    solicitud.fecha_class = 'ok'
+            elif solicitud.fecha_objetivo_25:
+                # Si solo tiene la de 25 días, usar esa
+                dias_restantes = (solicitud.fecha_objetivo_25 - hoy).days
+                if dias_restantes <= 5:
+                    solicitud.fecha_class = 'urgente'
+                elif dias_restantes <= 10:
+                    solicitud.fecha_class = 'proxima'
+                else:
                     solicitud.fecha_class = 'ok'
             else:
                 solicitud.fecha_class = ''
@@ -74,9 +90,9 @@ def index():
                 db.session.rollback()
                 print(f"Error al guardar fechas objetivo: {e}")
         
-        # Ordenar por fecha objetivo (más próximos primero), los que no tienen fecha objetivo al final
+        # Ordenar por fecha objetivo más próxima (17 días primero, luego 25), los que no tienen fecha objetivo al final
         solicitudes.sort(key=lambda s: (
-            s.fecha_objetivo if s.fecha_objetivo else datetime.max.date(),
+            s.fecha_objetivo_17 if s.fecha_objetivo_17 else (s.fecha_objetivo_25 if s.fecha_objetivo_25 else datetime.max.date()),
             s.fecha_aceptado if s.fecha_aceptado else datetime.max.date()
         ))
         

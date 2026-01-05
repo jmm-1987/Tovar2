@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}Factura Solicitud #{{ solicitud.id }} - Gestión de Pedidos{% endblock %}
+{% block title %}Factura Solicitud {{ solicitud.numero_solicitud or solicitud.id }} - Gestión de Pedidos{% endblock %}
 
 {% block content %}
 <div class="factura-card" style="background: white; border-radius: 8px; padding: 30px; margin-bottom: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); animation: slideUp 0.5s ease-out;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 2px solid #e0e0e0; padding-bottom: 20px;">
         <div>
-            <h2 style="margin: 0 0 10px 0; color: #2c3e50;">Factura Solicitud #{{ solicitud.id }}</h2>
+            <h2 style="margin: 0 0 10px 0; color: #2c3e50;">Factura Solicitud {{ solicitud.numero_solicitud or solicitud.id }}</h2>
             <p style="margin: 5px 0; color: #666;"><strong>Estado:</strong> 
                 <span class="badge badge-estado-{{ solicitud.estado.lower()|replace(' ', '-') }}">{{ solicitud.estado }}</span>
             </p>

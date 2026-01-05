@@ -3,6 +3,17 @@
 {% block title %}Nueva Solicitud - Gestión de Pedidos{% endblock %}
 
 {% block content %}
+<style>
+.container {
+    padding-top: 10px !important;
+    padding-left: 15px !important;
+    padding-right: 15px !important;
+    max-width: 100% !important;
+}
+header {
+    margin-bottom: 0.8rem !important;
+}
+</style>
 <h2>Nueva Solicitud</h2>
 
 <form method="POST" enctype="multipart/form-data">
@@ -44,6 +55,7 @@
             <label for="tipo_pedido">Tipo *</label>
             <select name="tipo_pedido" id="tipo_pedido" required>
                 <option value="fabricacion">Fabricación</option>
+                <option value="bordado">Bordado/Serig.</option>
                 <option value="pedido proveedor">Pedido proveedor</option>
             </select>
         </div>
@@ -102,6 +114,42 @@
         <small style="color: #666; font-size: 0.85em; display: block; margin-top: 10px;" id="contador-imagenes">0/5 imágenes seleccionadas</small>
     </div>
 
+    <h3 style="margin-top: 30px; margin-bottom: 15px; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px;">Información para la Fabricación</h3>
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dee2e6;">
+        <div class="form-row-compact">
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="tipo_producto">Tipo Producto *</label>
+                <input type="text" name="tipo_producto" id="tipo_producto" required placeholder="Ej: Camiseta, Polo, Sudadera..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="colores_principales">Colores Principales *</label>
+                <input type="text" name="colores_principales" id="colores_principales" required placeholder="Ej: Azul marino, Rojo, Negro..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+        </div>
+        
+        <div class="form-row-compact">
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="colores_secundarios">Colores Secundarios *</label>
+                <input type="text" name="colores_secundarios" id="colores_secundarios" required placeholder="Ej: Blanco, Gris claro..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="ubicacion_logo">Ubicación del Logo *</label>
+                <input type="text" name="ubicacion_logo" id="ubicacion_logo" required placeholder="Ej: Pecho izquierdo, Espalda, Manga..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+        </div>
+        
+        <div class="form-row-compact">
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="referencias_web">Referencias Web *</label>
+                <input type="text" name="referencias_web" id="referencias_web" required placeholder="URLs o enlaces de referencia..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="datos_adicionales">Datos/Info Adicional *</label>
+                <input type="text" name="datos_adicionales" id="datos_adicionales" required placeholder="Información adicional relevante..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+        </div>
+    </div>
+
     <div class="form-group">
         <label for="seguimiento">Comertarios internos y seguimiento</label>
         <textarea name="seguimiento" id="seguimiento" rows="3" placeholder="Escribe aquí las actualizaciones y seguimiento del presupuesto..."></textarea>
@@ -109,29 +157,47 @@
 
     <h3>Productos del Presupuesto</h3>
     <div id="prendas-container">
+        <!-- Cabecera de las líneas del pedido -->
+        <div class="linea-pedido-header" style="display: flex; align-items: center; padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px 4px 0 0; margin-bottom: 0; font-weight: 600; font-size: 0.9rem; color: #495057;">
+            <div style="flex: 0 0 40px; text-align: center;">#</div>
+            <div style="display: flex; flex: 1; gap: 5px; flex-wrap: wrap;">
+                <div style="flex: 0 0 200px;">Nombre</div>
+                <div style="flex: 0 0 80px;">Unidades</div>
+                <div style="flex: 0 0 80px;">Talla</div>
+                <div style="flex: 0 0 150px;">Modelo</div>
+                <div style="flex: 0 0 100px;">Color</div>
+                <div style="flex: 0 0 100px;">Forma</div>
+                <div style="flex: 0 0 80px;">Sexo</div>
+                <div style="flex: 0 0 120px;">Tejido</div>
+                <div style="flex: 0 0 100px;">Precio €</div>
+                <div style="flex: 0 0 80px;">Desc. %</div>
+                <div style="flex: 0 0 100px;">P. Final €</div>
+            </div>
+            <div style="flex: 0 0 100px; text-align: center;">Acciones</div>
+        </div>
         <div class="linea-pedido-row">
             <div class="linea-pedido-numero">#1</div>
             <div class="linea-pedido-campos">
                 <!-- Orden: nombre_mostrar, unidades, talla, modelo, color, forma, sexo, tejido, precio -->
-                <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 0 0 1200px; width: 1200px;">
-                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="1" min="1" required placeholder="Unidades *" title="Unidades">
-                <input type="text" name="talla[]" class="linea-campo-compact" placeholder="Talla" title="Talla">
-                <input type="text" name="prenda_nombre[]" class="linea-campo-compact prenda-input" placeholder="Modelo (seleccione o escriba texto libre)" title="Modelo" list="prendas-list" autocomplete="off">
+                <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 0 0 200px; width: 200px;">
+                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="1" min="1" required placeholder="Unidades *" title="Unidades" style="flex: 0 0 80px; width: 80px;">
+                <input type="text" name="talla[]" class="linea-campo-compact" placeholder="Talla" title="Talla" style="flex: 0 0 80px; width: 80px;">
+                <input type="text" name="prenda_nombre[]" class="linea-campo-compact prenda-input" placeholder="Modelo (seleccione o escriba texto libre)" title="Modelo" list="prendas-list" autocomplete="off" style="flex: 0 0 150px; width: 150px;">
                 <input type="hidden" name="prenda_id[]" class="prenda-id-hidden">
                 <datalist id="prendas-list">
                     {% for prenda in prendas %}
                     <option value="{{ prenda.nombre }}" data-id="{{ prenda.id }}">{{ prenda.nombre }}</option>
                     {% endfor %}
                 </datalist>
-                <input type="text" name="color[]" class="linea-campo-compact" placeholder="Color" title="Color">
-                <input type="text" name="forma[]" class="linea-campo-compact" placeholder="Forma" title="Forma" list="formas-list">
-                <select name="sexo[]" class="linea-campo-compact" title="Sexo">
+                <input type="text" name="color[]" class="linea-campo-compact" placeholder="Color" title="Color" style="flex: 0 0 100px; width: 100px;">
+                <input type="text" name="forma[]" class="linea-campo-compact" placeholder="Forma" title="Forma" list="formas-list" style="flex: 0 0 100px; width: 100px;">
+                <select name="sexo[]" class="linea-campo-compact" title="Sexo" style="flex: 0 0 80px; width: 80px;">
                     <option value="">Sexo</option>
                     <option value="cro">Cro</option>
                     <option value="sra">Sra</option>
                     <option value="unisex">Unisex</option>
                 </select>
-                <select name="tejido[]" class="linea-campo-compact" title="Tejido">
+                <select name="tejido[]" class="linea-campo-compact" title="Tejido" style="flex: 0 0 120px; width: 120px;">
                     <option value="">Tejido</option>
                     <option value="SARGA">SARGA</option>
                     <option value="MICRO">MICRO</option>
@@ -163,16 +229,12 @@
 
     <!-- Datalist para formas (disponible para todos los inputs de forma) -->
     <datalist id="formas-list">
-        <option value="Recta">
-        <option value="Ajustada">
-        <option value="Holgada">
-        <option value="Oversize">
-        <option value="Slim">
-        <option value="Regular">
-        <option value="Relaxed">
-        <option value="Tapered">
-        <option value="Straight">
-        <option value="Skinny">
+        <option value="Abt Cremallera">
+        <option value="Abt Botones">
+        <option value="Cerrada">
+        <option value="Serigrafia">
+        <option value="Bordado">
+        <option value="Seri + bordado">
     </datalist>
 
     <div class="actions">

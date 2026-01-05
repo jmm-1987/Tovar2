@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}Editar Solicitud #{{ solicitud.id }} - Gestión de Pedidos{% endblock %}
+{% block title %}Editar Solicitud {{ solicitud.numero_solicitud or solicitud.id }} - Gestión de Pedidos{% endblock %}
 
 {% block content %}
-<h2>Editar Solicitud #{{ solicitud.id }}</h2>
+<h2>Editar Solicitud {{ solicitud.numero_solicitud or solicitud.id }}</h2>
 
 <form method="POST" enctype="multipart/form-data">
     <div class="form-row-compact">
@@ -45,6 +45,7 @@
             <label for="tipo_pedido">Tipo *</label>
             <select name="tipo_pedido" id="tipo_pedido" required>
                 <option value="fabricacion" {% if solicitud.tipo_pedido == 'fabricacion' %}selected{% endif %}>Fabricación</option>
+                <option value="bordado" {% if solicitud.tipo_pedido == 'bordado' %}selected{% endif %}>Bordado/Serig.</option>
                 <option value="pedido proveedor" {% if solicitud.tipo_pedido == 'pedido proveedor' %}selected{% endif %}>Pedido proveedor</option>
             </select>
         </div>
@@ -125,6 +126,42 @@
             {% if solicitud.imagen_adicional_5 %}{% set contador = contador + 1 %}{% endif %}
             {{ contador }}/5 imágenes seleccionadas
         </small>
+    </div>
+
+    <h3 style="margin-top: 30px; margin-bottom: 15px; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px;">Información para la Fabricación</h3>
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dee2e6;">
+        <div class="form-row-compact">
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="tipo_producto">Tipo Producto *</label>
+                <input type="text" name="tipo_producto" id="tipo_producto" required value="{{ solicitud.tipo_producto or '' }}" placeholder="Ej: Camiseta, Polo, Sudadera..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="colores_principales">Colores Principales *</label>
+                <input type="text" name="colores_principales" id="colores_principales" required value="{{ solicitud.colores_principales or '' }}" placeholder="Ej: Azul marino, Rojo, Negro..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+        </div>
+        
+        <div class="form-row-compact">
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="colores_secundarios">Colores Secundarios *</label>
+                <input type="text" name="colores_secundarios" id="colores_secundarios" required value="{{ solicitud.colores_secundarios or '' }}" placeholder="Ej: Blanco, Gris claro..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="ubicacion_logo">Ubicación del Logo *</label>
+                <input type="text" name="ubicacion_logo" id="ubicacion_logo" required value="{{ solicitud.ubicacion_logo or '' }}" placeholder="Ej: Pecho izquierdo, Espalda, Manga..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+        </div>
+        
+        <div class="form-row-compact">
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="referencias_web">Referencias Web *</label>
+                <input type="text" name="referencias_web" id="referencias_web" required value="{{ solicitud.referencias_web or '' }}" placeholder="URLs o enlaces de referencia..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="datos_adicionales">Datos/Info Adicional *</label>
+                <input type="text" name="datos_adicionales" id="datos_adicionales" required value="{{ solicitud.datos_adicionales or '' }}" placeholder="Información adicional relevante..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+        </div>
     </div>
 
     <div class="form-group">

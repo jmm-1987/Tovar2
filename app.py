@@ -321,6 +321,68 @@ def migrate_database():
                     except Exception as e:
                         print(f"Error al agregar columna precio_final a lineas_presupuesto: {e}")
             
+            # Verificar si existe la tabla presupuestos y agregar columnas de información para fabricación
+            if 'presupuestos' in table_names:
+                columns_presupuestos = [col['name'] for col in inspector.get_columns('presupuestos')]
+                
+                nuevas_columnas_fabricacion = {
+                    'tipo_producto': 'VARCHAR(200)',
+                    'colores_principales': 'VARCHAR(200)',
+                    'colores_secundarios': 'VARCHAR(200)',
+                    'ubicacion_logo': 'VARCHAR(200)',
+                    'referencias_web': 'TEXT',
+                    'datos_adicionales': 'TEXT'
+                }
+                
+                for columna, tipo in nuevas_columnas_fabricacion.items():
+                    if columna not in columns_presupuestos:
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(text(f"ALTER TABLE presupuestos ADD COLUMN {columna} {tipo}"))
+                                conn.commit()
+                                print(f"Migración: Columna {columna} agregada exitosamente a presupuestos")
+                        except Exception as e:
+                            print(f"Error al agregar columna {columna} a presupuestos: {e}")
+                
+                # Añadir columna marcada_encargado_a_id si no existe
+                if 'marcada_encargado_a_id' not in columns_presupuestos:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE presupuestos ADD COLUMN marcada_encargado_a_id INTEGER REFERENCES usuarios(id)"))
+                            conn.commit()
+                            print("Migración: Columna marcada_encargado_a_id agregada exitosamente a presupuestos")
+                    except Exception as e:
+                        print(f"Error al agregar columna marcada_encargado_a_id a presupuestos: {e}")
+                
+                # Añadir columna numero_solicitud si no existe
+                if 'numero_solicitud' not in columns_presupuestos:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE presupuestos ADD COLUMN numero_solicitud VARCHAR(10)"))
+                            conn.commit()
+                            print("Migración: Columna numero_solicitud agregada exitosamente a presupuestos")
+                    except Exception as e:
+                        print(f"Error al agregar columna numero_solicitud a presupuestos: {e}")
+                
+                # Añadir columnas fecha_objetivo_25 y fecha_objetivo_17 si no existen
+                if 'fecha_objetivo_25' not in columns_presupuestos:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE presupuestos ADD COLUMN fecha_objetivo_25 DATE"))
+                            conn.commit()
+                            print("Migración: Columna fecha_objetivo_25 agregada exitosamente a presupuestos")
+                    except Exception as e:
+                        print(f"Error al agregar columna fecha_objetivo_25 a presupuestos: {e}")
+                
+                if 'fecha_objetivo_17' not in columns_presupuestos:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE presupuestos ADD COLUMN fecha_objetivo_17 DATE"))
+                            conn.commit()
+                            print("Migración: Columna fecha_objetivo_17 agregada exitosamente a presupuestos")
+                    except Exception as e:
+                        print(f"Error al agregar columna fecha_objetivo_17 a presupuestos: {e}")
+            
             # Verificar si existe la tabla facturas y hacer pedido_id nullable si no lo es
             if 'facturas' in table_names:
                 columns_facturas = [col['name'] for col in inspector.get_columns('facturas')]
@@ -464,6 +526,8 @@ def migrate_database():
                     'fecha_rechazado': 'DATE',
                     'fecha_aceptacion': 'DATE',
                     'fecha_objetivo': 'DATE',
+                    'fecha_objetivo_25': 'DATE',
+                    'fecha_objetivo_17': 'DATE',
                     'fecha_entrega_trabajo': 'DATE',
                     'fecha_envio_taller': 'DATE',
                     'fecha_entrega_bordados': 'DATE',
@@ -888,11 +952,11 @@ Saludos cordiales,
 {empresa_nombre}'''
                 },
                 {
-                    'tipo': 'cambio_estado_solicitud_terminado',
-                    'asunto': 'Solicitud #{solicitud_id} terminada',
+                    'tipo': 'cambio_estado_solicitud_revision_y_empaquetado',
+                    'asunto': 'Solicitud #{solicitud_id} en revisión y empaquetado',
                     'cuerpo': '''Estimado/a {cliente_nombre},
 
-Su solicitud #{solicitud_id} se encuentra en estado TERMINADO.
+Su solicitud #{solicitud_id} se encuentra en estado REVISIÓN Y EMPAQUETADO.
 
 Estamos ultimando los detalles para su envío o recogida.
 
@@ -941,7 +1005,7 @@ Saludos cordiales,
             # Limpiar plantillas obsoletas que no corresponden a estados actuales
             try:
                 # Estados válidos actuales
-                estados_validos = ['presupuesto', 'rechazado', 'aceptado', 'mockup', 'en preparacion', 'terminado', 'entregado al cliente']
+                estados_validos = ['presupuesto', 'rechazado', 'aceptado', 'mockup', 'en preparacion', 'revision y empaquetado', 'entregado al cliente']
                 subestados_validos = ['hacer marcada', 'imprimir', 'calandra', 'corte', 'confeccion', 'sublimacion', 'bordado']
                 
                 # Plantillas válidas
@@ -951,7 +1015,7 @@ Saludos cordiales,
                     'cambio_estado_solicitud_aceptado',
                     'cambio_estado_solicitud_mockup',
                     'cambio_estado_solicitud_en_preparacion',
-                    'cambio_estado_solicitud_terminado',
+                    'cambio_estado_solicitud_revision_y_empaquetado',
                     'cambio_estado_solicitud_entregado_al_cliente',
                     'cambio_subestado_en_preparacion_hacer_marcada',
                     'cambio_subestado_en_preparacion_imprimir',

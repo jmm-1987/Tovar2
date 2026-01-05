@@ -1,7 +1,7 @@
 """Utilidades para generar números de facturas y tickets"""
 from datetime import datetime
 from extensions import db
-from models import Factura, Ticket
+from models import Factura, Ticket, Presupuesto
 
 def obtener_siguiente_numero_factura(fecha_expedicion=None):
     """
@@ -43,7 +43,7 @@ def obtener_siguiente_numero_factura(fecha_expedicion=None):
         else:
             siguiente_numero = 1
     
-    # Formatear el número con el prefijo
+
     numero_completo = f'{prefijo}{siguiente_numero}'
     
     return numero_completo
@@ -93,6 +93,52 @@ def obtener_siguiente_numero_ticket(fecha_expedicion=None):
     
     return numero_completo
 
-
-
-
+def obtener_siguiente_numero_solicitud(fecha_creacion=None):
+    """
+    Obtiene el siguiente número de solicitud para el mes actual.
+    Formato: aamm_contador (ej: 2601_01, 2601_02, etc.)
+    - aa = año (2 dígitos)
+    - mm = mes (2 dígitos)
+    - contador = contador de 2 dígitos que se reinicia cada mes
+    """
+    if fecha_creacion is None:
+        fecha_creacion = datetime.now().date()
+    
+    año = fecha_creacion.strftime('%y')  # Año con 2 dígitos (26 para 2026)
+    mes = fecha_creacion.strftime('%m')  # Mes con 2 dígitos (01 para enero)
+    
+    # Prefijo con formato aamm
+    prefijo = f'{año}{mes}'
+    
+    # Buscar todas las solicitudes que empiecen con este prefijo
+    solicitudes_del_mes = Presupuesto.query.filter(
+        Presupuesto.numero_solicitud.like(f'{prefijo}_%')
+    ).all()
+    
+    if not solicitudes_del_mes:
+        # Si no hay solicitudes para este mes, empezar en 01
+        siguiente_contador = 1
+    else:
+        # Extraer los contadores y encontrar el máximo
+        contadores = []
+        for solicitud in solicitudes_del_mes:
+            if solicitud.numero_solicitud:
+                try:
+                    # El número tiene formato 2601_01, extraer solo la parte del contador
+                    partes = solicitud.numero_solicitud.split('_')
+                    if len(partes) == 2 and partes[0] == prefijo:
+                        contador_str = partes[1]
+                        if contador_str.isdigit():
+                            contadores.append(int(contador_str))
+                except:
+                    continue
+        
+        if contadores:
+            siguiente_contador = max(contadores) + 1
+        else:
+            siguiente_contador = 1
+    
+    # Formatear el número completo: aamm_contador (con contador de 2 dígitos)
+    numero_completo = f'{prefijo}_{siguiente_contador:02d}'
+    
+    return numero_completo

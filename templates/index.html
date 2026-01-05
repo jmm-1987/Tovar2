@@ -3,6 +3,13 @@
 {% block title %}Panel de Control - Gestión de Pedidos{% endblock %}
 
 {% block content %}
+<style>
+.container {
+    padding-left: 10px !important;
+    padding-right: 10px !important;
+    max-width: 100% !important;
+}
+</style>
 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
     <h2 style="font-size: 1.5rem; margin: 0;">PANEL DE CONTROL</h2>
     <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
@@ -23,9 +30,8 @@
     <div class="pedido-card {% if solicitud.fecha_class %}pedido-{{ solicitud.fecha_class }}{% endif %}">
         <div class="pedido-card-header">
             <div class="pedido-id">
-                Solicitud #{{ solicitud.id }}{% if solicitud.fecha_aceptado %} - {{ solicitud.fecha_aceptado.strftime('%d/%m/%Y') }}{% endif %}
+                Solicitud {{ solicitud.numero_solicitud or solicitud.id }}{% if solicitud.fecha_aceptado %} - {{ solicitud.fecha_aceptado.strftime('%d/%m/%Y') }}{% endif %}
             </div>
-            <span class="badge badge-estado-{{ solicitud.estado|lower|replace(' ', '-') }}">{{ solicitud.estado|title }}</span>
         </div>
         
         <div class="pedido-card-body">
@@ -39,18 +45,23 @@
                 <span>{{ solicitud.tipo_pedido|title }}</span>
             </div>
             
+            {% if solicitud.fecha_objetivo_25 or solicitud.fecha_objetivo_17 %}
             <div class="pedido-info-item">
-                <strong>Fecha Objetivo:</strong>
-                <span>
-                    {% if solicitud.fecha_objetivo %}
-                        <span class="fecha-objetivo {{ solicitud.fecha_class }}">
-                            {{ solicitud.fecha_objetivo.strftime('%d/%m/%Y') }}
-                        </span>
-                    {% else %}
-                        -
+                <strong>Fechas Objetivo:</strong>
+                <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+                    {% if solicitud.fecha_objetivo_17 %}
+                    <span class="fecha-objetivo" style="font-size: 0.85rem; color: #0066cc; font-weight: 600;">
+                        17 días: {{ solicitud.fecha_objetivo_17.strftime('%d/%m/%Y') }}
+                    </span>
                     {% endif %}
-                </span>
+                    {% if solicitud.fecha_objetivo_25 %}
+                    <span class="fecha-objetivo" style="font-size: 0.85rem; color: #ff6600; font-weight: 600;">
+                        25 días: {{ solicitud.fecha_objetivo_25.strftime('%d/%m/%Y') }}
+                    </span>
+                    {% endif %}
+                </div>
             </div>
+            {% endif %}
             
             {% if solicitud.estado == 'mockup' and solicitud.fecha_limite_mockup and hoy is defined %}
             <div class="pedido-info-item">
@@ -89,9 +100,9 @@
             </div>
             {% endif %}
             
-            {% if solicitud.estado == 'mockup' and solicitud.subestado and solicitud.mockup_encargado_a %}
+            {% if solicitud.estado == 'mockup' and solicitud.mockup_encargado_a %}
             <div class="pedido-info-item">
-                <strong>Encargado a:</strong>
+                <strong>Resp. Mockup:</strong>
                 <span style="font-weight: 500; color: #2c3e50;">{{ solicitud.mockup_encargado_a.usuario }}</span>
             </div>
             {% endif %}

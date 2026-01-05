@@ -239,6 +239,9 @@ class Presupuesto(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     
+    # Número de solicitud con formato aamm_contador (ej: 2601_01)
+    numero_solicitud = db.Column(db.String(10), unique=True, nullable=True)
+    
     # Relaciones
     comercial_id = db.Column(db.Integer, db.ForeignKey('comerciales.id'), nullable=False)
     cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=False)
@@ -247,7 +250,7 @@ class Presupuesto(db.Model):
     tipo_pedido = db.Column(db.String(50), nullable=False)  # confeccion, bordado, serigrafia, sublimacion, varios
     
     # Estado unificado de la solicitud (presupuesto/pedido)
-    estado = db.Column(db.String(50), nullable=False, default='presupuesto')  # presupuesto, rechazado, aceptado, mockup, en preparacion, terminado, entregado al cliente
+    estado = db.Column(db.String(50), nullable=False, default='presupuesto')  # presupuesto, rechazado, aceptado, mockup, en preparacion, revision y empaquetado, entregado al cliente
     
     # Subestado para estados que tienen subestados
     subestado = db.Column(db.String(50), nullable=True)  # Para mockup: encargado a, REVISIÓN CLIENTE, CAMBIOS 1, CAMBIOS 2, RECHAZADO, aceptado. Para en preparacion: hacer marcada, imprimir, calandra, corte, confeccion, sublimacion, bordado
@@ -257,6 +260,9 @@ class Presupuesto(db.Model):
     
     # Usuario al que se encarga el mockup
     mockup_encargado_a_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=True)
+    
+    # Usuario al que se encarga hacer marcada
+    marcada_encargado_a_id = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=True)
     
     # Forma de pago
     forma_pago = db.Column(db.Text)
@@ -280,6 +286,14 @@ class Presupuesto(db.Model):
     # Campo de seguimiento para actualizaciones de comerciales
     seguimiento = db.Column(db.Text)
     
+    # Información para la fabricación
+    tipo_producto = db.Column(db.String(200), nullable=False)  # Tipo de producto
+    colores_principales = db.Column(db.String(200), nullable=False)  # Colores principales
+    colores_secundarios = db.Column(db.String(200), nullable=False)  # Colores secundarios
+    ubicacion_logo = db.Column(db.String(200), nullable=False)  # Ubicación del logo
+    referencias_web = db.Column(db.Text, nullable=False)  # Referencias web
+    datos_adicionales = db.Column(db.Text, nullable=False)  # Datos/Info adicional
+    
     # Fechas por estado (se guardan y no se sobrescriben)
     fecha_presupuesto = db.Column(db.Date)  # Fecha cuando se marcó como presupuesto (usa fecha_creacion si no existe)
     fecha_aceptado = db.Column(db.Date)  # Fecha cuando se aceptó
@@ -297,7 +311,9 @@ class Presupuesto(db.Model):
     
     # Fechas adicionales del proceso (compatibilidad con pedidos)
     fecha_aceptacion = db.Column(db.Date)  # Alias de fecha_aceptado para compatibilidad
-    fecha_objetivo = db.Column(db.Date)  # Fecha objetivo de entrega
+    fecha_objetivo = db.Column(db.Date)  # Fecha objetivo de entrega (deprecated, usar fecha_objetivo_25 y fecha_objetivo_17)
+    fecha_objetivo_25 = db.Column(db.Date)  # Fecha objetivo de 25 días hábiles desde aceptación del mockup
+    fecha_objetivo_17 = db.Column(db.Date)  # Fecha objetivo de 17 días hábiles desde aceptación del mockup
     fecha_entrega_trabajo = db.Column(db.Date)
     fecha_envio_taller = db.Column(db.Date)
     fecha_entrega_bordados = db.Column(db.Date)
@@ -316,6 +332,9 @@ class Presupuesto(db.Model):
     
     # Relación con usuario al que se encarga el mockup
     mockup_encargado_a = db.relationship('Usuario', foreign_keys=[mockup_encargado_a_id], backref='mockups_encargados')
+    
+    # Relación con usuario al que se encarga hacer marcada
+    marcada_encargado_a = db.relationship('Usuario', foreign_keys=[marcada_encargado_a_id], backref='marcadas_encargadas')
     
     def __repr__(self):
         return f'<Presupuesto {self.id} - {self.cliente.nombre if self.cliente else "Sin cliente"}>'
