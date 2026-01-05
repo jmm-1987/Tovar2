@@ -154,6 +154,9 @@
                     {% if estado_actual == 'revision y empaquetado' %}
                     <div style="font-size: 0.8rem; font-weight: 600; margin-bottom: 2px; line-height: 1.2;">Revisión</div>
                     <div style="font-size: 0.8rem; font-weight: 600; margin-bottom: 2px; line-height: 1.2;">y empaquetado</div>
+                    {% elif estado_actual == 'entregado al cliente' %}
+                    <div style="font-size: 0.8rem; font-weight: 600; margin-bottom: 2px; line-height: 1.2;">Entregado</div>
+                    <div style="font-size: 0.8rem; font-weight: 600; margin-bottom: 2px; line-height: 1.2;">al cliente</div>
                     {% else %}
                     <div style="font-size: 0.8rem; font-weight: 600; margin-bottom: 2px;">{{ estado_actual|title }}</div>
                     {% endif %}
