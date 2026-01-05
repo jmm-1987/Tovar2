@@ -44,9 +44,12 @@ def index():
         necesita_commit = False
         
         for solicitud in solicitudes:
-            # Si tiene fecha de aceptación pero no tiene fechas objetivo, calcularlas
-            # Esto puede pasar si el mockup fue aceptado antes de implementar las nuevas fechas
-            if solicitud.fecha_aceptado:
+            # Las fechas objetivo se calculan cuando se acepta el mockup (subestado "aceptado" del estado "mockup")
+            # Este código solo es un fallback para solicitudes antiguas que ya tenían fecha_aceptado pero no fechas objetivo
+            # Solo calcular si el mockup ya fue aceptado (tiene fecha_aceptado) pero no tiene fechas objetivo
+            if solicitud.fecha_aceptado and not solicitud.fecha_objetivo_25 and not solicitud.fecha_objetivo_17:
+                # Verificar que realmente pasó por mockup y fue aceptado
+                # Solo calcular como fallback si no tiene fechas objetivo
                 from utils.fechas import calcular_fecha_saltando_festivos
                 if not solicitud.fecha_objetivo_25:
                     solicitud.fecha_objetivo_25 = calcular_fecha_saltando_festivos(solicitud.fecha_aceptado, 25)

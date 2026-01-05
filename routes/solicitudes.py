@@ -531,14 +531,12 @@ def cambiar_estado_solicitud(solicitud_id):
             from utils.fechas import calcular_fecha_saltando_festivos
             solicitud.fecha_limite_mockup = calcular_fecha_saltando_festivos(hoy, 3)
         
-        # Si se acepta, establecer fecha de aceptación y calcular fecha objetivo (20 días hábiles)
+        # Si se acepta la solicitud (estado aceptado), establecer fecha de aceptación
+        # NOTA: Las fechas objetivo (25 y 17 días) se calculan cuando se acepta el mockup, no aquí
         if nuevo_estado == 'aceptado' and estado_anterior != 'aceptado':
             if not solicitud.fecha_aceptado:
                 solicitud.fecha_aceptado = hoy
                 solicitud.fecha_aceptacion = hoy  # Compatibilidad
-                # Calcular fecha objetivo saltando días festivos
-                from utils.fechas import calcular_fecha_saltando_festivos
-                solicitud.fecha_objetivo = calcular_fecha_saltando_festivos(hoy, 20)
         
         # Crear registro del cambio solo si hubo cambio real
         if hubo_cambio or (nuevo_estado == estado_anterior and nuevo_subestado and nuevo_subestado != subestado_anterior):
@@ -1156,6 +1154,85 @@ def descargar_pdf_solicitud(solicitud_id):
         print(f"Error completo al generar PDF: {error_trace}")
         flash(f'Error al generar PDF: {str(e)}', 'error')
         return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
+
+@solicitudes_bp.route('/solicitudes/<int:solicitud_id>/hoja-trabajo')
+@login_required
+def hoja_trabajo_solicitud(solicitud_id):
+    """Generar hoja de trabajo en formato PDF"""
+    try:
+        from sqlalchemy.orm import joinedload
+        solicitud = Presupuesto.query.options(
+            joinedload(Presupuesto.cliente),
+            joinedload(Presupuesto.comercial),
+            joinedload(Presupuesto.lineas)
+        ).get_or_404(solicitud_id)
+        
+        # Renderizar el HTML de la hoja de trabajo
+        html = render_template('solicitudes/hoja_trabajo.html', 
+                             solicitud=solicitud,
+                             use_base64=True)
+        
+        # Crear el PDF en memoria usando playwright
+        pdf_buffer = BytesIO()
+        
+        try:
+            # Guardar HTML temporalmente para que playwright pueda acceder a él
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+                temp_file.write(html)
+                temp_html_path = temp_file.name
+            
+            # Usar playwright para generar el PDF
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                
+                # Cargar el HTML desde el archivo temporal
+                page.goto(f'file://{temp_html_path}')
+                
+                # Generar PDF
+                pdf_bytes = page.pdf(
+                    format='A4',
+                    print_background=True,
+                    margin={
+                        'top': '10mm',
+                        'right': '10mm',
+                        'bottom': '10mm',
+                        'left': '10mm'
+                    }
+                )
+                
+                browser.close()
+            
+            # Escribir el PDF al buffer
+            pdf_buffer.write(pdf_bytes)
+            
+            # Limpiar archivo temporal
+            try:
+                os.unlink(temp_html_path)
+            except:
+                pass
+            
+        except Exception as pdf_error:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error al crear PDF con playwright: {error_trace}")
+            flash(f'Error al generar PDF: {str(pdf_error)}', 'error')
+            return redirect(url_for('index.index'))
+        
+        # Preparar la respuesta con el PDF
+        pdf_buffer.seek(0)
+        response = make_response(pdf_buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=hoja_trabajo_{solicitud.numero_solicitud or solicitud.id}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error completo al generar hoja de trabajo: {error_trace}")
+        flash(f'Error al generar hoja de trabajo: {str(e)}', 'error')
+        return redirect(url_for('index.index'))
 
 @solicitudes_bp.route('/solicitudes/imagen/<path:ruta_imagen>')
 @login_required

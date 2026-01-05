@@ -10,26 +10,21 @@ def es_dia_festivo(fecha, excluir_sabados=None, excluir_domingos=None):
     
     Args:
         fecha: objeto date a verificar
-        excluir_sabados: si se deben excluir sábados (None para obtener de BD)
-        excluir_domingos: si se deben excluir domingos (None para obtener de BD)
+        excluir_sabados: si se deben excluir sábados (None para obtener de BD, True por defecto)
+        excluir_domingos: si se deben excluir domingos (None para obtener de BD, True por defecto)
     
     Returns:
         True si es día festivo/no laborable, False en caso contrario
     """
-    # Obtener configuración de sábados y domingos si no se proporciona
+    # SIEMPRE excluir sábados y domingos (son días no laborables)
+    # La configuración solo se usa si se proporciona explícitamente el parámetro
     if excluir_sabados is None:
-        try:
-            config_sabados = Configuracion.query.filter_by(clave='excluir_sabados').first()
-            excluir_sabados = config_sabados.valor.lower() == 'true' if config_sabados else False
-        except:
-            excluir_sabados = False
+        # Por defecto, SIEMPRE excluir sábados
+        excluir_sabados = True
     
     if excluir_domingos is None:
-        try:
-            config_domingos = Configuracion.query.filter_by(clave='excluir_domingos').first()
-            excluir_domingos = config_domingos.valor.lower() == 'true' if config_domingos else False
-        except:
-            excluir_domingos = False
+        # Por defecto, SIEMPRE excluir domingos
+        excluir_domingos = True
     
     # Verificar si es sábado o domingo
     dia_semana = fecha.weekday()  # 0=Lunes, 6=Domingo
@@ -43,7 +38,8 @@ def es_dia_festivo(fecha, excluir_sabados=None, excluir_domingos=None):
         dia_festivo = DiaFestivo.query.filter_by(fecha=fecha, activo=True).first()
         if dia_festivo:
             return True
-    except:
+    except Exception as e:
+        print(f"Error al verificar día festivo {fecha}: {e}")
         pass
     
     return False
@@ -61,12 +57,18 @@ def calcular_fecha_saltando_festivos(fecha_inicio, dias_habiles):
     """
     fecha_actual = fecha_inicio
     dias_sumados = 0
+    max_iteraciones = dias_habiles * 3  # Límite de seguridad (máximo 3 veces los días hábiles)
+    iteraciones = 0
     
-    while dias_sumados < dias_habiles:
+    while dias_sumados < dias_habiles and iteraciones < max_iteraciones:
         fecha_actual += timedelta(days=1)
+        iteraciones += 1
         # Si no es día festivo, contar como día hábil
         if not es_dia_festivo(fecha_actual):
             dias_sumados += 1
+    
+    if iteraciones >= max_iteraciones:
+        print(f"ADVERTENCIA: Se alcanzó el límite de iteraciones al calcular fecha. Inicio: {fecha_inicio}, Días hábiles: {dias_habiles}, Fecha final: {fecha_actual}")
     
     return fecha_actual
 

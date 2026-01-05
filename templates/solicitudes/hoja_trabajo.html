@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hoja de Trabajo - Solicitud {{ solicitud.numero_solicitud or solicitud.id }}</title>
+    <style type="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        @page {
+            size: A4;
+            margin: 10mm;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: white;
+            color: #333;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            background: white;
+            margin: 0 auto;
+            padding: 10mm;
+            page-break-after: always;
+        }
+        
+        .page:last-child {
+            page-break-after: auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 3px solid #2c3e50;
+            padding-bottom: 15px;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .header .numero {
+            font-size: 18px;
+            color: #666;
+            font-weight: bold;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+            page-break-inside: avoid;
+        }
+        
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .two-columns {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        
+        .info-item {
+            margin-bottom: 8px;
+        }
+        
+        .info-item strong {
+            color: #495057;
+            display: inline-block;
+            min-width: 140px;
+        }
+        
+        .info-item span {
+            color: #212529;
+        }
+        
+        .fabricacion-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .fabricacion-item {
+            margin-bottom: 10px;
+        }
+        
+        .fabricacion-item strong {
+            display: block;
+            color: #495057;
+            margin-bottom: 3px;
+        }
+        
+        .fabricacion-item div {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            color: #212529;
+            min-height: 30px;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 10px;
+        }
+        
+        table thead {
+            background: #2c3e50;
+            color: white;
+        }
+        
+        table th {
+            padding: 8px 5px;
+            text-align: left;
+            font-weight: bold;
+            border: 1px solid #dee2e6;
+        }
+        
+        table td {
+            padding: 6px 5px;
+            border: 1px solid #dee2e6;
+        }
+        
+        table tbody tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+        
+        .text-right {
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <!-- Encabezado -->
+        <div class="header">
+            <h1>HOJA DE TRABAJO</h1>
+            <div class="numero">Solicitud: {{ solicitud.numero_solicitud or solicitud.id }}</div>
+        </div>
+        
+        <!-- Datos del Cliente -->
+        <div class="section">
+            <div class="section-title">DATOS DEL CLIENTE</div>
+            <div class="two-columns">
+                <div>
+                    <div class="info-item">
+                        <strong>Nombre:</strong>
+                        <span>{{ solicitud.cliente.nombre if solicitud.cliente else 'N/A' }}</span>
+                    </div>
+                    {% if solicitud.cliente.direccion %}
+                    <div class="info-item">
+                        <strong>Dirección:</strong>
+                        <span>{{ solicitud.cliente.direccion }}</span>
+                    </div>
+                    {% endif %}
+                    {% if solicitud.cliente.poblacion %}
+                    <div class="info-item">
+                        <strong>Población:</strong>
+                        <span>{{ solicitud.cliente.poblacion }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div>
+                    {% if solicitud.cliente.telefono %}
+                    <div class="info-item">
+                        <strong>Teléfono:</strong>
+                        <span>{{ solicitud.cliente.telefono }}</span>
+                    </div>
+                    {% endif %}
+                    {% if solicitud.cliente.email %}
+                    <div class="info-item">
+                        <strong>Email:</strong>
+                        <span>{{ solicitud.cliente.email }}</span>
+                    </div>
+                    {% endif %}
+                    {% if solicitud.cliente.nif %}
+                    <div class="info-item">
+                        <strong>NIF:</strong>
+                        <span>{{ solicitud.cliente.nif }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Datos de la Solicitud -->
+        <div class="section">
+            <div class="section-title">DATOS DE LA SOLICITUD</div>
+            <div class="two-columns">
+                <div>
+                    <div class="info-item">
+                        <strong>Estado:</strong>
+                        <span>{{ solicitud.estado|title }}</span>
+                    </div>
+                    <div class="info-item">
+                        <strong>Tipo:</strong>
+                        <span>{{ solicitud.tipo_pedido|title }}</span>
+                    </div>
+                    {% if solicitud.comercial %}
+                    <div class="info-item">
+                        <strong>Comercial:</strong>
+                        <span>{{ solicitud.comercial.nombre }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                <div>
+                    {% if solicitud.fecha_creacion %}
+                    <div class="info-item">
+                        <strong>Fecha Creación:</strong>
+                        <span>{{ solicitud.fecha_creacion.strftime('%d/%m/%Y') }}</span>
+                    </div>
+                    {% endif %}
+                    {% if solicitud.fecha_aceptado %}
+                    <div class="info-item">
+                        <strong>Fecha Aceptación:</strong>
+                        <span>{{ solicitud.fecha_aceptado.strftime('%d/%m/%Y') }}</span>
+                    </div>
+                    {% endif %}
+                    {% if solicitud.fecha_objetivo_17 %}
+                    <div class="info-item">
+                        <strong>Fecha Objetivo (17 días):</strong>
+                        <span>{{ solicitud.fecha_objetivo_17.strftime('%d/%m/%Y') }}</span>
+                    </div>
+                    {% endif %}
+                    {% if solicitud.fecha_objetivo_25 %}
+                    <div class="info-item">
+                        <strong>Fecha Objetivo (25 días):</strong>
+                        <span>{{ solicitud.fecha_objetivo_25.strftime('%d/%m/%Y') }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Información para la Fabricación -->
+        <div class="section">
+            <div class="section-title">INFORMACIÓN PARA LA FABRICACIÓN</div>
+            <div class="fabricacion-grid">
+                <div class="fabricacion-item">
+                    <strong>Tipo Producto:</strong>
+                    <div>{{ solicitud.tipo_producto or 'No especificado' }}</div>
+                </div>
+                <div class="fabricacion-item">
+                    <strong>Colores Principales:</strong>
+                    <div>{{ solicitud.colores_principales or 'No especificado' }}</div>
+                </div>
+                <div class="fabricacion-item">
+                    <strong>Colores Secundarios:</strong>
+                    <div>{{ solicitud.colores_secundarios or 'No especificado' }}</div>
+                </div>
+                <div class="fabricacion-item">
+                    <strong>Ubicación del Logo:</strong>
+                    <div>{{ solicitud.ubicacion_logo or 'No especificado' }}</div>
+                </div>
+            </div>
+            {% if solicitud.referencias_web %}
+            <div class="fabricacion-item" style="grid-column: 1 / -1;">
+                <strong>Referencias Web:</strong>
+                <div style="white-space: pre-wrap; word-break: break-all;">{{ solicitud.referencias_web }}</div>
+            </div>
+            {% endif %}
+            {% if solicitud.datos_adicionales %}
+            <div class="fabricacion-item" style="grid-column: 1 / -1;">
+                <strong>Datos/Info Adicional:</strong>
+                <div style="white-space: pre-wrap;">{{ solicitud.datos_adicionales }}</div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Líneas del Pedido -->
+        <div class="section">
+            <div class="section-title">LÍNEAS DEL PEDIDO</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 5%;">#</th>
+                        <th style="width: 20%;">Nombre</th>
+                        <th style="width: 8%;" class="text-center">Cant.</th>
+                        <th style="width: 8%;">Talla</th>
+                        <th style="width: 15%;">Modelo</th>
+                        <th style="width: 10%;">Color</th>
+                        <th style="width: 10%;">Forma</th>
+                        <th style="width: 8%;">Sexo</th>
+                        <th style="width: 10%;">Tejido</th>
+                        <th style="width: 6%;" class="text-right">Precio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linea in solicitud.lineas %}
+                    <tr>
+                        <td class="text-center">{{ loop.index }}</td>
+                        <td>{{ linea.nombre_mostrar or linea.nombre or 'N/A' }}</td>
+                        <td class="text-center">{{ linea.cantidad }}</td>
+                        <td>{{ linea.talla or '-' }}</td>
+                        <td>{{ linea.prenda.nombre if linea.prenda else (linea.nombre or '-') }}</td>
+                        <td>{{ linea.color or '-' }}</td>
+                        <td>{{ linea.forma or '-' }}</td>
+                        <td>{{ linea.sexo|title if linea.sexo else '-' }}</td>
+                        <td>{{ linea.tejido or '-' }}</td>
+                        <td class="text-right">{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '-' }} €</td>
+                    </tr>
+                    {% if linea.nombre or linea.cargo %}
+                    <tr style="background: #fff3cd;">
+                        <td colspan="10" style="padding-left: 20px; font-size: 9px;">
+                            {% if linea.nombre %}<strong>Nombre personalizado:</strong> {{ linea.nombre }}{% endif %}
+                            {% if linea.nombre and linea.cargo %} | {% endif %}
+                            {% if linea.cargo %}<strong>Cargo:</strong> {{ linea.cargo }}{% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% if solicitud.seguimiento %}
+        <div class="section">
+            <div class="section-title">SEGUIMIENTO</div>
+            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; white-space: pre-wrap;">{{ solicitud.seguimiento }}</div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
+
