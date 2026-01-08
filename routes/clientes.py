@@ -182,8 +182,9 @@ def ficha_cliente(id):
     # Obtener solicitudes (presupuestos) del cliente en lugar de pedidos
     pedidos = Presupuesto.query.filter_by(cliente_id=id).order_by(Presupuesto.fecha_creacion.desc()).limit(20).all()
     
-    # Obtener historial de facturas (a través de presupuestos/solicitudes o pedidos antiguos)
-    # Las facturas pueden venir de presupuestos (nuevo sistema) o de pedidos (sistema antiguo)
+    # Obtener historial de facturas (a través de presupuestos/solicitudes, pedidos antiguos, o por NIF)
+    # Las facturas pueden venir de presupuestos (nuevo sistema), pedidos (sistema antiguo), o albaranes facturados
+    from sqlalchemy import or_
     facturas = Factura.query.filter(
         or_(
             Factura.presupuesto_id.in_(
@@ -191,7 +192,9 @@ def ficha_cliente(id):
             ),
             Factura.pedido_id.in_(
                 db.session.query(Pedido.id).filter_by(cliente_id=id)
-            )
+            ),
+            # Incluir facturas que coincidan con el NIF del cliente (para facturas de albaranes)
+            Factura.nif == cliente.nif
         )
     ).order_by(Factura.fecha_creacion.desc()).limit(20).all()
     

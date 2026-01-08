@@ -27,18 +27,44 @@
         .page {
             width: 210mm;
             min-height: 297mm;
-            max-height: 297mm;
+            height: 297mm;
             background: white;
             margin: 0 auto 10px;
             padding: 10mm;
+            padding-bottom: 25mm;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            page-break-after: always;
+            page-break-after: auto;
             page-break-inside: avoid;
             overflow: hidden;
             box-sizing: border-box;
+            position: relative;
+        }
+        
+        .page-content {
+            min-height: calc(297mm - 30mm);
+            padding-bottom: 20mm;
+        }
+        
+        .footer-datos {
+            position: absolute;
+            bottom: 5mm;
+            left: 10mm;
+            right: 10mm;
+            margin-top: 30px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            font-size: 9px;
+            color: #666;
+            line-height: 1.3;
+            text-align: justify;
         }
         
         .page:last-child {
+            page-break-after: auto;
+        }
+        
+        .page:only-child {
             page-break-after: auto;
         }
         
@@ -200,12 +226,16 @@
             .page {
                 margin: 0;
                 box-shadow: none;
-                page-break-after: always;
+                page-break-after: auto;
                 page-break-inside: avoid;
                 overflow: hidden;
             }
             
             .page:last-child {
+                page-break-after: auto;
+            }
+            
+            .page:only-child {
                 page-break-after: auto;
             }
             
@@ -222,6 +252,7 @@
 <body>
     <!-- PÁGINA 1: CONTENIDO DEL ALBARÁN -->
     <div class="page">
+        <div class="page-content">
         <div class="albaran-header">
             <div class="logo-section">
                 {% if use_base64 is defined and use_base64 and logo_base64 %}
@@ -334,6 +365,12 @@
             Este albarán no tiene líneas registradas.
         </p>
         {% endif %}
+        </div>
+        
+        <!-- Pie de página con información de protección de datos -->
+        <div class="footer-datos">
+            <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.</p>
+        </div>
     </div>
 
     <div class="no-print">
