@@ -27,18 +27,44 @@
         .page {
             width: 210mm;
             min-height: 297mm;
-            max-height: 297mm;
+            height: 297mm;
             background: white;
             margin: 0 auto 10px;
-            padding: 5mm 10mm 10mm 10mm;
+            padding: 5mm 10mm 5mm 10mm;
+            padding-bottom: 25mm;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            page-break-after: always;
+            page-break-after: auto;
             page-break-inside: avoid;
             overflow: hidden;
             box-sizing: border-box;
+            position: relative;
+        }
+        
+        .page-content {
+            min-height: calc(297mm - 30mm);
+            padding-bottom: 20mm;
+        }
+        
+        .footer-datos {
+            position: absolute;
+            bottom: 5mm;
+            left: 10mm;
+            right: 10mm;
+            margin-top: 30px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            font-size: 9px;
+            color: #666;
+            line-height: 1.3;
+            text-align: justify;
         }
         
         .page:last-child {
+            page-break-after: auto;
+        }
+        
+        .page:only-child {
             page-break-after: auto;
         }
         
@@ -454,12 +480,16 @@
             .page {
                 margin: 0;
                 box-shadow: none;
-                page-break-after: always;
+                page-break-after: auto;
                 page-break-inside: avoid;
                 overflow: hidden;
             }
             
             .page:last-child {
+                page-break-after: auto;
+            }
+            
+            .page:only-child {
                 page-break-after: auto;
             }
             
@@ -514,6 +544,7 @@
     
     <!-- PÁGINA 1: CONTENIDO DEL PRESUPUESTO -->
     <div class="page">
+        <div class="page-content">
         <div class="presupuesto-header">
             <div class="logo-section">
                 {% if use_base64 is defined and use_base64 and logo_base64 %}
@@ -542,28 +573,31 @@
                 <p><strong>Fecha:</strong> {{ presupuesto.fecha_creacion.strftime('%d/%m/%Y') if presupuesto.fecha_creacion else 'N/A' }}</p>
                 <p><strong>Estado:</strong> {{ presupuesto.estado }}</p>
                 <p><strong>Tipo:</strong> {{ presupuesto.tipo_pedido }} | <strong>Comercial:</strong> {{ presupuesto.comercial.nombre if presupuesto.comercial else 'N/A' }}{% if presupuesto.comercial and presupuesto.comercial.usuario and presupuesto.comercial.usuario.telefono %} - {{ presupuesto.comercial.usuario.telefono }}{% endif %}</p>
+                {% if presupuesto.forma_pago %}
+                <p><strong>Forma de Pago:</strong> {{ presupuesto.forma_pago }}</p>
+                {% endif %}
                 
                 <h3 style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;">Datos del Cliente</h3>
-                <p><strong>Nombre:</strong> {{ presupuesto.cliente.nombre if presupuesto.cliente else 'N/A' }}</p>
-                {% if presupuesto.cliente and presupuesto.cliente.nif %}
-                <p><strong>NIF:</strong> {{ presupuesto.cliente.nif }}</p>
-                {% endif %}
+                <p><strong>{{ presupuesto.cliente.nombre if presupuesto.cliente else 'N/A' }}</strong></p>
                 {% if presupuesto.cliente and presupuesto.cliente.direccion %}
-                <p><strong>Dirección:</strong> {{ presupuesto.cliente.direccion }}</p>
+                <p>{{ presupuesto.cliente.direccion }}</p>
                 {% endif %}
-                {% if presupuesto.cliente and presupuesto.cliente.poblacion %}
-                <p><strong>Población:</strong> {{ presupuesto.cliente.poblacion }}{% if presupuesto.cliente.provincia %}, {{ presupuesto.cliente.provincia }}{% endif %}{% if presupuesto.cliente.codigo_postal %} - {{ presupuesto.cliente.codigo_postal }}{% endif %}</p>
-                {% elif presupuesto.cliente and presupuesto.cliente.provincia %}
-                <p><strong>Provincia:</strong> {{ presupuesto.cliente.provincia }}</p>
+                {% if presupuesto.cliente %}
+                    {% set cp = presupuesto.cliente.codigo_postal or '' %}
+                    {% set poblacion = presupuesto.cliente.poblacion or '' %}
+                    {% set provincia = presupuesto.cliente.provincia or '' %}
+                    {% if cp or poblacion or provincia %}
+                        <p>
+                            {% if cp %}{{ cp }}{% endif %}
+                            {% if cp and poblacion %}-{% endif %}
+                            {% if poblacion %}{{ poblacion }}{% endif %}
+                            {% if (cp or poblacion) and provincia %}-{% endif %}
+                            {% if provincia %}{{ provincia }}{% endif %}
+                        </p>
+                    {% endif %}
                 {% endif %}
-                {% if presupuesto.cliente and presupuesto.cliente.telefono %}
-                <p><strong>Teléfono:</strong> {{ presupuesto.cliente.telefono }}</p>
-                {% endif %}
-                {% if presupuesto.cliente and presupuesto.cliente.movil %}
-                <p><strong>Móvil:</strong> {{ presupuesto.cliente.movil }}</p>
-                {% endif %}
-                {% if presupuesto.cliente and presupuesto.cliente.email %}
-                <p><strong>Email:</strong> {{ presupuesto.cliente.email }}</p>
+                {% if presupuesto.cliente and presupuesto.cliente.nif %}
+                <p><strong>CIF/NIF:</strong> {{ presupuesto.cliente.nif }}</p>
                 {% endif %}
             </div>
             {% if presupuesto.imagen_diseno %}
@@ -833,11 +867,11 @@
             <p>LA EMPRESA se compromete a informar a EL CLIENTE de cualquier retraso significativo en los plazos de entrega con la mayor antelación posible.</p>
             
             <h3>3. CALIDAD Y ESPECIFICACIONES</h3>
-            <p>LA EMPRESA garantiza que todas las prendas fabricadas cumplirán con las especificaciones acordadas en el presupuesto. Las muestras, si las hubiera, son orientativas y pueden presentar ligeras variaciones en la producción final debido a las características propias de los procesos de fabricación textil.</p>
+            <p>LA EMPRESA garantiza que todos los productos fabricados cumplirán con las especificaciones acordadas en el presupuesto. Las muestras, si las hubiera, son orientativas y pueden presentar ligeras variaciones en la producción final debido a las características propias de los procesos de fabricación textil.</p>
             <p>EL CLIENTE deberá revisar y aprobar las muestras antes de la producción en serie. Cualquier modificación solicitada después de la aprobación de muestras puede conllevar costes adicionales y retrasos en la entrega.</p>
             
             <h3>4. COLORES Y TELAS</h3>
-            <p>Los colores de las prendas pueden presentar ligeras variaciones debido a:</p>
+            <p>Los colores de los productos pueden presentar ligeras variaciones debido a:</p>
             <ul>
                 <li>Diferencias entre lotes de tela</li>
                 <li>Características de los procesos de teñido</li>
@@ -862,11 +896,11 @@
             <p>Las cancelaciones de pedidos después de la aceptación del presupuesto pueden conllevar el pago de los costes ya incurridos en materiales, mano de obra y procesos de producción iniciados.</p>
             
             <h3>8. RECEPCIÓN Y REVISIÓN</h3>
-            <p>EL CLIENTE deberá revisar las prendas recibidas en un plazo máximo de 7 días naturales desde la entrega. Cualquier reclamación por defectos de fabricación deberá comunicarse por escrito dentro de este plazo, adjuntando fotografías y descripción detallada del problema.</p>
-            <p>Pasado este plazo sin comunicación, se entenderá que las prendas han sido aceptadas conforme.</p>
+            <p>EL CLIENTE deberá revisar los productos recibidos en un plazo máximo de 7 días naturales desde la entrega. Cualquier reclamación por defectos de fabricación deberá comunicarse por escrito dentro de este plazo, adjuntando fotografías y descripción detallada del problema.</p>
+            <p>Pasado este plazo sin comunicación, se entenderá que los productos han sido aceptados conforme.</p>
             
             <h3>9. GARANTÍA</h3>
-            <p>LA EMPRESA garantiza la calidad de las prendas fabricadas durante un período de 6 meses desde la fecha de entrega, siempre que se hayan seguido las instrucciones de cuidado y mantenimiento proporcionadas.</p>
+            <p>LA EMPRESA garantiza la calidad de los productos fabricados durante un período de 6 meses desde la fecha de entrega, siempre que se hayan seguido las instrucciones de cuidado y mantenimiento proporcionadas.</p>
             <p>La garantía no cubre:</p>
             <ul>
                 <li>Desgaste normal por uso</li>
@@ -876,18 +910,7 @@
             </ul>
             
             <h3>10. PROPIEDAD INTELECTUAL</h3>
-            <p>Los diseños, logos y elementos gráficos proporcionados por EL CLIENTE para su aplicación en las prendas deben ser de su propiedad o contar con las licencias necesarias. LA EMPRESA no se responsabiliza de cualquier reclamación relacionada con derechos de propiedad intelectual de terceros.</p>
-            
-            {% if presupuesto.forma_pago or (presupuesto.cliente and presupuesto.cliente.numero_cuenta) %}
-            <div style="margin-top: 10px; margin-bottom: 10px; padding: 8px; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6;">
-                {% if presupuesto.forma_pago %}
-                <p style="margin: 3px 0;"><strong>Forma de Pago:</strong> {{ presupuesto.forma_pago }}</p>
-                {% endif %}
-                {% if presupuesto.cliente and presupuesto.cliente.numero_cuenta %}
-                <p style="margin: 3px 0;"><strong>Número de Cuenta:</strong> {{ presupuesto.cliente.numero_cuenta }}</p>
-                {% endif %}
-            </div>
-            {% endif %}
+            <p>Los diseños, logos y elementos gráficos proporcionados por EL CLIENTE para su aplicación en los productos deben ser de su propiedad o contar con las licencias necesarias. LA EMPRESA no se responsabiliza de cualquier reclamación relacionada con derechos de propiedad intelectual de terceros.</p>
             
             <h3>11. PROTECCIÓN DE DATOS</h3>
             <p>Los datos personales y comerciales facilitados por EL CLIENTE serán tratados conforme a la normativa vigente de protección de datos, utilizándose únicamente para la gestión del pedido y la relación comercial.</p>
@@ -913,6 +936,12 @@
                 <p style="margin: 2px 0;">Fecha: ___________________</p>
                 <p style="margin: 2px 0;">Lugar: ___________________</p>
             </div>
+        </div>
+        </div>
+        
+        <!-- Pie de página con información de protección de datos -->
+        <div class="footer-datos">
+            <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.</p>
         </div>
     </div>
     {% endif %}

@@ -298,11 +298,40 @@ def migrate_database():
                 columns_lineas_presupuesto = [col['name'] for col in inspector.get_columns('lineas_presupuesto')]
                 
                 # Verificar si prenda_id es NOT NULL y hacerlo nullable si es necesario
+                # En SQLite, la información de nullable puede no ser confiable, así que verificamos de otra forma
                 prenda_id_not_null = False
-                for col_info in inspector.get_columns('lineas_presupuesto'):
-                    if col_info['name'] == 'prenda_id' and col_info.get('nullable') == False:
+                try:
+                    # Obtener el SQL de creación de la tabla desde sqlite_master
+                    test_result = db.session.execute(text('''
+                        SELECT sql FROM sqlite_master 
+                        WHERE type='table' AND name='lineas_presupuesto'
+                    ''')).fetchone()
+                    
+                    if test_result and test_result[0]:
+                        sql_create = test_result[0].upper()
+                        # Verificar si en el SQL de creación aparece "prenda_id" con "NOT NULL"
+                        # Buscar cualquier ocurrencia de "prenda_id" seguida de "NOT NULL"
+                        import re
+                        # Patrón simple: prenda_id seguido de NOT NULL en cualquier parte de la definición
+                        # pero antes de FOREIGN KEY
+                        pattern = r'PRENDA_ID\s+INTEGER\s+NOT\s+NULL'
+                        if re.search(pattern, sql_create):
+                            prenda_id_not_null = True
+                            print(f"DEBUG: Detectado prenda_id NOT NULL en estructura de tabla")
+                        # También verificar de forma más simple
+                        elif 'PRENDA_ID INTEGER NOT NULL' in sql_create.replace(' ', ''):
+                            prenda_id_not_null = True
+                            print(f"DEBUG: Detectado prenda_id NOT NULL (método alternativo)")
+                    else:
+                        # Si no podemos obtener el SQL, asumir que necesita migración
+                        print("DEBUG: No se pudo obtener SQL de creación, asumiendo que necesita migración")
                         prenda_id_not_null = True
-                        break
+                except Exception as e:
+                    print(f"Error al verificar estructura de prenda_id: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    # Si hay error, intentar migración por seguridad
+                    prenda_id_not_null = True
                 
                 # Si prenda_id es NOT NULL, necesitamos recrear la tabla para hacerla nullable
                 tabla_recreada = False

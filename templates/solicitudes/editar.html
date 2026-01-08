@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}Editar Solicitud #{{ solicitud.id }} - Gestión de Pedidos{% endblock %}
+{% block title %}Editar Solicitud {{ solicitud.numero_solicitud or solicitud.id }} - Gestión de Pedidos{% endblock %}
 
 {% block content %}
-<h2>Editar Solicitud #{{ solicitud.id }}</h2>
+<h2>Editar Solicitud {{ solicitud.numero_solicitud or solicitud.id }}</h2>
 
 <form method="POST" enctype="multipart/form-data">
     <div class="form-row-compact">
@@ -45,6 +45,7 @@
             <label for="tipo_pedido">Tipo *</label>
             <select name="tipo_pedido" id="tipo_pedido" required>
                 <option value="fabricacion" {% if solicitud.tipo_pedido == 'fabricacion' %}selected{% endif %}>Fabricación</option>
+                <option value="bordado" {% if solicitud.tipo_pedido == 'bordado' %}selected{% endif %}>Bordado/Serig.</option>
                 <option value="pedido proveedor" {% if solicitud.tipo_pedido == 'pedido proveedor' %}selected{% endif %}>Pedido proveedor</option>
             </select>
         </div>
@@ -127,13 +128,67 @@
         </small>
     </div>
 
+    <h3 style="margin-top: 30px; margin-bottom: 15px; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px;">Información para la Fabricación</h3>
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dee2e6;">
+        <div class="form-row-compact">
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="tipo_producto">Tipo Producto *</label>
+                <input type="text" name="tipo_producto" id="tipo_producto" required value="{{ solicitud.tipo_producto or '' }}" placeholder="Ej: Camiseta, Polo, Sudadera..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="colores_principales">Colores Principales *</label>
+                <input type="text" name="colores_principales" id="colores_principales" required value="{{ solicitud.colores_principales or '' }}" placeholder="Ej: Azul marino, Rojo, Negro..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+        </div>
+        
+        <div class="form-row-compact">
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="colores_secundarios">Colores Secundarios *</label>
+                <input type="text" name="colores_secundarios" id="colores_secundarios" required value="{{ solicitud.colores_secundarios or '' }}" placeholder="Ej: Blanco, Gris claro..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="ubicacion_logo">Ubicación del Logo *</label>
+                <input type="text" name="ubicacion_logo" id="ubicacion_logo" required value="{{ solicitud.ubicacion_logo or '' }}" placeholder="Ej: Pecho izquierdo, Espalda, Manga..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+        </div>
+        
+        <div class="form-row-compact">
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="referencias_web">Referencias Web *</label>
+                <input type="text" name="referencias_web" id="referencias_web" required value="{{ solicitud.referencias_web or '' }}" placeholder="URLs o enlaces de referencia..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+            <div class="form-group-compact" style="flex: 1;">
+                <label for="datos_adicionales">Datos/Info Adicional *</label>
+                <input type="text" name="datos_adicionales" id="datos_adicionales" required value="{{ solicitud.datos_adicionales or '' }}" placeholder="Información adicional relevante..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            </div>
+        </div>
+    </div>
+
     <div class="form-group">
         <label for="seguimiento">Comentarios internos y seguimiento</label>
         <textarea name="seguimiento" id="seguimiento" rows="3" placeholder="Escribe aquí las actualizaciones y seguimiento de la solicitud...">{{ solicitud.seguimiento or '' }}</textarea>
     </div>
 
-    <h3>Prendas del Presupuesto</h3>
+    <h3>Productos del Presupuesto</h3>
     <div id="prendas-container">
+        <!-- Cabecera de las líneas del pedido -->
+        <div class="linea-pedido-header" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px 4px 0 0; margin-bottom: 0; font-weight: 600; font-size: 0.9rem; color: #495057;">
+            <div style="min-width: 35px; text-align: center;">#</div>
+            <div style="display: flex; flex: 1; gap: 6px; flex-wrap: wrap;">
+                <div style="flex: 0 0 750px;">Nombre</div>
+                <div style="flex: 0 0 80px;">Unidades</div>
+                <div style="flex: 0 0 150px;">Modelo</div>
+                <div style="flex: 0 0 100px;">Color</div>
+                <div style="flex: 0 0 100px;">Forma</div>
+                <div style="flex: 0 0 80px;">Sexo</div>
+                <div style="flex: 0 0 80px;">Talla</div>
+                <div style="flex: 0 0 120px;">Tejido</div>
+                <div style="flex: 0 0 100px;">Precio €</div>
+                <div style="flex: 0 0 80px;">Desc. %</div>
+                <div style="flex: 0 0 100px;">P. Final €</div>
+            </div>
+            <div style="flex: 0 0 100px; text-align: center;">Acciones</div>
+        </div>
         {% if solicitud.lineas %}
             {% for linea in solicitud.lineas %}
             <div class="linea-pedido-row">
@@ -142,12 +197,13 @@
                     <!-- Orden: nombre_mostrar, unidades, modelo, color, forma, sexo, talla, tejido, precio -->
                     <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" value="{{ linea.nombre_mostrar or '' }}" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 0 0 750px; width: 750px;">
                     <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="{{ linea.cantidad }}" min="1" required placeholder="Unidades *" title="Unidades">
-                    <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo">
-                        <option value="">Modelo *</option>
+                    <input type="text" name="prenda_nombre[]" class="linea-campo-compact prenda-input" value="{% if linea.prenda %}{{ linea.prenda.nombre }}{% endif %}" placeholder="Modelo (seleccione o escriba texto libre)" title="Modelo" list="prendas-list" autocomplete="off">
+                    <input type="hidden" name="prenda_id[]" class="prenda-id-hidden" value="{{ linea.prenda_id or '' }}">
+                    <datalist id="prendas-list">
                         {% for prenda in prendas %}
-                        <option value="{{ prenda.id }}" {% if linea.prenda_id == prenda.id %}selected{% endif %}>{{ prenda.nombre }}</option>
+                        <option value="{{ prenda.nombre }}" data-id="{{ prenda.id }}">{{ prenda.nombre }}</option>
                         {% endfor %}
-                    </select>
+                    </datalist>
                     <input type="text" name="color[]" class="linea-campo-compact" value="{{ linea.color or '' }}" placeholder="Color" title="Color">
                     <input type="text" name="forma[]" class="linea-campo-compact" value="{{ linea.forma or '' }}" placeholder="Forma" title="Forma" list="formas-list">
                     <select name="sexo[]" class="linea-campo-compact" title="Sexo">
@@ -192,12 +248,13 @@
                 <!-- Orden: nombre_mostrar, unidades, modelo, color, forma, sexo, talla, tejido, precio -->
                 <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 0 0 750px; width: 750px;">
                 <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="1" min="1" required placeholder="Unidades *" title="Unidades">
-                <select name="prenda_id[]" class="linea-campo-compact" required title="Modelo">
-                    <option value="">Modelo *</option>
+                <input type="text" name="prenda_nombre[]" class="linea-campo-compact prenda-input" placeholder="Modelo (seleccione o escriba texto libre)" title="Modelo" list="prendas-list" autocomplete="off">
+                <input type="hidden" name="prenda_id[]" class="prenda-id-hidden">
+                <datalist id="prendas-list">
                     {% for prenda in prendas %}
-                    <option value="{{ prenda.id }}">{{ prenda.nombre }}</option>
+                    <option value="{{ prenda.nombre }}" data-id="{{ prenda.id }}">{{ prenda.nombre }}</option>
                     {% endfor %}
-                </select>
+                </datalist>
                 <input type="text" name="color[]" class="linea-campo-compact" placeholder="Color" title="Color">
                 <input type="text" name="forma[]" class="linea-campo-compact" placeholder="Forma" title="Forma" list="formas-list">
                 <select name="sexo[]" class="linea-campo-compact" title="Sexo">
@@ -429,6 +486,12 @@ function agregarLinea() {
         select.selectedIndex = 0;
     });
     
+    // Limpiar campos de prenda
+    const prendaInputNuevo = nuevaLinea.querySelector('input[name="prenda_nombre[]"]');
+    const prendaIdHiddenNuevo = nuevaLinea.querySelector('input[name="prenda_id[]"].prenda-id-hidden');
+    if (prendaInputNuevo) prendaInputNuevo.value = '';
+    if (prendaIdHiddenNuevo) prendaIdHiddenNuevo.value = '';
+    
     // Resetear descuento y precio final
     const descuentoInput = nuevaLinea.querySelector('.descuento-input');
     const precioFinalInput = nuevaLinea.querySelector('.precio-final-input');
@@ -445,6 +508,56 @@ function agregarLinea() {
     if (precioUnitarioInput && descuentoInput && precioFinalInput) {
         precioUnitarioInput.addEventListener('input', calcularPrecioFinal);
         descuentoInput.addEventListener('input', calcularPrecioFinal);
+    }
+    
+    // Añadir listener para sincronizar prenda_id
+    const prendaInputNuevo = nuevaLinea.querySelector('input[name="prenda_nombre[]"]');
+    if (prendaInputNuevo) {
+        prendaInputNuevo.addEventListener('input', function() {
+            const prendaNombre = this.value.trim();
+            const prendaIdHidden = nuevaLinea.querySelector('input[name="prenda_id[]"].prenda-id-hidden');
+            if (!prendaIdHidden) return;
+            
+            if (prendaNombre === '') {
+                prendaIdHidden.value = '';
+                return;
+            }
+            
+            const datalist = document.getElementById('prendas-list');
+            if (datalist) {
+                const options = datalist.querySelectorAll('option');
+                for (const option of options) {
+                    if (option.value === prendaNombre) {
+                        const prendaId = option.getAttribute('data-id');
+                        if (prendaId) {
+                            prendaIdHidden.value = prendaId;
+                            return;
+                        }
+                    }
+                }
+            }
+            prendaIdHidden.value = '';
+        });
+        prendaInputNuevo.addEventListener('change', function() {
+            const prendaNombre = this.value.trim();
+            const prendaIdHidden = nuevaLinea.querySelector('input[name="prenda_id[]"].prenda-id-hidden');
+            if (!prendaIdHidden) return;
+            
+            const datalist = document.getElementById('prendas-list');
+            if (datalist) {
+                const options = datalist.querySelectorAll('option');
+                for (const option of options) {
+                    if (option.value === prendaNombre) {
+                        const prendaId = option.getAttribute('data-id');
+                        if (prendaId) {
+                            prendaIdHidden.value = prendaId;
+                            return;
+                        }
+                    }
+                }
+            }
+            prendaIdHidden.value = '';
+        });
     }
     
     // Resetear botón de personalizar
@@ -470,6 +583,58 @@ function renumerarPrendas() {
         }
     });
 }
+
+// Manejar input de prenda con datalist
+document.addEventListener('DOMContentLoaded', function() {
+    // Función para sincronizar prenda_id desde prenda_nombre
+    function sincronizarPrendaId(input) {
+        const prendaNombre = input.value.trim();
+        const prendaIdHidden = input.closest('.linea-pedido-campos')?.querySelector('input[name="prenda_id[]"].prenda-id-hidden');
+        if (!prendaIdHidden) return;
+        
+        if (prendaNombre === '') {
+            prendaIdHidden.value = '';
+            return;
+        }
+        
+        // Buscar en el datalist si el nombre coincide con alguna opción
+        const datalist = document.getElementById('prendas-list');
+        if (datalist) {
+            const options = datalist.querySelectorAll('option');
+            for (const option of options) {
+                if (option.value === prendaNombre) {
+                    const prendaId = option.getAttribute('data-id');
+                    if (prendaId) {
+                        prendaIdHidden.value = prendaId;
+                        return;
+                    }
+                }
+            }
+        }
+        
+        // Si no coincide, es texto libre, dejar prenda_id vacío
+        prendaIdHidden.value = '';
+    }
+    
+    // Añadir listeners a todos los inputs de prenda existentes
+    document.querySelectorAll('input[name="prenda_nombre[]"]').forEach(input => {
+        input.addEventListener('input', function() {
+            sincronizarPrendaId(this);
+        });
+        input.addEventListener('change', function() {
+            sincronizarPrendaId(this);
+        });
+        // Inicializar
+        sincronizarPrendaId(input);
+    });
+    
+    // Añadir listeners cuando se añaden nuevas líneas (mediante delegación de eventos)
+    document.addEventListener('input', function(e) {
+        if (e.target && e.target.name === 'prenda_nombre[]') {
+            sincronizarPrendaId(e.target);
+        }
+    });
+});
 
 // Función para calcular el precio final con descuento
 function calcularPrecioFinal(event) {
@@ -549,11 +714,13 @@ function duplicarLinea(btn) {
     const container = document.getElementById('prendas-container');
     
     // Obtener valores de los selects originales antes de limpiar
-    const prendaSelectOriginal = lineaRow.querySelector('select[name="prenda_id[]"]');
+    const prendaInputOriginal = lineaRow.querySelector('input[name="prenda_nombre[]"]');
+    const prendaIdHiddenOriginal = lineaRow.querySelector('input[name="prenda_id[]"].prenda-id-hidden');
     const sexoSelectOriginal = lineaRow.querySelector('select[name="sexo[]"]');
     const tejidoSelectOriginal = lineaRow.querySelector('select[name="tejido[]"]');
     
-    const prendaValue = prendaSelectOriginal ? prendaSelectOriginal.value : '';
+    const prendaNombreValue = prendaInputOriginal ? prendaInputOriginal.value : '';
+    const prendaIdValue = prendaIdHiddenOriginal ? prendaIdHiddenOriginal.value : '';
     const sexoValue = sexoSelectOriginal ? sexoSelectOriginal.value : '';
     const tejidoValue = tejidoSelectOriginal ? tejidoSelectOriginal.value : '';
     
@@ -568,13 +735,17 @@ function duplicarLinea(btn) {
         unidadesInput.value = '1';
     }
     
-    // Establecer valores de los selects en la línea duplicada
-    const prendaSelectNuevo = nuevaLinea.querySelector('select[name="prenda_id[]"]');
+    // Establecer valores en la línea duplicada
+    const prendaInputNuevo = nuevaLinea.querySelector('input[name="prenda_nombre[]"]');
+    const prendaIdHiddenNuevo = nuevaLinea.querySelector('input[name="prenda_id[]"].prenda-id-hidden');
     const sexoSelectNuevo = nuevaLinea.querySelector('select[name="sexo[]"]');
     const tejidoSelectNuevo = nuevaLinea.querySelector('select[name="tejido[]"]');
     
-    if (prendaSelectNuevo && prendaValue) {
-        prendaSelectNuevo.value = prendaValue;
+    if (prendaInputNuevo && prendaNombreValue) {
+        prendaInputNuevo.value = prendaNombreValue;
+    }
+    if (prendaIdHiddenNuevo && prendaIdValue) {
+        prendaIdHiddenNuevo.value = prendaIdValue;
     }
     if (sexoSelectNuevo && sexoValue) {
         sexoSelectNuevo.value = sexoValue;
@@ -781,12 +952,12 @@ window.onclick = function(event) {
                 <h4>Información Principal</h4>
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="nombre_cliente_modal">Nombre *</label>
-                        <input type="text" name="nombre" id="nombre_cliente_modal" required placeholder="Nombre o razón social">
+                        <label for="nombre_cliente_modal">Nombre Fiscal *</label>
+                        <input type="text" name="nombre" id="nombre_cliente_modal" required placeholder="Razón social o nombre fiscal">
                     </div>
                     <div class="form-group">
-                        <label for="alias_cliente_modal">Alias</label>
-                        <input type="text" name="alias" id="alias_cliente_modal" placeholder="Alias">
+                        <label for="alias_cliente_modal">Nombre Comercial</label>
+                        <input type="text" name="alias" id="alias_cliente_modal" placeholder="Nombre comercial">
                     </div>
                 </div>
                 <div class="form-row">
@@ -842,8 +1013,6 @@ window.onclick = function(event) {
                     <input type="email" name="email" id="email_cliente_modal" placeholder="email@ejemplo.com">
                 </div>
                 <div class="form-group">
-                    <label for="personas_contacto_cliente_modal">Personas de Contacto</label>
-                    <textarea name="personas_contacto" id="personas_contacto_cliente_modal" rows="2" placeholder="Nombre, teléfono, email"></textarea>
                 </div>
             </div>
 
@@ -851,7 +1020,7 @@ window.onclick = function(event) {
                 <h4>Dirección</h4>
                 <div class="form-group">
                     <label for="direccion_cliente_modal">Dirección</label>
-                    <textarea name="direccion" id="direccion_cliente_modal" rows="2" placeholder="Dirección completa"></textarea>
+                    <input type="text" name="direccion" id="direccion_cliente_modal" placeholder="Dirección completa">
                 </div>
                 <div class="form-row">
                     <div class="form-group">
