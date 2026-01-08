@@ -424,6 +424,7 @@ class LineaTicket(db.Model):
     # Campos de la línea
     descripcion = db.Column(db.String(500), nullable=False)
     cantidad = db.Column(db.Numeric(10, 2), nullable=False, default=1)
+    talla = db.Column(db.String(20), nullable=True)  # Talla del producto
     precio_unitario = db.Column(db.Numeric(10, 2), nullable=False)
     importe = db.Column(db.Numeric(10, 2), nullable=False)  # cantidad * precio_unitario
     

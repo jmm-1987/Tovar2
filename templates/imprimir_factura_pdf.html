@@ -27,44 +27,18 @@
         .page {
             width: 210mm;
             min-height: 297mm;
-            height: 297mm;
+            max-height: 297mm;
             background: white;
             margin: 0 auto 10px;
-            padding: 5mm 10mm 5mm 10mm;
-            padding-bottom: 25mm;
+            padding: 5mm 10mm 10mm 10mm;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            page-break-after: auto;
+            page-break-after: always;
             page-break-inside: avoid;
             overflow: hidden;
             box-sizing: border-box;
-            position: relative;
-        }
-        
-        .page-content {
-            min-height: calc(297mm - 30mm);
-            padding-bottom: 20mm;
-        }
-        
-        .footer-datos {
-            position: absolute;
-            bottom: 5mm;
-            left: 10mm;
-            right: 10mm;
-            margin-top: 30px;
-            padding: 8px;
-            background: #f8f9fa;
-            border-top: 1px solid #dee2e6;
-            font-size: 9px;
-            color: #666;
-            line-height: 1.3;
-            text-align: justify;
         }
         
         .page:last-child {
-            page-break-after: auto;
-        }
-        
-        .page:only-child {
             page-break-after: auto;
         }
         
@@ -255,16 +229,12 @@
             .page {
                 margin: 0;
                 box-shadow: none;
-                page-break-after: auto;
+                page-break-after: always;
                 page-break-inside: avoid;
                 overflow: hidden;
             }
             
             .page:last-child {
-                page-break-after: auto;
-            }
-            
-            .page:only-child {
                 page-break-after: auto;
             }
         }
@@ -291,7 +261,6 @@
                 <p>B06763502</p>
                 <p>C/Marquesa de Pinares, 11</p>
                 <p>06800-Mérida (Badajoz)</p>
-                <p>IBAN: ES2200495247862816942248</p>
             </div>
         </div>
 
@@ -310,46 +279,28 @@
                 {% if pedido and pedido.tipo_pedido %}
                 <p><strong>Tipo:</strong> {{ pedido.tipo_pedido }}</p>
                 {% endif %}
-                {% if pedido and pedido.forma_pago %}
-                <p><strong>Forma de Pago:</strong> {{ pedido.forma_pago }}</p>
-                {% endif %}
                 
                 <h3 style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;">Datos del Cliente</h3>
-                <p>{{ factura.nombre }}</p>
-                {% if cliente and cliente.direccion %}
-                <p>{{ cliente.direccion }}</p>
-                {% elif pedido and pedido.cliente and pedido.cliente.direccion %}
-                <p>{{ pedido.cliente.direccion }}</p>
-                {% endif %}
-                {% if cliente %}
-                    {% set cp = cliente.codigo_postal or '' %}
-                    {% set poblacion = cliente.poblacion or '' %}
-                    {% set provincia = cliente.provincia or '' %}
-                    {% if cp or poblacion or provincia %}
-                    <p>
-                        {% if cp %}{{ cp }}{% endif %}
-                        {% if cp and poblacion %} - {% endif %}
-                        {% if poblacion %}{{ poblacion }}{% endif %}
-                        {% if (cp or poblacion) and provincia %} - {% endif %}
-                        {% if provincia %}{{ provincia }}{% endif %}
-                    </p>
-                    {% endif %}
-                {% elif pedido and pedido.cliente %}
-                    {% set cp = pedido.cliente.codigo_postal or '' %}
-                    {% set poblacion = pedido.cliente.poblacion or '' %}
-                    {% set provincia = pedido.cliente.provincia or '' %}
-                    {% if cp or poblacion or provincia %}
-                    <p>
-                        {% if cp %}{{ cp }}{% endif %}
-                        {% if cp and poblacion %} - {% endif %}
-                        {% if poblacion %}{{ poblacion }}{% endif %}
-                        {% if (cp or poblacion) and provincia %} - {% endif %}
-                        {% if provincia %}{{ provincia }}{% endif %}
-                    </p>
-                    {% endif %}
-                {% endif %}
+                <p><strong>Nombre:</strong> {{ factura.nombre }}</p>
                 {% if factura.nif %}
-                <p><strong>CIF/NIF:</strong> {{ factura.nif }}</p>
+                <p><strong>NIF:</strong> {{ factura.nif }}</p>
+                {% endif %}
+                {% if pedido and pedido.cliente and pedido.cliente.direccion %}
+                <p><strong>Dirección:</strong> {{ pedido.cliente.direccion }}</p>
+                {% endif %}
+                {% if pedido and pedido.cliente and pedido.cliente.poblacion %}
+                <p><strong>Población:</strong> {{ pedido.cliente.poblacion }}{% if pedido.cliente.provincia %}, {{ pedido.cliente.provincia }}{% endif %}{% if pedido.cliente.codigo_postal %} - {{ pedido.cliente.codigo_postal }}{% endif %}</p>
+                {% elif pedido and pedido.cliente and pedido.cliente.provincia %}
+                <p><strong>Provincia:</strong> {{ pedido.cliente.provincia }}</p>
+                {% endif %}
+                {% if pedido and pedido.cliente and pedido.cliente.telefono %}
+                <p><strong>Teléfono:</strong> {{ pedido.cliente.telefono }}</p>
+                {% endif %}
+                {% if pedido and pedido.cliente and pedido.cliente.movil %}
+                <p><strong>Móvil:</strong> {{ pedido.cliente.movil }}</p>
+                {% endif %}
+                {% if pedido and pedido.cliente and pedido.cliente.email %}
+                <p><strong>Email:</strong> {{ pedido.cliente.email }}</p>
                 {% endif %}
             </div>
             <div class="datos-box">
@@ -470,11 +421,21 @@
             Esta factura no tiene líneas registradas.
         </p>
         {% endif %}
-        </div>
         
-        <!-- Pie de página con información de protección de datos -->
-        <div class="footer-datos">
-            <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.</p>
+        {% if (pedido and pedido.forma_pago) or (pedido and pedido.cliente and pedido.cliente.numero_cuenta) %}
+        <div style="margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6;">
+            {% if pedido and pedido.forma_pago %}
+            <p style="margin: 3px 0;"><strong>Forma de Pago:</strong> {{ pedido.forma_pago }}</p>
+            {% endif %}
+            {% if pedido and pedido.cliente and pedido.cliente.numero_cuenta %}
+            <p style="margin: 3px 0;"><strong>Número de Cuenta:</strong> {{ pedido.cliente.numero_cuenta }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #dee2e6;">
+            <h3 style="font-size: 0.9em; color: #2c3e50; margin-bottom: 5px;">PROTECCIÓN DE DATOS</h3>
+            <p style="font-size: 0.85em; color: #495057; margin: 0;">Los datos personales y comerciales facilitados por EL CLIENTE serán tratados conforme a la normativa vigente de protección de datos, utilizándose únicamente para la gestión del pedido y la relación comercial.</p>
         </div>
     </div>
 

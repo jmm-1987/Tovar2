@@ -51,8 +51,8 @@
             </div>
             <div class="form-group">
                 <label for="numero_cuenta">Número de Cuenta</label>
-                <input type="text" name="numero_cuenta" id="numero_cuenta" value="{{ cliente.numero_cuenta or '' }}" placeholder="ES24-3456-3456-3456-3456-3456" maxlength="29">
-                <small style="color: #666; font-size: 12px;">Formato: ES seguido de 22 dígitos (ESXX-XXXX-XXXX-XXXX-XXXX-XXXX). Opcional.</small>
+                <input type="text" name="numero_cuenta" id="numero_cuenta" value="{{ cliente.numero_cuenta or '' }}" placeholder="ES24-3456-3456-3456-3456-3456" maxlength="29" pattern="ES[0-9]{2}-[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{4}-[0-9]{4}">
+                <small style="color: #666; font-size: 12px;">Formato: ES seguido de 22 dígitos (ESXX-XXXX-XXXX-XXXX-XXXX-XXXX)</small>
             </div>
         </div>
 
@@ -348,49 +348,49 @@ function eliminarDireccionEnvio(button) {
 document.addEventListener('DOMContentLoaded', function() {
     const numeroCuentaInput = document.getElementById('numero_cuenta');
     if (numeroCuentaInput) {
-        // Solo formatear si hay un valor, no forzar ES si está vacío
-        if (numeroCuentaInput.value && !numeroCuentaInput.value.toUpperCase().startsWith('ES')) {
-            // Si hay un valor existente que empieza con números, formatearlo
-            const numbers = numeroCuentaInput.value.replace(/\D/g, '').substring(0, 22);
-            if (numbers.length > 0) {
-                let formatted = 'ES';
-                // Primeros 2 dígitos sin guión
-                formatted += numbers.substring(0, 2);
-                // Añadir guión después de los 2 primeros dígitos
-                if (numbers.length > 2) {
-                    formatted += '-';
-                    // Resto de dígitos en grupos de 4
-                    const rest = numbers.substring(2);
-                    for (let i = 0; i < rest.length; i++) {
-                        if (i > 0 && i % 4 === 0) {
+        // Si el campo está vacío o no empieza con ES, inicializar con ES
+        if (!numeroCuentaInput.value || !numeroCuentaInput.value.toUpperCase().startsWith('ES')) {
+            if (!numeroCuentaInput.value) {
+                numeroCuentaInput.value = 'ES';
+            } else {
+                // Si hay un valor existente que empieza con números, formatearlo
+                const numbers = numeroCuentaInput.value.replace(/\D/g, '').substring(0, 22);
+                if (numbers.length > 0) {
+                    let formatted = 'ES';
+                    // Primeros 2 dígitos sin guión
+                    if (numbers.length > 0) {
+                        formatted += numbers.substring(0, 2);
+                        // Añadir guión después de los 2 primeros dígitos
+                        if (numbers.length > 2) {
                             formatted += '-';
+                            // Resto de dígitos en grupos de 4
+                            const rest = numbers.substring(2);
+                            for (let i = 0; i < rest.length; i++) {
+                                if (i > 0 && i % 4 === 0) {
+                                    formatted += '-';
+                                }
+                                formatted += rest[i];
+                            }
                         }
-                        formatted += rest[i];
                     }
+                    numeroCuentaInput.value = formatted;
+                } else {
+                    numeroCuentaInput.value = 'ES';
                 }
-                numeroCuentaInput.value = formatted;
             }
         }
         
         numeroCuentaInput.addEventListener('input', function(e) {
             let value = e.target.value.toUpperCase();
             
-            // Si el campo está vacío, permitir que esté vacío
-            if (!value || value.trim() === '') {
-                e.target.value = '';
-                return;
-            }
-            
-            // Forzar que empiece con ES solo si hay contenido
+            // Forzar que empiece con ES
             if (!value.startsWith('ES')) {
                 // Si hay números al inicio, añadir ES al principio
                 const numbers = value.replace(/\D/g, '');
                 if (numbers.length > 0) {
                     value = 'ES' + numbers.substring(0, 22);
                 } else {
-                    // Si no hay números, permitir que esté vacío
-                    e.target.value = '';
-                    return;
+                    value = 'ES';
                 }
             } else {
                 // Extraer solo los números después de ES
@@ -458,7 +458,12 @@ document.addEventListener('DOMContentLoaded', function() {
             e.target.value = formatted;
         });
         
-        // No forzar ES al hacer focus, permitir campo vacío
+        // Manejar el evento de focus para asegurar que siempre tenga ES
+        numeroCuentaInput.addEventListener('focus', function(e) {
+            if (!e.target.value || !e.target.value.toUpperCase().startsWith('ES')) {
+                e.target.value = 'ES';
+            }
+        });
     }
 });
 </script>

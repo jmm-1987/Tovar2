@@ -91,16 +91,10 @@ function cambiarTipoVista(tipo) {
 }
 </script>
 
-<!-- BOTONES PARA CREAR FACTURA DIRECTA Y NUEVO ALBARÁN -->
-<div style="margin-bottom: 20px; text-align: right; display: flex; gap: 10px; justify-content: flex-end;">
+<!-- BOTÓN PARA CREAR FACTURA DIRECTA -->
+<div style="margin-bottom: 20px; text-align: right;">
     <a href="{{ url_for('facturacion.nueva_factura') }}" class="btn btn-success" style="padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(40,167,69,0.3); transition: all 0.3s ease;">
         ➕ Crear Factura Directa
-    </a>
-    <a href="{{ url_for('facturacion.nuevo_albaran') }}" class="btn btn-primary" style="padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
-        📄 Nuevo Albarán
-    </a>
-    <a href="{{ url_for('facturacion.facturar_albaranes') }}" class="btn btn-warning" style="padding: 10px 20px; background: #ffc107; color: #212529; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(255,193,7,0.3); transition: all 0.3s ease;">
-        🧾 Facturar Albaranes
     </a>
 </div>
 
@@ -124,21 +118,14 @@ function cambiarTipoVista(tipo) {
         <tbody>
             {% for prefactura in prefacturas %}
             {% set es_solicitud = prefactura.__class__.__name__ == 'Presupuesto' %}
-            {% set es_albaran = prefactura.__class__.__name__ == 'Factura' and prefactura.numero.startswith('A') and '_' in prefactura.numero %}
             <tr class="pedido-row" style="border-bottom: 1px solid #e9ecef; transition: all 0.3s ease;">
                 <td style="padding: 15px; color: #212529; font-weight: 600;">#{{ prefactura.id }}</td>
                 <td style="padding: 15px; color: #212529; font-weight: 500;">
-                    {% if es_albaran %}
-                        {{ prefactura.nombre if prefactura.nombre else 'N/A' }}
-                    {% else %}
-                        {{ prefactura.cliente.nombre if prefactura.cliente else 'N/A' }}
-                    {% endif %}
+                    {{ prefactura.cliente.nombre if prefactura.cliente else 'N/A' }}
                 </td>
                 <td style="padding: 15px; color: #212529;">
                     {% if es_solicitud %}
                         Solicitud - {{ prefactura.tipo_pedido if prefactura.tipo_pedido else 'N/A' }}
-                    {% elif es_albaran %}
-                        Albarán - {{ prefactura.numero }}
                     {% else %}
                         {{ prefactura.tipo_pedido }}
                     {% endif %}
@@ -152,12 +139,6 @@ function cambiarTipoVista(tipo) {
                     {% if es_solicitud %}
                         {% if prefactura.fecha_aceptado %}
                             {{ prefactura.fecha_aceptado.strftime('%d/%m/%Y') }}
-                        {% else %}
-                            <span style="color: #999;">-</span>
-                        {% endif %}
-                    {% elif es_albaran %}
-                        {% if prefactura.fecha_expedicion %}
-                            {{ prefactura.fecha_expedicion.strftime('%d/%m/%Y') }}
                         {% else %}
                             <span style="color: #999;">-</span>
                         {% endif %}
@@ -184,18 +165,6 @@ function cambiarTipoVista(tipo) {
                            style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block;"
                            target="_blank">
                             📋 Albarán
-                        </a>
-                    {% elif es_albaran %}
-                        <a href="{{ url_for('facturacion.editar_albaran', factura_id=prefactura.id) }}" 
-                           class="btn btn-info" 
-                           style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block; margin-right: 5px;">
-                            ✏️ Editar
-                        </a>
-                        <a href="{{ url_for('facturacion.descargar_pdf_factura', factura_id=prefactura.id) }}" 
-                           class="btn btn-secondary" 
-                           style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block;"
-                           target="_blank">
-                            📄 PDF
                         </a>
                     {% else %}
                         <a href="{{ url_for('facturacion.ver_factura', pedido_id=prefactura.id) }}" 

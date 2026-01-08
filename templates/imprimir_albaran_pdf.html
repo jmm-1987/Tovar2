@@ -27,44 +27,18 @@
         .page {
             width: 210mm;
             min-height: 297mm;
-            height: 297mm;
+            max-height: 297mm;
             background: white;
             margin: 0 auto 10px;
             padding: 10mm;
-            padding-bottom: 25mm;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            page-break-after: auto;
+            page-break-after: always;
             page-break-inside: avoid;
             overflow: hidden;
             box-sizing: border-box;
-            position: relative;
-        }
-        
-        .page-content {
-            min-height: calc(297mm - 30mm);
-            padding-bottom: 20mm;
-        }
-        
-        .footer-datos {
-            position: absolute;
-            bottom: 5mm;
-            left: 10mm;
-            right: 10mm;
-            margin-top: 30px;
-            padding: 8px;
-            background: #f8f9fa;
-            border-top: 1px solid #dee2e6;
-            font-size: 9px;
-            color: #666;
-            line-height: 1.3;
-            text-align: justify;
         }
         
         .page:last-child {
-            page-break-after: auto;
-        }
-        
-        .page:only-child {
             page-break-after: auto;
         }
         
@@ -226,16 +200,12 @@
             .page {
                 margin: 0;
                 box-shadow: none;
-                page-break-after: auto;
+                page-break-after: always;
                 page-break-inside: avoid;
                 overflow: hidden;
             }
             
             .page:last-child {
-                page-break-after: auto;
-            }
-            
-            .page:only-child {
                 page-break-after: auto;
             }
             
@@ -252,7 +222,6 @@
 <body>
     <!-- PÁGINA 1: CONTENIDO DEL ALBARÁN -->
     <div class="page">
-        <div class="page-content">
         <div class="albaran-header">
             <div class="logo-section">
                 {% if use_base64 is defined and use_base64 and logo_base64 %}
@@ -327,9 +296,6 @@
                 {% if pedido and pedido.tipo_pedido %}
                 <p><strong>Tipo de Pedido:</strong> {{ pedido.tipo_pedido }}</p>
                 {% endif %}
-                {% if pedido and pedido.forma_pago %}
-                <p><strong>Forma de Pago:</strong> {{ pedido.forma_pago }}</p>
-                {% endif %}
             </div>
         </div>
 
@@ -365,11 +331,21 @@
             Este albarán no tiene líneas registradas.
         </p>
         {% endif %}
-        </div>
         
-        <!-- Pie de página con información de protección de datos -->
-        <div class="footer-datos">
-            <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.</p>
+        {% if (pedido and pedido.forma_pago) or (pedido and pedido.cliente and pedido.cliente.numero_cuenta) %}
+        <div style="margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 4px; border: 1px solid #dee2e6;">
+            {% if pedido and pedido.forma_pago %}
+            <p style="margin: 3px 0;"><strong>Forma de Pago:</strong> {{ pedido.forma_pago }}</p>
+            {% endif %}
+            {% if pedido and pedido.cliente and pedido.cliente.numero_cuenta %}
+            <p style="margin: 3px 0;"><strong>Número de Cuenta:</strong> {{ pedido.cliente.numero_cuenta }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #dee2e6;">
+            <h3 style="font-size: 0.9em; color: #2c3e50; margin-bottom: 5px;">PROTECCIÓN DE DATOS</h3>
+            <p style="font-size: 0.85em; color: #495057; margin: 0;">Los datos personales y comerciales facilitados por EL CLIENTE serán tratados conforme a la normativa vigente de protección de datos, utilizándose únicamente para la gestión del pedido y la relación comercial.</p>
         </div>
     </div>
 

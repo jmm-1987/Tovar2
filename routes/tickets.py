@@ -134,6 +134,7 @@ def nuevo_ticket():
             # Crear líneas de ticket
             descripciones = request.form.getlist('descripcion_linea[]')
             cantidades = request.form.getlist('cantidad[]')
+            tallas = request.form.getlist('talla[]')
             precios_unitarios = request.form.getlist('precio_unitario[]')
             
             tipo_calculo_iva = request.form.get('tipo_calculo_iva', 'desglosar')
@@ -145,6 +146,7 @@ def nuevo_ticket():
                 if descripciones[i] and cantidades[i] and precios_unitarios[i]:
                     cantidad = Decimal(cantidades[i])
                     precio_unitario_input = Decimal(precios_unitarios[i])
+                    talla = tallas[i] if i < len(tallas) else None
                     
                     # Siempre guardar precio sin IVA
                     # El precio que viene del formulario ya es sin IVA (después de los cambios en el frontend)
@@ -162,6 +164,7 @@ def nuevo_ticket():
                         ticket_id=ticket.id,
                         descripcion=descripciones[i],
                         cantidad=cantidad,
+                        talla=talla,
                         precio_unitario=precio_unitario_sin_iva,
                         importe=importe_sin_iva  # Guardar importe sin IVA
                     )

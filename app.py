@@ -297,6 +297,95 @@ def migrate_database():
             if 'lineas_presupuesto' in table_names:
                 columns_lineas_presupuesto = [col['name'] for col in inspector.get_columns('lineas_presupuesto')]
                 
+                # Verificar si prenda_id es NOT NULL y hacerlo nullable si es necesario
+                prenda_id_not_null = False
+                for col_info in inspector.get_columns('lineas_presupuesto'):
+                    if col_info['name'] == 'prenda_id' and col_info.get('nullable') == False:
+                        prenda_id_not_null = True
+                        break
+                
+                # Si prenda_id es NOT NULL, necesitamos recrear la tabla para hacerla nullable
+                tabla_recreada = False
+                if prenda_id_not_null:
+                    try:
+                        with db.engine.connect() as conn:
+                            # Desactivar temporalmente las foreign keys para poder recrear la tabla
+                            conn.execute(text('PRAGMA foreign_keys = OFF'))
+                            
+                            # Crear tabla temporal con la estructura correcta (prenda_id nullable)
+                            conn.execute(text('''
+                                CREATE TABLE lineas_presupuesto_temp (
+                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                    presupuesto_id INTEGER NOT NULL,
+                                    prenda_id INTEGER,
+                                    nombre VARCHAR(200) NOT NULL,
+                                    cargo VARCHAR(100),
+                                    nombre_mostrar VARCHAR(200),
+                                    cantidad INTEGER NOT NULL DEFAULT 1,
+                                    color VARCHAR(50),
+                                    forma VARCHAR(100),
+                                    tipo_manda VARCHAR(100),
+                                    sexo VARCHAR(20),
+                                    talla VARCHAR(20),
+                                    tejido VARCHAR(100),
+                                    precio_unitario NUMERIC(10, 2),
+                                    descuento NUMERIC(5, 2) NOT NULL DEFAULT 0,
+                                    precio_final NUMERIC(10, 2),
+                                    estado VARCHAR(50) NOT NULL DEFAULT 'pendiente',
+                                    FOREIGN KEY (presupuesto_id) REFERENCES presupuestos(id),
+                                    FOREIGN KEY (prenda_id) REFERENCES prendas(id)
+                                )
+                            '''))
+                            
+                            # Copiar datos de la tabla antigua a la nueva
+                            # Verificar qué columnas existen en la tabla original
+                            columnas_originales = [col['name'] for col in inspector.get_columns('lineas_presupuesto')]
+                            
+                            # Construir la lista de columnas a copiar
+                            columnas_copiar = ['id', 'presupuesto_id', 'prenda_id', 'nombre', 'cargo', 'nombre_mostrar', 
+                                             'cantidad', 'color', 'forma', 'tipo_manda', 'sexo', 'talla', 'tejido', 
+                                             'precio_unitario', 'descuento', 'precio_final', 'estado']
+                            
+                            # Filtrar columnas que existen en la tabla original
+                            columnas_existentes = [col for col in columnas_copiar if col in columnas_originales]
+                            
+                            # Construir la consulta INSERT dinámicamente
+                            columnas_str = ', '.join(columnas_existentes)
+                            conn.execute(text(f'''
+                                INSERT INTO lineas_presupuesto_temp ({columnas_str})
+                                SELECT {columnas_str}
+                                FROM lineas_presupuesto
+                            '''))
+                            
+                            # Eliminar tabla antigua
+                            conn.execute(text('DROP TABLE lineas_presupuesto'))
+                            
+                            # Renombrar tabla temporal
+                            conn.execute(text('ALTER TABLE lineas_presupuesto_temp RENAME TO lineas_presupuesto'))
+                            
+                            # Reactivar foreign keys
+                            conn.execute(text('PRAGMA foreign_keys = ON'))
+                            
+                            conn.commit()
+                            tabla_recreada = True
+                            print("Migración: Columna prenda_id en lineas_presupuesto ahora es nullable")
+                    except Exception as e:
+                        print(f"Error al migrar prenda_id a nullable en lineas_presupuesto: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        # Intentar reactivar foreign keys en caso de error
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(text('PRAGMA foreign_keys = ON'))
+                                conn.commit()
+                        except:
+                            pass
+                
+                # Refrescar la lista de columnas después de la migración (si se recreó la tabla)
+                if tabla_recreada:
+                    inspector = inspect(db.engine)
+                    columns_lineas_presupuesto = [col['name'] for col in inspector.get_columns('lineas_presupuesto')]
+                
                 if 'estado' not in columns_lineas_presupuesto:
                     # Agregar la columna estado usando SQL directo
                     with db.engine.connect() as conn:
@@ -320,6 +409,19 @@ def migrate_database():
                             print("Migración: Columna precio_final agregada exitosamente a lineas_presupuesto")
                     except Exception as e:
                         print(f"Error al agregar columna precio_final a lineas_presupuesto: {e}")
+            
+            # Verificar si existe la tabla lineas_ticket y agregar columna talla si no existe
+            if 'lineas_ticket' in table_names:
+                columns_lineas_ticket = [col['name'] for col in inspector.get_columns('lineas_ticket')]
+                
+                if 'talla' not in columns_lineas_ticket:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE lineas_ticket ADD COLUMN talla VARCHAR(20)"))
+                            conn.commit()
+                            print("Migración: Columna talla agregada exitosamente a lineas_ticket")
+                    except Exception as e:
+                        print(f"Error al agregar columna talla a lineas_ticket: {e}")
             
             # Verificar si existe la tabla presupuestos y agregar columnas de información para fabricación
             if 'presupuestos' in table_names:
