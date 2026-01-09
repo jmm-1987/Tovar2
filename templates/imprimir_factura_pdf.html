@@ -319,51 +319,65 @@
                 {% endif %}
                 
                 <h3 style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;">Datos del Cliente</h3>
-                {% if presupuesto and presupuesto.cliente %}
-                    <p><strong>{{ presupuesto.cliente.nombre }}</strong></p>
-                    {% if presupuesto.cliente.direccion %}
-                    <p>{{ presupuesto.cliente.direccion }}</p>
-                    {% endif %}
-                    {% set cp = presupuesto.cliente.codigo_postal or '' %}
-                    {% set poblacion = presupuesto.cliente.poblacion or '' %}
-                    {% set provincia = presupuesto.cliente.provincia or '' %}
-                    {% if cp or poblacion or provincia %}
-                        <p>
-                            {% if cp %}{{ cp }}{% endif %}
-                            {% if cp and poblacion %}-{% endif %}
-                            {% if poblacion %}{{ poblacion }}{% endif %}
-                            {% if (cp or poblacion) and provincia %}-{% endif %}
-                            {% if provincia %}{{ provincia }}{% endif %}
-                        </p>
-                    {% endif %}
-                    {% if presupuesto.cliente.nif %}
-                    <p><strong>NIF/CIF:</strong> {{ presupuesto.cliente.nif }}</p>
-                    {% endif %}
+                {% set cliente_data_source = None %}
+                {% set cliente_nombre = None %}
+                {% set cliente_direccion = None %}
+                {% set cliente_cp = None %}
+                {% set cliente_poblacion = None %}
+                {% set cliente_provincia = None %}
+                {% set cliente_nif = None %}
+                
+                {# PRIORIDAD 1: Cliente directo de la factura (para facturas directas) #}
+                {% if cliente_directo %}
+                    {% set cliente_data_source = cliente_directo %}
+                {# PRIORIDAD 2: Cliente desde presupuesto #}
+                {% elif presupuesto and presupuesto.cliente %}
+                    {% set cliente_data_source = presupuesto.cliente %}
+                {# PRIORIDAD 3: Cliente desde pedido #}
                 {% elif pedido and pedido.cliente %}
-                    <p><strong>{{ pedido.cliente.nombre }}</strong></p>
-                    {% if pedido.cliente.direccion %}
-                    <p>{{ pedido.cliente.direccion }}</p>
-                    {% endif %}
-                    {% set cp = pedido.cliente.codigo_postal or '' %}
-                    {% set poblacion = pedido.cliente.poblacion or '' %}
-                    {% set provincia = pedido.cliente.provincia or '' %}
-                    {% if cp or poblacion or provincia %}
-                        <p>
-                            {% if cp %}{{ cp }}{% endif %}
-                            {% if cp and poblacion %}-{% endif %}
-                            {% if poblacion %}{{ poblacion }}{% endif %}
-                            {% if (cp or poblacion) and provincia %}-{% endif %}
-                            {% if provincia %}{{ provincia }}{% endif %}
-                        </p>
-                    {% endif %}
-                    {% if pedido.cliente.nif %}
-                    <p><strong>NIF/CIF:</strong> {{ pedido.cliente.nif }}</p>
-                    {% endif %}
+                    {% set cliente_data_source = pedido.cliente %}
+                {# PRIORIDAD 4: Cliente desde pedido.presupuesto #}
+                {% elif pedido and pedido.presupuesto and pedido.presupuesto.cliente %}
+                    {% set cliente_data_source = pedido.presupuesto.cliente %}
+                {% endif %}
+                
+                {% if cliente_data_source %}
+                    {% set cliente_nombre = cliente_data_source.nombre %}
+                    {% set cliente_direccion = cliente_data_source.direccion %}
+                    {% set cliente_cp = cliente_data_source.codigo_postal %}
+                    {% set cliente_poblacion = cliente_data_source.poblacion %}
+                    {% set cliente_provincia = cliente_data_source.provincia %}
+                    {% set cliente_nif = cliente_data_source.nif %}
                 {% else %}
-                    <p><strong>{{ factura.nombre }}</strong></p>
-                    {% if factura.nif %}
-                    <p><strong>NIF/CIF:</strong> {{ factura.nif }}</p>
-                    {% endif %}
+                    {# Fallback a datos copiados en la factura #}
+                    {% set cliente_nombre = factura.nombre %}
+                    {% set cliente_nif = factura.nif %}
+                {% endif %}
+                
+                {# Mostrar nombre #}
+                {% if cliente_nombre %}
+                <p><strong>{{ cliente_nombre }}</strong></p>
+                {% endif %}
+                
+                {# Mostrar dirección #}
+                {% if cliente_direccion %}
+                <p>{{ cliente_direccion }}</p>
+                {% endif %}
+                
+                {# Mostrar CP-Población-Provincia #}
+                {% if cliente_cp or cliente_poblacion or cliente_provincia %}
+                <p>
+                    {% if cliente_cp %}{{ cliente_cp }}{% endif %}
+                    {% if cliente_cp and cliente_poblacion %}-{% endif %}
+                    {% if cliente_poblacion %}{{ cliente_poblacion }}{% endif %}
+                    {% if (cliente_cp or cliente_poblacion) and cliente_provincia %}-{% endif %}
+                    {% if cliente_provincia %}{{ cliente_provincia }}{% endif %}
+                </p>
+                {% endif %}
+                
+                {# Mostrar NIF/CIF #}
+                {% if cliente_nif %}
+                <p><strong>NIF/CIF:</strong> {{ cliente_nif }}</p>
                 {% endif %}
             </div>
             <div class="datos-box">

@@ -11,7 +11,7 @@ import base64
 from io import BytesIO
 from sqlalchemy import not_
 from extensions import db
-from models import Factura, LineaFactura, Cliente, Presupuesto, LineaPresupuesto
+from models import Factura, LineaFactura, Cliente, Presupuesto, LineaPresupuesto, Pedido
 from utils.numeracion import obtener_siguiente_numero_factura, obtener_siguiente_numero_albaran
 from playwright.sync_api import sync_playwright
 from utils.auth import not_usuario_required
@@ -766,9 +766,18 @@ def nueva_factura():
             else:
                 importe_total = subtotal
             
+            # Obtener cliente_id si se proporcionó
+            cliente_id_int = None
+            if cliente_id:
+                try:
+                    cliente_id_int = int(cliente_id)
+                except:
+                    cliente_id_int = None
+            
             # Crear factura sin pedido
             factura = Factura(
                 pedido_id=None,  # Factura directa sin pedido
+                cliente_id=cliente_id_int,  # Cliente asociado si se seleccionó uno
                 serie=serie,
                 numero=numero,
                 fecha_expedicion=fecha_expedicion,
@@ -1324,10 +1333,23 @@ def editar_albaran(factura_id):
 def preparar_datos_imprimir_factura(factura_id):
     """Función auxiliar para preparar todos los datos necesarios para imprimir la factura"""
     from decimal import Decimal
+    from sqlalchemy.orm import joinedload
     
-    factura = Factura.query.get_or_404(factura_id)
+    # Cargar factura con todas las relaciones necesarias
+    factura = Factura.query.options(
+        joinedload(Factura.cliente),  # Cliente directo de la factura
+        joinedload(Factura.pedido).joinedload(Pedido.cliente),
+        joinedload(Factura.pedido).joinedload(Pedido.presupuesto).joinedload(Presupuesto.cliente),
+        joinedload(Factura.presupuesto).joinedload(Presupuesto.cliente)
+    ).get_or_404(factura_id)
+    
     pedido = factura.pedido
     presupuesto = factura.presupuesto
+    cliente_directo = factura.cliente  # Cliente directo de la factura (para facturas directas)
+    
+    # Si no hay presupuesto directo pero hay pedido, intentar obtenerlo del pedido
+    if not presupuesto and pedido and pedido.presupuesto:
+        presupuesto = pedido.presupuesto
     
     # Calcular totales usando precio_unitario y descuento de las líneas
     tipo_iva = 21
@@ -1404,6 +1426,7 @@ def preparar_datos_imprimir_factura(factura_id):
         'factura': factura,
         'pedido': pedido,
         'presupuesto': presupuesto,
+        'cliente_directo': cliente_directo,  # Cliente directo de la factura
         'base_imponible': float(base_imponible),
         'iva_total': float(iva_total),
         'total_con_iva': float(total_con_iva),

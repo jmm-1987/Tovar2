@@ -464,6 +464,10 @@ class Factura(db.Model):
     presupuesto_id = db.Column(db.Integer, db.ForeignKey('presupuestos.id'), nullable=True)
     presupuesto = db.relationship('Presupuesto', backref='facturas', lazy=True)
     
+    # Relación directa con cliente (para facturas directas)
+    cliente_id = db.Column(db.Integer, db.ForeignKey('clientes.id'), nullable=True)
+    cliente = db.relationship('Cliente', backref='facturas', lazy=True)
+    
     # Datos de la factura
     serie = db.Column(db.String(10), nullable=False, default='A')
     numero = db.Column(db.String(50), nullable=False)
@@ -471,7 +475,7 @@ class Factura(db.Model):
     tipo_factura = db.Column(db.String(10), nullable=False, default='F1')  # F1 = Factura completa
     descripcion = db.Column(db.Text)
     
-    # Datos del cliente (copiados del pedido)
+    # Datos del cliente (copiados del pedido o cliente, para compatibilidad)
     nif = db.Column(db.String(20))
     nombre = db.Column(db.String(200), nullable=False)
     
