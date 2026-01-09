@@ -485,6 +485,9 @@ class Factura(db.Model):
     # Descuento por pronto pago
     descuento_pronto_pago = db.Column(db.Numeric(5, 2), nullable=False, default=0)  # Porcentaje de descuento por pronto pago (0-100)
     
+    # Tipo de IVA
+    tipo_iva = db.Column(db.Numeric(5, 2), nullable=False, default=21.00)  # Porcentaje de IVA (21%, 10%, 4%, 0%)
+    
     # Estado y huella de Verifactu
     estado = db.Column(db.String(50), nullable=False, default='pendiente')  # pendiente, enviado, confirmado, error
     huella_verifactu = db.Column(db.Text)  # Respuesta de la API Verifactu

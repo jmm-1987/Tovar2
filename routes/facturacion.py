@@ -244,6 +244,7 @@ def formalizar_factura_solicitud(presupuesto_id):
             nombre=cliente.nombre if cliente else 'Sin cliente',
             importe_total=importe_total,
             descuento_pronto_pago=descuento_pronto_pago_decimal,
+            tipo_iva=Decimal('21.00'),  # IVA por defecto 21%
             estado='pendiente'
         )
         
@@ -458,6 +459,7 @@ def formalizar_factura(pedido_id):
             nif=cliente.nif if cliente and cliente.nif else '',
             nombre=cliente.nombre if cliente else 'Sin cliente',
             importe_total=importe_total,
+            tipo_iva=Decimal('21.00'),  # IVA por defecto 21%
             estado='pendiente'
         )
         
@@ -632,6 +634,7 @@ def nueva_factura():
             email_cliente = request.form.get('email_cliente', '')
             cliente_id = request.form.get('cliente_id', '')
             descuento_pronto_pago = request.form.get('descuento_pronto_pago', '0') or '0'
+            tipo_iva = request.form.get('tipo_iva', '21') or '21'
             
             # Obtener líneas de factura
             descripciones = request.form.getlist('descripcion_linea[]')
@@ -746,10 +749,11 @@ def nueva_factura():
                         'importe': importe
                     })
             
-            # Calcular IVA (21% sobre la base imponible)
+            # Calcular IVA según el tipo seleccionado
             # Los precios unitarios son sin IVA, así que importe_total es la base imponible
             base_imponible = importe_total
-            iva = base_imponible * Decimal('0.21')
+            tipo_iva_decimal = Decimal(str(tipo_iva))
+            iva = base_imponible * (tipo_iva_decimal / Decimal('100'))
             subtotal = base_imponible + iva
             
             # Procesar descuento por pronto pago
@@ -787,6 +791,7 @@ def nueva_factura():
                 nombre=nombre_cliente,
                 importe_total=importe_total,
                 descuento_pronto_pago=descuento_pronto_pago_decimal,
+                tipo_iva=tipo_iva_decimal,
                 estado='pendiente'
             )
             
@@ -904,6 +909,171 @@ def nueva_factura():
     # Establecer fecha de hoy por defecto
     fecha_hoy = datetime.now().strftime('%Y-%m-%d')
     return render_template('facturacion/nueva_factura.html', clientes=clientes, fecha_hoy=fecha_hoy)
+
+@facturacion_bp.route('/facturacion/factura/<int:factura_id>/editar', methods=['GET', 'POST'])
+@login_required
+@not_usuario_required
+def editar_factura(factura_id):
+    """Editar una factura directa existente"""
+    factura = Factura.query.get_or_404(factura_id)
+    
+    # Verificar que es una factura directa (sin pedido ni presupuesto)
+    if factura.pedido_id is not None or factura.presupuesto_id is not None:
+        flash('Esta factura no es una factura directa y no se puede editar desde aquí', 'error')
+        return redirect(url_for('facturacion.facturacion', tipo_vista='formalizadas'))
+    
+    if request.method == 'POST':
+        try:
+            # Obtener datos del formulario
+            fecha_expedicion_str = request.form.get('fecha_expedicion', '')
+            tipo_factura = request.form.get('tipo_factura', 'F1')
+            descripcion = request.form.get('descripcion', '')
+            nombre_cliente = request.form.get('nombre_cliente', '')
+            nif_cliente = request.form.get('nif_cliente', '')
+            direccion_cliente = request.form.get('direccion_cliente', '')
+            poblacion_cliente = request.form.get('poblacion_cliente', '')
+            provincia_cliente = request.form.get('provincia_cliente', '')
+            codigo_postal_cliente = request.form.get('codigo_postal_cliente', '')
+            telefono_cliente = request.form.get('telefono_cliente', '')
+            email_cliente = request.form.get('email_cliente', '')
+            cliente_id = request.form.get('cliente_id', '')
+            descuento_pronto_pago = request.form.get('descuento_pronto_pago', '0') or '0'
+            tipo_iva = request.form.get('tipo_iva', '21') or '21'
+            
+            # Obtener líneas de factura
+            descripciones = request.form.getlist('descripcion_linea[]')
+            cantidades = request.form.getlist('cantidad[]')
+            tallas = request.form.getlist('talla[]')
+            precios_unitarios = request.form.getlist('precio_unitario[]')
+            descuentos = request.form.getlist('descuento[]')
+            precios_finales = request.form.getlist('precio_final[]')
+            
+            if not fecha_expedicion_str:
+                flash('La fecha de expedición es obligatoria', 'error')
+                return redirect(url_for('facturacion.editar_factura', factura_id=factura_id))
+            
+            if not nombre_cliente:
+                flash('El nombre del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.editar_factura', factura_id=factura_id))
+            
+            if not nif_cliente:
+                flash('El NIF/CIF del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.editar_factura', factura_id=factura_id))
+            
+            if not descripciones or not any(descripciones):
+                flash('Debe haber al menos una línea en la factura', 'error')
+                return redirect(url_for('facturacion.editar_factura', factura_id=factura_id))
+            
+            # Procesar fecha
+            fecha_expedicion = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d').date()
+            
+            # Obtener cliente_id si se proporcionó
+            cliente_id_int = None
+            if cliente_id:
+                try:
+                    cliente_id_int = int(cliente_id)
+                except:
+                    cliente_id_int = None
+            
+            # Actualizar datos de la factura
+            factura.fecha_expedicion = fecha_expedicion
+            factura.tipo_factura = tipo_factura
+            factura.descripcion = descripcion
+            factura.nombre = nombre_cliente
+            factura.nif = nif_cliente
+            factura.cliente_id = cliente_id_int
+            factura.tipo_iva = Decimal(str(tipo_iva))
+            factura.descuento_pronto_pago = Decimal(str(descuento_pronto_pago))
+            
+            # Eliminar líneas existentes
+            for linea in factura.lineas:
+                db.session.delete(linea)
+            db.session.flush()
+            
+            # Calcular importe total
+            importe_total = Decimal('0.00')
+            lineas_data = []
+            for i in range(len(descripciones)):
+                if descripciones[i]:
+                    cantidad = Decimal(str(cantidades[i])) if i < len(cantidades) and cantidades[i] else Decimal('1')
+                    precio_unitario = Decimal(str(precios_unitarios[i])) if i < len(precios_unitarios) and precios_unitarios[i] else Decimal('0')
+                    
+                    # Procesar descuento
+                    descuento = Decimal('0')
+                    if i < len(descuentos) and descuentos[i]:
+                        try:
+                            descuento = Decimal(str(descuentos[i]))
+                        except:
+                            descuento = Decimal('0')
+                    
+                    # Procesar precio final (si existe, usar ese; sino calcular con descuento)
+                    precio_final = None
+                    if i < len(precios_finales) and precios_finales[i]:
+                        try:
+                            precio_final = Decimal(str(precios_finales[i]))
+                        except:
+                            precio_final = None
+                    
+                    # Si no hay precio_final pero hay descuento, calcularlo
+                    if precio_final is None and descuento > 0:
+                        precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+                    elif precio_final is None:
+                        precio_final = precio_unitario
+                    
+                    # Calcular importe usando precio_final si existe
+                    importe = cantidad * precio_final
+                    importe_total += importe
+                    
+                    talla = tallas[i] if i < len(tallas) and tallas[i] else None
+                    
+                    # Crear nueva línea
+                    linea_factura = LineaFactura(
+                        factura_id=factura.id,
+                        linea_pedido_id=None,
+                        descripcion=descripciones[i],
+                        cantidad=cantidad,
+                        talla=talla,
+                        precio_unitario=precio_unitario,
+                        descuento=descuento,
+                        precio_final=precio_final,
+                        importe=importe
+                    )
+                    db.session.add(linea_factura)
+            
+            # Calcular IVA según el tipo seleccionado
+            base_imponible = importe_total
+            tipo_iva_decimal = Decimal(str(tipo_iva))
+            iva = base_imponible * (tipo_iva_decimal / Decimal('100'))
+            subtotal = base_imponible + iva
+            
+            # Aplicar descuento por pronto pago
+            descuento_pronto_pago_decimal = Decimal(str(descuento_pronto_pago))
+            if descuento_pronto_pago_decimal > 0:
+                descuento_aplicado = subtotal * (descuento_pronto_pago_decimal / Decimal('100'))
+                importe_total = subtotal - descuento_aplicado
+            else:
+                importe_total = subtotal
+            
+            factura.importe_total = importe_total
+            
+            db.session.commit()
+            flash('Factura actualizada correctamente', 'success')
+            return redirect(url_for('facturacion.facturacion', tipo_vista='formalizadas'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al actualizar la factura: {str(e)}', 'error')
+            import traceback
+            traceback.print_exc()
+    
+    # GET: mostrar formulario con datos existentes
+    clientes = Cliente.query.order_by(Cliente.nombre).all()
+    cliente_directo = factura.cliente if factura.cliente_id else None
+    
+    return render_template('facturacion/editar_factura.html', 
+                         factura=factura,
+                         clientes=clientes,
+                         cliente_directo=cliente_directo)
 
 @facturacion_bp.route('/facturacion/nuevo_albaran', methods=['GET', 'POST'])
 @login_required
@@ -1061,6 +1231,7 @@ def nuevo_albaran():
                 nombre=nombre_cliente,
                 importe_total=importe_total,
                 descuento_pronto_pago=descuento_pronto_pago_decimal,
+                tipo_iva=Decimal('21.00'),  # IVA por defecto 21%
                 estado='pendiente'  # Pendiente de formalizar
             )
             
@@ -1352,7 +1523,8 @@ def preparar_datos_imprimir_factura(factura_id):
         presupuesto = pedido.presupuesto
     
     # Calcular totales usando precio_unitario y descuento de las líneas
-    tipo_iva = 21
+    # Usar el tipo de IVA guardado en la factura, o 21% por defecto
+    tipo_iva = float(factura.tipo_iva) if factura.tipo_iva else 21
     base_imponible = Decimal('0.00')
     
     for linea in factura.lineas:

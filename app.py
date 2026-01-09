@@ -1450,7 +1450,7 @@ Saludos cordiales,
                         traceback.print_exc()
                         # Intentar crear todas las tablas como fallback
             
-            # Verificar si existe la tabla facturas y agregar columna cliente_id si no existe
+            # Verificar si existe la tabla facturas y agregar columnas si no existen
             if 'facturas' in table_names:
                 columns_facturas = [col['name'] for col in inspector.get_columns('facturas')]
                 
@@ -1462,6 +1462,15 @@ Saludos cordiales,
                             print("Migración: Columna cliente_id agregada exitosamente a facturas")
                     except Exception as e:
                         print(f"Error al agregar columna cliente_id a facturas: {e}")
+                
+                if 'tipo_iva' not in columns_facturas:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE facturas ADD COLUMN tipo_iva NUMERIC(5, 2) DEFAULT 21.00'))
+                            conn.commit()
+                            print("Migración: Columna tipo_iva agregada exitosamente a facturas")
+                    except Exception as e:
+                        print(f"Error al agregar columna tipo_iva a facturas: {e}")
             
             # Verificar si existe la tabla lineas_factura y agregar columnas de descuento si no existen
             if 'lineas_factura' in table_names:

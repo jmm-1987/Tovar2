@@ -6,6 +6,9 @@
 <style>
 .container {
     padding-top: 10px !important;
+    padding-left: 5px !important;
+    padding-right: 5px !important;
+    max-width: 100% !important;
 }
 header {
     margin-bottom: 0.8rem !important;
@@ -261,36 +264,39 @@ function cambiarTipoVista(tipo) {
                     </span>
                 </td>
                 <td style="padding: 15px; text-align: center;">
-                    {% if factura.presupuesto_id %}
-                        <a href="{{ url_for('facturacion.ver_factura_solicitud', presupuesto_id=factura.presupuesto_id) }}" 
-                           class="btn btn-secondary" 
-                           style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block; margin-right: 5px;">
-                            Ver
+                    <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
+                        {% if factura.presupuesto_id %}
+                            <a href="{{ url_for('facturacion.ver_factura_solicitud', presupuesto_id=factura.presupuesto_id) }}" 
+                               class="btn btn-secondary" 
+                               style="padding: 4px 8px; font-size: 0.75rem; text-decoration: none; display: inline-block; white-space: nowrap;">
+                                Ver
+                            </a>
+                        {% elif factura.pedido_id %}
+                            <a href="{{ url_for('facturacion.ver_factura', pedido_id=factura.pedido_id) }}" 
+                               class="btn btn-secondary" 
+                               style="padding: 4px 8px; font-size: 0.75rem; text-decoration: none; display: inline-block; white-space: nowrap;">
+                                Ver
+                            </a>
+                        {% else %}
+                            <a href="{{ url_for('facturacion.editar_factura', factura_id=factura.id) }}" 
+                               class="btn btn-warning" 
+                               style="padding: 4px 8px; font-size: 0.75rem; text-decoration: none; display: inline-block; white-space: nowrap; background-color: #ffc107; color: #212529; border: none;">
+                                ✏️ Editar
+                            </a>
+                        {% endif %}
+                        <a href="{{ url_for('facturacion.descargar_pdf_factura', factura_id=factura.id) }}" 
+                           class="btn btn-success" 
+                           style="padding: 4px 8px; font-size: 0.75rem; text-decoration: none; display: inline-block; white-space: nowrap;"
+                           target="_blank">
+                            📄 Factura
                         </a>
-                    {% elif factura.pedido_id %}
-                        <a href="{{ url_for('facturacion.ver_factura', pedido_id=factura.pedido_id) }}" 
-                           class="btn btn-secondary" 
-                           style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block; margin-right: 5px;">
-                            Ver
+                        <a href="{{ url_for('facturacion.descargar_pdf_albaran_factura', factura_id=factura.id) }}" 
+                           class="btn btn-info" 
+                           style="padding: 4px 8px; font-size: 0.75rem; text-decoration: none; display: inline-block; white-space: nowrap;"
+                           target="_blank">
+                            📋 Albarán
                         </a>
-                    {% else %}
-                        <span class="btn btn-secondary" 
-                              style="padding: 8px 15px; font-size: 0.9rem; display: inline-block; margin-right: 5px; opacity: 0.5; cursor: not-allowed;">
-                            Ver
-                        </span>
-                    {% endif %}
-                    <a href="{{ url_for('facturacion.descargar_pdf_factura', factura_id=factura.id) }}" 
-                       class="btn btn-success" 
-                       style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block; margin-right: 5px;"
-                       target="_blank">
-                        📄 Factura
-                    </a>
-                    <a href="{{ url_for('facturacion.descargar_pdf_albaran_factura', factura_id=factura.id) }}" 
-                       class="btn btn-info" 
-                       style="padding: 8px 15px; font-size: 0.9rem; text-decoration: none; display: inline-block;"
-                       target="_blank">
-                        📋 Albarán
-                    </a>
+                    </div>
                 </td>
             </tr>
             {% endfor %}
