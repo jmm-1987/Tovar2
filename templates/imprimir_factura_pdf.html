@@ -305,7 +305,6 @@
                 <h3>Datos del {% if es_albaran is defined and es_albaran %}Albarán{% else %}Factura{% endif %}</h3>
                 <p><strong>Número:</strong> {{ factura.serie }}-{{ factura.numero }}</p>
                 <p><strong>Fecha:</strong> {{ factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else 'N/A' }}</p>
-                <p><strong>Estado:</strong> {{ factura.estado }}</p>
                 {% if pedido %}
                 <p><strong>Pedido:</strong> #{{ pedido.id }}{% if pedido.presupuesto_id %} (Presupuesto #{{ pedido.presupuesto_id }}){% endif %}</p>
                 {% endif %}
@@ -320,11 +319,31 @@
                 {% endif %}
                 
                 <h3 style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;">Datos del Cliente</h3>
-                <p><strong>{{ factura.nombre }}</strong></p>
-                {% if pedido and pedido.cliente and pedido.cliente.direccion %}
-                <p>{{ pedido.cliente.direccion }}</p>
-                {% endif %}
-                {% if pedido and pedido.cliente %}
+                {% if presupuesto and presupuesto.cliente %}
+                    <p><strong>{{ presupuesto.cliente.nombre }}</strong></p>
+                    {% if presupuesto.cliente.direccion %}
+                    <p>{{ presupuesto.cliente.direccion }}</p>
+                    {% endif %}
+                    {% set cp = presupuesto.cliente.codigo_postal or '' %}
+                    {% set poblacion = presupuesto.cliente.poblacion or '' %}
+                    {% set provincia = presupuesto.cliente.provincia or '' %}
+                    {% if cp or poblacion or provincia %}
+                        <p>
+                            {% if cp %}{{ cp }}{% endif %}
+                            {% if cp and poblacion %}-{% endif %}
+                            {% if poblacion %}{{ poblacion }}{% endif %}
+                            {% if (cp or poblacion) and provincia %}-{% endif %}
+                            {% if provincia %}{{ provincia }}{% endif %}
+                        </p>
+                    {% endif %}
+                    {% if presupuesto.cliente.nif %}
+                    <p><strong>NIF/CIF:</strong> {{ presupuesto.cliente.nif }}</p>
+                    {% endif %}
+                {% elif pedido and pedido.cliente %}
+                    <p><strong>{{ pedido.cliente.nombre }}</strong></p>
+                    {% if pedido.cliente.direccion %}
+                    <p>{{ pedido.cliente.direccion }}</p>
+                    {% endif %}
                     {% set cp = pedido.cliente.codigo_postal or '' %}
                     {% set poblacion = pedido.cliente.poblacion or '' %}
                     {% set provincia = pedido.cliente.provincia or '' %}
@@ -337,9 +356,14 @@
                             {% if provincia %}{{ provincia }}{% endif %}
                         </p>
                     {% endif %}
-                {% endif %}
-                {% if factura.nif %}
-                <p><strong>CIF/NIF:</strong> {{ factura.nif }}</p>
+                    {% if pedido.cliente.nif %}
+                    <p><strong>NIF/CIF:</strong> {{ pedido.cliente.nif }}</p>
+                    {% endif %}
+                {% else %}
+                    <p><strong>{{ factura.nombre }}</strong></p>
+                    {% if factura.nif %}
+                    <p><strong>NIF/CIF:</strong> {{ factura.nif }}</p>
+                    {% endif %}
                 {% endif %}
             </div>
             <div class="datos-box">
@@ -350,20 +374,20 @@
             </div>
         </div>
 
-        <h3 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 5px; margin-bottom: 10px; font-size: 1rem;">Líneas del {% if es_albaran is defined and es_albaran %}Albarán{% else %}Factura{% endif %}</h3>
+        
         
         {% if factura.lineas %}
         <table class="lineas-table">
             <thead>
                 <tr>
-                    <th style="width: 50%;">Descripción</th>
+                    <th style="width: 48%;">Descripción</th>
                     <th style="width: 7%; text-align: center;">Cantidad</th>
                     <th style="width: 8%; text-align: center;">Talla</th>
                     {% if not (es_albaran is defined and es_albaran) %}
                     <th style="width: 10%; text-align: right;">Precio Unit.</th>
                     <th style="width: 8%; text-align: right;">Descuento</th>
                     <th style="width: 10%; text-align: right;">Precio Final</th>
-                    <th style="width: 7%; text-align: right;">Total</th>
+                    <th style="width: 9%; text-align: right;">Total</th>
                     {% endif %}
                 </tr>
             </thead>
@@ -466,7 +490,8 @@
      
         <div class="footer-datos">
             <p><span class="iban">Forma de Pago: Transferencia | IBAN:ES2200495247862816942248</span></p>
-        </br></br>
+        </br>
+ 
             <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.</p>
         </div>
     </div>

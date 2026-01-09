@@ -1471,6 +1471,15 @@ Saludos cordiales,
                             print("Migración: Columna precio_final agregada exitosamente a lineas_factura")
                     except Exception as e:
                         print(f"Error al agregar columna precio_final a lineas_factura: {e}")
+                
+                if 'talla' not in columns_lineas_factura:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE lineas_factura ADD COLUMN talla VARCHAR(20)'))
+                            conn.commit()
+                            print("Migración: Columna talla agregada exitosamente a lineas_factura")
+                    except Exception as e:
+                        print(f"Error al agregar columna talla a lineas_factura: {e}")
             
             # Verificar si existe la tabla configuracion
             if 'configuracion' not in table_names:

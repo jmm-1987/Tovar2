@@ -270,6 +270,9 @@ class Presupuesto(db.Model):
     # Imagen del diseño
     imagen_diseno = db.Column(db.String(255))
     
+    # Imagen del mockup (PDF)
+    imagen_mockup = db.Column(db.String(255))  # Mockup en formato PDF
+    
     # Imágenes para el PDF del presupuesto
     imagen_portada = db.Column(db.String(255))  # Imagen de portada (primera página)
     imagen_adicional_1 = db.Column(db.String(255))  # Imagen adicional 1 (segunda página)
@@ -507,6 +510,7 @@ class LineaFactura(db.Model):
     # Campos de la línea
     descripcion = db.Column(db.String(500), nullable=False)
     cantidad = db.Column(db.Numeric(10, 2), nullable=False, default=1)
+    talla = db.Column(db.String(20), nullable=True)  # Talla del producto
     precio_unitario = db.Column(db.Numeric(10, 2), nullable=False)
     descuento = db.Column(db.Numeric(5, 2), nullable=False, default=0)  # Porcentaje de descuento (0-100)
     precio_final = db.Column(db.Numeric(10, 2), nullable=True)  # Precio unitario con descuento aplicado

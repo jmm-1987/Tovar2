@@ -385,11 +385,22 @@
             
             {% set tiene_imagenes_adicionales = solicitud.imagen_portada or solicitud.imagen_adicional_1 or solicitud.imagen_adicional_2 or solicitud.imagen_adicional_3 or solicitud.imagen_adicional_4 or solicitud.imagen_adicional_5 %}
             {% if tiene_imagenes_adicionales or solicitud.imagen_diseno %}
-            <div>
+            <div style="margin-bottom: 10px;">
                 <button type="button" onclick="abrirModalImagenes(); return false;" 
                    style="width: 100%; padding: 8px 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; font-weight: 500; cursor: pointer; font-size: 14px;">
                     📷 Ver todas las imágenes
                 </button>
+            </div>
+            {% endif %}
+            
+            {% if solicitud.imagen_mockup %}
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #dee2e6;">
+                <p style="margin-bottom: 10px; font-weight: 600; color: #495057; font-size: 0.9rem;">Mockup (PDF)</p>
+                <a href="{{ url_for('solicitudes.servir_imagen_sftp', ruta_imagen=solicitud.imagen_mockup) }}" 
+                   target="_blank"
+                   style="display: inline-block; width: 100%; padding: 8px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; font-weight: 500; cursor: pointer; font-size: 14px; text-align: center; text-decoration: none;">
+                    📄 Ver/Descargar Mockup PDF
+                </a>
             </div>
             {% endif %}
         </div>
@@ -626,6 +637,20 @@ select[name="estado"]:focus {
                 {% if solicitud.descripcion_imagen_5 %}
                 <div class="imagen-galeria-descripcion">{{ solicitud.descripcion_imagen_5 }}</div>
                 {% endif %}
+            </div>
+            {% endif %}
+            
+            {% if solicitud.imagen_mockup %}
+            <div class="imagen-galeria-item" style="background: #f8f9fa; border: 2px dashed #28a745;">
+                <div style="padding: 20px; text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 10px;">📄</div>
+                    <p style="font-weight: 600; margin-bottom: 10px;">Mockup (PDF)</p>
+                    <a href="{{ url_for('solicitudes.servir_imagen_sftp', ruta_imagen=solicitud.imagen_mockup) }}" 
+                       target="_blank"
+                       style="display: inline-block; padding: 8px 16px; background-color: #28a745; color: white; border: none; border-radius: 4px; font-weight: 500; cursor: pointer; font-size: 14px; text-decoration: none;">
+                        Ver/Descargar PDF
+                    </a>
+                </div>
             </div>
             {% endif %}
         </div>

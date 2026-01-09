@@ -274,11 +274,19 @@ def formalizar_factura_solicitud(presupuesto_id):
             else:
                 precio_final = precio_unitario
             
+            # Obtener talla de la línea de presupuesto si existe
+            talla = None
+            if linea_presupuesto_id:
+                linea_presupuesto = LineaPresupuesto.query.get(linea_presupuesto_id)
+                if linea_presupuesto and linea_presupuesto.talla:
+                    talla = linea_presupuesto.talla
+            
             linea_factura = LineaFactura(
                 factura_id=factura.id,
                 linea_pedido_id=None,  # No hay línea de pedido, es de presupuesto
                 descripcion=descripcion_linea,
                 cantidad=cantidad,
+                talla=talla,
                 precio_unitario=precio_unitario,
                 descuento=descuento,
                 precio_final=precio_final,
@@ -464,11 +472,20 @@ def formalizar_factura(pedido_id):
             precio_unitario = Decimal(str(linea_data.get('precio_unitario', 0)))
             importe = Decimal(str(linea_data.get('importe', 0)))
             
+            # Obtener talla de la línea de pedido si existe
+            talla = None
+            if linea_pedido_id:
+                from models import LineaPedido
+                linea_pedido = LineaPedido.query.get(linea_pedido_id)
+                if linea_pedido and linea_pedido.talla:
+                    talla = linea_pedido.talla
+            
             linea_factura = LineaFactura(
                 factura_id=factura.id,
                 linea_pedido_id=linea_pedido_id,
                 descripcion=descripcion_linea,
                 cantidad=cantidad,
+                talla=talla,
                 precio_unitario=precio_unitario,
                 importe=importe
             )
@@ -619,6 +636,7 @@ def nueva_factura():
             # Obtener líneas de factura
             descripciones = request.form.getlist('descripcion_linea[]')
             cantidades = request.form.getlist('cantidad[]')
+            tallas = request.form.getlist('talla[]')
             precios_unitarios = request.form.getlist('precio_unitario[]')
             descuentos = request.form.getlist('descuento[]')
             precios_finales = request.form.getlist('precio_final[]')
@@ -717,9 +735,11 @@ def nueva_factura():
                     importe = cantidad * precio_final
                     importe_total += importe
                     
+                    talla = tallas[i] if i < len(tallas) and tallas[i] else None
                     lineas_data.append({
                         'descripcion': descripciones[i],
                         'cantidad': cantidad,
+                        'talla': talla,
                         'precio_unitario': precio_unitario,
                         'descuento': descuento,
                         'precio_final': precio_final,
@@ -771,6 +791,7 @@ def nueva_factura():
                     linea_pedido_id=None,  # Sin línea de pedido asociada
                     descripcion=linea_data['descripcion'],
                     cantidad=linea_data['cantidad'],
+                    talla=linea_data.get('talla'),
                     precio_unitario=linea_data['precio_unitario'],
                     descuento=linea_data['descuento'],
                     precio_final=linea_data['precio_final'],
@@ -900,6 +921,7 @@ def nuevo_albaran():
             # Obtener líneas de albarán
             descripciones = request.form.getlist('descripcion_linea[]')
             cantidades = request.form.getlist('cantidad[]')
+            tallas = request.form.getlist('talla[]')
             precios_unitarios = request.form.getlist('precio_unitario[]')
             descuentos = request.form.getlist('descuento[]')
             precios_finales = request.form.getlist('precio_final[]')
@@ -998,9 +1020,11 @@ def nuevo_albaran():
                     importe = cantidad * precio_final
                     importe_total += importe
                     
+                    talla = tallas[i] if i < len(tallas) and tallas[i] else None
                     lineas_data.append({
                         'descripcion': descripciones[i],
                         'cantidad': cantidad,
+                        'talla': talla,
                         'precio_unitario': precio_unitario,
                         'descuento': descuento,
                         'precio_final': precio_final,
@@ -1041,6 +1065,7 @@ def nuevo_albaran():
                     linea_pedido_id=None,  # Sin línea de pedido asociada
                     descripcion=linea_data['descripcion'],
                     cantidad=linea_data['cantidad'],
+                    talla=linea_data.get('talla'),
                     precio_unitario=linea_data['precio_unitario'],
                     descuento=linea_data['descuento'],
                     precio_final=linea_data['precio_final'],
@@ -1098,6 +1123,7 @@ def editar_albaran(factura_id):
             # Obtener líneas de albarán
             descripciones = request.form.getlist('descripcion_linea[]')
             cantidades = request.form.getlist('cantidad[]')
+            tallas = request.form.getlist('talla[]')
             precios_unitarios = request.form.getlist('precio_unitario[]')
             descuentos = request.form.getlist('descuento[]')
             precios_finales = request.form.getlist('precio_final[]')
@@ -1192,9 +1218,11 @@ def editar_albaran(factura_id):
                     importe = cantidad * precio_final
                     importe_total += importe
                     
+                    talla = tallas[i] if i < len(tallas) and tallas[i] else None
                     lineas_data.append({
                         'descripcion': descripciones[i],
                         'cantidad': cantidad,
+                        'talla': talla,
                         'precio_unitario': precio_unitario,
                         'descuento': descuento,
                         'precio_final': precio_final,
@@ -1238,6 +1266,7 @@ def editar_albaran(factura_id):
                     linea_pedido_id=None,
                     descripcion=linea_data['descripcion'],
                     cantidad=linea_data['cantidad'],
+                    talla=linea_data.get('talla'),
                     precio_unitario=linea_data['precio_unitario'],
                     descuento=linea_data['descuento'],
                     precio_final=linea_data['precio_final'],
@@ -1298,6 +1327,7 @@ def preparar_datos_imprimir_factura(factura_id):
     
     factura = Factura.query.get_or_404(factura_id)
     pedido = factura.pedido
+    presupuesto = factura.presupuesto
     
     # Calcular totales usando precio_unitario y descuento de las líneas
     tipo_iva = 21
@@ -1373,6 +1403,7 @@ def preparar_datos_imprimir_factura(factura_id):
     return {
         'factura': factura,
         'pedido': pedido,
+        'presupuesto': presupuesto,
         'base_imponible': float(base_imponible),
         'iva_total': float(iva_total),
         'total_con_iva': float(total_con_iva),
@@ -1397,11 +1428,13 @@ def preparar_datos_imprimir_albaran(factura_id=None, pedido_id=None):
         # Si tenemos factura_id, obtener factura y pedido
         factura = Factura.query.get_or_404(factura_id)
         pedido = factura.pedido
+        presupuesto = factura.presupuesto
         lineas = factura.lineas
     elif pedido_id:
         # Si solo tenemos pedido_id (prefactura), obtener pedido y usar sus líneas
         pedido = Pedido.query.get_or_404(pedido_id)
         factura = None
+        presupuesto = pedido.presupuesto if pedido else None
         lineas = pedido.lineas
     else:
         raise ValueError("Se debe proporcionar factura_id o pedido_id")
@@ -1436,6 +1469,7 @@ def preparar_datos_imprimir_albaran(factura_id=None, pedido_id=None):
     return {
         'factura': factura,
         'pedido': pedido,
+        'presupuesto': presupuesto,
         'lineas': lineas,
         'logo_base64': logo_base64
     }
@@ -1778,6 +1812,7 @@ def procesar_facturacion_albaranes():
                 lineas_data.append({
                     'descripcion': linea.descripcion or f'Albarán {albaran.numero}',
                     'cantidad': cantidad,
+                    'talla': linea.talla if linea.talla else None,
                     'precio_unitario': precio_unitario,
                     'descuento': descuento,
                     'precio_final': precio_final,
@@ -1830,6 +1865,7 @@ def procesar_facturacion_albaranes():
                 linea_pedido_id=None,
                 descripcion=linea_data['descripcion'],
                 cantidad=linea_data['cantidad'],
+                talla=linea_data.get('talla'),
                 precio_unitario=linea_data['precio_unitario'],
                 descuento=linea_data['descuento'],
                 precio_final=linea_data['precio_final'],

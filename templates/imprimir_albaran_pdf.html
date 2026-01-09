@@ -290,15 +290,31 @@
         <div class="datos-section">
             <div class="datos-box">
                 <h3>Datos del Cliente</h3>
-                {% if factura %}
-                    <p><strong>{{ factura.nombre }}</strong></p>
+                {% if presupuesto and presupuesto.cliente %}
+                    <p><strong>{{ presupuesto.cliente.nombre }}</strong></p>
+                    {% if presupuesto.cliente.direccion %}
+                    <p>{{ presupuesto.cliente.direccion }}</p>
+                    {% endif %}
+                    {% set cp = presupuesto.cliente.codigo_postal or '' %}
+                    {% set poblacion = presupuesto.cliente.poblacion or '' %}
+                    {% set provincia = presupuesto.cliente.provincia or '' %}
+                    {% if cp or poblacion or provincia %}
+                        <p>
+                            {% if cp %}{{ cp }}{% endif %}
+                            {% if cp and poblacion %}-{% endif %}
+                            {% if poblacion %}{{ poblacion }}{% endif %}
+                            {% if (cp or poblacion) and provincia %}-{% endif %}
+                            {% if provincia %}{{ provincia }}{% endif %}
+                        </p>
+                    {% endif %}
+                    {% if presupuesto.cliente.nif %}
+                    <p><strong>NIF/CIF:</strong> {{ presupuesto.cliente.nif }}</p>
+                    {% endif %}
                 {% elif pedido and pedido.cliente %}
                     <p><strong>{{ pedido.cliente.nombre }}</strong></p>
-                {% endif %}
-                {% if pedido and pedido.cliente and pedido.cliente.direccion %}
-                <p>{{ pedido.cliente.direccion }}</p>
-                {% endif %}
-                {% if pedido and pedido.cliente %}
+                    {% if pedido.cliente.direccion %}
+                    <p>{{ pedido.cliente.direccion }}</p>
+                    {% endif %}
                     {% set cp = pedido.cliente.codigo_postal or '' %}
                     {% set poblacion = pedido.cliente.poblacion or '' %}
                     {% set provincia = pedido.cliente.provincia or '' %}
@@ -311,11 +327,14 @@
                             {% if provincia %}{{ provincia }}{% endif %}
                         </p>
                     {% endif %}
-                {% endif %}
-                {% if factura and factura.nif %}
-                    <p><strong>CIF/NIF:</strong> {{ factura.nif }}</p>
-                {% elif pedido and pedido.cliente and pedido.cliente.nif %}
-                    <p><strong>CIF/NIF:</strong> {{ pedido.cliente.nif }}</p>
+                    {% if pedido.cliente.nif %}
+                    <p><strong>NIF/CIF:</strong> {{ pedido.cliente.nif }}</p>
+                    {% endif %}
+                {% elif factura %}
+                    <p><strong>{{ factura.nombre }}</strong></p>
+                    {% if factura.nif %}
+                    <p><strong>NIF/CIF:</strong> {{ factura.nif }}</p>
+                    {% endif %}
                 {% endif %}
             </div>
             <div class="datos-box">

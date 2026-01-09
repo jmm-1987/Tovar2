@@ -355,6 +355,15 @@ def nueva_solicitud():
                     ruta_relativa = subir_imagen_sftp(file, nombre_archivo)
                     solicitud.imagen_portada = ruta_relativa
             
+            # Procesar imagen de mockup (PDF)
+            if 'imagen_mockup' in request.files:
+                file = request.files['imagen_mockup']
+                if file and file.filename:
+                    filename = secure_filename(file.filename)
+                    nombre_archivo = f"{solicitud.id}_mockup_{filename}"
+                    ruta_relativa = subir_imagen_sftp(file, nombre_archivo)
+                    solicitud.imagen_mockup = ruta_relativa
+            
             # Procesar imágenes adicionales
             for i in range(1, 6):
                 imagen_key = f'imagen_adicional_{i}'
@@ -683,6 +692,7 @@ def editar_solicitud(solicitud_id):
             
             # Manejar actualización de imágenes
             actualizar_imagen('imagen_diseno', 'imagen_diseno')
+            actualizar_imagen('imagen_mockup', 'imagen_mockup')
             actualizar_imagen('imagen_portada', 'imagen_portada')
             actualizar_imagen('imagen_adicional_1', 'imagen_adicional_1')
             actualizar_imagen('imagen_adicional_2', 'imagen_adicional_2')
@@ -1258,7 +1268,9 @@ def servir_imagen_sftp(ruta_imagen):
         if imagen_data:
             # Determinar tipo MIME
             ruta_lower = ruta_imagen.lower()
-            if ruta_lower.endswith('.png'):
+            if ruta_lower.endswith('.pdf'):
+                mimetype = 'application/pdf'
+            elif ruta_lower.endswith('.png'):
                 mimetype = 'image/png'
             elif ruta_lower.endswith(('.jpg', '.jpeg')):
                 mimetype = 'image/jpeg'

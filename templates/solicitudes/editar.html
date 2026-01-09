@@ -72,6 +72,17 @@
         </div>
     </div>
 
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="imagen_mockup">Mockup (PDF)</label>
+            <input type="file" name="imagen_mockup" id="imagen_mockup" accept=".pdf,application/pdf">
+            {% if solicitud.imagen_mockup %}
+            <p style="font-size: 0.85em; color: #666; margin-top: 5px;">Mockup actual: <a href="{{ url_for('solicitudes.servir_imagen_sftp', ruta_imagen=solicitud.imagen_mockup) }}" target="_blank">{{ solicitud.imagen_mockup }}</a></p>
+            {% endif %}
+            <small style="font-size: 0.8em; color: #666; display: block; margin-top: 4px;">Subir mockup en formato PDF</small>
+        </div>
+    </div>
+
     <h3>Imágenes para el PDF del Presupuesto</h3>
     <div style="margin-bottom: 20px;">
         <label style="display: block; margin-bottom: 10px; font-weight: 500;">Imágenes Adicionales (Página 2) - Máximo 5 imágenes</label>

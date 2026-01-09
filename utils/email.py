@@ -234,6 +234,49 @@ def enviar_email_cambio_estado_solicitud(solicitud, nuevo_estado, subestado=None
             body=cuerpo
         )
         
+        # Adjuntar mockup si está disponible
+        if solicitud.imagen_mockup:
+            try:
+                from utils.sftp_upload import download_file_from_sftp
+                import os
+                
+                # Construir ruta remota en SFTP
+                ruta_mockup = solicitud.imagen_mockup
+                if ruta_mockup.startswith('/'):
+                    remote_path = ruta_mockup
+                else:
+                    # Si es relativa, construir ruta completa en SFTP
+                    config = os.environ.get('SFTP_DIR', '/')
+                    if config != '/':
+                        remote_path = f"{config.rstrip('/')}/{ruta_mockup}"
+                    else:
+                        remote_path = f"/{ruta_mockup}"
+                
+                # Intentar descargar desde SFTP primero
+                mockup_data = download_file_from_sftp(remote_path)
+                
+                # Si no está en SFTP, intentar leer localmente
+                if not mockup_data:
+                    imagen_path_local = os.path.join(current_app.config['UPLOAD_FOLDER'], ruta_mockup)
+                    if os.path.exists(imagen_path_local):
+                        with open(imagen_path_local, 'rb') as f:
+                            mockup_data = f.read()
+                
+                # Adjuntar al email si se encontró el archivo
+                if mockup_data:
+                    # Obtener nombre del archivo
+                    nombre_archivo = os.path.basename(ruta_mockup)
+                    if not nombre_archivo.endswith('.pdf'):
+                        nombre_archivo = f"mockup_solicitud_{solicitud.id}.pdf"
+                    
+                    msg.attach(
+                        nombre_archivo,
+                        'application/pdf',
+                        mockup_data
+                    )
+            except Exception as e:
+                print(f"Error al adjuntar mockup al email: {e}")
+        
         # Enviar email
         try:
             mail.send(msg)

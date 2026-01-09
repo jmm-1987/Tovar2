@@ -92,8 +92,9 @@
         <div class="linea-factura-header">
             <div class="linea-factura-numero-header">#</div>
             <div class="linea-factura-campos-header">
-                <div class="header-col" style="flex: 1; min-width: 624px;">Descripción</div>
+                <div class="header-col" style="flex: 1; min-width: 500px;">Descripción</div>
                 <div class="header-col" style="flex: 0 0 80px; width: 80px;">Cant.</div>
+                <div class="header-col" style="flex: 0 0 80px; width: 80px;">Talla</div>
                 <div class="header-col" style="flex: 0 0 100px; width: 100px;">P. Unit.</div>
                 <div class="header-col" style="flex: 0 0 80px; width: 80px;">Desc. %</div>
                 <div class="header-col" style="flex: 0 0 100px; width: 100px;">P. Final</div>
@@ -107,8 +108,9 @@
                 <div class="linea-factura-row">
                     <div class="linea-factura-numero">#{{ loop.index }}</div>
                     <div class="linea-factura-campos">
-                        <input type="text" name="descripcion_linea[]" value="{{ linea.descripcion or '' }}" placeholder="Descripción" required class="linea-campo-compact" style="flex: 1; min-width: 624px;">
+                        <input type="text" name="descripcion_linea[]" value="{{ linea.descripcion or '' }}" placeholder="Descripción" required class="linea-campo-compact" style="flex: 1; min-width: 500px;">
                         <input type="number" name="cantidad[]" value="{{ "%.2f"|format(linea.cantidad) if linea.cantidad else '1' }}" placeholder="Cant." step="0.01" min="0" required class="linea-campo-compact linea-cantidad" style="flex: 0 0 80px; width: 80px;">
+                        <input type="text" name="talla[]" value="{{ linea.talla or '' }}" placeholder="Talla" class="linea-campo-compact" style="flex: 0 0 80px; width: 80px;">
                         <input type="number" name="precio_unitario[]" value="{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '0' }}" placeholder="P. Unit." step="0.01" min="0" required class="linea-campo-compact precio-unitario" style="flex: 0 0 100px; width: 100px;">
                         <input type="number" name="descuento[]" value="{{ "%.2f"|format(linea.descuento) if linea.descuento else '0' }}" class="linea-campo-compact descuento-input" step="0.01" min="0" max="100" placeholder="Desc. %" title="Descuento (%)" style="flex: 0 0 80px; width: 80px;">
                         <input type="number" name="precio_final[]" value="{{ "%.2f"|format(linea.precio_final) if linea.precio_final else '' }}" class="linea-campo-compact precio-final-input" step="0.01" min="0" placeholder="P. Final" title="Precio Final" readonly style="flex: 0 0 100px; width: 100px; background: #f0f0f0;">
@@ -121,8 +123,9 @@
             <div class="linea-factura-row">
                 <div class="linea-factura-numero">#1</div>
                 <div class="linea-factura-campos">
-                    <input type="text" name="descripcion_linea[]" placeholder="Descripción" required class="linea-campo-compact" style="flex: 1; min-width: 624px;">
+                    <input type="text" name="descripcion_linea[]" placeholder="Descripción" required class="linea-campo-compact" style="flex: 1; min-width: 500px;">
                     <input type="number" name="cantidad[]" placeholder="Cant." step="0.01" min="0" value="1" required class="linea-campo-compact linea-cantidad" style="flex: 0 0 80px; width: 80px;">
+                    <input type="text" name="talla[]" placeholder="Talla" class="linea-campo-compact" style="flex: 0 0 80px; width: 80px;">
                     <input type="number" name="precio_unitario[]" placeholder="P. Unit." step="0.01" min="0" required class="linea-campo-compact precio-unitario" style="flex: 0 0 100px; width: 100px;">
                     <input type="number" name="descuento[]" class="linea-campo-compact descuento-input" step="0.01" min="0" max="100" value="0" placeholder="Desc. %" title="Descuento (%)" style="flex: 0 0 80px; width: 80px;">
                     <input type="number" name="precio_final[]" class="linea-campo-compact precio-final-input" step="0.01" min="0" placeholder="P. Final" title="Precio Final" readonly style="flex: 0 0 100px; width: 100px; background: #f0f0f0;">
@@ -492,8 +495,8 @@ document.addEventListener('DOMContentLoaded', function() {
     box-sizing: border-box;
 }
 
-.linea-factura-campos input[type="text"] {
-    min-width: 624px;
+.linea-factura-campos input[type="text"]:first-of-type {
+    min-width: 500px;
 }
 
 .importe-linea {
