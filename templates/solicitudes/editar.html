@@ -132,7 +132,7 @@
                      onclick="document.getElementById('imagen_adicional_{{ i }}').click()">
                     <input type="file" name="imagen_adicional_{{ i }}" id="imagen_adicional_{{ i }}" accept="image/*" style="display: none;" onchange="handleImageSelect({{ i }}, this)">
                     <div class="imagen-preview" id="preview_container_{{ i }}" style="width: 100%; height: 100%; display: {% if tiene_imagen %}flex{% else %}none{% endif %}; position: relative; border-radius: 6px; overflow: hidden;">
-                        <img id="preview_img_{{ i }}" src="{% if tiene_imagen %}{{ url_for('static', filename='uploads/' + tiene_imagen) }}{% endif %}" alt="Preview" style="width: 100%; height: 100%; object-fit: cover;">
+                        <img id="preview_img_{{ i }}" src="{% if tiene_imagen %}{{ url_for('solicitudes.servir_imagen_sftp', ruta_imagen=tiene_imagen) }}{% endif %}" alt="Preview" style="width: 100%; height: 100%; object-fit: cover;">
                         <button type="button" onclick="eliminarImagen({{ i }}); event.stopPropagation();" style="position: absolute; top: 5px; right: 5px; background: rgba(220, 53, 69, 0.9); color: white; border: none; border-radius: 50%; width: 25px; height: 25px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center;">×</button>
                     </div>
                     <div class="imagen-placeholder" id="placeholder_{{ i }}" style="display: {% if tiene_imagen %}none{% else %}flex{% endif %}; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%;">
@@ -303,7 +303,9 @@
                     <option value="T.CAMISETA">T.CAMISETA</option>
                     <option value="T.SHOFT">T.SHOFT</option>
                 </select>
-                <input type="number" name="precio_unitario[]" class="linea-campo-compact" step="0.01" min="0" placeholder="Precio €" title="Precio" style="flex: 0 0 100px; width: 100px;">
+                <input type="number" name="precio_unitario[]" class="linea-campo-compact precio-unitario-input" step="0.01" min="0" placeholder="Precio €" title="Precio" style="flex: 0 0 100px; width: 100px;">
+                <input type="number" name="descuento[]" class="linea-campo-compact descuento-input" step="0.01" min="0" max="100" value="0" placeholder="Desc. %" title="Descuento (%)" style="flex: 0 0 80px; width: 80px;">
+                <input type="number" name="precio_final[]" class="linea-campo-compact precio-final-input" step="0.01" min="0" placeholder="P. Final €" title="Precio Final" readonly style="flex: 0 0 100px; width: 100px; background: #f0f0f0;">
                 
                 <!-- Campos personalizados (nombre y cargo) - se muestran al final si tienen valor o si se activa personalización -->
                 <input type="text" name="nombre[]" class="linea-campo-compact campo-personalizado" placeholder="Nombre personalizado" title="Nombre personalizado" style="display: none; flex: 2.5;">
@@ -549,6 +551,11 @@ function agregarLinea() {
     contadorPrendas++;
     const container = document.getElementById('prendas-container');
     const primeraLinea = container.querySelector('.linea-pedido-row');
+    if (!primeraLinea) {
+        console.error('No se encontró ninguna línea para clonar');
+        alert('Error: No se puede agregar una nueva línea. Por favor, recarga la página.');
+        return;
+    }
     const nuevaLinea = primeraLinea.cloneNode(true);
     
     // Limpiar valores
@@ -589,8 +596,7 @@ function agregarLinea() {
         descuentoInput.addEventListener('input', calcularPrecioFinal);
     }
     
-    // Añadir listener para sincronizar prenda_id
-    const prendaInputNuevo = nuevaLinea.querySelector('input[name="prenda_nombre[]"]');
+    // Añadir listener para sincronizar prenda_id (reutilizar prendaInputNuevo ya declarado arriba)
     if (prendaInputNuevo) {
         prendaInputNuevo.addEventListener('input', function() {
             const prendaNombre = this.value.trim();

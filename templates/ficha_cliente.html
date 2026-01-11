@@ -214,9 +214,9 @@
     <div class="historial-section">
         <h3>📊 Historial</h3>
         
-        <!-- Presupuestos -->
+        <!-- Solicitudes -->
         <div class="historial-subsection">
-            <h4>Presupuestos ({{ presupuestos|length }})</h4>
+            <h4>Solicitudes ({{ presupuestos|length }})</h4>
             {% if presupuestos %}
             <table class="historial-table">
                 <thead>
@@ -243,40 +243,7 @@
                 </tbody>
             </table>
             {% else %}
-            <p class="no-data">No hay presupuestos registrados.</p>
-            {% endif %}
-        </div>
-
-        <!-- Pedidos -->
-        <div class="historial-subsection">
-            <h4>Pedidos ({{ pedidos|length }})</h4>
-            {% if pedidos %}
-            <table class="historial-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>Fecha</th>
-                        <th>Estado</th>
-                        <th>Tipo</th>
-                        <th>Acciones</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for pedido in pedidos %}
-                    <tr>
-                        <td>{{ pedido.id }}</td>
-                        <td>{{ pedido.fecha_creacion.strftime('%d/%m/%Y') if pedido.fecha_creacion else '-' }}</td>
-                        <td><span class="badge badge-{{ pedido.estado|lower|replace(' ', '-') }}">{{ pedido.estado }}</span></td>
-                        <td>{{ pedido.tipo_pedido }}</td>
-                        <td>
-                            <a href="{{ url_for('solicitudes.ver_solicitud', solicitud_id=pedido.id) }}" class="btn btn-sm btn-primary">Ver</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            {% else %}
-            <p class="no-data">No hay pedidos registrados.</p>
+            <p class="no-data">No hay solicitudes registradas.</p>
             {% endif %}
         </div>
 

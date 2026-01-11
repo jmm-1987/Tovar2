@@ -80,28 +80,36 @@
                     <th>Número</th>
                     <th>Fecha</th>
                     <th>Cliente</th>
-                    <th>Importe Total</th>
+                    <th>Base Imponible</th>
                     <th>IVA</th>
+                    <th>Importe Total</th>
                 </tr>
             </thead>
             <tbody>
                 {% for factura in facturas %}
+                {% set tipo_iva_val = factura.tipo_iva|float if factura.tipo_iva else 21.0 %}
+                {% set importe_total_val = factura.importe_total|float %}
+                {% set descuento_pronto_pago_val = factura.descuento_pronto_pago|float if factura.descuento_pronto_pago else 0.0 %}
+                {% if descuento_pronto_pago_val > 0 %}
+                    {# Si hay descuento por pronto pago, el importe_total ya lo tiene aplicado #}
+                    {# importe_total = subtotal * (1 - descuento/100) #}
+                    {# subtotal = importe_total / (1 - descuento/100) #}
+                    {% set subtotal_sin_descuento = importe_total_val / (1 - descuento_pronto_pago_val / 100) %}
+                    {# subtotal = base + iva = base * (1 + tipo_iva/100) #}
+                    {% set base_imponible = subtotal_sin_descuento / (1 + tipo_iva_val / 100) %}
+                    {% set importe_iva = subtotal_sin_descuento - base_imponible %}
+                {% else %}
+                    {# Sin descuento: importe_total = base + iva = base * (1 + tipo_iva/100) #}
+                    {% set base_imponible = importe_total_val / (1 + tipo_iva_val / 100) %}
+                    {% set importe_iva = importe_total_val - base_imponible %}
+                {% endif %}
                 <tr>
                     <td>{{ factura.serie }}-{{ factura.numero }}</td>
                     <td>{{ factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else '-' }}</td>
                     <td>{{ factura.nombre }}</td>
-                    <td>{{ "%.2f"|format(factura.importe_total) }} €</td>
-                    <td>
-                        {% set iva_factura = 0.0 %}
-                        {% set tipo_iva = 21.0 %}
-                        {% for linea in factura.lineas %}
-                            {% set importe_con_iva = linea.importe|float %}
-                            {% set base_imponible = importe_con_iva / (1.0 + tipo_iva / 100.0) %}
-                            {% set iva_linea = base_imponible * tipo_iva / 100.0 %}
-                            {% set iva_factura = iva_factura + iva_linea %}
-                        {% endfor %}
-                        {{ "%.2f"|format(iva_factura) }} €
-                    </td>
+                    <td style="text-align: right;">{{ "%.2f"|format(base_imponible) }} €</td>
+                    <td style="text-align: right;">{{ "%.2f"|format(importe_iva) }} € ({{ "%.0f"|format(tipo_iva_val) }}%)</td>
+                    <td style="text-align: right;"><strong>{{ "%.2f"|format(importe_total_val) }} €</strong></td>
                 </tr>
                 {% endfor %}
             </tbody>

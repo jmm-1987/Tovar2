@@ -18,9 +18,9 @@
                     <th>Fecha</th>
                     <th>Cliente</th>
                     <th>NIF</th>
-                    <th>Importe Total</th>
                     <th>Base Imponible</th>
                     <th>IVA</th>
+                    <th>Importe Total</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
@@ -31,28 +31,37 @@
                     <td>{{ factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else '-' }}</td>
                     <td>{{ factura.nombre }}</td>
                     <td>{{ factura.nif or '-' }}</td>
-                    <td><strong>{{ "%.2f"|format(factura.importe_total) }} €</strong></td>
-                    <td>
-                        {% set tipo_iva = 21.0 %}
-                        {% set base_total = 0.0 %}
-                        {% for linea in factura.lineas %}
-                            {% set importe_con_iva = linea.importe|float %}
-                            {% set base_imponible = importe_con_iva / (1.0 + tipo_iva / 100.0) %}
-                            {% set base_total = base_total + base_imponible %}
-                        {% endfor %}
-                        {{ "%.2f"|format(base_total) }} €
+                    <td style="text-align: right;">
+                        {% set tipo_iva_val = factura.tipo_iva|float if factura.tipo_iva else 21.0 %}
+                        {% set importe_total_val = factura.importe_total|float %}
+                        {% set descuento_pronto_pago_val = factura.descuento_pronto_pago|float if factura.descuento_pronto_pago else 0.0 %}
+                        {% if descuento_pronto_pago_val > 0 %}
+                            {# Si hay descuento por pronto pago, el importe_total ya lo tiene aplicado #}
+                            {% set subtotal_sin_descuento = importe_total_val / (1 - descuento_pronto_pago_val / 100) %}
+                            {% set base_imponible = subtotal_sin_descuento / (1 + tipo_iva_val / 100) %}
+                        {% else %}
+                            {# Sin descuento: importe_total = base + iva = base * (1 + tipo_iva/100) #}
+                            {% set base_imponible = importe_total_val / (1 + tipo_iva_val / 100) %}
+                        {% endif %}
+                        {{ "%.2f"|format(base_imponible) }} €
                     </td>
-                    <td>
-                        {% set tipo_iva = 21.0 %}
-                        {% set iva_factura = 0.0 %}
-                        {% for linea in factura.lineas %}
-                            {% set importe_con_iva = linea.importe|float %}
-                            {% set base_imponible = importe_con_iva / (1.0 + tipo_iva / 100.0) %}
-                            {% set iva_linea = base_imponible * tipo_iva / 100.0 %}
-                            {% set iva_factura = iva_factura + iva_linea %}
-                        {% endfor %}
-                        {{ "%.2f"|format(iva_factura) }} €
+                    <td style="text-align: right;">
+                        {% set tipo_iva_val = factura.tipo_iva|float if factura.tipo_iva else 21.0 %}
+                        {% set importe_total_val = factura.importe_total|float %}
+                        {% set descuento_pronto_pago_val = factura.descuento_pronto_pago|float if factura.descuento_pronto_pago else 0.0 %}
+                        {% if descuento_pronto_pago_val > 0 %}
+                            {# Si hay descuento por pronto pago, el importe_total ya lo tiene aplicado #}
+                            {% set subtotal_sin_descuento = importe_total_val / (1 - descuento_pronto_pago_val / 100) %}
+                            {% set base_imponible = subtotal_sin_descuento / (1 + tipo_iva_val / 100) %}
+                            {% set importe_iva = subtotal_sin_descuento - base_imponible %}
+                        {% else %}
+                            {# Sin descuento: importe_total = base + iva = base * (1 + tipo_iva/100) #}
+                            {% set base_imponible = importe_total_val / (1 + tipo_iva_val / 100) %}
+                            {% set importe_iva = importe_total_val - base_imponible %}
+                        {% endif %}
+                        {{ "%.2f"|format(importe_iva) }} € ({{ "%.0f"|format(tipo_iva_val) }}%)
                     </td>
+                    <td style="text-align: right;"><strong>{{ "%.2f"|format(importe_total_val) }} €</strong></td>
                     <td>
                         <a href="{{ url_for('facturacion.imprimir_factura', factura_id=factura.id) }}" class="btn btn-sm btn-primary" target="_blank">Ver Factura</a>
                     </td>
@@ -62,34 +71,43 @@
             <tfoot>
                 <tr style="background: #f8f9fa; font-weight: bold;">
                     <td colspan="4" style="text-align: right;">TOTALES:</td>
-                    <td>
-                        {% set total_facturacion = facturas|sum(attribute='importe_total') %}
-                        {{ "%.2f"|format(total_facturacion) }} €
-                    </td>
-                    <td>
-                        {% set tipo_iva = 21.0 %}
+                    <td style="text-align: right;">
                         {% set total_base = 0.0 %}
                         {% for factura in facturas %}
-                            {% for linea in factura.lineas %}
-                                {% set importe_con_iva = linea.importe|float %}
-                                {% set base_imponible = importe_con_iva / (1.0 + tipo_iva / 100.0) %}
-                                {% set total_base = total_base + base_imponible %}
-                            {% endfor %}
+                            {% set tipo_iva_val = factura.tipo_iva|float if factura.tipo_iva else 21.0 %}
+                            {% set importe_total_val = factura.importe_total|float %}
+                            {% set descuento_pronto_pago_val = factura.descuento_pronto_pago|float if factura.descuento_pronto_pago else 0.0 %}
+                            {% if descuento_pronto_pago_val > 0 %}
+                                {% set subtotal_sin_descuento = importe_total_val / (1 - descuento_pronto_pago_val / 100) %}
+                                {% set base_imponible = subtotal_sin_descuento / (1 + tipo_iva_val / 100) %}
+                            {% else %}
+                                {% set base_imponible = importe_total_val / (1 + tipo_iva_val / 100) %}
+                            {% endif %}
+                            {% set total_base = total_base + base_imponible %}
                         {% endfor %}
                         {{ "%.2f"|format(total_base) }} €
                     </td>
-                    <td>
-                        {% set tipo_iva = 21.0 %}
+                    <td style="text-align: right;">
                         {% set total_iva = 0.0 %}
                         {% for factura in facturas %}
-                            {% for linea in factura.lineas %}
-                                {% set importe_con_iva = linea.importe|float %}
-                                {% set base_imponible = importe_con_iva / (1.0 + tipo_iva / 100.0) %}
-                                {% set iva_linea = base_imponible * tipo_iva / 100.0 %}
-                                {% set total_iva = total_iva + iva_linea %}
-                            {% endfor %}
+                            {% set tipo_iva_val = factura.tipo_iva|float if factura.tipo_iva else 21.0 %}
+                            {% set importe_total_val = factura.importe_total|float %}
+                            {% set descuento_pronto_pago_val = factura.descuento_pronto_pago|float if factura.descuento_pronto_pago else 0.0 %}
+                            {% if descuento_pronto_pago_val > 0 %}
+                                {% set subtotal_sin_descuento = importe_total_val / (1 - descuento_pronto_pago_val / 100) %}
+                                {% set base_imponible = subtotal_sin_descuento / (1 + tipo_iva_val / 100) %}
+                                {% set importe_iva = subtotal_sin_descuento - base_imponible %}
+                            {% else %}
+                                {% set base_imponible = importe_total_val / (1 + tipo_iva_val / 100) %}
+                                {% set importe_iva = importe_total_val - base_imponible %}
+                            {% endif %}
+                            {% set total_iva = total_iva + importe_iva %}
                         {% endfor %}
                         {{ "%.2f"|format(total_iva) }} €
+                    </td>
+                    <td style="text-align: right;">
+                        {% set total_facturacion = facturas|sum(attribute='importe_total') %}
+                        <strong>{{ "%.2f"|format(total_facturacion) }} €</strong>
                     </td>
                     <td></td>
                 </tr>

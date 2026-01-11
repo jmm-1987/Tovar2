@@ -77,6 +77,181 @@
             page-break-after: always !important;
         }
         
+        /* PÁGINA 2: IMÁGENES ADICIONALES */
+        .imagenes-page {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 0;
+            padding-top: 10mm;
+            box-sizing: border-box;
+        }
+        
+        .imagenes-header {
+            text-align: center;
+            margin-bottom: 10mm;
+            border-bottom: 3px solid #2c3e50;
+            flex-shrink: 0;
+        }
+        
+        .imagenes-header h2 {
+            font-size: 20px;
+            color: #2c3e50;
+            margin: 0;
+            font-weight: bold;
+        }
+        
+        .imagenes-grid {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 10mm 15mm;
+            box-sizing: border-box;
+        }
+        
+        .imagen-item {
+            width: 50%;
+            vertical-align: top;
+            padding: 0;
+            page-break-inside: avoid;
+        }
+        
+        .imagen-item-wrapper {
+            display: block;
+            text-align: center;
+            width: 100%;
+        }
+        
+        .imagen-container {
+            width: 300px !important;
+            height: 250px !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 5mm;
+            box-sizing: border-box;
+            margin: 0 auto;
+        }
+        
+        .imagen-adicional {
+            width: 300px !important;
+            height: 250px !important;
+            max-width: 300px !important;
+            max-height: 250px !important;
+            object-fit: contain;
+            display: block;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .descripcion-imagen {
+            width: 100%;
+            padding: 0;
+            font-size: 9pt;
+            line-height: 1.4;
+            color: #333;
+            text-align: center;
+        }
+        
+        /* PÁGINA 3: CONDICIONADO */
+        .condicionado-page {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 0;
+            padding-top: 20mm;
+            box-sizing: border-box;
+        }
+        
+        .condicionado-header {
+            text-align: center;
+            margin-bottom: 8px;
+            margin-top: 0;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .condicionado-header h1 {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 3px;
+            margin-top: 0;
+            padding-top: 0;
+        }
+        
+        .condicionado-header h2 {
+            font-size: 14px;
+            color: #666;
+            font-weight: normal;
+            margin: 0;
+        }
+        
+        .condicionado-content {
+            flex: 1;
+            font-size: 9px;
+            line-height: 1.4;
+            text-align: justify;
+            margin-bottom: 8px;
+            margin-top: 0;
+            overflow: hidden;
+        }
+        
+        .condicionado-content h3 {
+            font-size: 10px;
+            color: #2c3e50;
+            margin-top: 8px;
+            margin-bottom: 4px;
+            font-weight: bold;
+        }
+        
+        .condicionado-content p {
+            margin-bottom: 5px;
+            margin-top: 0;
+        }
+        
+        .condicionado-content ul {
+            margin-left: 15px;
+            margin-bottom: 5px;
+            margin-top: 0;
+            padding-left: 10px;
+        }
+        
+        .condicionado-content li {
+            margin-bottom: 3px;
+        }
+        
+        .firma-section {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 2px solid #2c3e50;
+            flex-shrink: 0;
+        }
+        
+        .firma-box {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        
+        .firma-cliente, .firma-empresa {
+            width: 45%;
+            text-align: center;
+        }
+        
+        .firma-line {
+            border-top: 1px solid #333;
+            margin: 30px auto 5px;
+            width: 80%;
+        }
+        
+        .firma-label {
+            font-size: 9px;
+            color: #666;
+        }
+        
         .no-print {
             text-align: center;
             margin-top: 20px;
@@ -310,6 +485,23 @@
     </style>
 </head>
 <body>
+    {% set imagenes_adicionales = [
+        presupuesto.imagen_adicional_1 if presupuesto.imagen_adicional_1 else None,
+        presupuesto.imagen_adicional_2 if presupuesto.imagen_adicional_2 else None,
+        presupuesto.imagen_adicional_3 if presupuesto.imagen_adicional_3 else None,
+        presupuesto.imagen_adicional_4 if presupuesto.imagen_adicional_4 else None,
+        presupuesto.imagen_adicional_5 if presupuesto.imagen_adicional_5 else None
+    ] %}
+    {% set descripciones_adicionales = [
+        descripciones_imagenes[0] if descripciones_imagenes is defined and descripciones_imagenes[0] else (presupuesto.descripcion_imagen_1 if presupuesto.descripcion_imagen_1 else ''),
+        descripciones_imagenes[1] if descripciones_imagenes is defined and descripciones_imagenes[1] else (presupuesto.descripcion_imagen_2 if presupuesto.descripcion_imagen_2 else ''),
+        descripciones_imagenes[2] if descripciones_imagenes is defined and descripciones_imagenes[2] else (presupuesto.descripcion_imagen_3 if presupuesto.descripcion_imagen_3 else ''),
+        descripciones_imagenes[3] if descripciones_imagenes is defined and descripciones_imagenes[3] else (presupuesto.descripcion_imagen_4 if presupuesto.descripcion_imagen_4 else ''),
+        descripciones_imagenes[4] if descripciones_imagenes is defined and descripciones_imagenes[4] else (presupuesto.descripcion_imagen_5 if presupuesto.descripcion_imagen_5 else '')
+    ] %}
+    
+    {% set tiene_imagenes_adicionales = imagenes_adicionales[0] or imagenes_adicionales[1] or imagenes_adicionales[2] or imagenes_adicionales[3] or imagenes_adicionales[4] %}
+    
     <!-- PÁGINA 1: CONTENIDO DEL PRESUPUESTO DETALLADO -->
     <div class="page">
         <div class="page-content">
@@ -470,6 +662,249 @@
             Este presupuesto no tiene líneas registradas.
         </p>
         {% endif %}
+        </div>
+        
+        <!-- Pie de página con información de protección de datos -->
+        <div class="footer-datos">
+            <p><span class="iban">Número de cuenta | IBAN:ES2200495247862816942248</span></p>
+            </br>
+            <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.</p>
+        </div>
+    </div>
+    
+    <!-- PÁGINA 2: IMÁGENES ADICIONALES (Máximo 4 imágenes con descripciones) -->
+    {% if tiene_imagenes_adicionales %}
+    <div class="page imagenes-page">
+        <div class="imagenes-header">
+            <h2>DISEÑOS DEL PEDIDO</h2>
+        </div>
+        <table class="imagenes-grid" style="width: 100%;">
+            {% set img0 = imagenes_adicionales[0] if imagenes_adicionales[0] else None %}
+            {% set img1 = imagenes_adicionales[1] if imagenes_adicionales[1] else None %}
+            {% set img2 = imagenes_adicionales[2] if imagenes_adicionales[2] else None %}
+            {% set img3 = imagenes_adicionales[3] if imagenes_adicionales[3] else None %}
+            {% set img4 = imagenes_adicionales[4] if imagenes_adicionales[4] else None %}
+            
+            {% if img0 or img1 %}
+            <tr>
+                {% if img0 %}
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[0] %}
+                            <img src="{{ imagenes_adicionales_base64[0] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[0]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[0], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[0] %}
+                            {{ descripciones_adicionales[0] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                {% else %}
+                <td class="imagen-item"></td>
+                {% endif %}
+                {% if img1 %}
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[1] %}
+                            <img src="{{ imagenes_adicionales_base64[1] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[1]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[1], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[1] %}
+                            {{ descripciones_adicionales[1] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                {% else %}
+                <td class="imagen-item"></td>
+                {% endif %}
+            </tr>
+            {% endif %}
+            
+            {% if img2 or img3 %}
+            <tr>
+                {% if img2 %}
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[2] %}
+                            <img src="{{ imagenes_adicionales_base64[2] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[2]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[2], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[2] %}
+                            {{ descripciones_adicionales[2] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                {% else %}
+                <td class="imagen-item"></td>
+                {% endif %}
+                {% if img3 %}
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[3] %}
+                            <img src="{{ imagenes_adicionales_base64[3] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[3]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[3], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[3] %}
+                            {{ descripciones_adicionales[3] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                {% else %}
+                <td class="imagen-item"></td>
+                {% endif %}
+            </tr>
+            {% endif %}
+            
+            {% if img4 %}
+            <tr>
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[4] %}
+                            <img src="{{ imagenes_adicionales_base64[4] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[4]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[4], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[4] %}
+                            {{ descripciones_adicionales[4] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td class="imagen-item"></td>
+            </tr>
+            {% endif %}
+        </table>
+        
+        <!-- Pie de página con información de protección de datos -->
+        <div class="footer-datos">
+            <p><span class="iban">Forma de Pago: Transferencia | IBAN:ES2200495247862816942248</span></p>
+            </br>
+            <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.</p>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- PÁGINA 3: CONDICIONADO -->
+    <div class="page condicionado-page">
+        <div class="condicionado-header">
+            <h1>CONDICIONES GENERALES</h1>
+            <h2>ACEPTACIÓN PREVIA AL PEDIDO</h2>
+        </div>
+        
+        <div class="condicionado-content">
+            <p>El presente documento establece las condiciones generales que rigen la relación comercial entre <strong>{{ presupuesto.cliente.nombre if presupuesto.cliente else 'EL CLIENTE' }}</strong> (en adelante "EL CLIENTE") y nuestra empresa de fabricación de ropa (en adelante "LA EMPRESA").</p>
+            
+            <h3>1. ACEPTACIÓN DEL PRESUPUESTO</h3>
+            <p>La aceptación del presente presupuesto implica la aceptación íntegra de todas y cada una de las condiciones aquí establecidas. La firma de este documento constituye un acuerdo vinculante entre ambas partes.</p>
+            
+            <h3>2. PLAZOS DE ENTREGA</h3>
+            <p>Los plazos de entrega indicados en el presupuesto son estimados y pueden verse afectados por diversos factores fuera del control de LA EMPRESA, tales como:</p>
+            <ul>
+                <li>Disponibilidad de materias primas y tejidos</li>
+                <li>Retrasos en la recepción de materiales por parte de proveedores</li>
+                <li>Modificaciones o cambios solicitados por EL CLIENTE después de la aceptación del presupuesto</li>
+                <li>Circunstancias de fuerza mayor (huelgas, catástrofes naturales, pandemias, etc.)</li>
+                <li>Volumen de pedidos y carga de trabajo del taller</li>
+                <li>Procesos de bordado, serigrafía o personalización adicional</li>
+            </ul>
+            <p>LA EMPRESA se compromete a informar a EL CLIENTE de cualquier retraso significativo en los plazos de entrega con la mayor antelación posible.</p>
+            
+            <h3>3. CALIDAD Y ESPECIFICACIONES</h3>
+            <p>LA EMPRESA garantiza que todos los productos fabricados cumplirán con las especificaciones acordadas en el presupuesto. Las muestras, si las hubiera, son orientativas y pueden presentar ligeras variaciones en la producción final debido a las características propias de los procesos de fabricación textil.</p>
+            <p>EL CLIENTE deberá revisar y aprobar las muestras antes de la producción en serie. Cualquier modificación solicitada después de la aprobación de muestras puede conllevar costes adicionales y retrasos en la entrega.</p>
+            
+            <h3>4. COLORES Y TELAS</h3>
+            <p>Los colores de los productos pueden presentar ligeras variaciones debido a:</p>
+            <ul>
+                <li>Diferencias entre lotes de tela, características de los procesos de teñido o condiciones de visualización (luz natural vs. artificial)</li>
+            </ul>
+            <p>Estas variaciones son normales en la industria textil y no constituyen defecto de fabricación.</p>
+            
+            <h3>5. TALLAS Y MEDIDAS</h3>
+            <p>Las tallas indicadas en el presupuesto se ajustan a los estándares de la industria textil. Si EL CLIENTE requiere medidas personalizadas o tallas especiales, deberá especificarlo claramente en el momento de la aceptación del presupuesto. Las modificaciones posteriores pueden conllevar costes adicionales.</p>
+            
+            <h3>6. PAGO Y FACTURACIÓN</h3>
+            <p>Las condiciones de pago se establecerán según lo acordado en el presupuesto. LA EMPRESA se reserva el derecho de solicitar un anticipo antes de iniciar la producción, especialmente en pedidos de gran volumen o con características especiales.</p>
+            <p>El pago deberá realizarse según las condiciones acordadas. El retraso en el pago puede conllevar la suspensión de la producción o la retención de la mercancía hasta la recepción del importe correspondiente.</p>
+            
+            <h3>7. MODIFICACIONES Y CANCELACIONES</h3>
+            <p>Una vez aceptado el presupuesto y comenzada la producción, cualquier modificación solicitada por EL CLIENTE puede conllevar:</p>
+            <ul>
+                <li>Costes adicionales, retrasos en los plazos de entrega, o Pérdida de materiales ya cortados o procesados</li>
+            </ul>
+            <p>Las cancelaciones de pedidos después de la aceptación del presupuesto pueden conllevar el pago de los costes ya incurridos en materiales, mano de obra y procesos de producción iniciados.</p>
+            
+            <h3>8. RECEPCIÓN Y REVISIÓN</h3>
+            <p>EL CLIENTE deberá revisar los productos recibidos en un plazo máximo de 7 días naturales desde la entrega. Cualquier reclamación por defectos de fabricación deberá comunicarse por escrito dentro de este plazo, adjuntando fotografías y descripción detallada del problema.</p>
+            <p>Pasado este plazo sin comunicación, se entenderá que los productos han sido aceptados conforme.</p>
+            
+            <h3>9. GARANTÍA</h3>
+            <p>LA EMPRESA garantiza la calidad de los productos fabricados durante un período de 6 meses desde la fecha de entrega, siempre que se hayan seguido las instrucciones de cuidado y mantenimiento proporcionadas.</p>
+            <p>La garantía no cubre:</p>
+            <ul>
+                <li>Desgaste normal por uso</li>
+                <li>Daños causados por uso inadecuado o negligencia</li>
+                <li>Modificaciones realizadas por terceros</li>
+                <li>Lavados o tratamientos no recomendados</li>
+            </ul>
+            
+            <h3>10. PROPIEDAD INTELECTUAL</h3>
+            <p>Los diseños, logos y elementos gráficos proporcionados por EL CLIENTE para su aplicación en los productos deben ser de su propiedad o contar con las licencias necesarias. LA EMPRESA no se responsabiliza de cualquier reclamación relacionada con derechos de propiedad intelectual de terceros.</p>
+            
+            <h3>11. PROTECCIÓN DE DATOS</h3>
+            <p>Los datos personales y comerciales facilitados por EL CLIENTE serán tratados conforme a la normativa vigente de protección de datos, utilizándose únicamente para la gestión del pedido y la relación comercial.</p>
+            
+            <h3>12. LEGISLACIÓN APLICABLE</h3>
+            <p>El presente acuerdo se rige por la legislación española. Para cualquier controversia, las partes se someten a los juzgados y tribunales del domicilio de LA EMPRESA.</p>
+            
+            <p style="margin-top: 8px; margin-bottom: 0; font-weight: bold; text-align: center; font-size: 9px;">EL CLIENTE DECLARA HABER LEÍDO Y ACEPTADO TODAS LAS CONDICIONES ESTABLECIDAS EN EL PRESENTE DOCUMENTO</p>
+        </div>
+        
+        <div class="firma-section">
+            <div class="firma-box">
+                <div class="firma-cliente">
+                    <div class="firma-line"></div>
+                    <div class="firma-label">Firma y sello del CLIENTE</div>
+                </div>
+                <div class="firma-empresa">
+                    <div class="firma-line"></div>
+                    <div class="firma-label">Firma y sello de LA EMPRESA</div>
+                </div>
+            </div>
+        </div>
         </div>
         
         <!-- Pie de página con información de protección de datos -->
