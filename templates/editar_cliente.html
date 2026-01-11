@@ -350,25 +350,25 @@ document.addEventListener('DOMContentLoaded', function() {
     if (numeroCuentaInput) {
         // Solo formatear si hay un valor, no forzar ES si está vacío
         if (numeroCuentaInput.value && !numeroCuentaInput.value.toUpperCase().startsWith('ES')) {
-            // Si hay un valor existente que empieza con números, formatearlo
-            const numbers = numeroCuentaInput.value.replace(/\D/g, '').substring(0, 22);
-            if (numbers.length > 0) {
-                let formatted = 'ES';
-                // Primeros 2 dígitos sin guión
-                formatted += numbers.substring(0, 2);
-                // Añadir guión después de los 2 primeros dígitos
-                if (numbers.length > 2) {
-                    formatted += '-';
-                    // Resto de dígitos en grupos de 4
-                    const rest = numbers.substring(2);
-                    for (let i = 0; i < rest.length; i++) {
-                        if (i > 0 && i % 4 === 0) {
+                // Si hay un valor existente que empieza con números, formatearlo
+                const numbers = numeroCuentaInput.value.replace(/\D/g, '').substring(0, 22);
+                if (numbers.length > 0) {
+                    let formatted = 'ES';
+                    // Primeros 2 dígitos sin guión
+                        formatted += numbers.substring(0, 2);
+                        // Añadir guión después de los 2 primeros dígitos
+                        if (numbers.length > 2) {
                             formatted += '-';
+                            // Resto de dígitos en grupos de 4
+                            const rest = numbers.substring(2);
+                            for (let i = 0; i < rest.length; i++) {
+                                if (i > 0 && i % 4 === 0) {
+                                    formatted += '-';
+                                }
+                                formatted += rest[i];
                         }
-                        formatted += rest[i];
                     }
-                }
-                numeroCuentaInput.value = formatted;
+                    numeroCuentaInput.value = formatted;
             }
         }
         

@@ -415,17 +415,9 @@ def ver_solicitud(solicitud_id):
         joinedload(Presupuesto.marcada_encargado_a)
     ).get_or_404(solicitud_id)
     
-    # Debug: verificar si hay líneas
-    print(f"DEBUG ver_solicitud: Solicitud {solicitud_id} tiene {len(solicitud.lineas) if solicitud.lineas else 0} líneas")
-    if solicitud.lineas:
-        for linea in solicitud.lineas:
-            print(f"DEBUG ver_solicitud: Línea {linea.id} - nombre_mostrar: '{linea.nombre_mostrar}', nombre: '{linea.nombre}', prenda_id: {linea.prenda_id}")
-    else:
-        # Verificar directamente en la base de datos
+    # Verificar directamente en la base de datos si no hay líneas en la relación
+    if not solicitud.lineas:
         lineas_directas = LineaPresupuesto.query.filter_by(presupuesto_id=solicitud_id).all()
-        print(f"DEBUG ver_solicitud: Consulta directa encontró {len(lineas_directas)} líneas")
-        for linea in lineas_directas:
-            print(f"DEBUG ver_solicitud: Línea directa {linea.id} - nombre_mostrar: '{linea.nombre_mostrar}', nombre: '{linea.nombre}'")
         # Si hay líneas directas pero no en la relación, recargar
         if lineas_directas:
             db.session.refresh(solicitud)
@@ -873,7 +865,12 @@ def crear_cliente_ajax():
 
 def preparar_datos_imprimir_solicitud(solicitud_id):
     """Función auxiliar para preparar todos los datos necesarios para imprimir la solicitud"""
-    solicitud = Presupuesto.query.get_or_404(solicitud_id)
+    from sqlalchemy.orm import joinedload
+    solicitud = Presupuesto.query.options(
+        joinedload(Presupuesto.lineas).joinedload(LineaPresupuesto.prenda),
+        joinedload(Presupuesto.cliente),
+        joinedload(Presupuesto.comercial)
+    ).get_or_404(solicitud_id)
     
     # Calcular totales
     tipo_iva = 21
@@ -1165,21 +1162,90 @@ def descargar_pdf_solicitud(solicitud_id):
         flash(f'Error al generar PDF: {str(e)}', 'error')
         return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
 
-@solicitudes_bp.route('/solicitudes/<int:solicitud_id>/hoja-trabajo')
+@solicitudes_bp.route('/solicitudes/<int:solicitud_id>/descargar-pdf-detallado')
 @login_required
-def hoja_trabajo_solicitud(solicitud_id):
-    """Generar hoja de trabajo en formato PDF"""
+def descargar_pdf_detallado_solicitud(solicitud_id):
+    """Descargar solicitud en formato PDF detallado con todos los campos de las líneas"""
     try:
-        from sqlalchemy.orm import joinedload
-        solicitud = Presupuesto.query.options(
-            joinedload(Presupuesto.cliente),
-            joinedload(Presupuesto.comercial),
-            joinedload(Presupuesto.lineas)
-        ).get_or_404(solicitud_id)
+        datos = preparar_datos_imprimir_solicitud(solicitud_id)
+        
+        # Renderizar el HTML de la solicitud detallada
+        html = render_template('imprimir_presupuesto_detallado.html', 
+                             **datos,
+                             use_base64=True)
+        
+        # Crear el PDF en memoria usando playwright
+        pdf_buffer = BytesIO()
+        
+        try:
+            # Guardar HTML temporalmente para que playwright pueda acceder a él
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+                temp_file.write(html)
+                temp_html_path = temp_file.name
+            
+            # Usar playwright para generar el PDF
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                
+                # Cargar el HTML desde el archivo temporal
+                page.goto(f'file://{temp_html_path}')
+                
+                # Generar PDF
+                pdf_bytes = page.pdf(
+                    format='A4',
+                    print_background=True,
+                    margin={
+                        'top': '10mm',
+                        'right': '10mm',
+                        'bottom': '10mm',
+                        'left': '10mm'
+                    }
+                )
+                
+                browser.close()
+            
+            # Escribir el PDF al buffer
+            pdf_buffer.write(pdf_bytes)
+            
+            # Limpiar archivo temporal
+            try:
+                os.unlink(temp_html_path)
+            except:
+                pass
+            
+        except Exception as pdf_error:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error al crear PDF detallado con playwright: {error_trace}")
+            flash(f'Error al generar PDF detallado: {str(pdf_error)}', 'error')
+            return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
+        
+        # Preparar la respuesta con el PDF
+        pdf_buffer.seek(0)
+        response = make_response(pdf_buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=solicitud_detallado_{solicitud_id}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error completo al generar PDF detallado: {error_trace}")
+        flash(f'Error al generar PDF detallado: {str(e)}', 'error')
+        return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
+
+@solicitudes_bp.route('/solicitudes/<int:solicitud_id>/descargar-hoja-trabajo')
+@login_required
+def descargar_hoja_trabajo_solicitud(solicitud_id):
+    """Descargar hoja de trabajo en formato PDF con todos los detalles (sin imagen de diseño)"""
+    try:
+        datos = preparar_datos_imprimir_solicitud(solicitud_id)
         
         # Renderizar el HTML de la hoja de trabajo
         html = render_template('solicitudes/hoja_trabajo.html', 
-                             solicitud=solicitud,
+                             **datos,
                              use_base64=True)
         
         # Crear el PDF en memoria usando playwright
@@ -1233,7 +1299,7 @@ def hoja_trabajo_solicitud(solicitud_id):
         pdf_buffer.seek(0)
         response = make_response(pdf_buffer.read())
         response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'inline; filename=hoja_trabajo_{solicitud.numero_solicitud or solicitud.id}.pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=hoja_trabajo_{datos["solicitud"].numero_solicitud or datos["solicitud"].id}.pdf'
         
         return response
         

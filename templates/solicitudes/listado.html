@@ -112,8 +112,12 @@ header {
                 </td>
                 <td style="padding: 15px; text-align: center; color: #495057;">{{ solicitud.fecha_creacion.strftime('%d/%m/%Y') if solicitud.fecha_creacion else 'N/A' }}</td>
                 <td style="padding: 15px; text-align: center;">
-                    <a href="{{ url_for('solicitudes.ver_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-sm btn-primary" style="padding: 4px 8px; font-size: 0.75rem; margin-right: 5px;">Ver</a>
-                    <a href="{{ url_for('solicitudes.editar_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-sm btn-secondary" style="padding: 4px 8px; font-size: 0.75rem;">Editar</a>
+                    <div style="display: flex; gap: 4px; justify-content: center; align-items: center; flex-wrap: nowrap;">
+                        <a href="{{ url_for('solicitudes.ver_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-sm btn-primary" style="padding: 4px 8px; font-size: 0.75rem; white-space: nowrap;">Ver</a>
+                        <a href="{{ url_for('solicitudes.editar_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-sm btn-secondary" style="padding: 4px 8px; font-size: 0.75rem; white-space: nowrap;">Editar</a>
+                        <a href="{{ url_for('solicitudes.descargar_pdf_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-sm" style="padding: 4px 8px; font-size: 0.75rem; background: #dc3545; color: white; text-decoration: none; border-radius: 4px; white-space: nowrap;" target="_blank" title="Descargar PDF">📄 PDF</a>
+                        <a href="{{ url_for('solicitudes.descargar_pdf_detallado_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-sm" style="padding: 4px 8px; font-size: 0.75rem; background: #17a2b8; color: white; text-decoration: none; border-radius: 4px; white-space: nowrap;" target="_blank" title="Descargar PDF Detallado">📋 Det.</a>
+                    </div>
                 </td>
             </tr>
             {% endfor %}

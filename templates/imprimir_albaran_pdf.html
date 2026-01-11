@@ -326,15 +326,15 @@
                             {% if (cp or poblacion) and provincia %}-{% endif %}
                             {% if provincia %}{{ provincia }}{% endif %}
                         </p>
-                    {% endif %}
+                {% endif %}
                     {% if pedido.cliente.nif %}
                     <p><strong>NIF/CIF:</strong> {{ pedido.cliente.nif }}</p>
-                    {% endif %}
+                {% endif %}
                 {% elif factura %}
                     <p><strong>{{ factura.nombre }}</strong></p>
                     {% if factura.nif %}
                     <p><strong>NIF/CIF:</strong> {{ factura.nif }}</p>
-                    {% endif %}
+                {% endif %}
                 {% endif %}
             </div>
             <div class="datos-box">

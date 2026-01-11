@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% if es_albaran is defined and es_albaran %}Albarán{% else %}Presupuesto{% endif %} #{{ presupuesto.id }}</title>
+    <title>{% if es_albaran is defined and es_albaran %}Albarán{% else %}Presupuesto{% endif %} {{ presupuesto.numero_solicitud or presupuesto.id }}</title>
     <style type="text/css">
         * {
             margin: 0;
@@ -33,7 +33,7 @@
             padding: 5mm 10mm 5mm 10mm;
             padding-bottom: 25mm;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
-            page-break-after: auto;
+            page-break-after: always;
             page-break-inside: avoid;
             overflow: hidden;
             box-sizing: border-box;
@@ -60,12 +60,22 @@
             text-align: justify;
         }
         
+        .footer-datos .iban {
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
         .page:last-child {
             page-break-after: auto;
         }
         
         .page:only-child {
             page-break-after: auto;
+        }
+        
+        /* Forzar salto de página en cada página excepto la última */
+        .page:not(:last-child) {
+            page-break-after: always !important;
         }
         
         .no-print {
@@ -493,6 +503,10 @@
                 page-break-after: auto;
             }
             
+            .page:not(:last-child) {
+                page-break-after: always !important;
+            }
+            
             .presupuesto-container {
                 page-break-inside: avoid;
             }
@@ -569,7 +583,7 @@
         <div class="datos-section">
             <div class="datos-box">
                 <h3>Datos del {% if es_albaran is defined and es_albaran %}Albarán{% else %}Presupuesto{% endif %}</h3>
-                <p><strong>Número:</strong> #{{ presupuesto.id }}</p>
+                <p><strong>Número:</strong> {{ presupuesto.numero_solicitud or presupuesto.id }}</p>
                 <p><strong>Fecha:</strong> {{ presupuesto.fecha_creacion.strftime('%d/%m/%Y') if presupuesto.fecha_creacion else 'N/A' }}</p>
                 <p><strong>Estado:</strong> {{ presupuesto.estado }}</p>
                 <p><strong>Tipo:</strong> {{ presupuesto.tipo_pedido }} | <strong>Comercial:</strong> {{ presupuesto.comercial.nombre if presupuesto.comercial else 'N/A' }}{% if presupuesto.comercial and presupuesto.comercial.usuario and presupuesto.comercial.usuario.telefono %} - {{ presupuesto.comercial.usuario.telefono }}{% endif %}</p>
@@ -604,11 +618,11 @@
             <div class="diseno-box">
                 <h3>Diseño</h3>
                 {% if use_base64 is defined and use_base64 and imagen_diseno_base64 %}
-                <img src="{{ imagen_diseno_base64 }}" alt="Diseño" style="width: 100%; max-width: 100%; height: auto; max-height: 300px; object-fit: contain; border-radius: 4px;">
+                <img src="{{ imagen_diseno_base64 }}" alt="Diseño" style="width: 100%; max-width: 100%; height: auto; max-height: 225px; object-fit: contain; border-radius: 4px;">
                 {% elif base_url is defined and base_url %}
-                <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + presupuesto.imagen_diseno) }}" alt="Diseño" style="width: 100%; max-width: 100%; height: auto; max-height: 300px; object-fit: contain; border-radius: 4px;">
+                <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + presupuesto.imagen_diseno) }}" alt="Diseño" style="width: 100%; max-width: 100%; height: auto; max-height: 225px; object-fit: contain; border-radius: 4px;">
                 {% else %}
-                <img src="{{ url_for('static', filename='uploads/' + presupuesto.imagen_diseno, _external=True) }}" alt="Diseño" style="width: 100%; max-width: 100%; height: auto; max-height: 300px; object-fit: contain; border-radius: 4px;">
+                <img src="{{ url_for('static', filename='uploads/' + presupuesto.imagen_diseno, _external=True) }}" alt="Diseño" style="width: 100%; max-width: 100%; height: auto; max-height: 225px; object-fit: contain; border-radius: 4px;">
                 {% endif %}
             </div>
             {% else %}
@@ -616,7 +630,6 @@
             {% endif %}
         </div>
 
-        <h3 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 5px; margin-bottom: 10px; font-size: 1rem;">Líneas del {% if es_albaran is defined and es_albaran %}Albarán{% else %}Presupuesto{% endif %}</h3>
         
         {% if presupuesto.lineas %}
         <table class="lineas-table">
@@ -700,6 +713,14 @@
             Este presupuesto no tiene líneas registradas.
         </p>
         {% endif %}
+        </div>
+        
+        <!-- Pie de página con información de protección de datos -->
+        <!--<div class="footer-datos">
+            <p><span class="iban">Forma de Pago: Transferencia | IBAN:ES2200495247862816942248</span></p>
+            </br>
+            <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.</p>
+        </div>-->
     </div>
     
     <!-- PÁGINA 2: IMÁGENES ADICIONALES (Máximo 4 imágenes con descripciones) -->
@@ -837,6 +858,13 @@
             </tr>
             {% endif %}
         </table>
+        
+        <!-- Pie de página con información de protección de datos -->
+        <div class="footer-datos">
+            <p><span class="iban">Forma de Pago: Transferencia | IBAN:ES2200495247862816942248</span></p>
+            </br>
+            <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.</p>
+        </div>
     </div>
     {% endif %}
     
@@ -873,9 +901,7 @@
             <h3>4. COLORES Y TELAS</h3>
             <p>Los colores de los productos pueden presentar ligeras variaciones debido a:</p>
             <ul>
-                <li>Diferencias entre lotes de tela</li>
-                <li>Características de los procesos de teñido</li>
-                <li>Condiciones de visualización (luz natural vs. artificial)</li>
+                <li>Diferencias entre lotes de tela, características de los procesos de teñido o condiciones de visualización (luz natural vs. artificial)</li>
             </ul>
             <p>Estas variaciones son normales en la industria textil y no constituyen defecto de fabricación.</p>
             
@@ -889,9 +915,7 @@
             <h3>7. MODIFICACIONES Y CANCELACIONES</h3>
             <p>Una vez aceptado el presupuesto y comenzada la producción, cualquier modificación solicitada por EL CLIENTE puede conllevar:</p>
             <ul>
-                <li>Costes adicionales</li>
-                <li>Retrasos en los plazos de entrega</li>
-                <li>Pérdida de materiales ya cortados o procesados</li>
+                <li>Costes adicionales, retrasos en los plazos de entrega, o Pérdida de materiales ya cortados o procesados</li>
             </ul>
             <p>Las cancelaciones de pedidos después de la aceptación del presupuesto pueden conllevar el pago de los costes ya incurridos en materiales, mano de obra y procesos de producción iniciados.</p>
             
@@ -932,15 +956,17 @@
                     <div class="firma-label">Firma y sello de LA EMPRESA</div>
                 </div>
             </div>
-            <div style="margin-top: 10px; text-align: center; font-size: 8px; color: #666;">
+            <!--<div style="margin-top: 10px; text-align: center; font-size: 8px; color: #666;">
                 <p style="margin: 2px 0;">Fecha: ___________________</p>
                 <p style="margin: 2px 0;">Lugar: ___________________</p>
-            </div>
+            </div>-->
         </div>
         </div>
         
         <!-- Pie de página con información de protección de datos -->
         <div class="footer-datos">
+            <p><span class="iban">Forma de Pago: Transferencia | IBAN:ES2200495247862816942248</span></p>
+            </br>
             <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.</p>
         </div>
     </div>

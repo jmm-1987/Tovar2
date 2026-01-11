@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hoja de Trabajo - Solicitud {{ solicitud.numero_solicitud or solicitud.id }}</title>
+    <title>Presupuesto Detallado {{ presupuesto.numero_solicitud or presupuesto.id }}</title>
     <style type="text/css">
         * {
             margin: 0;
@@ -22,7 +22,6 @@
             padding: 10px;
             color: #333;
             font-size: 11px;
-            line-height: 1.4;
         }
         
         .page {
@@ -42,8 +41,28 @@
         }
         
         .page-content {
-            min-height: calc(297mm - 20mm);
-            padding-bottom: 10mm;
+            min-height: calc(297mm - 30mm);
+            padding-bottom: 20mm;
+        }
+        
+        .footer-datos {
+            position: absolute;
+            bottom: 5mm;
+            left: 10mm;
+            right: 10mm;
+            margin-top: 30px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            font-size: 9px;
+            color: #666;
+            line-height: 1.3;
+            text-align: justify;
+        }
+        
+        .footer-datos .iban {
+            font-size: 11px;
+            font-weight: 600;
         }
         
         .page:last-child {
@@ -56,6 +75,33 @@
         
         .page:not(:last-child) {
             page-break-after: always !important;
+        }
+        
+        .no-print {
+            text-align: center;
+            margin-top: 20px;
+            padding: 20px;
+        }
+        
+        .no-print .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 0 10px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .no-print .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .no-print .btn:hover {
+            opacity: 0.9;
         }
         
         .presupuesto-header {
@@ -120,6 +166,16 @@
             vertical-align: top;
         }
         
+        .diseno-box {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+        
         .datos-box h3 {
             color: #2c3e50;
             border-bottom: 1px solid #2c3e50;
@@ -140,6 +196,14 @@
             color: #495057;
             font-size: 0.9em;
             line-height: 1.4;
+        }
+        
+        .diseno-box h3 {
+            color: #2c3e50;
+            border-bottom: 1px solid #2c3e50;
+            padding-bottom: 3px;
+            margin-bottom: 5px;
+            font-size: 1rem;
         }
         
         .lineas-table {
@@ -209,49 +273,14 @@
             font-weight: 600;
         }
         
-        .section {
-            margin-bottom: 20px;
-            page-break-inside: avoid;
-        }
-        
-        .section-title {
-            font-size: 14px;
-            font-weight: bold;
-            color: #2c3e50;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 5px;
-            margin-bottom: 10px;
-        }
-        
-        .fabricacion-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin-top: 10px;
-        }
-        
-        .fabricacion-item {
-            margin-bottom: 10px;
-        }
-        
-        .fabricacion-item strong {
-            display: block;
-            color: #495057;
-            margin-bottom: 3px;
-        }
-        
-        .fabricacion-item div {
-            background: #f8f9fa;
-            padding: 8px;
-            border-radius: 4px;
-            color: #212529;
-            min-height: 30px;
-        }
-        
         @media print {
             body {
                 background: white;
                 padding: 0;
+            }
+            
+            .no-print {
+                display: none;
             }
             
             .page {
@@ -281,9 +310,9 @@
     </style>
 </head>
 <body>
+    <!-- PÁGINA 1: CONTENIDO DEL PRESUPUESTO DETALLADO -->
     <div class="page">
         <div class="page-content">
-        <!-- Encabezado -->
         <div class="presupuesto-header">
             <div class="logo-section">
                 {% if use_base64 is defined and use_base64 and logo_base64 %}
@@ -295,7 +324,7 @@
                 {% endif %}
             </div>
             <div class="presupuesto-title">
-                <h1>HOJA DE TRABAJO</h1>
+                <h1>PRESUPUESTO DETALLADO</h1>
             </div>
             <div class="presupuesto-info">
                 <p><strong>Weark Custom Tovar Sl</strong></p>
@@ -308,23 +337,23 @@
         <div class="datos-section">
             <div class="datos-box">
                 <h3>Datos del Presupuesto</h3>
-                <p><strong>Número:</strong> {{ solicitud.numero_solicitud or solicitud.id }}</p>
-                <p><strong>Fecha:</strong> {{ solicitud.fecha_creacion.strftime('%d/%m/%Y') if solicitud.fecha_creacion else 'N/A' }}</p>
-                <p><strong>Estado:</strong> {{ solicitud.estado }}</p>
-                <p><strong>Tipo:</strong> {{ solicitud.tipo_pedido }} | <strong>Comercial:</strong> {{ solicitud.comercial.nombre if solicitud.comercial else 'N/A' }}{% if solicitud.comercial and solicitud.comercial.usuario and solicitud.comercial.usuario.telefono %} - {{ solicitud.comercial.usuario.telefono }}{% endif %}</p>
-                {% if solicitud.forma_pago %}
-                <p><strong>Forma de Pago:</strong> {{ solicitud.forma_pago }}</p>
+                <p><strong>Número:</strong> {{ presupuesto.numero_solicitud or presupuesto.id }}</p>
+                <p><strong>Fecha:</strong> {{ presupuesto.fecha_creacion.strftime('%d/%m/%Y') if presupuesto.fecha_creacion else 'N/A' }}</p>
+                <p><strong>Estado:</strong> {{ presupuesto.estado }}</p>
+                <p><strong>Tipo:</strong> {{ presupuesto.tipo_pedido }} | <strong>Comercial:</strong> {{ presupuesto.comercial.nombre if presupuesto.comercial else 'N/A' }}{% if presupuesto.comercial and presupuesto.comercial.usuario and presupuesto.comercial.usuario.telefono %} - {{ presupuesto.comercial.usuario.telefono }}{% endif %}</p>
+                {% if presupuesto.forma_pago %}
+                <p><strong>Forma de Pago:</strong> {{ presupuesto.forma_pago }}</p>
                 {% endif %}
                 
                 <h3 style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;">Datos del Cliente</h3>
-                <p><strong>{{ solicitud.cliente.nombre if solicitud.cliente else 'N/A' }}</strong></p>
-                {% if solicitud.cliente and solicitud.cliente.direccion %}
-                <p>{{ solicitud.cliente.direccion }}</p>
+                <p><strong>{{ presupuesto.cliente.nombre if presupuesto.cliente else 'N/A' }}</strong></p>
+                {% if presupuesto.cliente and presupuesto.cliente.direccion %}
+                <p>{{ presupuesto.cliente.direccion }}</p>
                 {% endif %}
-                {% if solicitud.cliente %}
-                    {% set cp = solicitud.cliente.codigo_postal or '' %}
-                    {% set poblacion = solicitud.cliente.poblacion or '' %}
-                    {% set provincia = solicitud.cliente.provincia or '' %}
+                {% if presupuesto.cliente %}
+                    {% set cp = presupuesto.cliente.codigo_postal or '' %}
+                    {% set poblacion = presupuesto.cliente.poblacion or '' %}
+                    {% set provincia = presupuesto.cliente.provincia or '' %}
                     {% if cp or poblacion or provincia %}
                         <p>
                             {% if cp %}{{ cp }}{% endif %}
@@ -335,36 +364,29 @@
                         </p>
                     {% endif %}
                 {% endif %}
-                {% if solicitud.cliente and solicitud.cliente.nif %}
-                <p><strong>NIF/CIF:</strong> {{ solicitud.cliente.nif }}</p>
+                {% if presupuesto.cliente and presupuesto.cliente.nif %}
+                <p><strong>NIF/CIF:</strong> {{ presupuesto.cliente.nif }}</p>
                 {% endif %}
             </div>
-            <div class="datos-box">
-                <h3>Información para la Fabricación</h3>
-                {% if solicitud.tipo_producto %}
-                <p><strong>Tipo Producto:</strong> {{ solicitud.tipo_producto }}</p>
-                {% endif %}
-                {% if solicitud.colores_principales %}
-                <p><strong>Colores Principales:</strong> {{ solicitud.colores_principales }}</p>
-                {% endif %}
-                {% if solicitud.colores_secundarios %}
-                <p><strong>Colores Secundarios:</strong> {{ solicitud.colores_secundarios }}</p>
-                {% endif %}
-                {% if solicitud.ubicacion_logo %}
-                <p><strong>Ubicación del Logo:</strong> {{ solicitud.ubicacion_logo }}</p>
-                {% endif %}
-                {% if solicitud.referencias_web %}
-                <p><strong>Referencias Web:</strong> {{ solicitud.referencias_web }}</p>
-                {% endif %}
-                {% if solicitud.datos_adicionales %}
-                <p><strong>Datos/Info Adicional:</strong> {{ solicitud.datos_adicionales }}</p>
+            {% if presupuesto.imagen_diseno %}
+            <div class="diseno-box">
+                <h3>Diseño</h3>
+                {% if use_base64 is defined and use_base64 and imagen_diseno_base64 %}
+                <img src="{{ imagen_diseno_base64 }}" alt="Diseño" style="width: 100%; max-width: 100%; height: auto; max-height: 225px; object-fit: contain; border-radius: 4px;">
+                {% elif base_url is defined and base_url %}
+                <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + presupuesto.imagen_diseno) }}" alt="Diseño" style="width: 100%; max-width: 100%; height: auto; max-height: 225px; object-fit: contain; border-radius: 4px;">
+                {% else %}
+                <img src="{{ url_for('static', filename='uploads/' + presupuesto.imagen_diseno, _external=True) }}" alt="Diseño" style="width: 100%; max-width: 100%; height: auto; max-height: 225px; object-fit: contain; border-radius: 4px;">
                 {% endif %}
             </div>
+            {% else %}
+            <div class="diseno-box"></div>
+            {% endif %}
         </div>
 
         <h3 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 5px; margin-bottom: 10px; font-size: 1rem;">Líneas del Presupuesto (Detallado)</h3>
         
-        {% if solicitud.lineas %}
+        {% if presupuesto.lineas %}
         <table class="lineas-table">
             <thead>
                 <tr>
@@ -384,7 +406,7 @@
                 </tr>
             </thead>
             <tbody>
-                {% for linea in solicitud.lineas %}
+                {% for linea in presupuesto.lineas %}
                 {% set precio_unitario_val = linea.precio_unitario if linea.precio_unitario else 0 %}
                 {% set cantidad_val = linea.cantidad if linea.cantidad else 0 %}
                 {% set descuento_val = linea.descuento if linea.descuento else 0 %}
@@ -448,14 +470,20 @@
             Este presupuesto no tiene líneas registradas.
         </p>
         {% endif %}
+        </div>
         
-        {% if solicitud.seguimiento %}
-        <div class="section" style="margin-top: 20px;">
-            <div class="section-title">SEGUIMIENTO</div>
-            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; white-space: pre-wrap; font-size: 10px;">{{ solicitud.seguimiento }}</div>
+        <!-- Pie de página con información de protección de datos -->
+        <div class="footer-datos">
+            <p><span class="iban">Forma de Pago: Transferencia | IBAN:ES2200495247862816942248</span></p>
+            </br>
+            <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.</p>
         </div>
-        {% endif %}
-        </div>
+    </div>
+
+    <div class="no-print">
+        <button onclick="window.print()" class="btn btn-primary">Imprimir</button>
+        <a href="{{ url_for('solicitudes.ver_solicitud', solicitud_id=presupuesto.id) }}" class="btn btn-secondary">Volver</a>
     </div>
 </body>
 </html>
+
