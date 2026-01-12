@@ -202,24 +202,6 @@
 
     <h3>Productos del Presupuesto</h3>
     <div id="prendas-container">
-        <!-- Cabecera de las líneas del pedido -->
-        <div class="linea-pedido-header" style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px 4px 0 0; margin-bottom: 0; font-weight: 600; font-size: 0.9rem; color: #495057;">
-            <div style="min-width: 35px; text-align: center;">#</div>
-            <div style="display: flex; flex: 1; gap: 6px; flex-wrap: wrap;">
-                <div style="flex: 0 0 750px;">Nombre</div>
-                <div style="flex: 0 0 80px;">Unidades</div>
-                <div style="flex: 0 0 150px;">Modelo</div>
-                <div style="flex: 0 0 100px;">Color</div>
-                <div style="flex: 0 0 100px;">Forma</div>
-                <div style="flex: 0 0 80px;">Sexo</div>
-                <div style="flex: 0 0 80px;">Talla</div>
-                <div style="flex: 0 0 120px;">Tejido</div>
-                <div style="flex: 0 0 100px;">Precio €</div>
-                <div style="flex: 0 0 80px;">Desc. %</div>
-                <div style="flex: 0 0 100px;">P. Final €</div>
-            </div>
-            <div style="flex: 0 0 100px; text-align: center;">Acciones</div>
-        </div>
         {% if solicitud.lineas %}
             {% for linea in solicitud.lineas %}
             <div class="linea-pedido-row">
