@@ -271,15 +271,21 @@ def nueva_solicitud():
                     
                     # Convertir prenda_id a int si existe, sino None (texto libre)
                     prenda_id_final = None
+                    prenda_nombre_texto_final = None
                     if prenda_id_val:
                         try:
                             prenda_id_final = int(prenda_id_val)
                         except (ValueError, TypeError):
                             prenda_id_final = None
                     
+                    # Si no hay prenda_id pero hay texto libre, guardar el texto
+                    if not prenda_id_final and prenda_nombre_val and prenda_nombre_val.strip():
+                        prenda_nombre_texto_final = prenda_nombre_val.strip()
+                    
                     linea = LineaPresupuesto(
                         presupuesto_id=solicitud.id,
                         prenda_id=prenda_id_final,  # Puede ser None para texto libre
+                        prenda_nombre_texto=prenda_nombre_texto_final,  # Texto libre del modelo
                         nombre=nombres[i] if i < len(nombres) else '',  # Mantenido para compatibilidad
                         nombre_mostrar=nombre_mostrar_val,
                         cargo=cargos[i] if i < len(cargos) else '',
@@ -727,7 +733,22 @@ def editar_solicitud(solicitud_id):
             max_len = max(len(prenda_ids), len(nombres_mostrar), len(cantidades))
             
             for i in range(max_len):
-                prenda_id_val = prenda_ids[i] if i < len(prenda_ids) and prenda_ids[i] else None
+                # Procesar prenda_id: convertir cadenas vacías a None y valores válidos a entero
+                prenda_id_raw = prenda_ids[i] if i < len(prenda_ids) else ''
+                if prenda_id_raw and prenda_id_raw.strip():
+                    try:
+                        prenda_id_val = int(prenda_id_raw)
+                    except (ValueError, TypeError):
+                        prenda_id_val = None
+                else:
+                    prenda_id_val = None
+                
+                # Procesar prenda_nombre_texto: guardar texto libre cuando no hay prenda_id
+                prenda_nombre_val = prenda_nombres[i] if i < len(prenda_nombres) and prenda_nombres[i] else ''
+                prenda_nombre_texto_final = None
+                if not prenda_id_val and prenda_nombre_val and prenda_nombre_val.strip():
+                    prenda_nombre_texto_final = prenda_nombre_val.strip()
+                
                 nombre_mostrar_val = nombres_mostrar[i] if i < len(nombres_mostrar) and nombres_mostrar[i] else ''
                 nombre_val = nombres[i] if i < len(nombres) and nombres[i] else ''
                 
@@ -771,7 +792,8 @@ def editar_solicitud(solicitud_id):
                     
                     linea = LineaPresupuesto(
                         presupuesto_id=solicitud.id,
-                        prenda_id=prenda_ids[i],
+                        prenda_id=prenda_id_val,
+                        prenda_nombre_texto=prenda_nombre_texto_final,  # Texto libre del modelo
                         nombre=nombres[i] if i < len(nombres) else '',  # Mantenido para compatibilidad
                         nombre_mostrar=nombre_mostrar_val,
                         cargo=cargos[i] if i < len(cargos) else '',

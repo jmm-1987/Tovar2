@@ -1503,6 +1503,19 @@ Saludos cordiales,
                     except Exception as e:
                         print(f"Error al agregar columna talla a lineas_factura: {e}")
             
+            # Verificar si existe la tabla lineas_presupuesto y agregar columna prenda_nombre_texto si no existe
+            if 'lineas_presupuesto' in table_names:
+                columns_lineas_presupuesto = [col['name'] for col in inspector.get_columns('lineas_presupuesto')]
+                
+                if 'prenda_nombre_texto' not in columns_lineas_presupuesto:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE lineas_presupuesto ADD COLUMN prenda_nombre_texto VARCHAR(200)'))
+                            conn.commit()
+                            print("Migración: Columna prenda_nombre_texto agregada exitosamente a lineas_presupuesto")
+                    except Exception as e:
+                        print(f"Error al agregar columna prenda_nombre_texto a lineas_presupuesto: {e}")
+            
             # Verificar si existe la tabla configuracion
             if 'configuracion' not in table_names:
                 try:

@@ -356,6 +356,7 @@ class LineaPresupuesto(db.Model):
     nombre = db.Column(db.String(200), nullable=False)  # Mantenido para compatibilidad, no se usa en la UI
     cargo = db.Column(db.String(100))  # Mantenido para compatibilidad, no se usa en la UI
     nombre_mostrar = db.Column(db.String(200), nullable=True)  # Nombre para mostrar al cliente
+    prenda_nombre_texto = db.Column(db.String(200), nullable=True)  # Texto libre del modelo cuando no hay prenda_id
     cantidad = db.Column(db.Integer, nullable=False, default=1)
     color = db.Column(db.String(50))
     forma = db.Column(db.String(100))

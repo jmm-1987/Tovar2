@@ -210,7 +210,7 @@
                     <!-- Orden: nombre_mostrar, unidades, modelo, color, forma, sexo, talla, tejido, precio -->
                     <input type="text" name="nombre_mostrar[]" class="linea-campo-compact" value="{{ linea.nombre_mostrar or '' }}" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 0 0 750px; width: 750px;">
                     <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="{{ linea.cantidad }}" min="1" required placeholder="Unidades *" title="Unidades">
-                    <input type="text" name="prenda_nombre[]" class="linea-campo-compact prenda-input" value="{% if linea.prenda %}{{ linea.prenda.nombre }}{% endif %}" placeholder="Modelo (seleccione o escriba texto libre)" title="Modelo" list="prendas-list" autocomplete="off">
+                    <input type="text" name="prenda_nombre[]" class="linea-campo-compact prenda-input" value="{% if linea.prenda %}{{ linea.prenda.nombre }}{% elif linea.prenda_nombre_texto %}{{ linea.prenda_nombre_texto }}{% endif %}" placeholder="Modelo (seleccione o escriba texto libre)" title="Modelo" list="prendas-list" autocomplete="off">
                     <input type="hidden" name="prenda_id[]" class="prenda-id-hidden" value="{{ linea.prenda_id or '' }}">
                     <datalist id="prendas-list">
                         {% for prenda in prendas %}
@@ -233,6 +233,7 @@
                         <option value="NUEVO T.POLO" {% if linea.tejido == 'NUEVO T.POLO' %}selected{% endif %}>NUEVO T.POLO</option>
                         <option value="T.CAMISETA" {% if linea.tejido == 'T.CAMISETA' %}selected{% endif %}>T.CAMISETA</option>
                         <option value="T.SHOFT" {% if linea.tejido == 'T.SHOFT' %}selected{% endif %}>T.SHOFT</option>
+                        <option value="DAMA" {% if linea.tejido == 'DAMA' %}selected{% endif %}>DAMA</option>
                     </select>
                     <input type="number" name="precio_unitario[]" class="linea-campo-compact precio-unitario-input" step="0.01" min="0" value="{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '' }}" placeholder="Precio €" title="Precio" style="flex: 0 0 100px; width: 100px;">
                     <input type="number" name="descuento[]" class="linea-campo-compact descuento-input" step="0.01" min="0" max="100" value="{{ "%.2f"|format(linea.descuento) if linea.descuento else '0' }}" placeholder="Desc. %" title="Descuento (%)" style="flex: 0 0 80px; width: 80px;">
@@ -284,6 +285,7 @@
                     <option value="NUEVO T.POLO">NUEVO T.POLO</option>
                     <option value="T.CAMISETA">T.CAMISETA</option>
                     <option value="T.SHOFT">T.SHOFT</option>
+                    <option value="DAMA">DAMA</option>
                 </select>
                 <input type="number" name="precio_unitario[]" class="linea-campo-compact precio-unitario-input" step="0.01" min="0" placeholder="Precio €" title="Precio" style="flex: 0 0 100px; width: 100px;">
                 <input type="number" name="descuento[]" class="linea-campo-compact descuento-input" step="0.01" min="0" max="100" value="0" placeholder="Desc. %" title="Descuento (%)" style="flex: 0 0 80px; width: 80px;">
@@ -310,75 +312,12 @@
 
     <!-- Datalist para formas (disponible para todos los inputs de forma) -->
     <datalist id="formas-list">
-        <option value="Recta">
-        <option value="Ajustada">
-        <option value="Holgada">
-        <option value="Oversize">
-        <option value="Slim">
-        <option value="Regular">
-        <option value="Relaxed">
-        <option value="Tapered">
-        <option value="Straight">
-        <option value="Skinny">
-        <option value="POLAR">
-        <option value="POLAR.NARANJ.">
-        <option value="POLAR.VERDE">
-        <option value="POLAR.NEGRO">
-        <option value="POLAR.AZ.MARIN">
-        <option value="POLAR.BLANC.">
-        <option value="POLAR.AZ.CELES">
-        <option value="POLAR.OTRO">
-        <option value="POLAR NARANJ.">
-        <option value="POLAR VERDE">
-        <option value="POLAR NEGRO">
-        <option value="ABRIGO">
-        <option value="BAT.AMERICANA">
-        <option value="BAT.MAO TRAJANO">
-        <option value="BAT.BRUTUS">
-        <option value="BAT.GEMINA">
-        <option value="BAT.JULIA">
-        <option value="BAT.DIANA">
-        <option value="BAT.ALAUDAE">
-        <option value="GORRO.GOMA">
-        <option value="GORRO.CUERDA">
-        <option value="CAPA PELUQUERO">
-        <option value="CAMISETA WEARK">
-        <option value="CAM. AZ.CEL.">
-        <option value="CAM. ROJA">
-        <option value="CAM. VERDE">
-        <option value="CAM.BURD.">
-        <option value="CAM.GRIS">
-        <option value="CAM. OTRO">
-        <option value="CAM. NEGRA">
-        <option value="CAM.NARAN.">
-        <option value="CAM.AZ.MAR.">
-        <option value="CAM. AMARL.">
-        <option value="POLO.BLAN.">
-        <option value="POLO.VERD.">
-        <option value="POLO.AZ.CEL.">
-        <option value="POLO.ROJO">
-        <option value="POLO AMAR.">
-        <option value="POLO.AZ.MARI">
-        <option value="POLO.MARON">
-        <option value="POL.GRIS">
-        <option value="POL.NEG.">
-        <option value="POLO.OTRO">
-        <option value="T1">
-        <option value="T2">
-        <option value="T3">
-        <option value="T4">
-        <option value="T5">
-        <option value="T201">
-        <option value="T301">
-        <option value="T401">
-        <option value="COCINA">
-        <option value="CHAQ. COCINA">
-        <option value="MAD.CORTO">
-        <option value="MAD.PETO">
-        <option value="MAD.FRANCES">
-        <option value="CAMISA.CELEST">
-        <option value="CAMISA.BLANC.">
-        <option value="CAMISA OTRO">
+        <option value="Abt Cremallera">
+        <option value="Abt Botones">
+        <option value="Cerrada">
+        <option value="Serigrafia">
+        <option value="Bordado">
+        <option value="Seri + bordado">
     </datalist>
 
     <div class="actions">

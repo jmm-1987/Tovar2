@@ -400,7 +400,7 @@
                 {% endif %}
                 {% set total_linea = precio_a_usar * cantidad %}
                 {% set nombre_prenda = linea.nombre_mostrar or linea.nombre or 'N/A' %}
-                {% set modelo_prenda = linea.prenda.nombre if linea.prenda else '-' %}
+                {% set modelo_prenda = linea.prenda.nombre if linea.prenda else (linea.prenda_nombre_texto if linea.prenda_nombre_texto else '-') %}
                 {% set nombre_personalizado = linea.nombre if (linea.nombre and linea.nombre.strip()) else '-' %}
                 {% set cargo_personalizado = linea.cargo if (linea.cargo and linea.cargo.strip()) else '-' %}
                 <tr>
