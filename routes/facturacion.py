@@ -1104,6 +1104,7 @@ def nuevo_albaran():
             precios_unitarios = request.form.getlist('precio_unitario[]')
             descuentos = request.form.getlist('descuento[]')
             precios_finales = request.form.getlist('precio_final[]')
+            es_linea_texto = request.form.getlist('es_linea_texto[]')
             
             if not fecha_expedicion_str:
                 flash('La fecha de expedición es obligatoria', 'error')
@@ -1170,36 +1171,62 @@ def nuevo_albaran():
             lineas_data = []
             for i in range(len(descripciones)):
                 if descripciones[i]:
-                    cantidad = Decimal(str(cantidades[i])) if i < len(cantidades) and cantidades[i] else Decimal('1')
-                    precio_unitario = Decimal(str(precios_unitarios[i])) if i < len(precios_unitarios) and precios_unitarios[i] else Decimal('0')
+                    # Verificar si es línea de texto
+                    es_texto = i < len(es_linea_texto) and es_linea_texto[i] == '1'
                     
-                    # Procesar descuento
-                    descuento = Decimal('0')
-                    if i < len(descuentos) and descuentos[i]:
-                        try:
-                            descuento = Decimal(str(descuentos[i]))
-                        except:
-                            descuento = Decimal('0')
+                    if es_texto:
+                        # Línea de texto: cantidad 0, sin precios
+                        cantidad = Decimal('0')
+                        precio_unitario = Decimal('0')
+                        descuento = Decimal('0')
+                        precio_final = Decimal('0')
+                        importe = Decimal('0')
+                        talla = None
+                    else:
+                        cantidad = Decimal(str(cantidades[i])) if i < len(cantidades) and cantidades[i] else Decimal('1')
+                        # Permitir precio vacío (None) para albaranes sin precio
+                        precio_unitario = None
+                        if i < len(precios_unitarios) and precios_unitarios[i] and precios_unitarios[i].strip():
+                            try:
+                                precio_unitario = Decimal(str(precios_unitarios[i]))
+                            except:
+                                precio_unitario = None
+                        
+                        # Procesar descuento
+                        descuento = Decimal('0')
+                        if i < len(descuentos) and descuentos[i]:
+                            try:
+                                descuento = Decimal(str(descuentos[i]))
+                            except:
+                                descuento = Decimal('0')
+                        
+                        # Procesar precio final (si existe, usar ese; sino calcular con descuento)
+                        precio_final = None
+                        if i < len(precios_finales) and precios_finales[i] and precios_finales[i].strip():
+                            try:
+                                precio_final = Decimal(str(precios_finales[i]))
+                            except:
+                                precio_final = None
+                        
+                        # Si no hay precio_unitario, precio_final e importe serán 0
+                        if precio_unitario is None:
+                            precio_unitario = Decimal('0')
+                            precio_final = Decimal('0')
+                            importe = Decimal('0')
+                        else:
+                            # Si no hay precio_final pero hay descuento, calcularlo
+                            if precio_final is None and descuento > 0:
+                                precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+                            elif precio_final is None:
+                                precio_final = precio_unitario
+                            
+                            # Calcular importe usando precio_final si existe
+                            importe = cantidad * precio_final
+                        
+                        talla = tallas[i] if i < len(tallas) and tallas[i] else None
                     
-                    # Procesar precio final (si existe, usar ese; sino calcular con descuento)
-                    precio_final = None
-                    if i < len(precios_finales) and precios_finales[i]:
-                        try:
-                            precio_final = Decimal(str(precios_finales[i]))
-                        except:
-                            precio_final = None
-                    
-                    # Si no hay precio_final pero hay descuento, calcularlo
-                    if precio_final is None and descuento > 0:
-                        precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
-                    elif precio_final is None:
-                        precio_final = precio_unitario
-                    
-                    # Calcular importe usando precio_final si existe
-                    importe = cantidad * precio_final
                     importe_total += importe
                     
-                    talla = tallas[i] if i < len(tallas) and tallas[i] else None
                     lineas_data.append({
                         'descripcion': descripciones[i],
                         'cantidad': cantidad,
@@ -1307,6 +1334,7 @@ def editar_albaran(factura_id):
             precios_unitarios = request.form.getlist('precio_unitario[]')
             descuentos = request.form.getlist('descuento[]')
             precios_finales = request.form.getlist('precio_final[]')
+            es_linea_texto = request.form.getlist('es_linea_texto[]')
             
             if not fecha_expedicion_str:
                 flash('La fecha de expedición es obligatoria', 'error')
@@ -1369,36 +1397,62 @@ def editar_albaran(factura_id):
             lineas_data = []
             for i in range(len(descripciones)):
                 if descripciones[i]:
-                    cantidad = Decimal(str(cantidades[i])) if i < len(cantidades) and cantidades[i] else Decimal('1')
-                    precio_unitario = Decimal(str(precios_unitarios[i])) if i < len(precios_unitarios) and precios_unitarios[i] else Decimal('0')
+                    # Verificar si es línea de texto
+                    es_texto = i < len(es_linea_texto) and es_linea_texto[i] == '1'
                     
-                    # Procesar descuento
-                    descuento = Decimal('0')
-                    if i < len(descuentos) and descuentos[i]:
-                        try:
-                            descuento = Decimal(str(descuentos[i]))
-                        except:
-                            descuento = Decimal('0')
+                    if es_texto:
+                        # Línea de texto: cantidad 0, sin precios
+                        cantidad = Decimal('0')
+                        precio_unitario = Decimal('0')
+                        descuento = Decimal('0')
+                        precio_final = Decimal('0')
+                        importe = Decimal('0')
+                        talla = None
+                    else:
+                        cantidad = Decimal(str(cantidades[i])) if i < len(cantidades) and cantidades[i] else Decimal('1')
+                        # Permitir precio vacío (None) para albaranes sin precio
+                        precio_unitario = None
+                        if i < len(precios_unitarios) and precios_unitarios[i] and precios_unitarios[i].strip():
+                            try:
+                                precio_unitario = Decimal(str(precios_unitarios[i]))
+                            except:
+                                precio_unitario = None
+                        
+                        # Procesar descuento
+                        descuento = Decimal('0')
+                        if i < len(descuentos) and descuentos[i]:
+                            try:
+                                descuento = Decimal(str(descuentos[i]))
+                            except:
+                                descuento = Decimal('0')
+                        
+                        # Procesar precio final (si existe, usar ese; sino calcular con descuento)
+                        precio_final = None
+                        if i < len(precios_finales) and precios_finales[i] and precios_finales[i].strip():
+                            try:
+                                precio_final = Decimal(str(precios_finales[i]))
+                            except:
+                                precio_final = None
+                        
+                        # Si no hay precio_unitario, precio_final e importe serán 0
+                        if precio_unitario is None:
+                            precio_unitario = Decimal('0')
+                            precio_final = Decimal('0')
+                            importe = Decimal('0')
+                        else:
+                            # Si no hay precio_final pero hay descuento, calcularlo
+                            if precio_final is None and descuento > 0:
+                                precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+                            elif precio_final is None:
+                                precio_final = precio_unitario
+                            
+                            # Calcular importe usando precio_final si existe
+                            importe = cantidad * precio_final
+                        
+                        talla = tallas[i] if i < len(tallas) and tallas[i] else None
                     
-                    # Procesar precio final (si existe, usar ese; sino calcular con descuento)
-                    precio_final = None
-                    if i < len(precios_finales) and precios_finales[i]:
-                        try:
-                            precio_final = Decimal(str(precios_finales[i]))
-                        except:
-                            precio_final = None
-                    
-                    # Si no hay precio_final pero hay descuento, calcularlo
-                    if precio_final is None and descuento > 0:
-                        precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
-                    elif precio_final is None:
-                        precio_final = precio_unitario
-                    
-                    # Calcular importe usando precio_final si existe
-                    importe = cantidad * precio_final
                     importe_total += importe
                     
-                    talla = tallas[i] if i < len(tallas) and tallas[i] else None
                     lineas_data.append({
                         'descripcion': descripciones[i],
                         'cantidad': cantidad,
@@ -1673,15 +1727,22 @@ def preparar_datos_imprimir_albaran(factura_id=None, pedido_id=None):
 @login_required
 @not_usuario_required
 def descargar_pdf_factura(factura_id):
-    """Descargar factura en formato PDF (con precios)"""
+    """Descargar factura en formato PDF (con precios) o albarán si es tipo albarán"""
     try:
         datos = preparar_datos_imprimir_factura(factura_id)
         
-        # Renderizar el HTML como factura (con precios)
-        # es_albaran ya viene en datos desde preparar_datos_imprimir_factura
-        html = render_template('imprimir_factura_pdf.html', 
-                             **datos,
-                             use_base64=True)
+        # Si es un albarán, usar el template de albarán (sin precios)
+        if datos.get('es_albaran', False):
+            # Preparar datos para albarán
+            datos_albaran = preparar_datos_imprimir_albaran(factura_id=factura_id)
+            html = render_template('imprimir_albaran_pdf.html', 
+                                 **datos_albaran,
+                                 use_base64=True)
+        else:
+            # Renderizar el HTML como factura (con precios)
+            html = render_template('imprimir_factura_pdf.html', 
+                                 **datos,
+                                 use_base64=True)
         
         # Crear el PDF en memoria usando playwright
         pdf_buffer = BytesIO()
@@ -1735,7 +1796,13 @@ def descargar_pdf_factura(factura_id):
         pdf_buffer.seek(0)
         response = make_response(pdf_buffer.read())
         response.headers['Content-Type'] = 'application/pdf'
-        response.headers['Content-Disposition'] = f'inline; filename=factura_{datos["factura"].serie}_{datos["factura"].numero}.pdf'
+        
+        # Nombre del archivo según si es albarán o factura
+        if datos.get('es_albaran', False):
+            numero_pedido = datos_albaran['pedido'].id if datos_albaran.get('pedido') else 'N/A'
+            response.headers['Content-Disposition'] = f'inline; filename=albaran_pedido_{numero_pedido}.pdf'
+        else:
+            response.headers['Content-Disposition'] = f'inline; filename=factura_{datos["factura"].serie}_{datos["factura"].numero}.pdf'
         
         return response
         

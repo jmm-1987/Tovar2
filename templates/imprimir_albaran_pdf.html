@@ -358,22 +358,33 @@
             <thead>
                 <tr>
                     <th style="width: 60%;">Descripción</th>
-                    <th style="text-align: center;">Cantidad</th>
+                    <th style="width: 15%; text-align: center;">Talla</th>
+                    <th style="width: 25%; text-align: center;">Cantidad</th>
                 </tr>
             </thead>
             <tbody>
                 {% for linea in lineas %}
                 {% set cantidad_val = linea.cantidad if linea.cantidad else 0 %}
                 {% set cantidad = cantidad_val|float %}
+                {% set es_linea_texto = cantidad == 0 and (not linea.precio_unitario or linea.precio_unitario == 0) %}
+                {% set talla_linea = None %}
+                {% if factura %}
+                    {% set talla_linea = linea.talla %}
+                {% elif pedido %}
+                    {% set talla_linea = linea.talla %}
+                {% endif %}
                 <tr>
-                    <td>
+                    <td {% if es_linea_texto %}colspan="3" style="font-style: italic; color: #666;"{% endif %}>
                         {% if factura %}
                             {{ linea.descripcion }}
                         {% elif pedido %}
                             {{ linea.nombre_mostrar or linea.nombre or 'N/A' }}
                         {% endif %}
                     </td>
+                    {% if not es_linea_texto %}
+                    <td style="text-align: center;">{{ talla_linea or '-' }}</td>
                     <td style="text-align: center;">{{ "%.2f"|format(cantidad) }}</td>
+                    {% endif %}
                 </tr>
                 {% endfor %}
             </tbody>
