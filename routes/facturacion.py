@@ -1191,39 +1191,39 @@ def nuevo_albaran():
                                 precio_unitario = Decimal(str(precios_unitarios[i]))
                             except:
                                 precio_unitario = None
+                    
+                    # Procesar descuento
+                    descuento = Decimal('0')
+                    if i < len(descuentos) and descuentos[i]:
+                        try:
+                            descuento = Decimal(str(descuentos[i]))
+                        except:
+                            descuento = Decimal('0')
+                    
+                    # Procesar precio final (si existe, usar ese; sino calcular con descuento)
+                    precio_final = None
+                    if i < len(precios_finales) and precios_finales[i] and precios_finales[i].strip():
+                        try:
+                            precio_final = Decimal(str(precios_finales[i]))
+                        except:
+                            precio_final = None
+                    
+                    # Si no hay precio_unitario, precio_final e importe serán 0
+                    if precio_unitario is None:
+                        precio_unitario = Decimal('0')
+                        precio_final = Decimal('0')
+                        importe = Decimal('0')
+                    else:
+                        # Si no hay precio_final pero hay descuento, calcularlo
+                        if precio_final is None and descuento > 0:
+                            precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+                        elif precio_final is None:
+                            precio_final = precio_unitario
                         
-                        # Procesar descuento
-                        descuento = Decimal('0')
-                        if i < len(descuentos) and descuentos[i]:
-                            try:
-                                descuento = Decimal(str(descuentos[i]))
-                            except:
-                                descuento = Decimal('0')
-                        
-                        # Procesar precio final (si existe, usar ese; sino calcular con descuento)
-                        precio_final = None
-                        if i < len(precios_finales) and precios_finales[i] and precios_finales[i].strip():
-                            try:
-                                precio_final = Decimal(str(precios_finales[i]))
-                            except:
-                                precio_final = None
-                        
-                        # Si no hay precio_unitario, precio_final e importe serán 0
-                        if precio_unitario is None:
-                            precio_unitario = Decimal('0')
-                            precio_final = Decimal('0')
-                            importe = Decimal('0')
-                        else:
-                            # Si no hay precio_final pero hay descuento, calcularlo
-                            if precio_final is None and descuento > 0:
-                                precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
-                            elif precio_final is None:
-                                precio_final = precio_unitario
-                            
-                            # Calcular importe usando precio_final si existe
-                            importe = cantidad * precio_final
-                        
-                        talla = tallas[i] if i < len(tallas) and tallas[i] else None
+                        # Calcular importe usando precio_final si existe
+                        importe = cantidad * precio_final
+                    
+                    talla = tallas[i] if i < len(tallas) and tallas[i] else None
                     
                     importe_total += importe
                     
@@ -1417,39 +1417,39 @@ def editar_albaran(factura_id):
                                 precio_unitario = Decimal(str(precios_unitarios[i]))
                             except:
                                 precio_unitario = None
+                    
+                    # Procesar descuento
+                    descuento = Decimal('0')
+                    if i < len(descuentos) and descuentos[i]:
+                        try:
+                            descuento = Decimal(str(descuentos[i]))
+                        except:
+                            descuento = Decimal('0')
+                    
+                    # Procesar precio final (si existe, usar ese; sino calcular con descuento)
+                    precio_final = None
+                    if i < len(precios_finales) and precios_finales[i] and precios_finales[i].strip():
+                        try:
+                            precio_final = Decimal(str(precios_finales[i]))
+                        except:
+                            precio_final = None
+                    
+                    # Si no hay precio_unitario, precio_final e importe serán 0
+                    if precio_unitario is None:
+                        precio_unitario = Decimal('0')
+                        precio_final = Decimal('0')
+                        importe = Decimal('0')
+                    else:
+                        # Si no hay precio_final pero hay descuento, calcularlo
+                        if precio_final is None and descuento > 0:
+                            precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+                        elif precio_final is None:
+                            precio_final = precio_unitario
                         
-                        # Procesar descuento
-                        descuento = Decimal('0')
-                        if i < len(descuentos) and descuentos[i]:
-                            try:
-                                descuento = Decimal(str(descuentos[i]))
-                            except:
-                                descuento = Decimal('0')
-                        
-                        # Procesar precio final (si existe, usar ese; sino calcular con descuento)
-                        precio_final = None
-                        if i < len(precios_finales) and precios_finales[i] and precios_finales[i].strip():
-                            try:
-                                precio_final = Decimal(str(precios_finales[i]))
-                            except:
-                                precio_final = None
-                        
-                        # Si no hay precio_unitario, precio_final e importe serán 0
-                        if precio_unitario is None:
-                            precio_unitario = Decimal('0')
-                            precio_final = Decimal('0')
-                            importe = Decimal('0')
-                        else:
-                            # Si no hay precio_final pero hay descuento, calcularlo
-                            if precio_final is None and descuento > 0:
-                                precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
-                            elif precio_final is None:
-                                precio_final = precio_unitario
-                            
-                            # Calcular importe usando precio_final si existe
-                            importe = cantidad * precio_final
-                        
-                        talla = tallas[i] if i < len(tallas) and tallas[i] else None
+                        # Calcular importe usando precio_final si existe
+                        importe = cantidad * precio_final
+                    
+                    talla = tallas[i] if i < len(tallas) and tallas[i] else None
                     
                     importe_total += importe
                     

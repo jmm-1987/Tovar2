@@ -882,13 +882,64 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Funciones para el modal de crear cliente
+const STORAGE_KEY_CLIENTE_PRESUPUESTO = 'cliente_presupuesto_draft';
+
 function abrirModalCrearCliente() {
-    document.getElementById('modalCrearClientePresupuesto').style.display = 'block';
+    const modal = document.getElementById('modalCrearClientePresupuesto');
+    const form = document.getElementById('formCrearClientePresupuesto');
+    modal.style.display = 'block';
+    
+    // Restaurar datos guardados
+    const datosGuardados = localStorage.getItem(STORAGE_KEY_CLIENTE_PRESUPUESTO);
+    if (datosGuardados) {
+        try {
+            const datos = JSON.parse(datosGuardados);
+            Object.keys(datos).forEach(key => {
+                const input = form.querySelector(`[name="${key}"]`);
+                if (input) {
+                    if (input.type === 'checkbox' || input.type === 'radio') {
+                        input.checked = datos[key] === input.value;
+                    } else {
+                        input.value = datos[key] || '';
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('Error al restaurar datos:', e);
+        }
+    }
 }
 
 function cerrarModalCrearClientePresupuesto() {
-    document.getElementById('modalCrearClientePresupuesto').style.display = 'none';
-    document.getElementById('formCrearClientePresupuesto').reset();
+    const modal = document.getElementById('modalCrearClientePresupuesto');
+    const form = document.getElementById('formCrearClientePresupuesto');
+    
+    // Guardar datos antes de cerrar
+    guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+    
+    modal.style.display = 'none';
+    // NO hacer reset aquí, solo ocultar
+}
+
+function guardarDatosFormulario(form, storageKey) {
+    const datos = {};
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        if (input.name && input.name !== 'csrf_token') {
+            if (input.type === 'checkbox' || input.type === 'radio') {
+                if (input.checked) {
+                    datos[input.name] = input.value;
+                }
+            } else {
+                datos[input.name] = input.value || '';
+            }
+        }
+    });
+    localStorage.setItem(storageKey, JSON.stringify(datos));
+}
+
+function limpiarDatosGuardados(storageKey) {
+    localStorage.removeItem(storageKey);
 }
 
 // Manejar el envío del formulario de crear cliente
@@ -920,8 +971,12 @@ document.getElementById('formCrearClientePresupuesto').addEventListener('submit'
             // Seleccionar el nuevo cliente
             selectCliente(data.cliente.id, data.cliente.nombre);
             
+            // Limpiar datos guardados
+            limpiarDatosGuardados(STORAGE_KEY_CLIENTE_PRESUPUESTO);
+            
             // Cerrar modal y limpiar formulario
-            cerrarModalCrearClientePresupuesto();
+            document.getElementById('modalCrearClientePresupuesto').style.display = 'none';
+            document.getElementById('formCrearClientePresupuesto').reset();
             
             alert('Cliente creado correctamente');
         } else {
@@ -944,6 +999,20 @@ window.onclick = function(event) {
         cerrarModalCrearClientePresupuesto();
     }
 }
+
+// Guardar datos automáticamente mientras el usuario escribe
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('formCrearClientePresupuesto');
+    if (form) {
+        // Guardar datos en cada cambio
+        form.addEventListener('input', function() {
+            guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+        });
+        form.addEventListener('change', function() {
+            guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+        });
+    }
+});
 </script>
 
 <!-- Modal para crear cliente desde presupuesto -->

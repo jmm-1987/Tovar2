@@ -87,7 +87,7 @@
             <h3>Crear Nuevo Cliente</h3>
             <span class="close" onclick="cerrarModalCrear()">&times;</span>
         </div>
-        <form method="POST" id="formCrearCliente" class="modal-form">
+        <form method="POST" id="formCrearCliente" class="modal-form" onsubmit="limpiarDatosGuardadosCliente('cliente_draft')" oninput="guardarDatosFormularioCliente(this, 'cliente_draft')">
             <div class="form-section">
                 <h4>Información Principal</h4>
                 <div class="form-row">
@@ -429,16 +429,153 @@
 </style>
 
 <script>
+const STORAGE_KEY_CLIENTE = 'cliente_draft';
+
 function abrirModalCrear() {
-    document.getElementById('modalCrearCliente').style.display = 'block';
+    const modal = document.getElementById('modalCrearCliente');
+    const form = document.getElementById('formCrearCliente');
+    modal.style.display = 'block';
     document.body.style.overflow = 'hidden';
+    
+    // Restaurar datos guardados
+    const datosGuardados = localStorage.getItem(STORAGE_KEY_CLIENTE);
+    if (datosGuardados) {
+        try {
+            const datos = JSON.parse(datosGuardados);
+            Object.keys(datos).forEach(key => {
+                const input = form.querySelector(`[name="${key}"]`);
+                if (input) {
+                    if (input.type === 'checkbox' || input.type === 'radio') {
+                        input.checked = datos[key] === input.value;
+                    } else {
+                        input.value = datos[key] || '';
+                    }
+                }
+            });
+            
+            // Restaurar direcciones de envío si existen
+            if (datos.direcciones_envio) {
+                datos.direcciones_envio.forEach((dir, index) => {
+                    if (index === 0) return; // La primera ya está en el formulario
+                    añadirDireccionEnvio();
+                    const container = document.getElementById('direcciones-envio-container');
+                    const ultimaDir = container.lastElementChild;
+                    if (ultimaDir) {
+                        // Buscar por patrón de nombre (direcciones_envio_direccion_X)
+                        const direccionInput = ultimaDir.querySelector('[name*="direcciones_envio_direccion"]');
+                        const poblacionInput = ultimaDir.querySelector('[name*="direcciones_envio_poblacion"]');
+                        const provinciaInput = ultimaDir.querySelector('[name*="direcciones_envio_provincia"]');
+                        const codigoPostalInput = ultimaDir.querySelector('[name*="direcciones_envio_codigo_postal"]');
+                        
+                        if (direccionInput) direccionInput.value = dir.direccion || '';
+                        if (poblacionInput) poblacionInput.value = dir.poblacion || '';
+                        if (provinciaInput) provinciaInput.value = dir.provincia || '';
+                        if (codigoPostalInput) codigoPostalInput.value = dir.codigo_postal || '';
+                    }
+                });
+            }
+            
+            // Restaurar personas de contacto si existen
+            if (datos.personas_contacto) {
+                datos.personas_contacto.forEach((persona, index) => {
+                    if (index === 0) return; // La primera ya está en el formulario
+                    añadirPersonaContacto();
+                    const container = document.getElementById('personas-contacto-container');
+                    const ultimaPersona = container.lastElementChild;
+                    if (ultimaPersona) {
+                        // Buscar por patrón de nombre (personas_contacto_nombre_X)
+                        const nombreInput = ultimaPersona.querySelector('[name*="personas_contacto_nombre"]');
+                        const cargoInput = ultimaPersona.querySelector('[name*="personas_contacto_cargo"]');
+                        const telefonoInput = ultimaPersona.querySelector('[name*="personas_contacto_movil"]');
+                        const emailInput = ultimaPersona.querySelector('[name*="personas_contacto_email"]');
+                        
+                        if (nombreInput) nombreInput.value = persona.nombre || '';
+                        if (cargoInput) cargoInput.value = persona.cargo || '';
+                        if (telefonoInput) telefonoInput.value = persona.telefono || '';
+                        if (emailInput) emailInput.value = persona.email || '';
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Error al restaurar datos:', e);
+        }
+    }
 }
 
 function cerrarModalCrear() {
-    document.getElementById('modalCrearCliente').style.display = 'none';
+    const modal = document.getElementById('modalCrearCliente');
+    const form = document.getElementById('formCrearCliente');
+    
+    // Guardar datos antes de cerrar
+    guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
+    
+    modal.style.display = 'none';
     document.body.style.overflow = 'auto';
-    // Limpiar formulario
-    document.getElementById('formCrearCliente').reset();
+    // NO hacer reset aquí, solo ocultar
+}
+
+function guardarDatosFormularioCliente(form, storageKey) {
+    const datos = {};
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        if (input.name && input.name !== 'csrf_token') {
+            if (input.type === 'checkbox' || input.type === 'radio') {
+                if (input.checked) {
+                    datos[input.name] = input.value;
+                }
+            } else {
+                datos[input.name] = input.value || '';
+            }
+        }
+    });
+    
+    // Guardar direcciones de envío (campos dinámicos con nombres como direcciones_envio_direccion_0, etc.)
+    const direcciones = [];
+    document.querySelectorAll('#direcciones-envio-container > div').forEach((div, index) => {
+        const direccionInput = div.querySelector(`[name="direcciones_envio_direccion_${index}"]`) || div.querySelector('[name*="direcciones_envio_direccion"]');
+        const poblacionInput = div.querySelector(`[name="direcciones_envio_poblacion_${index}"]`) || div.querySelector('[name*="direcciones_envio_poblacion"]');
+        const provinciaInput = div.querySelector(`[name="direcciones_envio_provincia_${index}"]`) || div.querySelector('[name*="direcciones_envio_provincia"]');
+        const codigoPostalInput = div.querySelector(`[name="direcciones_envio_codigo_postal_${index}"]`) || div.querySelector('[name*="direcciones_envio_codigo_postal"]');
+        
+        if (direccionInput || poblacionInput || provinciaInput || codigoPostalInput) {
+            direcciones.push({
+                direccion: direccionInput?.value || '',
+                poblacion: poblacionInput?.value || '',
+                provincia: provinciaInput?.value || '',
+                codigo_postal: codigoPostalInput?.value || ''
+            });
+        }
+    });
+    if (direcciones.length > 0) {
+        datos.direcciones_envio = direcciones;
+    }
+    
+    // Guardar personas de contacto (campos dinámicos con nombres como personas_contacto_nombre_0, etc.)
+    const personas = [];
+    document.querySelectorAll('#personas-contacto-container > div').forEach((div, index) => {
+        const nombreInput = div.querySelector(`[name="personas_contacto_nombre_${index}"]`) || div.querySelector('[name*="personas_contacto_nombre"]');
+        const cargoInput = div.querySelector(`[name="personas_contacto_cargo_${index}"]`) || div.querySelector('[name*="personas_contacto_cargo"]');
+        const telefonoInput = div.querySelector(`[name="personas_contacto_movil_${index}"]`) || div.querySelector('[name*="personas_contacto_movil"]');
+        const emailInput = div.querySelector(`[name="personas_contacto_email_${index}"]`) || div.querySelector('[name*="personas_contacto_email"]');
+        
+        if (nombreInput || cargoInput || telefonoInput || emailInput) {
+            personas.push({
+                nombre: nombreInput?.value || '',
+                cargo: cargoInput?.value || '',
+                telefono: telefonoInput?.value || '',
+                email: emailInput?.value || ''
+            });
+        }
+    });
+    if (personas.length > 0) {
+        datos.personas_contacto = personas;
+    }
+    
+    localStorage.setItem(storageKey, JSON.stringify(datos));
+}
+
+function limpiarDatosGuardadosCliente(storageKey) {
+    localStorage.removeItem(storageKey);
 }
 
 // Cerrar modal al hacer clic fuera de él
@@ -517,10 +654,25 @@ function añadirPersonaContacto() {
     `;
     
     container.appendChild(personaDiv);
+    
+    // Agregar event listeners para guardar automáticamente
+    personaDiv.querySelectorAll('input').forEach(input => {
+        input.addEventListener('input', function() {
+            const form = document.getElementById('formCrearCliente');
+            if (form) guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
+        });
+        input.addEventListener('change', function() {
+            const form = document.getElementById('formCrearCliente');
+            if (form) guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
+        });
+    });
 }
 
 function eliminarPersonaContacto(button) {
     button.closest('.persona-contacto-item').remove();
+    // Guardar después de eliminar
+    const form = document.getElementById('formCrearCliente');
+    if (form) guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
 }
 
 function añadirDireccionEnvio() {
@@ -564,13 +716,42 @@ function añadirDireccionEnvio() {
     `;
     
     container.appendChild(direccionDiv);
+    
+    // Agregar event listeners para guardar automáticamente
+    direccionDiv.querySelectorAll('input, textarea').forEach(input => {
+        input.addEventListener('input', function() {
+            const form = document.getElementById('formCrearCliente');
+            if (form) guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
+        });
+        input.addEventListener('change', function() {
+            const form = document.getElementById('formCrearCliente');
+            if (form) guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
+        });
+    });
 }
 
 function eliminarDireccionEnvio(button) {
     button.closest('.direccion-envio-item').remove();
+    // Guardar después de eliminar
+    const form = document.getElementById('formCrearCliente');
+    if (form) guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
 }
 
 // Formatear número de cuenta automáticamente
+// Guardar datos automáticamente mientras el usuario escribe
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('formCrearCliente');
+    if (form) {
+        // Guardar datos en cada cambio
+        form.addEventListener('input', function() {
+            guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
+        });
+        form.addEventListener('change', function() {
+            guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
+        });
+    }
+});
+
 document.addEventListener('DOMContentLoaded', function() {
     const numeroCuentaInput = document.getElementById('numero_cuenta');
     if (numeroCuentaInput) {

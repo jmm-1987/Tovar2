@@ -239,7 +239,8 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         // Obtener tipo de IVA seleccionado
-        const tipoIva = parseFloat(document.getElementById('tipo_iva').value) || 21;
+        const tipoIvaValue = document.getElementById('tipo_iva').value;
+        const tipoIva = tipoIvaValue !== null && tipoIvaValue !== '' ? parseFloat(tipoIvaValue) : 21;
         
         // Actualizar etiqueta de IVA
         document.getElementById('iva-label').textContent = `IVA (${tipoIva}%):`;
@@ -282,14 +283,34 @@ document.addEventListener('DOMContentLoaded', function() {
     actualizarTotales();
     
     // Event listener para descuento por pronto pago
-    document.getElementById('descuento_pronto_pago').addEventListener('input', function() {
-        actualizarTotales();
-    });
+    const descuentoProntoPagoInput = document.getElementById('descuento_pronto_pago');
+    if (descuentoProntoPagoInput) {
+        descuentoProntoPagoInput.addEventListener('input', function() {
+            actualizarTotales();
+        });
+        descuentoProntoPagoInput.addEventListener('change', function() {
+            actualizarTotales();
+        });
+    }
     
-    // Event listener para tipo de IVA
-    document.getElementById('tipo_iva').addEventListener('change', function() {
-        actualizarTotales();
-    });
+    // Event listener para tipo de IVA - asegurar que se ejecute cuando cambia
+    const tipoIvaSelect = document.getElementById('tipo_iva');
+    if (tipoIvaSelect) {
+        // Usar múltiples eventos para asegurar que funcione
+        tipoIvaSelect.addEventListener('change', function() {
+            actualizarTotales();
+        });
+        tipoIvaSelect.addEventListener('input', function() {
+            actualizarTotales();
+        });
+        // También escuchar eventos de click para capturar cambios inmediatos
+        tipoIvaSelect.addEventListener('click', function() {
+            // Usar setTimeout para que se ejecute después del cambio
+            setTimeout(function() {
+                actualizarTotales();
+            }, 10);
+        });
+    }
     
     // Agregar nueva línea
     document.getElementById('agregar-linea').addEventListener('click', function() {
@@ -559,6 +580,8 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 </style>
 {% endblock %}
+
+
 
 
 
