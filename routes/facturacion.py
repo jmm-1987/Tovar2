@@ -918,10 +918,12 @@ def nueva_factura():
             traceback.print_exc()
     
     # GET: mostrar formulario
+    from models import Comercial
     clientes = Cliente.query.order_by(Cliente.nombre).all()
+    comerciales = Comercial.query.all()
     # Establecer fecha de hoy por defecto
     fecha_hoy = datetime.now().strftime('%Y-%m-%d')
-    return render_template('facturacion/nueva_factura.html', clientes=clientes, fecha_hoy=fecha_hoy)
+    return render_template('facturacion/nueva_factura.html', clientes=clientes, comerciales=comerciales, fecha_hoy=fecha_hoy)
 
 @facturacion_bp.route('/facturacion/factura/<int:factura_id>/editar', methods=['GET', 'POST'])
 @login_required

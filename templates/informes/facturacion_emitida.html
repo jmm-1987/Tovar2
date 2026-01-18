@@ -45,6 +45,18 @@
                 {% endif %}
             </div>
             
+            <div class="filtro-group filtro-cliente">
+                <label for="cliente_id">Cliente:</label>
+                <select name="cliente_id" id="cliente_id">
+                    <option value="">Todos los clientes</option>
+                    {% for cliente in clientes %}
+                    <option value="{{ cliente.id }}" {% if cliente_id == cliente.id %}selected{% endif %}>
+                        {{ cliente.nombre }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
             <button type="submit" class="btn btn-primary">Filtrar</button>
         </form>
     </div>
@@ -53,7 +65,7 @@
     <div class="resumen-box">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h3 style="margin: 0;">Resumen - {{ periodo_label }}</h3>
-            <a href="{{ url_for('informes.facturacion_emitida_detalle', tipo=tipo_filtro, año=año, periodo=periodo) }}" class="btn btn-light" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">Ver Detalle</a>
+            <a href="{{ url_for('informes.facturacion_emitida_detalle', tipo=tipo_filtro, año=año, periodo=periodo) }}{% if cliente_id %}&cliente_id={{ cliente_id }}{% endif %}" class="btn btn-light" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">Ver Detalle</a>
         </div>
         <div class="resumen-grid">
             <div class="resumen-item">
@@ -139,15 +151,18 @@
 
 .filtros-form {
     display: flex;
-    gap: 15px;
+    gap: 10px;
     align-items: flex-end;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
 }
 
 .filtro-group {
     display: flex;
     flex-direction: column;
     gap: 5px;
+    flex: 0 0 auto;
+    min-width: 0;
 }
 
 .filtro-group label {
@@ -162,6 +177,32 @@
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 0.9em;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.filtro-group:first-child {
+    flex: 0 0 140px;
+}
+
+.filtro-group:nth-child(2) {
+    flex: 0 0 100px;
+}
+
+.filtro-group#periodo-group {
+    flex: 0 0 160px;
+}
+
+.filtro-group.filtro-cliente {
+    flex: 1 1 200px;
+    min-width: 180px;
+    max-width: 300px;
+}
+
+.filtros-form button {
+    flex: 0 0 auto;
+    white-space: nowrap;
 }
 
 .resumen-box {

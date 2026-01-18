@@ -4,7 +4,7 @@ from flask_login import login_required
 from datetime import datetime
 from decimal import Decimal
 from extensions import db
-from models import Factura, FacturaProveedor, Nomina, Empleado, LineaFactura
+from models import Factura, FacturaProveedor, Nomina, Empleado, LineaFactura, Cliente
 from sqlalchemy import func, extract, not_
 from utils.auth import not_usuario_required
 
@@ -26,12 +26,17 @@ def facturacion_emitida():
     tipo_filtro = request.args.get('tipo', 'mes')  # 'mes' o 'trimestre'
     año = request.args.get('año', datetime.now().year, type=int)
     periodo = request.args.get('periodo', None, type=int)
+    cliente_id = request.args.get('cliente_id', None, type=int)
     
     # Base query - Excluir albaranes (formato A2601_XXX)
     query = Factura.query.filter(
         extract('year', Factura.fecha_expedicion) == año,
         not_(Factura.numero.like('A%_%'))
     )
+    
+    # Aplicar filtro por cliente si está seleccionado
+    if cliente_id:
+        query = query.filter(Factura.cliente_id == cliente_id)
     
     if tipo_filtro == 'mes' and periodo:
         query = query.filter(extract('month', Factura.fecha_expedicion) == periodo)
@@ -63,6 +68,10 @@ def facturacion_emitida():
             iva_linea = base_imponible * tipo_iva / Decimal('100')
             total_iva_repercutido += iva_linea.quantize(Decimal('0.01'))
     
+    # Obtener lista de clientes para el filtro
+    clientes = Cliente.query.order_by(Cliente.nombre).all()
+    cliente_seleccionado = Cliente.query.get(cliente_id) if cliente_id else None
+    
     return render_template('informes/facturacion_emitida.html', 
                          facturas=facturas,
                          total_facturacion=total_facturacion,
@@ -70,7 +79,10 @@ def facturacion_emitida():
                          tipo_filtro=tipo_filtro,
                          año=año,
                          periodo=periodo,
-                         periodo_label=periodo_label)
+                         periodo_label=periodo_label,
+                         clientes=clientes,
+                         cliente_id=cliente_id,
+                         cliente_seleccionado=cliente_seleccionado)
 
 @informes_bp.route('/informes/facturacion-soportada')
 @login_required
@@ -236,12 +248,17 @@ def facturacion_emitida_detalle():
     tipo_filtro = request.args.get('tipo', 'mes')
     año = request.args.get('año', datetime.now().year, type=int)
     periodo = request.args.get('periodo', None, type=int)
+    cliente_id = request.args.get('cliente_id', None, type=int)
     
     # Base query - Excluir albaranes (formato A2601_XXX)
     query = Factura.query.filter(
         extract('year', Factura.fecha_expedicion) == año,
         not_(Factura.numero.like('A%_%'))
     )
+    
+    # Aplicar filtro por cliente si está seleccionado
+    if cliente_id:
+        query = query.filter(Factura.cliente_id == cliente_id)
     
     if tipo_filtro == 'mes' and periodo:
         query = query.filter(extract('month', Factura.fecha_expedicion) == periodo)
@@ -257,12 +274,17 @@ def facturacion_emitida_detalle():
     
     facturas = query.order_by(Factura.fecha_expedicion.desc()).all()
     
+    # Obtener cliente seleccionado si existe
+    cliente_seleccionado = Cliente.query.get(cliente_id) if cliente_id else None
+    
     return render_template('informes/detalle_facturacion_emitida.html',
                          facturas=facturas,
                          tipo_filtro=tipo_filtro,
                          año=año,
                          periodo=periodo,
-                         periodo_label=periodo_label)
+                         periodo_label=periodo_label,
+                         cliente_id=cliente_id,
+                         cliente_seleccionado=cliente_seleccionado)
 
 @informes_bp.route('/informes/facturacion-soportada/detalle')
 @login_required

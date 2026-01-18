@@ -23,21 +23,35 @@
             </div>
             
             <div class="form-group" style="flex: 1 1 250px; min-width: 250px;">
-                <label for="cliente_id">Cliente (AUTOCOMPLETAR)</label>
-                <select name="cliente_id" id="cliente_id" class="form-control" onchange="cargarDatosCliente()" style="width: 100%;">
-                    <option value="">Seleccionar cliente...</option>
-                    {% for cliente in clientes %}
-                    <option value="{{ cliente.id }}" 
-                            data-nombre="{{ cliente.nombre }}" 
-                            data-nif="{{ cliente.nif or '' }}"
-                            data-direccion="{{ cliente.direccion or '' }}"
-                            data-poblacion="{{ cliente.poblacion or '' }}"
-                            data-provincia="{{ cliente.provincia or '' }}"
-                            data-codigo-postal="{{ cliente.codigo_postal or '' }}"
-                            data-telefono="{{ cliente.telefono or '' }}"
-                            data-email="{{ cliente.email or '' }}">{{ cliente.nombre }}{% if cliente.nif %} - {{ cliente.nif }}{% endif %}</option>
-                    {% endfor %}
-                </select>
+                <label for="cliente_search">Cliente</label>
+                <div style="display: flex; gap: 5px;">
+                    <div style="position: relative; flex: 1;">
+                        <input type="text" id="cliente_search" placeholder="🔍 Buscar cliente..." 
+                               style="width: 100%; padding: 10px 35px 10px 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; box-sizing: border-box;"
+                               autocomplete="off">
+                        <select name="cliente_id" id="cliente_id" onchange="cargarDatosCliente()" style="display: none;">
+                            <option value="">Seleccionar cliente...</option>
+                            {% for cliente in clientes %}
+                            <option value="{{ cliente.id }}" 
+                                    data-nombre="{{ cliente.nombre|lower }}"
+                                    data-nombre-display="{{ cliente.nombre }}"
+                                    data-nif="{{ cliente.nif or '' }}"
+                                    data-direccion="{{ cliente.direccion or '' }}"
+                                    data-poblacion="{{ cliente.poblacion or '' }}"
+                                    data-provincia="{{ cliente.provincia or '' }}"
+                                    data-codigo-postal="{{ cliente.codigo_postal or '' }}"
+                                    data-telefono="{{ cliente.telefono or '' }}"
+                                    data-email="{{ cliente.email or '' }}">{{ cliente.nombre }}{% if cliente.nif %} - {{ cliente.nif }}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                        <div id="cliente_results" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px; max-height: 200px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+                    </div>
+                    <button type="button" onclick="abrirModalCrearClienteFactura()" 
+                            style="padding: 10px 15px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; white-space: nowrap;"
+                            title="Crear nuevo cliente">
+                        ➕
+                    </button>
+                </div>
             </div>
         </div>
         
@@ -120,6 +134,7 @@
                     <input type="number" name="descuento[]" class="linea-campo-compact descuento-input" step="0.01" min="0" max="100" value="0" placeholder="Desc. %" title="Descuento (%)" style="flex: 0 0 80px; width: 80px;">
                     <input type="number" name="precio_final[]" class="linea-campo-compact precio-final-input" step="0.01" placeholder="P. Final" title="Precio Final" readonly style="flex: 0 0 100px; width: 100px; background: #f0f0f0;">
                     <span class="importe-linea" style="flex: 0 0 100px; padding: 8px; text-align: right; font-weight: bold;">0.00 €</span>
+                    <button type="button" class="btn-duplicar-linea" onclick="duplicarLineaFactura(this)" title="Duplicar línea (mantiene todo excepto talla y cantidad)" style="padding: 4px 8px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; flex: 0 0 30px; font-size: 0.9rem;">📋</button>
                     <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; display: none; flex: 0 0 30px;">×</button>
                 </div>
             </div>
@@ -337,8 +352,15 @@ document.addEventListener('DOMContentLoaded', function() {
         // Actualizar número
         nuevaLinea.querySelector('.linea-factura-numero').textContent = '#' + lineaCount;
         
-        // Mostrar botón eliminar
+        // Mostrar botones
         nuevaLinea.querySelector('.btn-eliminar-linea').style.display = 'block';
+        const btnDuplicar = nuevaLinea.querySelector('.btn-duplicar-linea');
+        if (btnDuplicar) {
+            btnDuplicar.style.display = '';
+            btnDuplicar.addEventListener('click', function() {
+                duplicarLineaFactura(this);
+            });
+        }
         
         // Añadir event listeners
         const cantidadInput = nuevaLinea.querySelector('.linea-cantidad');
@@ -383,6 +405,121 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // Función para duplicar línea
+    window.duplicarLineaFactura = function(btn) {
+        const lineaRow = btn.closest('.linea-factura-row');
+        const nuevaLinea = lineaRow.cloneNode(true);
+        const container = document.getElementById('lineas-container');
+        
+        // Obtener valores de los campos originales antes de limpiar
+        const descripcionInputOriginal = lineaRow.querySelector('input[name="descripcion_linea[]"]');
+        const precioUnitarioInputOriginal = lineaRow.querySelector('input[name="precio_unitario[]"]');
+        const descuentoInputOriginal = lineaRow.querySelector('input[name="descuento[]"]');
+        const precioFinalInputOriginal = lineaRow.querySelector('input[name="precio_final[]"]');
+        
+        const descripcionValue = descripcionInputOriginal ? descripcionInputOriginal.value : '';
+        const precioUnitarioValue = precioUnitarioInputOriginal ? precioUnitarioInputOriginal.value : '';
+        const descuentoValue = descuentoInputOriginal ? descuentoInputOriginal.value : '';
+        const precioFinalValue = precioFinalInputOriginal ? precioFinalInputOriginal.value : '';
+        
+        // Limpiar talla y cantidad
+        const tallaInput = nuevaLinea.querySelector('input[name="talla[]"]');
+        const cantidadInput = nuevaLinea.querySelector('input[name="cantidad[]"]');
+        
+        if (tallaInput) {
+            tallaInput.value = '';
+        }
+        if (cantidadInput) {
+            cantidadInput.value = '1';
+        }
+        
+        // Establecer valores en la línea duplicada (mantener descripción y precios)
+        const descripcionInputNuevo = nuevaLinea.querySelector('input[name="descripcion_linea[]"]');
+        const precioUnitarioInputNuevo = nuevaLinea.querySelector('input[name="precio_unitario[]"]');
+        const descuentoInputNuevo = nuevaLinea.querySelector('input[name="descuento[]"]');
+        const precioFinalInputNuevo = nuevaLinea.querySelector('input[name="precio_final[]"]');
+        
+        if (descripcionInputNuevo && descripcionValue) {
+            descripcionInputNuevo.value = descripcionValue;
+        }
+        if (precioUnitarioInputNuevo && precioUnitarioValue) {
+            precioUnitarioInputNuevo.value = precioUnitarioValue;
+        }
+        if (descuentoInputNuevo && descuentoValue) {
+            descuentoInputNuevo.value = descuentoValue;
+        }
+        if (precioFinalInputNuevo && precioFinalValue) {
+            precioFinalInputNuevo.value = precioFinalValue;
+        }
+        
+        // Limpiar importe inicial
+        const importeSpan = nuevaLinea.querySelector('.importe-linea');
+        if (importeSpan) {
+            importeSpan.textContent = '0.00 €';
+        }
+        
+        // Actualizar número de línea
+        renumerarLineas();
+        
+        // Añadir event listeners a la nueva línea
+        const cantidadInputNuevo = nuevaLinea.querySelector('.linea-cantidad');
+        const precioUnitarioInputNuevo2 = nuevaLinea.querySelector('.precio-unitario');
+        const descuentoInputNuevo2 = nuevaLinea.querySelector('.descuento-input');
+        const precioFinalInputNuevo2 = nuevaLinea.querySelector('.precio-final-input');
+        
+        if (cantidadInputNuevo) {
+            cantidadInputNuevo.addEventListener('input', function() {
+                calcularImporteLinea(nuevaLinea);
+            });
+        }
+        
+        if (precioUnitarioInputNuevo2) {
+            precioUnitarioInputNuevo2.addEventListener('input', function() {
+                calcularPrecioFinal(nuevaLinea);
+            });
+        }
+        
+        if (descuentoInputNuevo2) {
+            descuentoInputNuevo2.addEventListener('input', function() {
+                calcularPrecioFinal(nuevaLinea);
+            });
+        }
+        
+        if (precioFinalInputNuevo2) {
+            precioFinalInputNuevo2.addEventListener('input', function() {
+                calcularImporteLinea(nuevaLinea);
+            });
+        }
+        
+        // Botón eliminar
+        nuevaLinea.querySelector('.btn-eliminar-linea').addEventListener('click', function() {
+            if (container.querySelectorAll('.linea-factura-row').length > 1) {
+                nuevaLinea.remove();
+                renumerarLineas();
+                actualizarTotales();
+            } else {
+                alert('Debe haber al menos una línea en la factura');
+            }
+        });
+        
+        // Botón duplicar
+        nuevaLinea.querySelector('.btn-duplicar-linea').addEventListener('click', function() {
+            duplicarLineaFactura(this);
+        });
+        
+        // Mostrar botón eliminar
+        nuevaLinea.querySelector('.btn-eliminar-linea').style.display = 'block';
+        
+        // Insertar después de la línea actual
+        lineaRow.parentNode.insertBefore(nuevaLinea, lineaRow.nextSibling);
+        
+        // Recalcular importe de la nueva línea
+        calcularImporteLinea(nuevaLinea);
+        
+        // Actualizar totales
+        actualizarTotales();
+    };
+    
     // Event listeners para la primera línea
     document.querySelectorAll('.linea-cantidad, .precio-unitario, .descuento-input').forEach(input => {
         input.addEventListener('input', function() {
@@ -395,13 +532,80 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // Cargar datos del cliente
+    // Sistema de búsqueda de cliente
+    const clienteSearch = document.getElementById('cliente_search');
+    const clienteSelect = document.getElementById('cliente_id');
+    const clienteResults = document.getElementById('cliente_results');
+    let clientes = Array.from(clienteSelect.options).slice(1).map(opt => ({
+        id: opt.value,
+        nombre: opt.getAttribute('data-nombre-display') || opt.textContent,
+        nombreLower: opt.getAttribute('data-nombre') || opt.textContent.toLowerCase(),
+        option: opt
+    }));
+    
+    let selectedClienteId = null;
+    let selectedClienteNombre = '';
+    
+    clienteSearch.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        
+        if (searchTerm === '') {
+            clienteResults.style.display = 'none';
+            clienteSelect.value = '';
+            selectedClienteId = null;
+            selectedClienteNombre = '';
+            cargarDatosCliente();
+            return;
+        }
+        
+        // Filtrar clientes
+        const filtered = clientes.filter(cliente => 
+            cliente.nombreLower.includes(searchTerm)
+        );
+        
+        if (filtered.length === 0) {
+            clienteResults.innerHTML = '<div style="padding: 10px; color: #999; text-align: center;">No se encontraron clientes</div>';
+            clienteResults.style.display = 'block';
+            return;
+        }
+        
+        // Mostrar resultados
+        clienteResults.innerHTML = filtered.map(cliente => 
+            `<div class="cliente-option" data-id="${cliente.id}" data-nombre="${cliente.nombre.replace(/'/g, "\\'")}" 
+                  style="padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; transition: background 0.2s;"
+                  onmouseover="this.style.background='#f0f0f0'" 
+                  onmouseout="this.style.background='white'"
+                  onclick="selectClienteFactura(${cliente.id}, '${cliente.nombre.replace(/'/g, "\\'").replace(/"/g, '&quot;')}')">
+                ${cliente.nombre}
+            </div>`
+        ).join('');
+        
+        clienteResults.style.display = 'block';
+    });
+    
+    // Ocultar resultados al hacer clic fuera
+    document.addEventListener('click', function(e) {
+        if (!clienteSearch.contains(e.target) && !clienteResults.contains(e.target)) {
+            clienteResults.style.display = 'none';
+        }
+    });
+    
+    // Función para seleccionar cliente desde la búsqueda
+    window.selectClienteFactura = function(id, nombre) {
+        selectedClienteId = id;
+        selectedClienteNombre = nombre;
+        clienteSearch.value = nombre;
+        clienteSelect.value = id;
+        clienteResults.style.display = 'none';
+        cargarDatosCliente();
+    };
+    
     window.cargarDatosCliente = function() {
         const selectCliente = document.getElementById('cliente_id');
         const optionSeleccionada = selectCliente.options[selectCliente.selectedIndex];
         
         if (optionSeleccionada && optionSeleccionada.value) {
-            const nombre = optionSeleccionada.getAttribute('data-nombre') || '';
+            const nombreDisplay = optionSeleccionada.getAttribute('data-nombre-display') || optionSeleccionada.textContent;
             const nif = optionSeleccionada.getAttribute('data-nif') || '';
             const direccion = optionSeleccionada.getAttribute('data-direccion') || '';
             const poblacion = optionSeleccionada.getAttribute('data-poblacion') || '';
@@ -410,7 +614,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const telefono = optionSeleccionada.getAttribute('data-telefono') || '';
             const email = optionSeleccionada.getAttribute('data-email') || '';
             
-            document.getElementById('nombre_cliente').value = nombre;
+            document.getElementById('nombre_cliente').value = nombreDisplay;
             document.getElementById('nif_cliente').value = nif;
             document.getElementById('direccion_cliente').value = direccion;
             document.getElementById('poblacion_cliente').value = poblacion;
@@ -418,6 +622,11 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('codigo_postal_cliente').value = codigoPostal;
             document.getElementById('telefono_cliente').value = telefono;
             document.getElementById('email_cliente').value = email;
+            
+            // Actualizar el input de búsqueda si está vacío
+            if (!clienteSearch.value) {
+                clienteSearch.value = nombreDisplay;
+            }
         } else {
             // Limpiar campos si no hay cliente seleccionado
             document.getElementById('nombre_cliente').value = '';
@@ -430,10 +639,425 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('email_cliente').value = '';
         }
     };
+    
+    // Validar antes de enviar
+    const form = document.getElementById('facturaForm');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (!selectedClienteId && !clienteSelect.value) {
+                e.preventDefault();
+                alert('Por favor, seleccione un cliente');
+                clienteSearch.focus();
+                return false;
+            }
+            // Asegurar que el select tenga el valor correcto
+            if (selectedClienteId) {
+                clienteSelect.value = selectedClienteId;
+            }
+        });
+    }
+});
+
+// Funciones para el modal de crear cliente
+const STORAGE_KEY_CLIENTE_FACTURA = 'cliente_factura_draft';
+
+function abrirModalCrearClienteFactura() {
+    const modal = document.getElementById('modalCrearClienteFactura');
+    const form = document.getElementById('formCrearClienteFactura');
+    modal.style.display = 'block';
+    
+    // Restaurar datos guardados
+    const datosGuardados = localStorage.getItem(STORAGE_KEY_CLIENTE_FACTURA);
+    if (datosGuardados) {
+        try {
+            const datos = JSON.parse(datosGuardados);
+            Object.keys(datos).forEach(key => {
+                const input = form.querySelector(`[name="${key}"]`);
+                if (input) {
+                    if (input.type === 'checkbox' || input.type === 'radio') {
+                        input.checked = datos[key] === input.value;
+                    } else {
+                        input.value = datos[key] || '';
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('Error al restaurar datos:', e);
+        }
+    }
+}
+
+function cerrarModalCrearClienteFactura() {
+    const modal = document.getElementById('modalCrearClienteFactura');
+    const form = document.getElementById('formCrearClienteFactura');
+    
+    // Guardar datos antes de cerrar
+    guardarDatosFormularioFactura(form, STORAGE_KEY_CLIENTE_FACTURA);
+    
+    modal.style.display = 'none';
+}
+
+function guardarDatosFormularioFactura(form, storageKey) {
+    const datos = {};
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        if (input.name && input.name !== 'csrf_token') {
+            if (input.type === 'checkbox' || input.type === 'radio') {
+                if (input.checked) {
+                    datos[input.name] = input.value;
+                }
+            } else {
+                datos[input.name] = input.value || '';
+            }
+        }
+    });
+    localStorage.setItem(storageKey, JSON.stringify(datos));
+}
+
+function limpiarDatosGuardadosFactura(storageKey) {
+    localStorage.removeItem(storageKey);
+}
+
+// Manejar el envío del formulario de crear cliente
+document.addEventListener('DOMContentLoaded', function() {
+    const formCrearCliente = document.getElementById('formCrearClienteFactura');
+    if (formCrearCliente) {
+        formCrearCliente.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creando...';
+            
+            fetch('{{ url_for("solicitudes.crear_cliente_ajax") }}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Agregar el nuevo cliente al select
+                    const clienteSelect = document.getElementById('cliente_id');
+                    const newOption = document.createElement('option');
+                    newOption.value = data.cliente.id;
+                    newOption.textContent = data.cliente.nombre;
+                    newOption.setAttribute('data-nombre', data.cliente.nombre.toLowerCase());
+                    newOption.setAttribute('data-nombre-display', data.cliente.nombre);
+                    newOption.setAttribute('data-nif', '');
+                    newOption.setAttribute('data-direccion', '');
+                    newOption.setAttribute('data-poblacion', '');
+                    newOption.setAttribute('data-provincia', '');
+                    newOption.setAttribute('data-codigo-postal', '');
+                    newOption.setAttribute('data-telefono', '');
+                    newOption.setAttribute('data-email', '');
+                    clienteSelect.appendChild(newOption);
+                    
+                    // Actualizar array de clientes en JavaScript
+                    clientes.push({
+                        id: data.cliente.id.toString(),
+                        nombre: data.cliente.nombre,
+                        nombreLower: data.cliente.nombre.toLowerCase(),
+                        option: newOption
+                    });
+                    
+                    // Seleccionar el nuevo cliente
+                    selectClienteFactura(data.cliente.id, data.cliente.nombre);
+                    
+                    // Limpiar datos guardados
+                    limpiarDatosGuardadosFactura(STORAGE_KEY_CLIENTE_FACTURA);
+                    
+                    // Cerrar modal y limpiar formulario
+                    document.getElementById('modalCrearClienteFactura').style.display = 'none';
+                    formCrearCliente.reset();
+                    
+                    alert('Cliente creado correctamente');
+                } else {
+                    alert('Error al crear cliente: ' + data.error);
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+            })
+            .catch(error => {
+                alert('Error al crear cliente: ' + error);
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            });
+        });
+        
+        // Guardar datos automáticamente mientras el usuario escribe
+        formCrearCliente.addEventListener('input', function() {
+            guardarDatosFormularioFactura(formCrearCliente, STORAGE_KEY_CLIENTE_FACTURA);
+        });
+        formCrearCliente.addEventListener('change', function() {
+            guardarDatosFormularioFactura(formCrearCliente, STORAGE_KEY_CLIENTE_FACTURA);
+        });
+    }
+    
+    // Cerrar modal al hacer clic fuera
+    window.onclick = function(event) {
+        const modal = document.getElementById('modalCrearClienteFactura');
+        if (event.target == modal) {
+            cerrarModalCrearClienteFactura();
+        }
+    }
 });
 </script>
 
+<!-- Modal para crear cliente desde factura -->
+<div id="modalCrearClienteFactura" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 700px;">
+        <div class="modal-header">
+            <h3>Crear Nuevo Cliente</h3>
+            <span class="close" onclick="cerrarModalCrearClienteFactura()">&times;</span>
+        </div>
+        <form id="formCrearClienteFactura" class="modal-form">
+            <div class="form-section">
+                <h4>Información Principal</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nombre_cliente_modal_factura">Nombre Fiscal *</label>
+                        <input type="text" name="nombre" id="nombre_cliente_modal_factura" required placeholder="Razón social o nombre fiscal">
+                    </div>
+                    <div class="form-group">
+                        <label for="alias_cliente_modal_factura">Nombre Comercial</label>
+                        <input type="text" name="alias" id="alias_cliente_modal_factura" placeholder="Nombre comercial">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nif_cliente_modal_factura">NIF/CIF</label>
+                        <input type="text" name="nif" id="nif_cliente_modal_factura" placeholder="A15022510" maxlength="20">
+                    </div>
+                    <div class="form-group">
+                        <label for="fecha_alta_cliente_modal_factura">Fecha de Alta</label>
+                        <input type="date" name="fecha_alta" id="fecha_alta_cliente_modal_factura">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="categoria_cliente_modal_factura">Categoría</label>
+                        <select name="categoria" id="categoria_cliente_modal_factura">
+                            <option value="">Sin categoría</option>
+                            <option value="hosteleria">Hostelería</option>
+                            <option value="clinica">Clínica</option>
+                            <option value="colegio">Colegio</option>
+                            <option value="emerita">Emerita</option>
+                            <option value="carnaval">Carnaval</option>
+                            <option value="transporte">Transporte</option>
+                            <option value="varios">Varios</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="comercial_id_cliente_modal_factura">Comercial Asignado</label>
+                        <select name="comercial_id" id="comercial_id_cliente_modal_factura">
+                            <option value="">Sin comercial asignado</option>
+                            {% for comercial in comerciales %}
+                            <option value="{{ comercial.id }}">{{ comercial.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Contacto</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="telefono_cliente_modal_factura">Teléfono</label>
+                        <input type="text" name="telefono" id="telefono_cliente_modal_factura" placeholder="Teléfono fijo">
+                    </div>
+                    <div class="form-group">
+                        <label for="movil_cliente_modal_factura">Móvil</label>
+                        <input type="text" name="movil" id="movil_cliente_modal_factura" placeholder="Teléfono móvil">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="email_cliente_modal_factura">Email</label>
+                    <input type="email" name="email" id="email_cliente_modal_factura" placeholder="email@ejemplo.com">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Dirección</h4>
+                <div class="form-group">
+                    <label for="direccion_cliente_modal_factura">Dirección</label>
+                    <input type="text" name="direccion" id="direccion_cliente_modal_factura" placeholder="Dirección completa">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="poblacion_cliente_modal_factura">Población</label>
+                        <input type="text" name="poblacion" id="poblacion_cliente_modal_factura" placeholder="Ciudad">
+                    </div>
+                    <div class="form-group">
+                        <label for="provincia_cliente_modal_factura">Provincia</label>
+                        <input type="text" name="provincia" id="provincia_cliente_modal_factura" placeholder="Provincia">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="codigo_postal_cliente_modal_factura">Código Postal</label>
+                        <input type="text" name="codigo_postal" id="codigo_postal_cliente_modal_factura" placeholder="28001" maxlength="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="pais_cliente_modal_factura">País</label>
+                        <input type="text" name="pais" id="pais_cliente_modal_factura" placeholder="España" value="España">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Anotaciones</h4>
+                <div class="form-group">
+                    <label for="anotaciones_cliente_modal_factura">Anotaciones</label>
+                    <textarea name="anotaciones" id="anotaciones_cliente_modal_factura" rows="2" placeholder="Notas adicionales"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Crear Cliente</button>
+                <button type="button" class="btn btn-secondary" onclick="cerrarModalCrearClienteFactura()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    overflow-y: auto;
+}
+
+.modal-content {
+    background-color: white;
+    margin: 3% auto;
+    padding: 0;
+    border-radius: 10px;
+    max-width: 700px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 2px solid #e0e0e0;
+    background: #f8f9fa;
+    border-radius: 10px 10px 0 0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.close {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 20px;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.modal-form {
+    padding: 20px;
+}
+
+.form-section {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.form-section:last-child {
+    border-bottom: none;
+}
+
+.form-section h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #2c3e50;
+    font-size: 16px;
+}
+
+.form-section .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.form-section .form-group {
+    margin-bottom: 15px;
+}
+
+.form-section .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #555;
+    font-size: 14px;
+}
+
+.form-section .form-group input,
+.form-section .form-group textarea,
+.form-section .form-group select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.form-section .form-group textarea {
+    resize: vertical;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 2px solid #e0e0e0;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
 .linea-factura-header {
     display: flex;
     align-items: stretch;
@@ -524,6 +1148,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .btn-eliminar-linea:hover {
     background: #c82333 !important;
+}
+
+.btn-duplicar-linea:hover {
+    background: #138496 !important;
 }
 
 .form-group {
