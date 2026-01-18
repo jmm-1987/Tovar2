@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from extensions import db
 from models import Factura, FacturaProveedor, Nomina, Empleado, LineaFactura
-from sqlalchemy import func, extract
+from sqlalchemy import func, extract, not_
 from utils.auth import not_usuario_required
 
 informes_bp = Blueprint('informes', __name__)
@@ -27,8 +27,11 @@ def facturacion_emitida():
     año = request.args.get('año', datetime.now().year, type=int)
     periodo = request.args.get('periodo', None, type=int)
     
-    # Base query
-    query = Factura.query.filter(extract('year', Factura.fecha_expedicion) == año)
+    # Base query - Excluir albaranes (formato A2601_XXX)
+    query = Factura.query.filter(
+        extract('year', Factura.fecha_expedicion) == año,
+        not_(Factura.numero.like('A%_%'))
+    )
     
     if tipo_filtro == 'mes' and periodo:
         query = query.filter(extract('month', Factura.fecha_expedicion) == periodo)
@@ -160,8 +163,11 @@ def iva():
     año = request.args.get('año', datetime.now().year, type=int)
     periodo = request.args.get('periodo', None, type=int)
     
-    # Calcular IVA repercutido (de facturas emitidas)
-    query_facturas = Factura.query.filter(extract('year', Factura.fecha_expedicion) == año)
+    # Calcular IVA repercutido (de facturas emitidas) - Excluir albaranes
+    query_facturas = Factura.query.filter(
+        extract('year', Factura.fecha_expedicion) == año,
+        not_(Factura.numero.like('A%_%'))
+    )
     
     if tipo_filtro == 'mes' and periodo:
         query_facturas = query_facturas.filter(extract('month', Factura.fecha_expedicion) == periodo)
@@ -231,8 +237,11 @@ def facturacion_emitida_detalle():
     año = request.args.get('año', datetime.now().year, type=int)
     periodo = request.args.get('periodo', None, type=int)
     
-    # Base query
-    query = Factura.query.filter(extract('year', Factura.fecha_expedicion) == año)
+    # Base query - Excluir albaranes (formato A2601_XXX)
+    query = Factura.query.filter(
+        extract('year', Factura.fecha_expedicion) == año,
+        not_(Factura.numero.like('A%_%'))
+    )
     
     if tipo_filtro == 'mes' and periodo:
         query = query.filter(extract('month', Factura.fecha_expedicion) == periodo)
@@ -327,8 +336,11 @@ def iva_detalle():
     año = request.args.get('año', datetime.now().year, type=int)
     periodo = request.args.get('periodo', None, type=int)
     
-    # Calcular IVA repercutido (de facturas emitidas)
-    query_facturas = Factura.query.filter(extract('year', Factura.fecha_expedicion) == año)
+    # Calcular IVA repercutido (de facturas emitidas) - Excluir albaranes
+    query_facturas = Factura.query.filter(
+        extract('year', Factura.fecha_expedicion) == año,
+        not_(Factura.numero.like('A%_%'))
+    )
     
     if tipo_filtro == 'mes' and periodo:
         query_facturas = query_facturas.filter(extract('month', Factura.fecha_expedicion) == periodo)

@@ -527,6 +527,26 @@ def migrate_database():
                             print("Migración: Columna descuento_pronto_pago agregada exitosamente a facturas")
                     except Exception as e:
                         print(f"Error al agregar columna descuento_pronto_pago a facturas: {e}")
+                
+                # Verificar y agregar columnas de estado de cobro
+                if 'estado_cobro' not in columns_facturas:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE facturas ADD COLUMN estado_cobro VARCHAR(50) DEFAULT 'pendiente'"))
+                            conn.commit()
+                            print("Migración: Columna estado_cobro agregada exitosamente a facturas")
+                    except Exception as e:
+                        print(f"Error al agregar columna estado_cobro a facturas: {e}")
+                
+                if 'importe_pagado' not in columns_facturas:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE facturas ADD COLUMN importe_pagado NUMERIC(10, 2) DEFAULT 0"))
+                            conn.commit()
+                            print("Migración: Columna importe_pagado agregada exitosamente a facturas")
+                    except Exception as e:
+                        print(f"Error al agregar columna importe_pagado a facturas: {e}")
+                
                 # Verificar si pedido_id existe y es NOT NULL
                 pedido_id_not_null = False
                 for col_info in inspector.get_columns('facturas'):

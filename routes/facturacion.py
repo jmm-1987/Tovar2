@@ -9,7 +9,7 @@ import json
 import tempfile
 import base64
 from io import BytesIO
-from sqlalchemy import not_
+from sqlalchemy import not_, or_, and_
 from extensions import db
 from models import Factura, LineaFactura, Cliente, Presupuesto, LineaPresupuesto, Pedido
 from utils.numeracion import obtener_siguiente_numero_factura, obtener_siguiente_numero_albaran
@@ -69,8 +69,6 @@ def facturacion():
         
         # Obtener albaranes: facturas pendientes con número que empieza con 'A' seguido de año y mes (formato A2601_XXX)
         # Los albaranes son facturas directas (sin presupuesto_id ni pedido_id) con estado='pendiente'
-        from sqlalchemy import and_
-        
         query_albaranes = Factura.query.filter(
             and_(
                 Factura.estado == 'pendiente',
@@ -119,15 +117,23 @@ def facturacion():
         estados_list = list(set([estado[0] for estado in estados_presupuestos if estado[0]]))
     else:
         # Obtener facturas formalizadas (excluir albaranes)
-        from sqlalchemy import and_
         query = Factura.query.filter(
             # Excluir albaranes: facturas con número en formato A2601_XXX
             not_(Factura.numero.like('A%_%'))
         )
         
-        # Aplicar filtro de estado
+        # Aplicar filtro de estado (usar estado_cobro en lugar de estado Verifactu)
         if estado_filtro:
-            query = query.filter(Factura.estado == estado_filtro)
+            # Si el estado es 'pendiente', también incluir NULL (facturas antiguas sin estado_cobro)
+            if estado_filtro == 'pendiente':
+                query = query.filter(
+                    or_(
+                        Factura.estado_cobro == estado_filtro,
+                        Factura.estado_cobro.is_(None)
+                    )
+                )
+            else:
+                query = query.filter(Factura.estado_cobro == estado_filtro)
         
         # Aplicar filtros de fecha
         if fecha_desde:
@@ -146,9 +152,16 @@ def facturacion():
         
         facturas = query.order_by(Factura.fecha_creacion.desc()).all()
         
-        # Obtener estados únicos de facturas para el filtro
-        estados = db.session.query(Factura.estado).distinct().all()
-        estados_list = [estado[0] for estado in estados if estado[0]]
+        # Obtener estados únicos de estado_cobro de facturas para el filtro
+        # Siempre incluir los tres estados posibles, incluso si no hay facturas con ese estado
+        estados_bd = db.session.query(Factura.estado_cobro).distinct().all()
+        estados_existentes = [estado[0] for estado in estados_bd if estado[0]]
+        
+        # Estados posibles de cobro
+        estados_posibles = ['pendiente', 'cobrada_parcialmente', 'cobrada']
+        
+        # Combinar estados existentes con estados posibles, eliminando duplicados y ordenando
+        estados_list = sorted(list(set(estados_existentes + estados_posibles)))
     
     return render_template('facturacion.html', 
                          prefacturas=prefacturas, 
@@ -2231,4 +2244,70 @@ def procesar_facturacion_albaranes():
         import traceback
         traceback.print_exc()
         return redirect(url_for('facturacion.facturar_albaranes'))
+
+@facturacion_bp.route('/facturacion/procesar-cobro-factura', methods=['POST'])
+@login_required
+@not_usuario_required
+def procesar_cobro_factura():
+    """Procesar el cobro de una factura (completa o parcial)"""
+    try:
+        factura_id = request.form.get('factura_id')
+        tipo_cobro = request.form.get('tipo_cobro')  # 'completa' o 'parcial'
+        
+        if not factura_id:
+            return jsonify({'success': False, 'error': 'ID de factura no proporcionado'}), 400
+        
+        factura = Factura.query.get_or_404(int(factura_id))
+        
+        if tipo_cobro == 'completa':
+            # Cobrar completa: importe_pagado = importe_total, estado_cobro = 'cobrada'
+            factura.importe_pagado = factura.importe_total
+            factura.estado_cobro = 'cobrada'
+        elif tipo_cobro == 'parcial':
+            # Cobrar parcialmente: sumar importe_parcial a importe_pagado
+            importe_parcial = request.form.get('importe_parcial')
+            if not importe_parcial:
+                return jsonify({'success': False, 'error': 'Importe parcial no proporcionado'}), 400
+            
+            try:
+                importe_parcial_decimal = Decimal(str(importe_parcial))
+                importe_total_decimal = Decimal(str(factura.importe_total))
+                importe_pagado_actual = Decimal(str(factura.importe_pagado)) if factura.importe_pagado else Decimal('0')
+                importe_pendiente = importe_total_decimal - importe_pagado_actual
+                
+                # Validar que el importe parcial no sea mayor que el pendiente
+                if importe_parcial_decimal > importe_pendiente:
+                    return jsonify({'success': False, 'error': 'El importe a cobrar no puede ser mayor que el importe pendiente'}), 400
+                
+                if importe_parcial_decimal <= 0:
+                    return jsonify({'success': False, 'error': 'El importe a cobrar debe ser mayor que 0'}), 400
+                
+                # Actualizar importe_pagado
+                nuevo_importe_pagado = importe_pagado_actual + importe_parcial_decimal
+                factura.importe_pagado = nuevo_importe_pagado
+                
+                # Si ya se ha pagado todo, marcar como cobrada, sino cobrada_parcialmente
+                if nuevo_importe_pagado >= importe_total_decimal:
+                    factura.estado_cobro = 'cobrada'
+                    factura.importe_pagado = importe_total_decimal  # Asegurar que no exceda el total
+                else:
+                    factura.estado_cobro = 'cobrada_parcialmente'
+                    
+            except (ValueError, TypeError) as e:
+                return jsonify({'success': False, 'error': f'Importe inválido: {str(e)}'}), 400
+        else:
+            return jsonify({'success': False, 'error': 'Tipo de cobro no válido'}), 400
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Cobro procesado correctamente. Estado: {factura.estado_cobro}'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Error al procesar el cobro: {str(e)}'}), 500
 

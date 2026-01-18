@@ -23,8 +23,7 @@ h2::after {
 <div style="margin-bottom: 15px;">
     <div class="filtros-container" style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); padding: 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #e9ecef;">
         <form method="GET" action="{{ url_for('facturacion.facturacion') }}" id="filtros-form" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
-            <!-- Mantener otros filtros al cambiar tipo -->
-            {% if estado_filtro %}<input type="hidden" name="estado" value="{{ estado_filtro }}">{% endif %}
+            <!-- Mantener otros filtros al cambiar tipo (no incluir estado porque viene del select) -->
             {% if fecha_desde %}<input type="hidden" name="fecha_desde" value="{{ fecha_desde }}">{% endif %}
             {% if fecha_hasta %}<input type="hidden" name="fecha_hasta" value="{{ fecha_hasta }}">{% endif %}
             
@@ -54,7 +53,13 @@ h2::after {
                 <select name="estado" id="estado" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
                     <option value="">Todos los estados</option>
                     {% for estado in estados %}
-                    <option value="{{ estado }}" {% if estado_filtro == estado %}selected{% endif %}>{{ estado }}</option>
+                    <option value="{{ estado }}" {% if estado_filtro == estado %}selected{% endif %}>
+                        {% if estado == 'pendiente' %}Pendiente
+                        {% elif estado == 'cobrada_parcialmente' %}Cobrada Parcialmente
+                        {% elif estado == 'cobrada' %}Cobrada
+                        {% else %}{{ estado.replace('_', ' ')|title }}
+                        {% endif %}
+                    </option>
                     {% endfor %}
                 </select>
             </div>
@@ -239,7 +244,7 @@ function cambiarTipoVista(tipo) {
                 <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Base Imponible</th>
                 <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">IVA</th>
                 <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Importe Total</th>
-                <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Estado</th>
+                <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Estado Cobro</th>
                 <th style="padding: 15px; text-align: center; color: #ffffff; font-weight: 600;">Acciones</th>
             </tr>
         </thead>
@@ -247,6 +252,8 @@ function cambiarTipoVista(tipo) {
             {% for factura in facturas %}
             {% set tipo_iva_val = factura.tipo_iva|float if factura.tipo_iva else 21.0 %}
             {% set importe_total_val = factura.importe_total|float %}
+            {% set importe_pagado_val = factura.importe_pagado|float if factura.importe_pagado else 0.0 %}
+            {% set importe_pendiente_val = importe_total_val - importe_pagado_val %}
             {% set descuento_pronto_pago_val = factura.descuento_pronto_pago|float if factura.descuento_pronto_pago else 0.0 %}
             {% if descuento_pronto_pago_val > 0 %}
                 {# Si hay descuento por pronto pago, el importe_total ya lo tiene aplicado #}
@@ -283,9 +290,15 @@ function cambiarTipoVista(tipo) {
                     {{ "%.2f"|format(importe_total_val) }} €
                 </td>
                 <td style="padding: 15px;">
-                    <span class="badge badge-estado-{{ factura.estado.lower()|replace(' ', '-')|replace('ó', 'o')|replace('í', 'i')|replace('é', 'e') }}">
-                        {{ factura.estado }}
+                    {% set estado_cobro_val = factura.estado_cobro if factura.estado_cobro else 'pendiente' %}
+                    <span class="badge badge-estado-{{ estado_cobro_val.lower()|replace(' ', '-')|replace('ó', 'o')|replace('í', 'i')|replace('é', 'e') }}">
+                        {{ estado_cobro_val|replace('_', ' ')|title }}
                     </span>
+                    {% if estado_cobro_val == 'cobrada_parcialmente' %}
+                        <div style="font-size: 0.75rem; color: #666; margin-top: 4px;">
+                            Pagado: {{ "%.2f"|format(importe_pagado_val) }} € / Pendiente: {{ "%.2f"|format(importe_pendiente_val) }} €
+                        </div>
+                    {% endif %}
                 </td>
                 <td style="padding: 15px; text-align: center;">
                     <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
@@ -320,6 +333,14 @@ function cambiarTipoVista(tipo) {
                        target="_blank">
                         📋 Albarán
                     </a>
+                    {% if estado_cobro_val != 'cobrada' %}
+                        <button type="button" 
+                                class="btn btn-primary" 
+                                onclick="abrirModalCobrar({{ factura.id }}, '{{ factura.serie }}', '{{ factura.numero }}', {{ importe_total_val }}, {{ importe_pagado_val }}, {{ importe_pendiente_val }})"
+                                style="padding: 4px 8px; font-size: 0.75rem; white-space: nowrap; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            💰 Cobrar
+                        </button>
+                    {% endif %}
                     </div>
                 </td>
             </tr>
@@ -333,6 +354,170 @@ function cambiarTipoVista(tipo) {
 </div>
 {% endif %}
 {% endif %}
+
+<!-- Modal para cobrar factura -->
+<div id="modalCobrar" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);">
+    <div style="background-color: #fefefe; margin: 10% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 500px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e9ecef; padding-bottom: 10px;">
+            <h3 style="margin: 0; color: #212529;">Cobrar Factura</h3>
+            <span id="cerrarModalCobrar" style="color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; line-height: 20px;">&times;</span>
+        </div>
+        
+        <div id="infoFactura" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+            <p style="margin: 5px 0;"><strong>Factura:</strong> <span id="modalSerieNumero"></span></p>
+            <p style="margin: 5px 0;"><strong>Importe Total:</strong> <span id="modalImporteTotal"></span> €</p>
+            <p style="margin: 5px 0;"><strong>Ya Pagado:</strong> <span id="modalImportePagado"></span> €</p>
+            <p style="margin: 5px 0;"><strong>Pendiente:</strong> <span id="modalImportePendiente"></span> €</p>
+        </div>
+        
+        <form id="formCobrar" onsubmit="procesarCobro(event)">
+            <input type="hidden" id="facturaIdCobrar" name="factura_id">
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #495057;">Tipo de cobro:</label>
+                <div style="display: flex; gap: 15px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="radio" name="tipo_cobro" value="completa" checked onchange="toggleImporteParcial(false)" style="margin-right: 8px;">
+                        <span>Cobrar Completa</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="radio" name="tipo_cobro" value="parcial" onchange="toggleImporteParcial(true)" style="margin-right: 8px;">
+                        <span>Cobrar Parcialmente</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div id="divImporteParcial" style="display: none; margin-bottom: 20px;">
+                <label for="importeParcial" style="display: block; margin-bottom: 8px; font-weight: 600; color: #495057;">Importe a cobrar:</label>
+                <input type="number" 
+                       id="importeParcial" 
+                       name="importe_parcial" 
+                       step="0.01" 
+                       min="0.01" 
+                       required
+                       style="width: 100%; padding: 8px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 1rem;">
+                <small style="color: #6c757d; display: block; margin-top: 5px;">Máximo: <span id="maxImporteParcial"></span> €</small>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 25px; padding-top: 15px; border-top: 2px solid #e9ecef;">
+                <button type="button" 
+                        onclick="cerrarModalCobrar()" 
+                        style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                    Cancelar
+                </button>
+                <button type="submit" 
+                        style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                    Confirmar Cobro
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let facturaActualCobrar = null;
+
+function abrirModalCobrar(facturaId, serie, numero, importeTotal, importePagado, importePendiente) {
+    facturaActualCobrar = {
+        id: facturaId,
+        serie: serie,
+        numero: numero,
+        importeTotal: importeTotal,
+        importePagado: importePagado,
+        importePendiente: importePendiente
+    };
+    
+    document.getElementById('facturaIdCobrar').value = facturaId;
+    document.getElementById('modalSerieNumero').textContent = serie + '-' + numero;
+    document.getElementById('modalImporteTotal').textContent = importeTotal.toFixed(2);
+    document.getElementById('modalImportePagado').textContent = importePagado.toFixed(2);
+    document.getElementById('modalImportePendiente').textContent = importePendiente.toFixed(2);
+    document.getElementById('maxImporteParcial').textContent = importePendiente.toFixed(2);
+    
+    // Resetear formulario
+    document.querySelector('input[name="tipo_cobro"][value="completa"]').checked = true;
+    toggleImporteParcial(false);
+    document.getElementById('importeParcial').value = '';
+    
+    document.getElementById('modalCobrar').style.display = 'block';
+}
+
+function cerrarModalCobrar() {
+    document.getElementById('modalCobrar').style.display = 'none';
+    facturaActualCobrar = null;
+}
+
+function toggleImporteParcial(mostrar) {
+    const divImporteParcial = document.getElementById('divImporteParcial');
+    const inputImporte = document.getElementById('importeParcial');
+    
+    if (mostrar) {
+        divImporteParcial.style.display = 'block';
+        inputImporte.required = true;
+        inputImporte.max = facturaActualCobrar ? facturaActualCobrar.importePendiente : 0;
+    } else {
+        divImporteParcial.style.display = 'none';
+        inputImporte.required = false;
+        inputImporte.value = '';
+    }
+}
+
+function procesarCobro(event) {
+    event.preventDefault();
+    
+    const facturaId = document.getElementById('facturaIdCobrar').value;
+    const tipoCobro = document.querySelector('input[name="tipo_cobro"]:checked').value;
+    const importeParcial = tipoCobro === 'parcial' ? parseFloat(document.getElementById('importeParcial').value) : null;
+    
+    if (tipoCobro === 'parcial' && (!importeParcial || importeParcial <= 0)) {
+        alert('Por favor, introduce un importe válido');
+        return;
+    }
+    
+    if (tipoCobro === 'parcial' && importeParcial > facturaActualCobrar.importePendiente) {
+        alert('El importe a cobrar no puede ser mayor que el importe pendiente');
+        return;
+    }
+    
+    // Realizar petición AJAX
+    const formData = new FormData();
+    formData.append('factura_id', facturaId);
+    formData.append('tipo_cobro', tipoCobro);
+    if (tipoCobro === 'parcial') {
+        formData.append('importe_parcial', importeParcial);
+    }
+    
+    fetch('{{ url_for("facturacion.procesar_cobro_factura") }}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            cerrarModalCobrar();
+            // Recargar la página para mostrar los cambios
+            window.location.reload();
+        } else {
+            alert('Error al procesar el cobro: ' + (data.error || 'Error desconocido'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al procesar el cobro');
+    });
+}
+
+// Cerrar modal al hacer clic fuera de él
+window.onclick = function(event) {
+    const modal = document.getElementById('modalCobrar');
+    if (event.target == modal) {
+        cerrarModalCobrar();
+    }
+}
+
+// Cerrar modal con la X
+document.getElementById('cerrarModalCobrar').onclick = cerrarModalCobrar;
+</script>
 
 <style>
 .filtro-input:hover {

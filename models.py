@@ -490,8 +490,12 @@ class Factura(db.Model):
     tipo_iva = db.Column(db.Numeric(5, 2), nullable=False, default=21.00)  # Porcentaje de IVA (21%, 10%, 4%, 0%)
     
     # Estado y huella de Verifactu
-    estado = db.Column(db.String(50), nullable=False, default='pendiente')  # pendiente, enviado, confirmado, error
+    estado = db.Column(db.String(50), nullable=False, default='pendiente')  # pendiente, enviado, confirmado, error (estado Verifactu)
     huella_verifactu = db.Column(db.Text)  # Respuesta de la API Verifactu
+    
+    # Estado de cobro de la factura
+    estado_cobro = db.Column(db.String(50), nullable=False, default='pendiente')  # pendiente, cobrada_parcialmente, cobrada
+    importe_pagado = db.Column(db.Numeric(10, 2), nullable=False, default=0)  # Importe que se ha pagado de la factura
     
     # Timestamp
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
