@@ -578,14 +578,6 @@ function limpiarDatosGuardadosCliente(storageKey) {
     localStorage.removeItem(storageKey);
 }
 
-// Cerrar modal al hacer clic fuera de él
-window.onclick = function(event) {
-    const modal = document.getElementById('modalCrearCliente');
-    if (event.target == modal) {
-        cerrarModalCrear();
-    }
-}
-
 // Cerrar modal con ESC
 document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
