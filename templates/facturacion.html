@@ -100,16 +100,34 @@ function cambiarTipoVista(tipo) {
 </script>
 
 <!-- BOTONES PARA CREAR FACTURA DIRECTA Y NUEVO ALBARÁN -->
-<div style="margin-bottom: 20px; text-align: right; display: flex; gap: 10px; justify-content: flex-end;">
-    <a href="{{ url_for('facturacion.nueva_factura') }}" class="btn btn-success" style="padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(40,167,69,0.3); transition: all 0.3s ease;">
-        ➕ Crear Factura Directa
-    </a>
-    <a href="{{ url_for('facturacion.nuevo_albaran') }}" class="btn btn-primary" style="padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
-        📄 Nuevo Albarán
-    </a>
-    <a href="{{ url_for('facturacion.facturar_albaranes') }}" class="btn btn-warning" style="padding: 10px 20px; background: #ffc107; color: #212529; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(255,193,7,0.3); transition: all 0.3s ease;">
-        🧾 Facturar Albaranes
-    </a>
+<div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+    <div id="totales-filtro" style="padding: 10px 20px; background: #f8f9fa; border-radius: 6px; border: 2px solid #28a745; flex: 1; min-width: 300px;">
+        <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+            <div style="font-weight: 600; color: #212529;">
+                <span style="color: #666; font-size: 0.9rem;">Total:</span>
+                <span id="total-total" style="font-size: 1.1rem; color: #212529; margin-left: 5px;">0.00 €</span>
+            </div>
+            <div style="font-weight: 600; color: #28a745;">
+                <span style="color: #666; font-size: 0.9rem;">Cobrado:</span>
+                <span id="total-cobrado" style="font-size: 1.1rem; color: #28a745; margin-left: 5px;">0.00 €</span>
+            </div>
+            <div style="font-weight: 600; color: #dc3545;">
+                <span style="color: #666; font-size: 0.9rem;">Pendiente:</span>
+                <span id="total-pendiente" style="font-size: 1.1rem; color: #dc3545; margin-left: 5px;">0.00 €</span>
+            </div>
+        </div>
+    </div>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="{{ url_for('facturacion.nueva_factura') }}" class="btn btn-success" style="padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(40,167,69,0.3); transition: all 0.3s ease;">
+            ➕ Crear Factura Directa
+        </a>
+        <a href="{{ url_for('facturacion.nuevo_albaran') }}" class="btn btn-primary" style="padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
+            📄 Nuevo Albarán
+        </a>
+        <a href="{{ url_for('facturacion.facturar_albaranes') }}" class="btn btn-warning" style="padding: 10px 20px; background: #ffc107; color: #212529; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(255,193,7,0.3); transition: all 0.3s ease;">
+            🧾 Facturar Albaranes
+        </a>
+    </div>
 </div>
 
 <!-- SECCIÓN DE PREFACTURAS (Pendientes de formalizar) -->
@@ -238,6 +256,9 @@ function cambiarTipoVista(tipo) {
     <table style="width: 100%; border-collapse: collapse;">
         <thead>
             <tr style="background: linear-gradient(135deg, #27ae60 0%, #229954 100%); border-bottom: 2px solid #1e8449;">
+                <th style="padding: 15px; text-align: center; color: #ffffff; font-weight: 600; width: 40px;">
+                    <input type="checkbox" id="selectAllFacturas" onchange="toggleAllFacturas(this)" style="cursor: pointer;">
+                </th>
                 <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Serie-Nº</th>
                 <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Cliente</th>
                 <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Fecha Expedición</th>
@@ -268,7 +289,10 @@ function cambiarTipoVista(tipo) {
                 {% set base_imponible = importe_total_val / (1 + tipo_iva_val / 100) %}
                 {% set importe_iva = importe_total_val - base_imponible %}
             {% endif %}
-            <tr class="factura-row" style="border-bottom: 1px solid #e9ecef; transition: all 0.3s ease;">
+            <tr class="factura-row" style="border-bottom: 1px solid #e9ecef; transition: all 0.3s ease;" data-importe-total="{{ importe_total_val }}" data-importe-pagado="{{ importe_pagado_val }}" data-importe-pendiente="{{ importe_pendiente_val }}">
+                <td style="padding: 15px; text-align: center;">
+                    <input type="checkbox" class="factura-checkbox" onchange="actualizarTotalesSeleccion()" value="{{ factura.id }}" style="cursor: pointer;">
+                </td>
                 <td style="padding: 15px; color: #212529; font-weight: 600;">{{ factura.serie }}-{{ factura.numero }}</td>
                 <td style="padding: 15px; color: #212529; font-weight: 500;">
                     {{ factura.nombre }}
@@ -517,6 +541,52 @@ window.onclick = function(event) {
 
 // Cerrar modal con la X
 document.getElementById('cerrarModalCobrar').onclick = cerrarModalCobrar;
+
+// Funciones para selección de facturas y cálculo de totales
+function toggleAllFacturas(checkbox) {
+    const checkboxes = document.querySelectorAll('.factura-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+    actualizarTotalesFiltro();
+}
+
+function actualizarTotalesFiltro() {
+    // Calcular totales de todas las facturas visibles en la tabla (según el filtro)
+    const rows = document.querySelectorAll('.factura-row');
+    
+    let totalTotal = 0;
+    let totalCobrado = 0;
+    let totalPendiente = 0;
+    
+    rows.forEach(row => {
+        const importeTotal = parseFloat(row.getAttribute('data-importe-total')) || 0;
+        const importePagado = parseFloat(row.getAttribute('data-importe-pagado')) || 0;
+        const importePendiente = parseFloat(row.getAttribute('data-importe-pendiente')) || 0;
+        
+        totalTotal += importeTotal;
+        totalCobrado += importePagado;
+        totalPendiente += importePendiente;
+    });
+    
+    document.getElementById('total-total').textContent = totalTotal.toFixed(2) + ' €';
+    document.getElementById('total-cobrado').textContent = totalCobrado.toFixed(2) + ' €';
+    document.getElementById('total-pendiente').textContent = totalPendiente.toFixed(2) + ' €';
+    
+    // Actualizar el checkbox de "seleccionar todos" si existe
+    const selectAllCheckbox = document.getElementById('selectAllFacturas');
+    if (selectAllCheckbox) {
+        const allCheckboxes = document.querySelectorAll('.factura-checkbox');
+        const checkedCount = document.querySelectorAll('.factura-checkbox:checked').length;
+        selectAllCheckbox.checked = checkedCount === allCheckboxes.length && allCheckboxes.length > 0;
+        selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < allCheckboxes.length;
+    }
+}
+
+// Calcular totales al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    actualizarTotalesFiltro();
+});
 </script>
 
 <style>

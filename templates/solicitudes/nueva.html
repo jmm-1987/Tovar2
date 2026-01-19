@@ -782,6 +782,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // Funciones para el modal de crear cliente
 const STORAGE_KEY_CLIENTE_PRESUPUESTO = 'cliente_presupuesto_draft';
+let contadorDireccionesClienteModal = 0;
+let contadorPersonasContactoClienteModal = 0;
 
 function abrirModalCrearCliente() {
     const modal = document.getElementById('modalCrearClientePresupuesto');
@@ -841,65 +843,7 @@ function limpiarDatosGuardados(storageKey) {
     localStorage.removeItem(storageKey);
 }
 
-// Manejar el envío del formulario de crear cliente
-document.getElementById('formCrearClientePresupuesto').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(this);
-    const submitBtn = this.querySelector('button[type="submit"]');
-    const originalText = submitBtn.textContent;
-    
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Creando...';
-    
-    fetch('{{ url_for("solicitudes.crear_cliente_ajax") }}', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Agregar el nuevo cliente al select
-            const clienteSelect = document.getElementById('cliente_id');
-            const newOption = document.createElement('option');
-            newOption.value = data.cliente.id;
-            newOption.textContent = data.cliente.nombre;
-            newOption.setAttribute('data-nombre', data.cliente.nombre.toLowerCase());
-            clienteSelect.appendChild(newOption);
-            
-            // Seleccionar el nuevo cliente
-            selectCliente(data.cliente.id, data.cliente.nombre);
-            
-            // Limpiar datos guardados
-            limpiarDatosGuardados(STORAGE_KEY_CLIENTE_PRESUPUESTO);
-            
-            // Cerrar modal y limpiar formulario
-            document.getElementById('modalCrearClientePresupuesto').style.display = 'none';
-            document.getElementById('formCrearClientePresupuesto').reset();
-            
-            alert('Cliente creado correctamente');
-        } else {
-            alert('Error al crear cliente: ' + data.error);
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalText;
-        }
-    })
-    .catch(error => {
-        alert('Error al crear cliente: ' + error);
-        submitBtn.disabled = false;
-        submitBtn.textContent = originalText;
-    });
-});
-
-// Cerrar modal al hacer clic fuera
-window.onclick = function(event) {
-    const modal = document.getElementById('modalCrearClientePresupuesto');
-    if (event.target == modal) {
-        cerrarModalCrearClientePresupuesto();
-    }
-}
-
-// Guardar datos automáticamente mientras el usuario escribe
+// Guardar datos automáticamente mientras el usuario escribe y manejar el envío del formulario
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('formCrearClientePresupuesto');
     if (form) {
@@ -910,18 +854,193 @@ document.addEventListener('DOMContentLoaded', function() {
         form.addEventListener('change', function() {
             guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
         });
+        
+        // Manejar el envío del formulario de crear cliente
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creando...';
+            
+            fetch('{{ url_for("solicitudes.crear_cliente_ajax") }}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Agregar el nuevo cliente al select
+                    const clienteSelect = document.getElementById('cliente_id');
+                    const newOption = document.createElement('option');
+                    newOption.value = data.cliente.id;
+                    newOption.textContent = data.cliente.nombre;
+                    newOption.setAttribute('data-nombre', data.cliente.nombre.toLowerCase());
+                    clienteSelect.appendChild(newOption);
+                    
+                    // Seleccionar el nuevo cliente
+                    selectCliente(data.cliente.id, data.cliente.nombre);
+                    
+                    // Limpiar datos guardados
+                    limpiarDatosGuardados(STORAGE_KEY_CLIENTE_PRESUPUESTO);
+                    
+                    // Cerrar modal y limpiar formulario
+                    document.getElementById('modalCrearClientePresupuesto').style.display = 'none';
+                    document.getElementById('formCrearClientePresupuesto').reset();
+                    
+                    alert('Cliente creado correctamente');
+                } else {
+                    alert('Error al crear cliente: ' + data.error);
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+            })
+            .catch(error => {
+                alert('Error al crear cliente: ' + error);
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            });
+        });
     }
 });
+
+// Cerrar modal al hacer clic fuera
+window.onclick = function(event) {
+    const modal = document.getElementById('modalCrearClientePresupuesto');
+    if (event.target == modal) {
+        cerrarModalCrearClientePresupuesto();
+    }
+}
+
+function añadirPersonaContactoClienteModal() {
+    const container = document.getElementById('personas-contacto-container-cliente-modal');
+    const index = contadorPersonasContactoClienteModal++;
+    
+    const personaDiv = document.createElement('div');
+    personaDiv.className = 'persona-contacto-item';
+    personaDiv.style.cssText = 'border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 5px; background: #f9f9f9;';
+    personaDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h5 style="margin: 0; font-size: 14px; color: #555;">Persona de Contacto ${index + 1}</h5>
+            <button type="button" class="btn btn-sm btn-danger" onclick="eliminarPersonaContactoClienteModal(this)" style="padding: 4px 8px; font-size: 12px;">✕ Eliminar</button>
+        </div>
+        <input type="hidden" name="personas_contacto[]" value="1">
+        <div class="form-group" style="margin-bottom: 10px;">
+            <label>Nombre *</label>
+            <input type="text" name="personas_contacto_nombre_${index}" required placeholder="Nombre completo" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div class="form-group">
+                <label>Cargo</label>
+                <input type="text" name="personas_contacto_cargo_${index}" placeholder="Cargo o puesto" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div class="form-group">
+                <label>Móvil</label>
+                <input type="text" name="personas_contacto_movil_${index}" placeholder="Teléfono móvil" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" name="personas_contacto_email_${index}" placeholder="email@ejemplo.com" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+    `;
+    
+    container.appendChild(personaDiv);
+    
+    // Agregar event listeners para guardar automáticamente
+    personaDiv.querySelectorAll('input').forEach(input => {
+        input.addEventListener('input', function() {
+            const form = document.getElementById('formCrearClientePresupuesto');
+            if (form) guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+        });
+        input.addEventListener('change', function() {
+            const form = document.getElementById('formCrearClientePresupuesto');
+            if (form) guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+        });
+    });
+}
+
+function eliminarPersonaContactoClienteModal(button) {
+    button.closest('.persona-contacto-item').remove();
+    // Guardar después de eliminar
+    const form = document.getElementById('formCrearClientePresupuesto');
+    if (form) guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+}
+
+function añadirDireccionEnvioClienteModal() {
+    const container = document.getElementById('direcciones-envio-container-cliente-modal');
+    const index = contadorDireccionesClienteModal++;
+    
+    const direccionDiv = document.createElement('div');
+    direccionDiv.className = 'direccion-envio-item';
+    direccionDiv.style.cssText = 'border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 5px; background: #f9f9f9;';
+    direccionDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h5 style="margin: 0; font-size: 14px; color: #555;">Dirección Envío ${index + 2}</h5>
+            <button type="button" class="btn btn-sm btn-danger" onclick="eliminarDireccionEnvioClienteModal(this)" style="padding: 4px 8px; font-size: 12px;">✕ Eliminar</button>
+        </div>
+        <input type="hidden" name="direcciones_envio[]" value="1">
+        <input type="hidden" name="direcciones_envio_nombre_${index}" value="Dirección envío ${index + 2}">
+        <div class="form-group" style="margin-bottom: 10px;">
+            <label>Dirección</label>
+            <textarea name="direcciones_envio_direccion_${index}" rows="2" placeholder="Dirección completa" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div class="form-group">
+                <label>Población</label>
+                <input type="text" name="direcciones_envio_poblacion_${index}" placeholder="Ciudad" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div class="form-group">
+                <label>Provincia</label>
+                <input type="text" name="direcciones_envio_provincia_${index}" placeholder="Provincia" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+                <label>Código Postal</label>
+                <input type="text" name="direcciones_envio_codigo_postal_${index}" placeholder="28001" maxlength="10" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div class="form-group">
+                <label>País</label>
+                <input type="text" name="direcciones_envio_pais_${index}" placeholder="España" value="España" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(direccionDiv);
+    
+    // Agregar event listeners para guardar automáticamente
+    direccionDiv.querySelectorAll('input, textarea').forEach(input => {
+        input.addEventListener('input', function() {
+            const form = document.getElementById('formCrearClientePresupuesto');
+            if (form) guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+        });
+        input.addEventListener('change', function() {
+            const form = document.getElementById('formCrearClientePresupuesto');
+            if (form) guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+        });
+    });
+}
+
+function eliminarDireccionEnvioClienteModal(button) {
+    button.closest('.direccion-envio-item').remove();
+    // Guardar después de eliminar
+    const form = document.getElementById('formCrearClientePresupuesto');
+    if (form) guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+}
 </script>
 
 <!-- Modal para crear cliente desde presupuesto -->
 <div id="modalCrearClientePresupuesto" class="modal" style="display: none;">
-    <div class="modal-content" style="max-width: 700px;">
+    <div class="modal-content">
         <div class="modal-header">
             <h3>Crear Nuevo Cliente</h3>
             <span class="close" onclick="cerrarModalCrearClientePresupuesto()">&times;</span>
         </div>
-        <form id="formCrearClientePresupuesto" class="modal-form">
+        <form id="formCrearClientePresupuesto" class="modal-form" oninput="guardarDatosFormulario(this, STORAGE_KEY_CLIENTE_PRESUPUESTO)">
             <div class="form-section">
                 <h4>Información Principal</h4>
                 <div class="form-row">
@@ -944,57 +1063,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         <input type="date" name="fecha_alta" id="fecha_alta_cliente_modal">
                     </div>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="categoria_cliente_modal">Categoría</label>
-                        <select name="categoria" id="categoria_cliente_modal">
-                            <option value="">Sin categoría</option>
-                            <option value="hosteleria">Hostelería</option>
-                            <option value="clinica">Clínica</option>
-                            <option value="colegio">Colegio</option>
-                            <option value="emerita">Emerita</option>
-                            <option value="carnaval">Carnaval</option>
-                            <option value="transporte">Transporte</option>
-                            <option value="varios">Varios</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="comercial_id_cliente_modal">Comercial Asignado</label>
-                        <select name="comercial_id" id="comercial_id_cliente_modal">
-                            <option value="">Sin comercial asignado</option>
-                            {% for comercial in comerciales %}
-                            <option value="{{ comercial.id }}">{{ comercial.nombre }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
             </div>
 
             <div class="form-section">
-                <h4>Contacto</h4>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="telefono_cliente_modal">Teléfono</label>
-                        <input type="text" name="telefono" id="telefono_cliente_modal" placeholder="Teléfono fijo">
-                    </div>
-                    <div class="form-group">
-                        <label for="movil_cliente_modal">Móvil</label>
-                        <input type="text" name="movil" id="movil_cliente_modal" placeholder="Teléfono móvil">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="email_cliente_modal">Email</label>
-                    <input type="email" name="email" id="email_cliente_modal" placeholder="email@ejemplo.com">
-                </div>
-                <div class="form-group">
-                </div>
-            </div>
-
-            <div class="form-section">
-                <h4>Dirección</h4>
+                <h4>Dirección Fiscal</h4>
                 <div class="form-group">
                     <label for="direccion_cliente_modal">Dirección</label>
-                    <input type="text" name="direccion" id="direccion_cliente_modal" placeholder="Dirección completa">
+                    <input type="text" name="direccion" id="direccion_cliente_modal" placeholder="Calle y número">
                 </div>
                 <div class="form-row">
                     <div class="form-group">
@@ -1016,6 +1091,80 @@ document.addEventListener('DOMContentLoaded', function() {
                         <input type="text" name="pais" id="pais_cliente_modal" placeholder="España" value="España">
                     </div>
                 </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Información Adicional</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="categoria_id_cliente_modal">Categoría</label>
+                        <select name="categoria_id" id="categoria_id_cliente_modal">
+                            <option value="">Sin categoría</option>
+                            {% for categoria in categorias %}
+                            <option value="{{ categoria.id }}">{{ categoria.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="comercial_id_cliente_modal">Comercial Asignado</label>
+                        <select name="comercial_id" id="comercial_id_cliente_modal">
+                            <option value="">Sin comercial asignado</option>
+                            {% for comercial in comerciales %}
+                            <option value="{{ comercial.id }}">{{ comercial.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="numero_cuenta_cliente_modal">Número de Cuenta</label>
+                    <input type="text" name="numero_cuenta" id="numero_cuenta_cliente_modal" placeholder="ES24-3456-3456-3456-3456-3456" maxlength="29">
+                    <small style="color: #666; font-size: 11px;">Formato: ES seguido de 22 dígitos (ESXX-XXXX-XXXX-XXXX-XXXX-XXXX). Opcional.</small>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Contacto</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="telefono_cliente_modal">Teléfono</label>
+                        <input type="text" name="telefono" id="telefono_cliente_modal" placeholder="Teléfono fijo">
+                    </div>
+                    <div class="form-group">
+                        <label for="movil_cliente_modal">Móvil</label>
+                        <input type="text" name="movil" id="movil_cliente_modal" placeholder="Teléfono móvil">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="email_general_cliente_modal">Email General</label>
+                        <input type="email" name="email_general" id="email_general_cliente_modal" placeholder="email@ejemplo.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="email_comunicaciones_cliente_modal">Email Comunicaciones</label>
+                        <input type="email" name="email_comunicaciones" id="email_comunicaciones_cliente_modal" placeholder="email@ejemplo.com">
+                        <small style="color: #666; font-size: 11px;">Para avisos de estados</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Direcciones de Envío Alternativas</h4>
+                <div id="direcciones-envio-container-cliente-modal">
+                    <!-- Las direcciones se añadirán dinámicamente aquí -->
+                </div>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="añadirDireccionEnvioClienteModal()" style="margin-top: 10px;">
+                    ➕ Añadir Dirección de Envío
+                </button>
+            </div>
+
+            <div class="form-section">
+                <h4>Personas de Contacto</h4>
+                <div id="personas-contacto-container-cliente-modal">
+                    <!-- Las personas de contacto se añadirán dinámicamente aquí -->
+                </div>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="añadirPersonaContactoClienteModal()" style="margin-top: 10px;">
+                    ➕ Añadir Persona de Contacto
+                </button>
             </div>
 
             <div class="form-section">

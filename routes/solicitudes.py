@@ -7,7 +7,7 @@ import os
 import tempfile
 from io import BytesIO
 from extensions import db
-from models import Comercial, Cliente, Prenda, Presupuesto, LineaPresupuesto, Usuario, RegistroEstadoSolicitud
+from models import Comercial, Cliente, Prenda, Presupuesto, LineaPresupuesto, Usuario, RegistroEstadoSolicitud, CategoriaCliente, DireccionEnvio, PersonaContacto
 from sqlalchemy.orm import joinedload
 from flask import jsonify
 from playwright.sync_api import sync_playwright
@@ -402,11 +402,13 @@ def nueva_solicitud():
     clientes = Cliente.query.order_by(Cliente.nombre).all()
     comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
     prendas = Prenda.query.order_by(Prenda.nombre).all()
+    categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
     
     return render_template('solicitudes/nueva.html',
                          clientes=clientes,
                          comerciales=comerciales,
-                         prendas=prendas)
+                         prendas=prendas,
+                         categorias=categorias)
 
 @solicitudes_bp.route('/solicitudes/<int:solicitud_id>')
 @login_required
@@ -846,6 +848,9 @@ def crear_cliente_ajax():
         comercial_id = request.form.get('comercial_id', '').strip()
         comercial_id = int(comercial_id) if comercial_id else None
         
+        categoria_id = request.form.get('categoria_id', '').strip()
+        categoria_id = int(categoria_id) if categoria_id else None
+        
         cliente = Cliente(
             nombre=request.form.get('nombre'),
             alias=request.form.get('alias', ''),
@@ -857,8 +862,12 @@ def crear_cliente_ajax():
             pais=request.form.get('pais', 'España'),
             telefono=request.form.get('telefono', ''),
             movil=request.form.get('movil', ''),
-            email=request.form.get('email', ''),
+            email=request.form.get('email', ''),  # Mantener para compatibilidad
+            email_general=request.form.get('email_general', ''),
+            email_comunicaciones=request.form.get('email_comunicaciones', ''),
+            categoria_id=categoria_id,
             anotaciones=request.form.get('anotaciones', ''),
+            numero_cuenta=request.form.get('numero_cuenta', '').strip(),
             usuario_web=request.form.get('usuario_web', '').strip() or None,
             fecha_alta=fecha_alta,
             comercial_id=comercial_id
@@ -869,6 +878,52 @@ def crear_cliente_ajax():
             cliente.set_password(password_web)
         
         db.session.add(cliente)
+        db.session.flush()  # Para obtener el ID del cliente
+        
+        # Procesar direcciones de envío
+        direcciones_data = request.form.getlist('direcciones_envio[]')
+        if direcciones_data:
+            for i, dir_data in enumerate(direcciones_data):
+                if dir_data.strip():  # Si hay datos
+                    # Obtener los campos de la dirección
+                    nombre = request.form.get(f'direcciones_envio_nombre_{i}', f'Dirección envío {i+2}')
+                    direccion = request.form.get(f'direcciones_envio_direccion_{i}', '')
+                    poblacion = request.form.get(f'direcciones_envio_poblacion_{i}', '')
+                    provincia = request.form.get(f'direcciones_envio_provincia_{i}', '')
+                    codigo_postal = request.form.get(f'direcciones_envio_codigo_postal_{i}', '')
+                    pais = request.form.get(f'direcciones_envio_pais_{i}', 'España')
+                    
+                    direccion_envio = DireccionEnvio(
+                        cliente_id=cliente.id,
+                        nombre=nombre,
+                        direccion=direccion,
+                        poblacion=poblacion,
+                        provincia=provincia,
+                        codigo_postal=codigo_postal,
+                        pais=pais
+                    )
+                    db.session.add(direccion_envio)
+        
+        # Procesar personas de contacto
+        personas_data = request.form.getlist('personas_contacto[]')
+        if personas_data:
+            for i, persona_data in enumerate(personas_data):
+                if persona_data.strip():  # Si hay datos
+                    nombre = request.form.get(f'personas_contacto_nombre_{i}', '').strip()
+                    cargo = request.form.get(f'personas_contacto_cargo_{i}', '').strip()
+                    movil = request.form.get(f'personas_contacto_movil_{i}', '').strip()
+                    email = request.form.get(f'personas_contacto_email_{i}', '').strip()
+                    
+                    if nombre:  # Solo crear si tiene nombre
+                        persona_contacto = PersonaContacto(
+                            cliente_id=cliente.id,
+                            nombre=nombre,
+                            cargo=cargo,
+                            movil=movil,
+                            email=email
+                        )
+                        db.session.add(persona_contacto)
+        
         db.session.commit()
         
         return jsonify({
