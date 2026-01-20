@@ -49,10 +49,21 @@
                     </select>
                 </div>
             </div>
-            <div class="form-group">
-                <label for="numero_cuenta">Número de Cuenta</label>
-                <input type="text" name="numero_cuenta" id="numero_cuenta" value="{{ cliente.numero_cuenta or '' }}" placeholder="ES24-3456-3456-3456-3456-3456" maxlength="29">
-                <small style="color: #666; font-size: 12px;">Formato: ES seguido de 22 dígitos (ESXX-XXXX-XXXX-XXXX-XXXX-XXXX). Opcional.</small>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="numero_cuenta">Número de Cuenta</label>
+                    <input type="text" name="numero_cuenta" id="numero_cuenta" value="{{ cliente.numero_cuenta or '' }}" placeholder="ES24-3456-3456-3456-3456-3456" maxlength="29">
+                    <small style="color: #666; font-size: 12px;">Formato: ES seguido de 22 dígitos (ESXX-XXXX-XXXX-XXXX-XXXX-XXXX). Opcional.</small>
+                </div>
+                <div class="form-group">
+                    <label for="tipo_iva">Tipo de IVA (%) *</label>
+                    <select name="tipo_iva" id="tipo_iva" required>
+                        <option value="21" {% if not cliente.tipo_iva or cliente.tipo_iva == 21 %}selected{% endif %}>21%</option>
+                        <option value="10" {% if cliente.tipo_iva == 10 %}selected{% endif %}>10%</option>
+                        <option value="4" {% if cliente.tipo_iva == 4 %}selected{% endif %}>4%</option>
+                        <option value="0" {% if cliente.tipo_iva == 0 %}selected{% endif %}>0%</option>
+                    </select>
+                </div>
             </div>
         </div>
 

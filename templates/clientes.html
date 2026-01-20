@@ -162,10 +162,21 @@
                         </select>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label for="numero_cuenta">Número de Cuenta</label>
-                    <input type="text" name="numero_cuenta" id="numero_cuenta" placeholder="ES24-3456-3456-3456-3456-3456" maxlength="29">
-                    <small style="color: #666; font-size: 11px;">Formato: ES seguido de 22 dígitos (ESXX-XXXX-XXXX-XXXX-XXXX-XXXX). Opcional.</small>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="numero_cuenta">Número de Cuenta</label>
+                        <input type="text" name="numero_cuenta" id="numero_cuenta" placeholder="ES24-3456-3456-3456-3456-3456" maxlength="29">
+                        <small style="color: #666; font-size: 11px;">Formato: ES seguido de 22 dígitos (ESXX-XXXX-XXXX-XXXX-XXXX-XXXX). Opcional.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="tipo_iva">Tipo de IVA (%) *</label>
+                        <select name="tipo_iva" id="tipo_iva" required>
+                            <option value="21" selected>21%</option>
+                            <option value="10">10%</option>
+                            <option value="4">4%</option>
+                            <option value="0">0%</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 

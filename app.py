@@ -1333,6 +1333,17 @@ Saludos cordiales,
                         except Exception as e:
                             print(f"Error al agregar columna {columna} a clientes: {e}")
                             pass
+                
+                # Agregar columna tipo_iva si no existe
+                if 'tipo_iva' not in columns_clientes:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE clientes ADD COLUMN tipo_iva NUMERIC(5, 2) DEFAULT 21.00'))
+                            conn.commit()
+                            print("Migración: Columna tipo_iva agregada exitosamente a clientes")
+                    except Exception as e:
+                        print(f"Error al agregar columna tipo_iva a clientes: {e}")
+                        pass
             
             # Crear tabla categorias_cliente si no existe
             if 'categorias_cliente' not in table_names:

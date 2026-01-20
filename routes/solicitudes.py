@@ -1334,6 +1334,10 @@ def crear_cliente_ajax():
         categoria_id = request.form.get('categoria_id', '').strip()
         categoria_id = int(categoria_id) if categoria_id else None
         
+        # Procesar tipo de IVA
+        tipo_iva_str = request.form.get('tipo_iva', '21').strip()
+        tipo_iva = float(tipo_iva_str) if tipo_iva_str else 21.0
+        
         cliente = Cliente(
             nombre=request.form.get('nombre'),
             alias=request.form.get('alias', ''),
@@ -1353,7 +1357,8 @@ def crear_cliente_ajax():
             numero_cuenta=request.form.get('numero_cuenta', '').strip(),
             usuario_web=request.form.get('usuario_web', '').strip() or None,
             fecha_alta=fecha_alta,
-            comercial_id=comercial_id
+            comercial_id=comercial_id,
+            tipo_iva=tipo_iva
         )
         
         password_web = request.form.get('password_web', '').strip()
@@ -1413,7 +1418,8 @@ def crear_cliente_ajax():
             'success': True,
             'cliente': {
                 'id': cliente.id,
-                'nombre': cliente.nombre
+                'nombre': cliente.nombre,
+                'tipo_iva': float(cliente.tipo_iva) if cliente.tipo_iva else 21.0
             }
         })
     except Exception as e:
@@ -1582,7 +1588,32 @@ def preparar_datos_imprimir_solicitud(solicitud_id):
         })
     
     # Calcular totales
-    tipo_iva = 21
+    # Obtener tipo de IVA del cliente (por defecto 21%)
+    tipo_iva = 21.0  # Valor por defecto
+    if solicitud.cliente:
+        try:
+            # Asegurar que el cliente esté cargado completamente
+            db.session.refresh(solicitud.cliente)
+            cliente_tipo_iva = solicitud.cliente.tipo_iva
+            
+            # Verificar si el campo existe y tiene valor
+            if cliente_tipo_iva is not None:
+                # Convertir a float, manejando Decimal y otros tipos numéricos
+                if hasattr(cliente_tipo_iva, '__float__'):
+                    tipo_iva = float(cliente_tipo_iva)
+                else:
+                    tipo_iva = float(str(cliente_tipo_iva))
+                print(f"DEBUG: Tipo IVA del cliente '{solicitud.cliente.nombre}' (ID: {solicitud.cliente.id}): {tipo_iva}%")
+            else:
+                print(f"DEBUG: Cliente '{solicitud.cliente.nombre}' (ID: {solicitud.cliente.id}) tiene tipo_iva=None, usando 21% por defecto")
+        except Exception as e:
+            print(f"DEBUG: Error al obtener tipo_iva del cliente: {e}, usando 21% por defecto")
+            import traceback
+            traceback.print_exc()
+            tipo_iva = 21.0
+    else:
+        print("DEBUG: Solicitud no tiene cliente asociado, usando 21% por defecto")
+    
     base_imponible = Decimal('0.00')
     
     for linea in solicitud.lineas:
@@ -1698,13 +1729,17 @@ def preparar_datos_imprimir_solicitud(solicitud_id):
         descripcion = getattr(solicitud, campo_descripcion, '') if hasattr(solicitud, campo_descripcion) else ''
         descripciones_imagenes.append(descripcion)
     
+    # Asegurar que tipo_iva sea un número para el template
+    tipo_iva_para_template = float(tipo_iva)
+    print(f"DEBUG: Tipo IVA que se pasa al template: {tipo_iva_para_template}%")
+    
     return {
         'presupuesto': solicitud,  # Mantener 'presupuesto' para compatibilidad con template
         'solicitud': solicitud,  # Agregar 'solicitud' también
         'base_imponible': float(base_imponible),
         'iva_total': float(iva_total),
         'total_con_iva': float(total_con_iva),
-        'tipo_iva': tipo_iva,
+        'tipo_iva': tipo_iva_para_template,  # Asegurar que sea float
         'logo_base64': logo_base64,
         'imagen_diseno_base64': imagen_diseno_base64,
         'imagen_portada_base64': imagen_portada_base64,

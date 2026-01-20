@@ -76,6 +76,9 @@ class Cliente(db.Model, UserMixin):
     anotaciones = db.Column(db.Text)  # Anotaciones adicionales
     numero_cuenta = db.Column(db.String(29))  # Número de cuenta bancaria (24 dígitos con guiones: XXXX-XXXX-XXXX-XXXX-XXXX-XXXX)
     
+    # Tipo de IVA
+    tipo_iva = db.Column(db.Numeric(5, 2), nullable=False, default=21.00)  # Porcentaje de IVA (21%, 10%, 4%, 0%)
+    
     # Campos de autenticación web
     usuario_web = db.Column(db.String(80), unique=True, nullable=True)  # Usuario para acceso web
     password_hash = db.Column(db.String(255), nullable=True)  # Contraseña hash

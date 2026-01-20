@@ -29,7 +29,7 @@
                         <input type="text" id="cliente_search" placeholder="🔍 Buscar cliente..." 
                                style="width: 100%; padding: 10px 35px 10px 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; box-sizing: border-box;"
                                autocomplete="off">
-                        <select name="cliente_id" id="cliente_id" onchange="cargarDatosCliente()" style="display: none;">
+                        <select name="cliente_id" id="cliente_id" onchange="setTimeout(function(){ cargarDatosCliente(); }, 10);" style="display: none;">
                             <option value="">Seleccionar cliente...</option>
                             {% for cliente in clientes %}
                             <option value="{{ cliente.id }}" 
@@ -41,7 +41,8 @@
                                     data-provincia="{{ cliente.provincia or '' }}"
                                     data-codigo-postal="{{ cliente.codigo_postal or '' }}"
                                     data-telefono="{{ cliente.telefono or '' }}"
-                                    data-email="{{ cliente.email or '' }}">{{ cliente.nombre }}{% if cliente.nif %} - {{ cliente.nif }}{% endif %}</option>
+                                    data-email="{{ cliente.email or '' }}"
+                                    data-tipo-iva="{% if cliente.tipo_iva is not none %}{{ cliente.tipo_iva|float|int }}{% else %}21{% endif %}">{{ cliente.nombre }}{% if cliente.nif %} - {{ cliente.nif }}{% endif %}</option>
                             {% endfor %}
                         </select>
                         <div id="cliente_results" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px; max-height: 200px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
@@ -602,30 +603,59 @@ document.addEventListener('DOMContentLoaded', function() {
     
     window.cargarDatosCliente = function() {
         const selectCliente = document.getElementById('cliente_id');
-        const optionSeleccionada = selectCliente.options[selectCliente.selectedIndex];
+        const clienteIdSeleccionado = selectCliente.value;
         
-        if (optionSeleccionada && optionSeleccionada.value) {
-            const nombreDisplay = optionSeleccionada.getAttribute('data-nombre-display') || optionSeleccionada.textContent;
-            const nif = optionSeleccionada.getAttribute('data-nif') || '';
-            const direccion = optionSeleccionada.getAttribute('data-direccion') || '';
-            const poblacion = optionSeleccionada.getAttribute('data-poblacion') || '';
-            const provincia = optionSeleccionada.getAttribute('data-provincia') || '';
-            const codigoPostal = optionSeleccionada.getAttribute('data-codigo-postal') || '';
-            const telefono = optionSeleccionada.getAttribute('data-telefono') || '';
-            const email = optionSeleccionada.getAttribute('data-email') || '';
+        if (clienteIdSeleccionado) {
+            // Buscar la opción por valor
+            const optionSeleccionada = Array.from(selectCliente.options).find(opt => opt.value === clienteIdSeleccionado);
             
-            document.getElementById('nombre_cliente').value = nombreDisplay;
-            document.getElementById('nif_cliente').value = nif;
-            document.getElementById('direccion_cliente').value = direccion;
-            document.getElementById('poblacion_cliente').value = poblacion;
-            document.getElementById('provincia_cliente').value = provincia;
-            document.getElementById('codigo_postal_cliente').value = codigoPostal;
-            document.getElementById('telefono_cliente').value = telefono;
-            document.getElementById('email_cliente').value = email;
-            
-            // Actualizar el input de búsqueda si está vacío
-            if (!clienteSearch.value) {
-                clienteSearch.value = nombreDisplay;
+            if (optionSeleccionada) {
+                const nombreDisplay = optionSeleccionada.getAttribute('data-nombre-display') || optionSeleccionada.textContent;
+                const nif = optionSeleccionada.getAttribute('data-nif') || '';
+                const direccion = optionSeleccionada.getAttribute('data-direccion') || '';
+                const poblacion = optionSeleccionada.getAttribute('data-poblacion') || '';
+                const provincia = optionSeleccionada.getAttribute('data-provincia') || '';
+                const codigoPostal = optionSeleccionada.getAttribute('data-codigo-postal') || '';
+                const telefono = optionSeleccionada.getAttribute('data-telefono') || '';
+                const email = optionSeleccionada.getAttribute('data-email') || '';
+                let tipoIva = optionSeleccionada.getAttribute('data-tipo-iva') || '21';
+                
+                // Asegurar que tipoIva sea un string válido
+                tipoIva = String(tipoIva).trim();
+                if (!tipoIva || tipoIva === 'None' || tipoIva === 'null') {
+                    tipoIva = '21';
+                }
+                
+                console.log('DEBUG: Cargando datos del cliente:', nombreDisplay, 'Tipo IVA:', tipoIva);
+                
+                document.getElementById('nombre_cliente').value = nombreDisplay;
+                document.getElementById('nif_cliente').value = nif;
+                document.getElementById('direccion_cliente').value = direccion;
+                document.getElementById('poblacion_cliente').value = poblacion;
+                document.getElementById('provincia_cliente').value = provincia;
+                document.getElementById('codigo_postal_cliente').value = codigoPostal;
+                document.getElementById('telefono_cliente').value = telefono;
+                document.getElementById('email_cliente').value = email;
+                
+                // Actualizar tipo de IVA del cliente
+                const tipoIvaSelect = document.getElementById('tipo_iva');
+                if (tipoIvaSelect) {
+                    tipoIvaSelect.value = tipoIva;
+                    console.log('DEBUG: Tipo IVA establecido en select:', tipoIvaSelect.value);
+                    // Recalcular totales (la función actualizarTotales actualiza el label también)
+                    if (typeof actualizarTotales === 'function') {
+                        actualizarTotales();
+                    }
+                } else {
+                    console.error('DEBUG: No se encontró el select de tipo_iva');
+                }
+                
+                // Actualizar el input de búsqueda si está vacío
+                if (!clienteSearch.value) {
+                    clienteSearch.value = nombreDisplay;
+                }
+            } else {
+                console.error('DEBUG: No se encontró la opción del cliente con ID:', clienteIdSeleccionado);
             }
         } else {
             // Limpiar campos si no hay cliente seleccionado
@@ -637,6 +667,15 @@ document.addEventListener('DOMContentLoaded', function() {
             document.getElementById('codigo_postal_cliente').value = '';
             document.getElementById('telefono_cliente').value = '';
             document.getElementById('email_cliente').value = '';
+            // Resetear tipo de IVA a 21%
+            const tipoIvaSelect = document.getElementById('tipo_iva');
+            if (tipoIvaSelect) {
+                tipoIvaSelect.value = '21';
+                // Recalcular totales
+                if (typeof actualizarTotales === 'function') {
+                    actualizarTotales();
+                }
+            }
         }
     };
     
@@ -753,6 +792,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     newOption.setAttribute('data-codigo-postal', '');
                     newOption.setAttribute('data-telefono', '');
                     newOption.setAttribute('data-email', '');
+                    newOption.setAttribute('data-tipo-iva', data.cliente.tipo_iva ? String(Math.round(data.cliente.tipo_iva)) : '21');
                     clienteSelect.appendChild(newOption);
                     
                     // Actualizar array de clientes en JavaScript
@@ -877,6 +917,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 <div class="form-group">
                     <label for="email_cliente_modal_factura">Email</label>
                     <input type="email" name="email" id="email_cliente_modal_factura" placeholder="email@ejemplo.com">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="numero_cuenta_cliente_modal_factura">Número de Cuenta</label>
+                        <input type="text" name="numero_cuenta" id="numero_cuenta_cliente_modal_factura" placeholder="ES24-3456-3456-3456-3456-3456" maxlength="29">
+                    </div>
+                    <div class="form-group">
+                        <label for="tipo_iva_cliente_modal_factura">Tipo de IVA (%) *</label>
+                        <select name="tipo_iva" id="tipo_iva_cliente_modal_factura" required>
+                            <option value="21" selected>21%</option>
+                            <option value="10">10%</option>
+                            <option value="4">4%</option>
+                            <option value="0">0%</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 

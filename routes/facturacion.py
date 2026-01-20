@@ -224,8 +224,10 @@ def formalizar_factura_solicitud(presupuesto_id):
             importe = Decimal(str(linea_data.get('importe', 0)))
             base_imponible += importe
         
-        # Calcular IVA (21% sobre la base imponible)
-        tipo_iva = Decimal('21')
+        # Calcular IVA usando el tipo_iva del cliente (por defecto 21%)
+        cliente = presupuesto.cliente
+        tipo_iva_valor = float(cliente.tipo_iva) if cliente and cliente.tipo_iva else 21.0
+        tipo_iva = Decimal(str(tipo_iva_valor))
         iva_total = base_imponible * (tipo_iva / Decimal('100'))
         subtotal = base_imponible + iva_total
         
@@ -257,7 +259,7 @@ def formalizar_factura_solicitud(presupuesto_id):
             nombre=cliente.nombre if cliente else 'Sin cliente',
             importe_total=importe_total,
             descuento_pronto_pago=descuento_pronto_pago_decimal,
-            tipo_iva=Decimal('21.00'),  # IVA por defecto 21%
+            tipo_iva=tipo_iva,  # IVA del cliente
             estado='pendiente'
         )
         
@@ -693,25 +695,29 @@ def nueva_factura():
             fecha_expedicion = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d').date()
             
             # Si hay cliente_id, obtener datos del cliente (pero permitir sobrescribir con los del formulario)
+            cliente_obj = None
             if cliente_id:
-                cliente = Cliente.query.get(cliente_id)
-                if cliente:
+                cliente_obj = Cliente.query.get(cliente_id)
+                if cliente_obj:
                     if not nombre_cliente:
-                        nombre_cliente = cliente.nombre
-                    if not nif_cliente and cliente.nif:
-                        nif_cliente = cliente.nif
-                    if not direccion_cliente and cliente.direccion:
-                        direccion_cliente = cliente.direccion
-                    if not poblacion_cliente and cliente.poblacion:
-                        poblacion_cliente = cliente.poblacion
-                    if not provincia_cliente and cliente.provincia:
-                        provincia_cliente = cliente.provincia
-                    if not codigo_postal_cliente and cliente.codigo_postal:
-                        codigo_postal_cliente = cliente.codigo_postal
-                    if not telefono_cliente and cliente.telefono:
-                        telefono_cliente = cliente.telefono
-                    if not email_cliente and cliente.email:
-                        email_cliente = cliente.email
+                        nombre_cliente = cliente_obj.nombre
+                    if not nif_cliente and cliente_obj.nif:
+                        nif_cliente = cliente_obj.nif
+                    if not direccion_cliente and cliente_obj.direccion:
+                        direccion_cliente = cliente_obj.direccion
+                    if not poblacion_cliente and cliente_obj.poblacion:
+                        poblacion_cliente = cliente_obj.poblacion
+                    if not provincia_cliente and cliente_obj.provincia:
+                        provincia_cliente = cliente_obj.provincia
+                    if not codigo_postal_cliente and cliente_obj.codigo_postal:
+                        codigo_postal_cliente = cliente_obj.codigo_postal
+                    if not telefono_cliente and cliente_obj.telefono:
+                        telefono_cliente = cliente_obj.telefono
+                    if not email_cliente and cliente_obj.email:
+                        email_cliente = cliente_obj.email
+                    # Usar tipo_iva del cliente si no se especificó en el formulario
+                    if tipo_iva == '21' and cliente_obj.tipo_iva:
+                        tipo_iva = str(cliente_obj.tipo_iva)
             
             # Generar número de factura automáticamente
             serie = 'A'

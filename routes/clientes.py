@@ -32,6 +32,10 @@ def gestion_clientes():
             categoria_id = request.form.get('categoria_id', '').strip()
             categoria_id = int(categoria_id) if categoria_id else None
             
+            # Procesar tipo de IVA
+            tipo_iva_str = request.form.get('tipo_iva', '21').strip()
+            tipo_iva = float(tipo_iva_str) if tipo_iva_str else 21.0
+            
             cliente = Cliente(
                 nombre=request.form.get('nombre'),
                 alias=request.form.get('alias', ''),
@@ -51,7 +55,8 @@ def gestion_clientes():
                 numero_cuenta=request.form.get('numero_cuenta', '').strip(),
                 usuario_web=request.form.get('usuario_web', '').strip() or None,
                 fecha_alta=fecha_alta,
-                comercial_id=comercial_id
+                comercial_id=comercial_id,
+                tipo_iva=tipo_iva
             )
             
             # Si se proporciona usuario web, también establecer contraseña si se proporciona
@@ -230,6 +235,10 @@ def editar_cliente(id):
             
             cliente.anotaciones = request.form.get('anotaciones', '')
             cliente.numero_cuenta = request.form.get('numero_cuenta', '').strip()
+            
+            # Procesar tipo de IVA
+            tipo_iva_str = request.form.get('tipo_iva', '21').strip()
+            cliente.tipo_iva = float(tipo_iva_str) if tipo_iva_str else 21.0
             
             # Procesar comercial asignado
             comercial_id = request.form.get('comercial_id', '').strip()
