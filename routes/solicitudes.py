@@ -138,21 +138,115 @@ def nueva_solicitud():
             fecha_objetivo_str = request.form.get('fecha_objetivo', '')
             
             # Información para la fabricación
-            tipo_producto = request.form.get('tipo_producto', '')
-            colores_principales = request.form.get('colores_principales', '')
-            colores_secundarios = request.form.get('colores_secundarios', '')
-            ubicacion_logo = request.form.get('ubicacion_logo', '')
             referencias_web = request.form.get('referencias_web', '')
             datos_adicionales = request.form.get('datos_adicionales', '')
+            
+            # Obtener información de todas las prendas (prenda1_*, prenda2_*, etc.)
+            prendas_info = []
+            prenda_num = 1
+            while True:
+                tipo_producto_key = f'prenda{prenda_num}_tipo_producto'
+                colores_principales_key = f'prenda{prenda_num}_colores_principales'
+                colores_secundarios_key = f'prenda{prenda_num}_colores_secundarios'
+                ubicacion_logo_key = f'prenda{prenda_num}_ubicacion_logo'
+                
+                tipo_producto = request.form.get(tipo_producto_key, '').strip()
+                colores_principales = request.form.get(colores_principales_key, '').strip()
+                colores_secundarios = request.form.get(colores_secundarios_key, '').strip()
+                ubicacion_logo = request.form.get(ubicacion_logo_key, '').strip()
+                
+                # Si no hay datos para esta prenda, terminar
+                if not tipo_producto and not colores_principales and not colores_secundarios and not ubicacion_logo:
+                    break
+                
+                prendas_info.append({
+                    'tipo_producto': tipo_producto,
+                    'colores_principales': colores_principales,
+                    'colores_secundarios': colores_secundarios,
+                    'ubicacion_logo': ubicacion_logo
+                })
+                prenda_num += 1
             
             # Validaciones
             if not comercial_id or not cliente_id or not tipo_pedido:
                 flash('Debe completar todos los campos obligatorios', 'error')
-                return redirect(url_for('solicitudes.nueva_solicitud'))
+                # Renderizar template con datos preservados en lugar de redirect
+                clientes = Cliente.query.order_by(Cliente.nombre).all()
+                comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
+                prendas = Prenda.query.order_by(Prenda.nombre).all()
+                categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
+                return render_template('solicitudes/nueva.html',
+                                     clientes=clientes,
+                                     comerciales=comerciales,
+                                     prendas=prendas,
+                                     categorias=categorias,
+                                     form_data=request.form)  # Pasar datos del formulario
             
-            if not tipo_producto or not colores_principales or not colores_secundarios or not ubicacion_logo or not referencias_web or not datos_adicionales:
-                flash('Debe completar todos los campos de información para la fabricación', 'error')
-                return redirect(url_for('solicitudes.nueva_solicitud'))
+            # Validar que haya al menos una prenda completa y que referencias_web y datos_adicionales estén completos
+            if not referencias_web or not datos_adicionales:
+                flash('Debe completar los campos de Referencias Web y Datos/Info Adicional', 'error')
+                clientes = Cliente.query.order_by(Cliente.nombre).all()
+                comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
+                prendas = Prenda.query.order_by(Prenda.nombre).all()
+                categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
+                return render_template('solicitudes/nueva.html',
+                                     clientes=clientes,
+                                     comerciales=comerciales,
+                                     prendas=prendas,
+                                     categorias=categorias,
+                                     form_data=request.form)
+            
+            if len(prendas_info) == 0:
+                flash('Debe completar al menos una prenda con todos sus campos', 'error')
+                clientes = Cliente.query.order_by(Cliente.nombre).all()
+                comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
+                prendas = Prenda.query.order_by(Prenda.nombre).all()
+                categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
+                return render_template('solicitudes/nueva.html',
+                                     clientes=clientes,
+                                     comerciales=comerciales,
+                                     prendas=prendas,
+                                     categorias=categorias,
+                                     form_data=request.form)
+            
+            # Validar que todas las prendas tengan todos los campos completos
+            for i, prenda in enumerate(prendas_info, 1):
+                if not prenda['tipo_producto'] or not prenda['colores_principales'] or not prenda['colores_secundarios'] or not prenda['ubicacion_logo']:
+                    flash(f'Debe completar todos los campos de la Prenda {i}', 'error')
+                    clientes = Cliente.query.order_by(Cliente.nombre).all()
+                    comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
+                    prendas = Prenda.query.order_by(Prenda.nombre).all()
+                    categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
+                    return render_template('solicitudes/nueva.html',
+                                         clientes=clientes,
+                                         comerciales=comerciales,
+                                         prendas=prendas,
+                                         categorias=categorias,
+                                         form_data=request.form)
+            
+            # Guardar la primera prenda en los campos principales (para compatibilidad)
+            primera_prenda = prendas_info[0]
+            tipo_producto = primera_prenda['tipo_producto']
+            colores_principales = primera_prenda['colores_principales']
+            colores_secundarios = primera_prenda['colores_secundarios']
+            ubicacion_logo = primera_prenda['ubicacion_logo']
+            
+            # Si hay más de una prenda, concatenar la información adicional en formato estructurado
+            if len(prendas_info) > 1:
+                # Agregar información de las demás prendas a los campos principales
+                prendas_adicionales = []
+                for i, prenda in enumerate(prendas_info[1:], 2):
+                    # Formato: "Prenda X: Tipo | ColPrinc: ... | ColSec: ... | Logo: ..."
+                    info_prenda = f"Prenda {i}: {prenda['tipo_producto']}"
+                    if prenda['colores_principales']:
+                        info_prenda += f" | ColPrinc: {prenda['colores_principales']}"
+                    if prenda['colores_secundarios']:
+                        info_prenda += f" | ColSec: {prenda['colores_secundarios']}"
+                    if prenda['ubicacion_logo']:
+                        info_prenda += f" | Logo: {prenda['ubicacion_logo']}"
+                    prendas_adicionales.append(info_prenda)
+                # Guardar en tipo_producto con separador " || " para distinguir de separadores internos
+                tipo_producto += " || " + " || ".join(prendas_adicionales)
             
             # Crear solicitud (presupuesto)
             solicitud = Presupuesto(
@@ -397,6 +491,17 @@ def nueva_solicitud():
             flash(f'Error al crear la solicitud: {str(e)}', 'error')
             import traceback
             traceback.print_exc()
+            # Renderizar template con datos preservados en lugar de redirect
+            clientes = Cliente.query.order_by(Cliente.nombre).all()
+            comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
+            prendas = Prenda.query.order_by(Prenda.nombre).all()
+            categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
+            return render_template('solicitudes/nueva.html',
+                                 clientes=clientes,
+                                 comerciales=comerciales,
+                                 prendas=prendas,
+                                 categorias=categorias,
+                                 form_data=request.form)  # Pasar datos del formulario
     
     # GET: mostrar formulario
     clientes = Cliente.query.order_by(Cliente.nombre).all()
@@ -408,7 +513,8 @@ def nueva_solicitud():
                          clientes=clientes,
                          comerciales=comerciales,
                          prendas=prendas,
-                         categorias=categorias)
+                         categorias=categorias,
+                         form_data=None)
 
 @solicitudes_bp.route('/solicitudes/<int:solicitud_id>')
 @login_required
@@ -445,6 +551,135 @@ def ver_solicitud(solicitud_id):
     # Obtener usuarios activos para asignar mockup
     usuarios = Usuario.query.filter_by(activo=True).order_by(Usuario.usuario).all()
     
+    # Parsear prendas desde la BD para mostrarlas en la vista
+    import re
+    prendas_info = []
+    
+    if solicitud.tipo_producto:
+        tipo_producto_texto = solicitud.tipo_producto
+        
+        # Detectar formato: si tiene " || " es el formato nuevo, si tiene " | " y contiene "Prenda" es el antiguo
+        if ' || ' in tipo_producto_texto:
+            # Formato nuevo: usar " || " como separador
+            partes = tipo_producto_texto.split(' || ')
+        elif ' | ' in tipo_producto_texto and 'Prenda' in tipo_producto_texto:
+            # Formato antiguo: usar " | " como separador
+            partes = tipo_producto_texto.split(' | ')
+        else:
+            # Solo una prenda, sin separadores
+            partes = [tipo_producto_texto]
+        
+        # Primera parte es la primera prenda (sin prefijo "Prenda 1:")
+        primera_prenda = partes[0].strip()
+        
+        # Agregar primera prenda con todos sus datos
+        prendas_info.append({
+            'numero': 1,
+            'tipo_producto': primera_prenda,
+            'colores_principales': solicitud.colores_principales or '',
+            'colores_secundarios': solicitud.colores_secundarios or '',
+            'ubicacion_logo': solicitud.ubicacion_logo or ''
+        })
+        
+        # Procesar prendas adicionales (si existen)
+        for parte in partes[1:]:
+            parte = parte.strip()
+            if not parte:
+                continue
+                
+            # Intentar formato nuevo primero: "Prenda X: Tipo | ColPrinc: ... | ColSec: ... | Logo: ..."
+            match_nuevo = re.match(r'Prenda\s+(\d+):\s*(.+?)(?:\s*\|\s*ColPrinc:\s*(.+?))?(?:\s*\|\s*ColSec:\s*(.+?))?(?:\s*\|\s*Logo:\s*(.+?))?$', parte)
+            if match_nuevo:
+                numero_prenda = int(match_nuevo.group(1))
+                tipo_prenda = match_nuevo.group(2).strip()
+                tipo_prenda = tipo_prenda.rstrip(' |')
+                colores_principales_prenda = match_nuevo.group(3).strip() if match_nuevo.group(3) else ''
+                colores_secundarios_prenda = match_nuevo.group(4).strip() if match_nuevo.group(4) else ''
+                ubicacion_logo_prenda = match_nuevo.group(5).strip() if match_nuevo.group(5) else ''
+                
+                prendas_info.append({
+                    'numero': numero_prenda,
+                    'tipo_producto': tipo_prenda,
+                    'colores_principales': colores_principales_prenda,
+                    'colores_secundarios': colores_secundarios_prenda,
+                    'ubicacion_logo': ubicacion_logo_prenda
+                })
+            else:
+                # Intentar parsear manualmente si el regex no funciona
+                if parte.startswith('Prenda') and ':' in parte:
+                    try:
+                        num_match = re.match(r'Prenda\s+(\d+):', parte)
+                        if num_match:
+                            numero_prenda = int(num_match.group(1))
+                            resto = parte[num_match.end():].strip()
+                            
+                            tipo_prenda = ''
+                            colores_principales_prenda = ''
+                            colores_secundarios_prenda = ''
+                            ubicacion_logo_prenda = ''
+                            
+                            campos = resto.split(' | ')
+                            tipo_prenda = campos[0].strip() if campos else ''
+                            
+                            for campo in campos[1:]:
+                                campo = campo.strip()
+                                if campo.startswith('ColPrinc:'):
+                                    colores_principales_prenda = campo.replace('ColPrinc:', '').strip()
+                                elif campo.startswith('ColSec:'):
+                                    colores_secundarios_prenda = campo.replace('ColSec:', '').strip()
+                                elif campo.startswith('Logo:'):
+                                    ubicacion_logo_prenda = campo.replace('Logo:', '').strip()
+                            
+                            prendas_info.append({
+                                'numero': numero_prenda,
+                                'tipo_producto': tipo_prenda,
+                                'colores_principales': colores_principales_prenda,
+                                'colores_secundarios': colores_secundarios_prenda,
+                                'ubicacion_logo': ubicacion_logo_prenda
+                            })
+                        else:
+                            raise ValueError("No se pudo parsear")
+                    except:
+                        # Formato antiguo: "Prenda X: Tipo - Colores" (compatibilidad)
+                        match_antiguo = re.match(r'Prenda\s+(\d+):\s*(.+?)\s*-\s*(.+)', parte)
+                        if match_antiguo:
+                            numero_prenda = int(match_antiguo.group(1))
+                            tipo_prenda = match_antiguo.group(2).strip()
+                            colores_prenda = match_antiguo.group(3).strip()
+                            
+                            prendas_info.append({
+                                'numero': numero_prenda,
+                                'tipo_producto': tipo_prenda,
+                                'colores_principales': colores_prenda,
+                                'colores_secundarios': '',
+                                'ubicacion_logo': ''
+                            })
+                else:
+                    # Formato antiguo: "Prenda X: Tipo - Colores" (compatibilidad)
+                    match_antiguo = re.match(r'Prenda\s+(\d+):\s*(.+?)\s*-\s*(.+)', parte)
+                    if match_antiguo:
+                        numero_prenda = int(match_antiguo.group(1))
+                        tipo_prenda = match_antiguo.group(2).strip()
+                        colores_prenda = match_antiguo.group(3).strip()
+                        
+                        prendas_info.append({
+                            'numero': numero_prenda,
+                            'tipo_producto': tipo_prenda,
+                            'colores_principales': colores_prenda,
+                            'colores_secundarios': '',
+                            'ubicacion_logo': ''
+                        })
+    
+    # Si no hay prendas extraídas, usar solo la primera
+    if not prendas_info:
+        prendas_info.append({
+            'numero': 1,
+            'tipo_producto': solicitud.tipo_producto or '',
+            'colores_principales': solicitud.colores_principales or '',
+            'colores_secundarios': solicitud.colores_secundarios or '',
+            'ubicacion_logo': solicitud.ubicacion_logo or ''
+        })
+    
     hoy = datetime.now().date()
     
     return render_template('solicitudes/ver.html',
@@ -454,7 +689,8 @@ def ver_solicitud(solicitud_id):
                          estados_fechas=ESTADOS_FECHAS,
                          registros_estado=registros_estado,
                          usuarios=usuarios,
-                         hoy=hoy)
+                         hoy=hoy,
+                         prendas_info=prendas_info)  # Pasar prendas parseadas
 
 @solicitudes_bp.route('/solicitudes/<int:solicitud_id>/cambiar-estado', methods=['POST'])
 @login_required
@@ -612,16 +848,105 @@ def editar_solicitud(solicitud_id):
             solicitud.seguimiento = request.form.get('seguimiento', '')
             
             # Actualizar información para la fabricación
-            tipo_producto = request.form.get('tipo_producto', '')
-            colores_principales = request.form.get('colores_principales', '')
-            colores_secundarios = request.form.get('colores_secundarios', '')
-            ubicacion_logo = request.form.get('ubicacion_logo', '')
             referencias_web = request.form.get('referencias_web', '')
             datos_adicionales = request.form.get('datos_adicionales', '')
             
-            if not tipo_producto or not colores_principales or not colores_secundarios or not ubicacion_logo or not referencias_web or not datos_adicionales:
-                flash('Debe completar todos los campos de información para la fabricación', 'error')
-                return redirect(url_for('solicitudes.editar_solicitud', solicitud_id=solicitud_id))
+            # Obtener información de todas las prendas (prenda1_*, prenda2_*, etc.)
+            prendas_info = []
+            prenda_num = 1
+            while True:
+                tipo_producto_key = f'prenda{prenda_num}_tipo_producto'
+                colores_principales_key = f'prenda{prenda_num}_colores_principales'
+                colores_secundarios_key = f'prenda{prenda_num}_colores_secundarios'
+                ubicacion_logo_key = f'prenda{prenda_num}_ubicacion_logo'
+                
+                tipo_producto = request.form.get(tipo_producto_key, '').strip()
+                colores_principales = request.form.get(colores_principales_key, '').strip()
+                colores_secundarios = request.form.get(colores_secundarios_key, '').strip()
+                ubicacion_logo = request.form.get(ubicacion_logo_key, '').strip()
+                
+                # Si no hay datos para esta prenda, terminar
+                if not tipo_producto and not colores_principales and not colores_secundarios and not ubicacion_logo:
+                    break
+                
+                prendas_info.append({
+                    'tipo_producto': tipo_producto,
+                    'colores_principales': colores_principales,
+                    'colores_secundarios': colores_secundarios,
+                    'ubicacion_logo': ubicacion_logo
+                })
+                prenda_num += 1
+            
+            # Validar que haya al menos una prenda completa y que referencias_web y datos_adicionales estén completos
+            if not referencias_web or not datos_adicionales:
+                flash('Debe completar los campos de Referencias Web y Datos/Info Adicional', 'error')
+                clientes = Cliente.query.order_by(Cliente.nombre).all()
+                comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
+                prendas = Prenda.query.order_by(Prenda.nombre).all()
+                categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
+                return render_template('solicitudes/editar.html',
+                                     solicitud=solicitud,
+                                     clientes=clientes,
+                                     comerciales=comerciales,
+                                     prendas=prendas,
+                                     categorias=categorias,
+                                     form_data=request.form)
+            
+            if len(prendas_info) == 0:
+                flash('Debe completar al menos una prenda con todos sus campos', 'error')
+                clientes = Cliente.query.order_by(Cliente.nombre).all()
+                comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
+                prendas = Prenda.query.order_by(Prenda.nombre).all()
+                categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
+                return render_template('solicitudes/editar.html',
+                                     solicitud=solicitud,
+                                     clientes=clientes,
+                                     comerciales=comerciales,
+                                     prendas=prendas,
+                                     categorias=categorias,
+                                     form_data=request.form)
+            
+            # Validar que todas las prendas tengan todos los campos completos
+            for i, prenda in enumerate(prendas_info, 1):
+                if not prenda['tipo_producto'] or not prenda['colores_principales'] or not prenda['colores_secundarios'] or not prenda['ubicacion_logo']:
+                    flash(f'Debe completar todos los campos de la Prenda {i}', 'error')
+                    clientes = Cliente.query.order_by(Cliente.nombre).all()
+                    comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
+                    prendas = Prenda.query.order_by(Prenda.nombre).all()
+                    categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
+                    return render_template('solicitudes/editar.html',
+                                         solicitud=solicitud,
+                                         clientes=clientes,
+                                         comerciales=comerciales,
+                                         prendas=prendas,
+                                         categorias=categorias,
+                                         form_data=request.form)
+            
+            # Guardar la primera prenda en los campos principales (para compatibilidad)
+            primera_prenda = prendas_info[0]
+            tipo_producto = primera_prenda['tipo_producto']
+            colores_principales = primera_prenda['colores_principales']
+            colores_secundarios = primera_prenda['colores_secundarios']
+            ubicacion_logo = primera_prenda['ubicacion_logo']
+            
+            # Si hay más de una prenda, concatenar la información adicional en formato estructurado
+            if len(prendas_info) > 1:
+                # Agregar información de las demás prendas a los campos principales
+                prendas_adicionales = []
+                for i, prenda in enumerate(prendas_info[1:], 2):
+                    # Formato: "Prenda X: Tipo | ColPrinc: ... | ColSec: ... | Logo: ..."
+                    info_prenda = f"Prenda {i}: {prenda['tipo_producto']}"
+                    if prenda['colores_principales']:
+                        info_prenda += f" | ColPrinc: {prenda['colores_principales']}"
+                    if prenda['colores_secundarios']:
+                        info_prenda += f" | ColSec: {prenda['colores_secundarios']}"
+                    if prenda['ubicacion_logo']:
+                        info_prenda += f" | Logo: {prenda['ubicacion_logo']}"
+                    prendas_adicionales.append(info_prenda)
+                # Guardar en tipo_producto con separador " || " para distinguir de separadores internos
+                tipo_producto += " || " + " || ".join(prendas_adicionales)
+                # Debug: mostrar qué se está guardando
+                print(f"DEBUG editar_solicitud: Guardando {len(prendas_info)} prendas. tipo_producto final: {tipo_producto}")
             
             solicitud.tipo_producto = tipo_producto
             solicitud.colores_principales = colores_principales
@@ -713,7 +1038,18 @@ def editar_solicitud(solicitud_id):
             except Exception as e:
                 db.session.rollback()
                 flash(f'Error al eliminar líneas anteriores: {str(e)}', 'error')
-                return redirect(url_for('solicitudes.editar_solicitud', solicitud_id=solicitud_id))
+                # Renderizar template con datos preservados en lugar de redirect
+                clientes = Cliente.query.order_by(Cliente.nombre).all()
+                comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
+                prendas = Prenda.query.order_by(Prenda.nombre).all()
+                categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
+                return render_template('solicitudes/editar.html',
+                                     solicitud=solicitud,
+                                     clientes=clientes,
+                                     comerciales=comerciales,
+                                     prendas=prendas,
+                                     categorias=categorias,
+                                     form_data=request.form)  # Pasar datos del formulario
             
             # Crear nuevas líneas (similar a editar_solicitud)
             prenda_ids = request.form.getlist('prenda_id[]')
@@ -819,17 +1155,164 @@ def editar_solicitud(solicitud_id):
         except Exception as e:
             db.session.rollback()
             flash(f'Error al actualizar la solicitud: {str(e)}', 'error')
+            import traceback
+            traceback.print_exc()
+            # Renderizar template con datos preservados en lugar de redirect
+            clientes = Cliente.query.order_by(Cliente.nombre).all()
+            comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
+            prendas = Prenda.query.order_by(Prenda.nombre).all()
+            categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
+            return render_template('solicitudes/editar.html',
+                                 solicitud=solicitud,
+                                 clientes=clientes,
+                                 comerciales=comerciales,
+                                 prendas=prendas,
+                                 categorias=categorias,
+                                 form_data=request.form)  # Pasar datos del formulario
     
     # GET: mostrar formulario
+    # Parsear prendas desde la BD para mostrarlas en el formulario
+    import re
+    prendas_info = []
+    
+    if solicitud.tipo_producto:
+        tipo_producto_texto = solicitud.tipo_producto
+        
+        # Detectar formato: si tiene " || " es el formato nuevo, si tiene " | " y contiene "Prenda" es el antiguo
+        if ' || ' in tipo_producto_texto:
+            # Formato nuevo: usar " || " como separador
+            partes = tipo_producto_texto.split(' || ')
+        elif ' | ' in tipo_producto_texto and 'Prenda' in tipo_producto_texto:
+            # Formato antiguo: usar " | " como separador
+            partes = tipo_producto_texto.split(' | ')
+        else:
+            # Solo una prenda, sin separadores
+            partes = [tipo_producto_texto]
+        
+        # Primera parte es la primera prenda (sin prefijo "Prenda 1:")
+        primera_prenda = partes[0].strip()
+        
+        # Agregar primera prenda con todos sus datos
+        prendas_info.append({
+            'numero': 1,
+            'tipo_producto': primera_prenda,
+            'colores_principales': solicitud.colores_principales or '',
+            'colores_secundarios': solicitud.colores_secundarios or '',
+            'ubicacion_logo': solicitud.ubicacion_logo or ''
+        })
+        
+        # Procesar prendas adicionales (si existen)
+        for parte in partes[1:]:
+            parte = parte.strip()
+            if not parte:
+                continue
+                
+            # Intentar formato nuevo primero: "Prenda X: Tipo | ColPrinc: ... | ColSec: ... | Logo: ..."
+            match_nuevo = re.match(r'Prenda\s+(\d+):\s*(.+?)(?:\s*\|\s*ColPrinc:\s*(.+?))?(?:\s*\|\s*ColSec:\s*(.+?))?(?:\s*\|\s*Logo:\s*(.+?))?$', parte)
+            if match_nuevo:
+                numero_prenda = int(match_nuevo.group(1))
+                tipo_prenda = match_nuevo.group(2).strip()
+                tipo_prenda = tipo_prenda.rstrip(' |')
+                colores_principales_prenda = match_nuevo.group(3).strip() if match_nuevo.group(3) else ''
+                colores_secundarios_prenda = match_nuevo.group(4).strip() if match_nuevo.group(4) else ''
+                ubicacion_logo_prenda = match_nuevo.group(5).strip() if match_nuevo.group(5) else ''
+                
+                prendas_info.append({
+                    'numero': numero_prenda,
+                    'tipo_producto': tipo_prenda,
+                    'colores_principales': colores_principales_prenda,
+                    'colores_secundarios': colores_secundarios_prenda,
+                    'ubicacion_logo': ubicacion_logo_prenda
+                })
+            else:
+                # Intentar parsear manualmente si el regex no funciona
+                if parte.startswith('Prenda') and ':' in parte:
+                    try:
+                        num_match = re.match(r'Prenda\s+(\d+):', parte)
+                        if num_match:
+                            numero_prenda = int(num_match.group(1))
+                            resto = parte[num_match.end():].strip()
+                            
+                            tipo_prenda = ''
+                            colores_principales_prenda = ''
+                            colores_secundarios_prenda = ''
+                            ubicacion_logo_prenda = ''
+                            
+                            campos = resto.split(' | ')
+                            tipo_prenda = campos[0].strip() if campos else ''
+                            
+                            for campo in campos[1:]:
+                                campo = campo.strip()
+                                if campo.startswith('ColPrinc:'):
+                                    colores_principales_prenda = campo.replace('ColPrinc:', '').strip()
+                                elif campo.startswith('ColSec:'):
+                                    colores_secundarios_prenda = campo.replace('ColSec:', '').strip()
+                                elif campo.startswith('Logo:'):
+                                    ubicacion_logo_prenda = campo.replace('Logo:', '').strip()
+                            
+                            prendas_info.append({
+                                'numero': numero_prenda,
+                                'tipo_producto': tipo_prenda,
+                                'colores_principales': colores_principales_prenda,
+                                'colores_secundarios': colores_secundarios_prenda,
+                                'ubicacion_logo': ubicacion_logo_prenda
+                            })
+                        else:
+                            raise ValueError("No se pudo parsear")
+                    except:
+                        # Formato antiguo: "Prenda X: Tipo - Colores" (compatibilidad)
+                        match_antiguo = re.match(r'Prenda\s+(\d+):\s*(.+?)\s*-\s*(.+)', parte)
+                        if match_antiguo:
+                            numero_prenda = int(match_antiguo.group(1))
+                            tipo_prenda = match_antiguo.group(2).strip()
+                            colores_prenda = match_antiguo.group(3).strip()
+                            
+                            prendas_info.append({
+                                'numero': numero_prenda,
+                                'tipo_producto': tipo_prenda,
+                                'colores_principales': colores_prenda,
+                                'colores_secundarios': '',
+                                'ubicacion_logo': ''
+                            })
+                else:
+                    # Formato antiguo: "Prenda X: Tipo - Colores" (compatibilidad)
+                    match_antiguo = re.match(r'Prenda\s+(\d+):\s*(.+?)\s*-\s*(.+)', parte)
+                    if match_antiguo:
+                        numero_prenda = int(match_antiguo.group(1))
+                        tipo_prenda = match_antiguo.group(2).strip()
+                        colores_prenda = match_antiguo.group(3).strip()
+                        
+                        prendas_info.append({
+                            'numero': numero_prenda,
+                            'tipo_producto': tipo_prenda,
+                            'colores_principales': colores_prenda,
+                            'colores_secundarios': '',
+                            'ubicacion_logo': ''
+                        })
+    
+    # Si no hay prendas extraídas, usar solo la primera
+    if not prendas_info:
+        prendas_info.append({
+            'numero': 1,
+            'tipo_producto': solicitud.tipo_producto or '',
+            'colores_principales': solicitud.colores_principales or '',
+            'colores_secundarios': solicitud.colores_secundarios or '',
+            'ubicacion_logo': solicitud.ubicacion_logo or ''
+        })
+    
     clientes = Cliente.query.order_by(Cliente.nombre).all()
     comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
     prendas = Prenda.query.order_by(Prenda.nombre).all()
+    categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
     
     return render_template('solicitudes/editar.html',
                          solicitud=solicitud,
                          clientes=clientes,
                          comerciales=comerciales,
-                         prendas=prendas)
+                         prendas=prendas,
+                         categorias=categorias,
+                         form_data=None,
+                         prendas_info=prendas_info)  # Pasar prendas parseadas
 
 
 @solicitudes_bp.route('/solicitudes/crear-cliente-ajax', methods=['POST'])
@@ -943,11 +1426,160 @@ def crear_cliente_ajax():
 def preparar_datos_imprimir_solicitud(solicitud_id):
     """Función auxiliar para preparar todos los datos necesarios para imprimir la solicitud"""
     from sqlalchemy.orm import joinedload
+    import re
     solicitud = Presupuesto.query.options(
         joinedload(Presupuesto.lineas).joinedload(LineaPresupuesto.prenda),
         joinedload(Presupuesto.cliente),
         joinedload(Presupuesto.comercial)
     ).get_or_404(solicitud_id)
+    
+    # Extraer información de todas las prendas desde tipo_producto
+    # Formato nuevo: "Prenda1 || Prenda 2: Tipo | ColPrinc: ... | ColSec: ... | Logo: ... || Prenda 3: ..."
+    # Formato antiguo: "Prenda1 | Prenda 2: Tipo - Colores | Prenda 3: Tipo - Colores"
+    prendas_info = []
+    
+    if solicitud.tipo_producto:
+        tipo_producto_texto = solicitud.tipo_producto
+        # Debug: mostrar qué se está parseando
+        print(f"DEBUG: Parseando tipo_producto: {tipo_producto_texto}")
+        
+        # Detectar formato: si tiene " || " es el formato nuevo, si tiene " | " y contiene "Prenda" es el antiguo
+        if ' || ' in tipo_producto_texto:
+            # Formato nuevo: usar " || " como separador
+            partes = tipo_producto_texto.split(' || ')
+            print(f"DEBUG: Formato nuevo detectado, partes: {partes}")
+        elif ' | ' in tipo_producto_texto and 'Prenda' in tipo_producto_texto:
+            # Formato antiguo: usar " | " como separador
+            partes = tipo_producto_texto.split(' | ')
+            print(f"DEBUG: Formato antiguo detectado, partes: {partes}")
+        else:
+            # Solo una prenda, sin separadores
+            partes = [tipo_producto_texto]
+            print(f"DEBUG: Solo una prenda detectada")
+        
+        # Primera parte es la primera prenda (sin prefijo "Prenda 1:")
+        primera_prenda = partes[0].strip()
+        
+        # Agregar primera prenda con todos sus datos
+        prendas_info.append({
+            'numero': 1,
+            'tipo_producto': primera_prenda,
+            'colores_principales': solicitud.colores_principales or '',
+            'colores_secundarios': solicitud.colores_secundarios or '',
+            'ubicacion_logo': solicitud.ubicacion_logo or ''
+        })
+        
+        # Procesar prendas adicionales (si existen)
+        for parte in partes[1:]:
+            parte = parte.strip()
+            if not parte:
+                continue
+                
+            # Intentar formato nuevo primero: "Prenda X: Tipo | ColPrinc: ... | ColSec: ... | Logo: ..."
+            # Mejorar el regex para capturar correctamente todos los campos
+            match_nuevo = re.match(r'Prenda\s+(\d+):\s*(.+?)(?:\s*\|\s*ColPrinc:\s*(.+?))?(?:\s*\|\s*ColSec:\s*(.+?))?(?:\s*\|\s*Logo:\s*(.+?))?$', parte)
+            if match_nuevo:
+                numero_prenda = int(match_nuevo.group(1))
+                tipo_prenda = match_nuevo.group(2).strip()
+                # Limpiar el tipo_prenda por si tiene espacios extra al final
+                tipo_prenda = tipo_prenda.rstrip(' |')
+                colores_principales_prenda = match_nuevo.group(3).strip() if match_nuevo.group(3) else ''
+                colores_secundarios_prenda = match_nuevo.group(4).strip() if match_nuevo.group(4) else ''
+                ubicacion_logo_prenda = match_nuevo.group(5).strip() if match_nuevo.group(5) else ''
+                
+                # Agregar prenda adicional con toda su información
+                prendas_info.append({
+                    'numero': numero_prenda,
+                    'tipo_producto': tipo_prenda,
+                    'colores_principales': colores_principales_prenda,
+                    'colores_secundarios': colores_secundarios_prenda,
+                    'ubicacion_logo': ubicacion_logo_prenda
+                })
+            else:
+                # Intentar parsear manualmente si el regex no funciona
+                # Formato: "Prenda X: Tipo | ColPrinc: ... | ColSec: ... | Logo: ..."
+                if parte.startswith('Prenda') and ':' in parte:
+                    try:
+                        # Extraer número de prenda
+                        num_match = re.match(r'Prenda\s+(\d+):', parte)
+                        if num_match:
+                            numero_prenda = int(num_match.group(1))
+                            # Extraer el resto después de "Prenda X: "
+                            resto = parte[num_match.end():].strip()
+                            
+                            # Parsear campos individuales
+                            tipo_prenda = ''
+                            colores_principales_prenda = ''
+                            colores_secundarios_prenda = ''
+                            ubicacion_logo_prenda = ''
+                            
+                            # Dividir por " | " y procesar cada parte
+                            campos = resto.split(' | ')
+                            tipo_prenda = campos[0].strip() if campos else ''
+                            
+                            for campo in campos[1:]:
+                                campo = campo.strip()
+                                if campo.startswith('ColPrinc:'):
+                                    colores_principales_prenda = campo.replace('ColPrinc:', '').strip()
+                                elif campo.startswith('ColSec:'):
+                                    colores_secundarios_prenda = campo.replace('ColSec:', '').strip()
+                                elif campo.startswith('Logo:'):
+                                    ubicacion_logo_prenda = campo.replace('Logo:', '').strip()
+                            
+                            prendas_info.append({
+                                'numero': numero_prenda,
+                                'tipo_producto': tipo_prenda,
+                                'colores_principales': colores_principales_prenda,
+                                'colores_secundarios': colores_secundarios_prenda,
+                                'ubicacion_logo': ubicacion_logo_prenda
+                            })
+                        else:
+                            # Si no se puede parsear, intentar formato antiguo
+                            raise ValueError("No se pudo parsear")
+                    except:
+                        # Si falla el parseo manual, intentar formato antiguo
+                        # Formato antiguo: "Prenda X: Tipo - Colores" (compatibilidad)
+                        match_antiguo = re.match(r'Prenda\s+(\d+):\s*(.+?)\s*-\s*(.+)', parte)
+                        if match_antiguo:
+                            numero_prenda = int(match_antiguo.group(1))
+                            tipo_prenda = match_antiguo.group(2).strip()
+                            colores_prenda = match_antiguo.group(3).strip()
+                            
+                            prendas_info.append({
+                                'numero': numero_prenda,
+                                'tipo_producto': tipo_prenda,
+                                'colores_principales': colores_prenda,
+                                'colores_secundarios': '',
+                                'ubicacion_logo': ''
+                            })
+                else:
+                    # Formato antiguo: "Prenda X: Tipo - Colores" (compatibilidad)
+                    match_antiguo = re.match(r'Prenda\s+(\d+):\s*(.+?)\s*-\s*(.+)', parte)
+                    if match_antiguo:
+                        numero_prenda = int(match_antiguo.group(1))
+                        tipo_prenda = match_antiguo.group(2).strip()
+                        colores_prenda = match_antiguo.group(3).strip()
+                        
+                        prendas_info.append({
+                            'numero': numero_prenda,
+                            'tipo_producto': tipo_prenda,
+                            'colores_principales': colores_prenda,
+                            'colores_secundarios': '',
+                            'ubicacion_logo': ''
+                        })
+                # Si no coincide con ningún patrón, podría ser solo el tipo sin "Prenda X:"
+                # En este caso, lo ignoramos ya que debería estar en la primera parte
+                # (No hay else aquí porque ya manejamos todos los casos posibles arriba)
+    
+    # Si no hay prendas extraídas, usar solo la primera
+    if not prendas_info:
+        prendas_info.append({
+            'numero': 1,
+            'tipo_producto': solicitud.tipo_producto or '',
+            'colores_principales': solicitud.colores_principales or '',
+            'colores_secundarios': solicitud.colores_secundarios or '',
+            'ubicacion_logo': solicitud.ubicacion_logo or ''
+        })
     
     # Calcular totales
     tipo_iva = 21
@@ -1077,7 +1709,8 @@ def preparar_datos_imprimir_solicitud(solicitud_id):
         'imagen_diseno_base64': imagen_diseno_base64,
         'imagen_portada_base64': imagen_portada_base64,
         'imagenes_adicionales_base64': imagenes_adicionales_base64,
-        'descripciones_imagenes': descripciones_imagenes
+        'descripciones_imagenes': descripciones_imagenes,
+        'prendas_info': prendas_info  # Información de todas las prendas
     }
 
 @solicitudes_bp.route('/solicitudes/<int:solicitud_id>/imprimir')

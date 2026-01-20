@@ -62,8 +62,8 @@
             display: flex;
             justify-content: space-between;
             align-items: start;
-            margin-bottom: 15px;
-            padding-bottom: 10px;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
             border-bottom: 2px solid #2c3e50;
         }
         
@@ -72,8 +72,8 @@
         }
         
         .logo-section img {
-            width: 120px;
-            height: 120px;
+            width: 60px;
+            height: 60px;
             object-fit: contain;
         }
         
@@ -287,11 +287,11 @@
         <div class="presupuesto-header">
             <div class="logo-section">
                 {% if use_base64 is defined and use_base64 and logo_base64 %}
-                <img src="{{ logo_base64 }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
+                <img src="{{ logo_base64 }}" alt="Logo" style="width: 60px; height: 60px; object-fit: contain;">
                 {% elif base_url is defined and base_url %}
-                <img src="{{ base_url }}{{ url_for('static', filename='logo1.png') }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
+                <img src="{{ base_url }}{{ url_for('static', filename='logo1.png') }}" alt="Logo" style="width: 60px; height: 60px; object-fit: contain;">
                 {% else %}
-                <img src="{{ url_for('static', filename='logo1.png', _external=True) }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
+                <img src="{{ url_for('static', filename='logo1.png', _external=True) }}" alt="Logo" style="width: 60px; height: 60px; object-fit: contain;">
                 {% endif %}
             </div>
             <div class="presupuesto-title">
@@ -341,23 +341,46 @@
             </div>
             <div class="datos-box">
                 <h3>Información para la Fabricación</h3>
-                {% if solicitud.tipo_producto %}
-                <p><strong>Tipo Producto:</strong> {{ solicitud.tipo_producto }}</p>
-                {% endif %}
-                {% if solicitud.colores_principales %}
-                <p><strong>Colores Principales:</strong> {{ solicitud.colores_principales }}</p>
-                {% endif %}
-                {% if solicitud.colores_secundarios %}
-                <p><strong>Colores Secundarios:</strong> {{ solicitud.colores_secundarios }}</p>
-                {% endif %}
-                {% if solicitud.ubicacion_logo %}
-                <p><strong>Ubicación del Logo:</strong> {{ solicitud.ubicacion_logo }}</p>
-                {% endif %}
+                
                 {% if solicitud.referencias_web %}
                 <p><strong>Referencias Web:</strong> {{ solicitud.referencias_web }}</p>
                 {% endif %}
                 {% if solicitud.datos_adicionales %}
                 <p><strong>Datos/Info Adicional:</strong> {{ solicitud.datos_adicionales }}</p>
+                {% endif %}
+                
+                {% if prendas_info is defined and prendas_info|length > 0 %}
+                    {% for prenda in prendas_info %}
+                    <div style="margin-top: {% if loop.index > 1 %}15px{% else %}10px{% endif %}; padding-top: {% if loop.index > 1 %}10px{% else %}0{% endif %}; border-top: {% if loop.index > 1 %}1px solid #dee2e6{% else %}none{% endif %};">
+                        <h4 style="color: #2c3e50; font-size: 0.95em; margin-bottom: 5px; margin-top: 0; font-weight: bold;">Prenda {{ prenda.numero }}</h4>
+                        {% if prenda.tipo_producto %}
+                        <p><strong>Tipo Producto:</strong> {{ prenda.tipo_producto }}</p>
+                        {% endif %}
+                        {% if prenda.colores_principales %}
+                        <p><strong>Colores Principales:</strong> {{ prenda.colores_principales }}</p>
+                        {% endif %}
+                        {% if prenda.colores_secundarios %}
+                        <p><strong>Colores Secundarios:</strong> {{ prenda.colores_secundarios }}</p>
+                        {% endif %}
+                        {% if prenda.ubicacion_logo %}
+                        <p><strong>Ubicación del Logo:</strong> {{ prenda.ubicacion_logo }}</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    {# Fallback: mostrar información tradicional si no hay prendas_info #}
+                    {% if solicitud.tipo_producto %}
+                    <p><strong>Tipo Producto:</strong> {{ solicitud.tipo_producto }}</p>
+                    {% endif %}
+                    {% if solicitud.colores_principales %}
+                    <p><strong>Colores Principales:</strong> {{ solicitud.colores_principales }}</p>
+                    {% endif %}
+                    {% if solicitud.colores_secundarios %}
+                    <p><strong>Colores Secundarios:</strong> {{ solicitud.colores_secundarios }}</p>
+                    {% endif %}
+                    {% if solicitud.ubicacion_logo %}
+                    <p><strong>Ubicación del Logo:</strong> {{ solicitud.ubicacion_logo }}</p>
+                    {% endif %}
                 {% endif %}
             </div>
         </div>

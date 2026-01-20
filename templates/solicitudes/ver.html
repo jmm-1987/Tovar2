@@ -411,26 +411,56 @@
         <div class="card" style="background-color: white; padding: 20px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); width: 100%;">
             <h3 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 15px;">Información para la Fabricación</h3>
             
-            <p><strong>Tipo Producto:</strong> {{ solicitud.tipo_producto or 'No especificado' }}</p>
-            
-            <p><strong>Colores Principales:</strong> {{ solicitud.colores_principales or 'No especificado' }}</p>
-            
-            <p><strong>Colores Secundarios:</strong> {{ solicitud.colores_secundarios or 'No especificado' }}</p>
-            
-            <p><strong>Ubicación del Logo:</strong> {{ solicitud.ubicacion_logo or 'No especificado' }}</p>
-            
             {% if solicitud.referencias_web %}
             <p><strong>Referencias Web:</strong></p>
-            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; margin-top: 5px; white-space: pre-wrap; word-break: break-all;">{{ solicitud.referencias_web }}</div>
+            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; margin-top: 5px; margin-bottom: 15px; white-space: pre-wrap; word-break: break-all;">{{ solicitud.referencias_web }}</div>
             {% else %}
-            <p><strong>Referencias Web:</strong> No especificado</p>
+            <p style="margin-bottom: 15px;"><strong>Referencias Web:</strong> No especificado</p>
             {% endif %}
             
             {% if solicitud.datos_adicionales %}
-            <p style="margin-top: 15px;"><strong>Datos/Info Adicional:</strong></p>
-            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; margin-top: 5px; white-space: pre-wrap;">{{ solicitud.datos_adicionales }}</div>
+            <p><strong>Datos/Info Adicional:</strong></p>
+            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; margin-top: 5px; margin-bottom: 15px; white-space: pre-wrap;">{{ solicitud.datos_adicionales }}</div>
             {% else %}
-            <p style="margin-top: 15px;"><strong>Datos/Info Adicional:</strong> No especificado</p>
+            <p style="margin-bottom: 15px;"><strong>Datos/Info Adicional:</strong> No especificado</p>
+            {% endif %}
+            
+            {% if prendas_info is defined and prendas_info|length > 0 %}
+                {% for prenda in prendas_info %}
+                <div style="margin-top: {% if loop.index > 1 %}15px{% else %}0{% endif %}; padding-top: {% if loop.index > 1 %}15px{% else %}0{% endif %}; border-top: {% if loop.index > 1 %}1px solid #dee2e6{% else %}none{% endif %};">
+                    <h4 style="color: #2c3e50; font-size: 1rem; margin-bottom: 10px; margin-top: 0; font-weight: bold;">Prenda {{ prenda.numero }}</h4>
+                    
+                    {% if prenda.tipo_producto %}
+                    <p><strong>Tipo Producto:</strong> {{ prenda.tipo_producto }}</p>
+                    {% else %}
+                    <p><strong>Tipo Producto:</strong> No especificado</p>
+                    {% endif %}
+                    
+                    {% if prenda.colores_principales %}
+                    <p><strong>Colores Principales:</strong> {{ prenda.colores_principales }}</p>
+                    {% else %}
+                    <p><strong>Colores Principales:</strong> No especificado</p>
+                    {% endif %}
+                    
+                    {% if prenda.colores_secundarios %}
+                    <p><strong>Colores Secundarios:</strong> {{ prenda.colores_secundarios }}</p>
+                    {% else %}
+                    <p><strong>Colores Secundarios:</strong> No especificado</p>
+                    {% endif %}
+                    
+                    {% if prenda.ubicacion_logo %}
+                    <p><strong>Ubicación del Logo:</strong> {{ prenda.ubicacion_logo }}</p>
+                    {% else %}
+                    <p><strong>Ubicación del Logo:</strong> No especificado</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            {% else %}
+                {# Fallback: mostrar información tradicional si no hay prendas_info #}
+                <p><strong>Tipo Producto:</strong> {{ solicitud.tipo_producto or 'No especificado' }}</p>
+                <p><strong>Colores Principales:</strong> {{ solicitud.colores_principales or 'No especificado' }}</p>
+                <p><strong>Colores Secundarios:</strong> {{ solicitud.colores_secundarios or 'No especificado' }}</p>
+                <p><strong>Ubicación del Logo:</strong> {{ solicitud.ubicacion_logo or 'No especificado' }}</p>
             {% endif %}
         </div>
     </div>

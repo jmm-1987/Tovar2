@@ -26,7 +26,7 @@ header {
                     <select name="comercial_id" id="comercial_id" required>
                         <option value="">Seleccione un comercial</option>
                         {% for comercial in comerciales %}
-                        <option value="{{ comercial.id }}" {% if solicitud.comercial_id == comercial.id %}selected{% endif %}>{{ comercial.nombre }}</option>
+                        <option value="{{ comercial.id }}" {% if form_data and form_data.comercial_id == comercial.id|string %}selected{% elif not form_data and solicitud.comercial_id == comercial.id %}selected{% endif %}>{{ comercial.nombre }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -36,13 +36,13 @@ header {
                     <div style="display: flex; gap: 5px;">
                         <div style="position: relative; flex: 1;">
                             <input type="text" id="cliente_search" placeholder="🔍 Buscar cliente..." 
-                                   value="{% if solicitud.cliente %}{{ solicitud.cliente.nombre }}{% endif %}"
+                                   value="{% if form_data and form_data.cliente_id %}{% for cliente in clientes %}{% if cliente.id|string == form_data.cliente_id|string %}{{ cliente.nombre }}{% endif %}{% endfor %}{% elif solicitud.cliente %}{{ solicitud.cliente.nombre }}{% endif %}"
                                    style="width: 100%; padding: 10px 35px 10px 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; box-sizing: border-box;"
                                    autocomplete="off">
                             <select name="cliente_id" id="cliente_id" required style="display: none;">
                                 <option value="">Seleccione un cliente</option>
                                 {% for cliente in clientes %}
-                                <option value="{{ cliente.id }}" data-nombre="{{ cliente.nombre|lower }}" {% if solicitud.cliente_id == cliente.id %}selected{% endif %}>{{ cliente.nombre }}</option>
+                                <option value="{{ cliente.id }}" data-nombre="{{ cliente.nombre|lower }}" {% if form_data and form_data.cliente_id == cliente.id|string %}selected{% elif not form_data and solicitud.cliente_id == cliente.id %}selected{% endif %}>{{ cliente.nombre }}</option>
                                 {% endfor %}
                             </select>
                             <div id="cliente_results" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px; max-height: 200px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
@@ -60,20 +60,20 @@ header {
                 <div class="form-group-compact">
                     <label for="tipo_pedido">Tipo *</label>
                     <select name="tipo_pedido" id="tipo_pedido" required>
-                        <option value="fabricacion" {% if solicitud.tipo_pedido == 'fabricacion' %}selected{% endif %}>Fabricación</option>
-                        <option value="bordado" {% if solicitud.tipo_pedido == 'bordado' %}selected{% endif %}>Bordado/Serig.</option>
-                        <option value="pedido proveedor" {% if solicitud.tipo_pedido == 'pedido proveedor' %}selected{% endif %}>Pedido proveedor</option>
+                        <option value="fabricacion" {% if form_data and form_data.tipo_pedido == 'fabricacion' %}selected{% elif not form_data and solicitud.tipo_pedido == 'fabricacion' %}selected{% endif %}>Fabricación</option>
+                        <option value="bordado" {% if form_data and form_data.tipo_pedido == 'bordado' %}selected{% elif not form_data and solicitud.tipo_pedido == 'bordado' %}selected{% endif %}>Bordado/Serig.</option>
+                        <option value="pedido proveedor" {% if form_data and form_data.tipo_pedido == 'pedido proveedor' %}selected{% elif not form_data and solicitud.tipo_pedido == 'pedido proveedor' %}selected{% endif %}>Pedido proveedor</option>
                     </select>
                 </div>
 
                 <div class="form-group-compact">
                     <label for="forma_pago">Forma de Pago</label>
-                    <input type="text" name="forma_pago" id="forma_pago" value="{{ solicitud.forma_pago or '' }}" placeholder="Ej: Transferencia, Efectivo, etc.">
+                    <input type="text" name="forma_pago" id="forma_pago" value="{% if form_data %}{{ form_data.forma_pago or '' }}{% else %}{{ solicitud.forma_pago or '' }}{% endif %}" placeholder="Ej: Transferencia, Efectivo, etc.">
                 </div>
 
                 <div class="form-group-compact">
                     <label for="fecha_objetivo">Fecha Objetivo</label>
-                    <input type="date" name="fecha_objetivo" id="fecha_objetivo" value="{% if solicitud.fecha_objetivo %}{{ solicitud.fecha_objetivo.strftime('%Y-%m-%d') }}{% endif %}" placeholder="Fecha objetivo de entrega">
+                    <input type="date" name="fecha_objetivo" id="fecha_objetivo" value="{% if form_data %}{{ form_data.fecha_objetivo or '' }}{% elif solicitud.fecha_objetivo %}{{ solicitud.fecha_objetivo.strftime('%Y-%m-%d') }}{% endif %}" placeholder="Fecha objetivo de entrega">
                     <small style="font-size: 0.8em; color: #666;">Se calcula automáticamente (20 días) al aceptar la solicitud</small>
                 </div>
             </div>
@@ -172,38 +172,52 @@ header {
 
     <h3 style="margin-top: 30px; margin-bottom: 15px; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px;">Información para la Fabricación</h3>
     <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dee2e6;">
-        <div class="form-row-compact">
-            <div class="form-group-compact" style="flex: 1;">
-                <label for="tipo_producto">Tipo Producto *</label>
-                <input type="text" name="tipo_producto" id="tipo_producto" required value="{{ solicitud.tipo_producto or '' }}" placeholder="Ej: Camiseta, Polo, Sudadera..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
-            </div>
-            <div class="form-group-compact" style="flex: 1;">
-                <label for="colores_principales">Colores Principales *</label>
-                <input type="text" name="colores_principales" id="colores_principales" required value="{{ solicitud.colores_principales or '' }}" placeholder="Ej: Azul marino, Rojo, Negro..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
-            </div>
-        </div>
-        
-        <div class="form-row-compact">
-            <div class="form-group-compact" style="flex: 1;">
-                <label for="colores_secundarios">Colores Secundarios *</label>
-                <input type="text" name="colores_secundarios" id="colores_secundarios" required value="{{ solicitud.colores_secundarios or '' }}" placeholder="Ej: Blanco, Gris claro..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
-            </div>
-            <div class="form-group-compact" style="flex: 1;">
-                <label for="ubicacion_logo">Ubicación del Logo *</label>
-                <input type="text" name="ubicacion_logo" id="ubicacion_logo" required value="{{ solicitud.ubicacion_logo or '' }}" placeholder="Ej: Pecho izquierdo, Espalda, Manga..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
-            </div>
-        </div>
-        
+        <!-- Referencias Web y Datos Adicionales al principio -->
         <div class="form-row-compact">
             <div class="form-group-compact" style="flex: 1;">
                 <label for="referencias_web">Referencias Web *</label>
-                <input type="text" name="referencias_web" id="referencias_web" required value="{{ solicitud.referencias_web or '' }}" placeholder="URLs o enlaces de referencia..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="text" name="referencias_web" id="referencias_web" required value="{% if form_data %}{{ form_data.referencias_web or '' }}{% else %}{{ solicitud.referencias_web or '' }}{% endif %}" placeholder="URLs o enlaces de referencia..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
             </div>
             <div class="form-group-compact" style="flex: 1;">
                 <label for="datos_adicionales">Datos/Info Adicional *</label>
-                <input type="text" name="datos_adicionales" id="datos_adicionales" required value="{{ solicitud.datos_adicionales or '' }}" placeholder="Información adicional relevante..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="text" name="datos_adicionales" id="datos_adicionales" required value="{% if form_data %}{{ form_data.datos_adicionales or '' }}{% else %}{{ solicitud.datos_adicionales or '' }}{% endif %}" placeholder="Información adicional relevante..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
             </div>
         </div>
+        
+        <!-- Los otros cuatro campos agrupados - Prenda 1 -->
+        <div id="prendas-fabricacion-container">
+            <div class="prenda-group" data-prenda-num="1" style="margin-top: 15px; padding: 15px; background: #ffffff; border: 1px solid #dee2e6; border-radius: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h4 style="margin: 0; color: #2c3e50; font-size: 1rem;">Prenda 1</h4>
+                    <button type="button" class="btn-eliminar-prenda" onclick="eliminarPrenda(this)" style="display: none; background: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Eliminar</button>
+                </div>
+                <div class="form-row-compact">
+                    <div class="form-group-compact" style="flex: 1;">
+                        <label for="prenda1_tipo_producto">Tipo Producto *</label>
+                        <input type="text" name="prenda1_tipo_producto" id="prenda1_tipo_producto" required value="{% if form_data %}{{ form_data.prenda1_tipo_producto or form_data.tipo_producto or '' }}{% else %}{{ solicitud.tipo_producto or '' }}{% endif %}" placeholder="Ej: Camiseta, Polo, Sudadera..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                    <div class="form-group-compact" style="flex: 1;">
+                        <label for="prenda1_colores_principales">Colores Principales *</label>
+                        <input type="text" name="prenda1_colores_principales" id="prenda1_colores_principales" required value="{% if form_data %}{{ form_data.prenda1_colores_principales or form_data.colores_principales or '' }}{% else %}{{ solicitud.colores_principales or '' }}{% endif %}" placeholder="Ej: Azul marino, Rojo, Negro..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                </div>
+                
+                <div class="form-row-compact">
+                    <div class="form-group-compact" style="flex: 1;">
+                        <label for="prenda1_colores_secundarios">Colores Secundarios *</label>
+                        <input type="text" name="prenda1_colores_secundarios" id="prenda1_colores_secundarios" required value="{% if form_data %}{{ form_data.prenda1_colores_secundarios or form_data.colores_secundarios or '' }}{% else %}{{ solicitud.colores_secundarios or '' }}{% endif %}" placeholder="Ej: Blanco, Gris claro..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                    <div class="form-group-compact" style="flex: 1;">
+                        <label for="prenda1_ubicacion_logo">Ubicación del Logo *</label>
+                        <input type="text" name="prenda1_ubicacion_logo" id="prenda1_ubicacion_logo" required value="{% if form_data %}{{ form_data.prenda1_ubicacion_logo or form_data.ubicacion_logo or '' }}{% else %}{{ solicitud.ubicacion_logo or '' }}{% endif %}" placeholder="Ej: Pecho izquierdo, Espalda, Manga..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <button type="button" onclick="agregarPrenda()" style="margin-top: 15px; background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
+            <span>+</span> Añadir Prenda
+        </button>
     </div>
 
     <div class="form-group">
@@ -371,6 +385,164 @@ header {
 </style>
 
 <script>
+// Restaurar datos del formulario si hay errores y cargar prendas desde BD
+document.addEventListener('DOMContentLoaded', function() {
+    {% if form_data %}
+    // Restaurar cliente en el buscador si hay error
+    const clienteId = '{{ form_data.cliente_id or "" }}';
+    if (clienteId) {
+        const clienteSelect = document.getElementById('cliente_id');
+        const clienteSearch = document.getElementById('cliente_search');
+        if (clienteSelect && clienteSearch) {
+            clienteSelect.value = clienteId;
+            const selectedOption = clienteSelect.options[clienteSelect.selectedIndex];
+            if (selectedOption) {
+                clienteSearch.value = selectedOption.textContent;
+            }
+        }
+    }
+    {% endif %}
+    
+    // Cargar prendas adicionales desde la BD si existen
+    {% if prendas_info is defined and prendas_info|length > 1 %}
+    const prendasInfo = {{ prendas_info|tojson|safe }};
+    const container = document.getElementById('prendas-fabricacion-container');
+    
+    // Agregar prendas adicionales (empezando desde la 2)
+    // El contador ya está inicializado con prendas_info.length
+    for (let i = 1; i < prendasInfo.length; i++) {
+        const prenda = prendasInfo[i];
+        
+        // Agregar la prenda (esto incrementa contadorPrendasFabricacion)
+        agregarPrenda();
+        
+        // Capturar el número de prenda usando una closure para evitar problemas con el setTimeout
+        (function(numeroPrenda, datosPrenda) {
+            // Esperar un momento para que se agregue el DOM y se actualicen los nombres
+            setTimeout(() => {
+                const todasPrendas = container.querySelectorAll('.prenda-group');
+                const nuevaPrenda = todasPrendas[todasPrendas.length - 1];
+                
+                if (nuevaPrenda) {
+                    // Buscar los inputs por el número que tiene después de agregarPrenda
+                    const tipoInput = nuevaPrenda.querySelector(`input[name="prenda${numeroPrenda}_tipo_producto"]`);
+                    const coloresPrincInput = nuevaPrenda.querySelector(`input[name="prenda${numeroPrenda}_colores_principales"]`);
+                    const coloresSecInput = nuevaPrenda.querySelector(`input[name="prenda${numeroPrenda}_colores_secundarios"]`);
+                    const ubicacionInput = nuevaPrenda.querySelector(`input[name="prenda${numeroPrenda}_ubicacion_logo"]`);
+                    
+                    if (tipoInput) tipoInput.value = datosPrenda.tipo_producto || '';
+                    if (coloresPrincInput) coloresPrincInput.value = datosPrenda.colores_principales || '';
+                    if (coloresSecInput) coloresSecInput.value = datosPrenda.colores_secundarios || '';
+                    if (ubicacionInput) ubicacionInput.value = datosPrenda.ubicacion_logo || '';
+                }
+            }, 100 * i); // Aumentar el delay para cada prenda para asegurar que se agreguen en orden
+        })(contadorPrendasFabricacion, prenda); // Pasar el contador actual y los datos de la prenda
+    }
+    {% endif %}
+});
+
+// Funciones para gestionar prendas de fabricación
+let contadorPrendasFabricacion = {% if prendas_info is defined and prendas_info|length > 0 %}{{ prendas_info|length }}{% else %}1{% endif %};
+
+function agregarPrenda() {
+    contadorPrendasFabricacion++;
+    const container = document.getElementById('prendas-fabricacion-container');
+    const primeraPrenda = container.querySelector('.prenda-group');
+    
+    if (!primeraPrenda) {
+        console.error('No se encontró la primera prenda para clonar');
+        return;
+    }
+    
+    const nuevaPrenda = primeraPrenda.cloneNode(true);
+    nuevaPrenda.setAttribute('data-prenda-num', contadorPrendasFabricacion);
+    
+    // Actualizar IDs y nombres de los campos
+    nuevaPrenda.querySelector('h4').textContent = `Prenda ${contadorPrendasFabricacion}`;
+    
+    nuevaPrenda.querySelectorAll('input').forEach(input => {
+        const oldId = input.id;
+        const oldName = input.name;
+        
+        if (oldId && oldName) {
+            const newId = oldId.replace(/prenda\d+/, `prenda${contadorPrendasFabricacion}`);
+            const newName = oldName.replace(/prenda\d+/, `prenda${contadorPrendasFabricacion}`);
+            input.id = newId;
+            input.name = newName;
+            input.value = '';
+            input.required = true;
+        }
+    });
+    
+    nuevaPrenda.querySelectorAll('label').forEach(label => {
+        const oldFor = label.getAttribute('for');
+        if (oldFor) {
+            label.setAttribute('for', oldFor.replace(/prenda\d+/, `prenda${contadorPrendasFabricacion}`));
+        }
+    });
+    
+    // Mostrar botón eliminar
+    const btnEliminar = nuevaPrenda.querySelector('.btn-eliminar-prenda');
+    if (btnEliminar) {
+        btnEliminar.style.display = 'block';
+    }
+    
+    container.appendChild(nuevaPrenda);
+}
+
+function eliminarPrenda(btn) {
+    const prendaGroup = btn.closest('.prenda-group');
+    const container = document.getElementById('prendas-fabricacion-container');
+    const todasPrendas = container.querySelectorAll('.prenda-group');
+    
+    if (todasPrendas.length > 1) {
+        prendaGroup.remove();
+        // Renumerar las prendas restantes
+        renumerarPrendas();
+    } else {
+        alert('Debe haber al menos una prenda');
+    }
+}
+
+function renumerarPrendas() {
+    const container = document.getElementById('prendas-fabricacion-container');
+    const todasPrendas = container.querySelectorAll('.prenda-group');
+    
+    todasPrendas.forEach((prenda, index) => {
+        const numero = index + 1;
+        prenda.setAttribute('data-prenda-num', numero);
+        prenda.querySelector('h4').textContent = `Prenda ${numero}`;
+        
+        // Ocultar botón eliminar en la primera prenda
+        const btnEliminar = prenda.querySelector('.btn-eliminar-prenda');
+        if (numero === 1 && btnEliminar) {
+            btnEliminar.style.display = 'none';
+        } else if (btnEliminar) {
+            btnEliminar.style.display = 'block';
+        }
+        
+        // Actualizar IDs y nombres
+        prenda.querySelectorAll('input').forEach(input => {
+            const oldId = input.id;
+            const oldName = input.name;
+            
+            if (oldId && oldName) {
+                const newId = oldId.replace(/prenda\d+/, `prenda${numero}`);
+                const newName = oldName.replace(/prenda\d+/, `prenda${numero}`);
+                input.id = newId;
+                input.name = newName;
+            }
+        });
+        
+        prenda.querySelectorAll('label').forEach(label => {
+            const oldFor = label.getAttribute('for');
+            if (oldFor) {
+                label.setAttribute('for', oldFor.replace(/prenda\d+/, `prenda${numero}`));
+            }
+        });
+    });
+}
+
 // Funciones para drag & drop
 function allowDrop(ev) {
     ev.preventDefault();

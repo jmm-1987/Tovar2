@@ -26,7 +26,7 @@ header {
                     <select name="comercial_id" id="comercial_id" required>
                         <option value="">Seleccione un comercial</option>
                         {% for comercial in comerciales %}
-                        <option value="{{ comercial.id }}">{{ comercial.nombre }}</option>
+                        <option value="{{ comercial.id }}" {% if form_data and form_data.comercial_id == comercial.id|string %}selected{% endif %}>{{ comercial.nombre }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -59,20 +59,20 @@ header {
                 <div class="form-group-compact">
                     <label for="tipo_pedido">Tipo *</label>
                     <select name="tipo_pedido" id="tipo_pedido" required>
-                        <option value="fabricacion">Fabricación</option>
-                        <option value="bordado">Bordado/Serig.</option>
-                        <option value="pedido proveedor">Pedido proveedor</option>
+                        <option value="fabricacion" {% if form_data and form_data.tipo_pedido == 'fabricacion' %}selected{% endif %}>Fabricación</option>
+                        <option value="bordado" {% if form_data and form_data.tipo_pedido == 'bordado' %}selected{% endif %}>Bordado/Serig.</option>
+                        <option value="pedido proveedor" {% if form_data and form_data.tipo_pedido == 'pedido proveedor' %}selected{% endif %}>Pedido proveedor</option>
                     </select>
                 </div>
 
                 <div class="form-group-compact">
                     <label for="forma_pago">Forma de Pago</label>
-                    <input type="text" name="forma_pago" id="forma_pago" placeholder="Ej: Transferencia, Efectivo, etc.">
+                    <input type="text" name="forma_pago" id="forma_pago" value="{% if form_data %}{{ form_data.forma_pago or '' }}{% endif %}" placeholder="Ej: Transferencia, Efectivo, etc.">
                 </div>
 
                 <div class="form-group-compact">
                     <label for="fecha_objetivo">Fecha Objetivo</label>
-                    <input type="date" name="fecha_objetivo" id="fecha_objetivo" placeholder="Fecha objetivo de entrega">
+                    <input type="date" name="fecha_objetivo" id="fecha_objetivo" value="{% if form_data %}{{ form_data.fecha_objetivo or '' }}{% endif %}" placeholder="Fecha objetivo de entrega">
                     <small style="font-size: 0.8em; color: #666; display: block; margin-top: 4px;">Fecha objetivo de entrega (opcional)</small>
                 </div>
             </div>
@@ -147,43 +147,57 @@ header {
 
     <h3 style="margin-top: 30px; margin-bottom: 15px; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px;">Información para la Fabricación</h3>
     <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dee2e6;">
-        <div class="form-row-compact">
-            <div class="form-group-compact" style="flex: 1;">
-                <label for="tipo_producto">Tipo Producto *</label>
-                <input type="text" name="tipo_producto" id="tipo_producto" required placeholder="Ej: Camiseta, Polo, Sudadera..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
-            </div>
-            <div class="form-group-compact" style="flex: 1;">
-                <label for="colores_principales">Colores Principales *</label>
-                <input type="text" name="colores_principales" id="colores_principales" required placeholder="Ej: Azul marino, Rojo, Negro..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
-            </div>
-        </div>
-        
-        <div class="form-row-compact">
-            <div class="form-group-compact" style="flex: 1;">
-                <label for="colores_secundarios">Colores Secundarios *</label>
-                <input type="text" name="colores_secundarios" id="colores_secundarios" required placeholder="Ej: Blanco, Gris claro..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
-            </div>
-            <div class="form-group-compact" style="flex: 1;">
-                <label for="ubicacion_logo">Ubicación del Logo *</label>
-                <input type="text" name="ubicacion_logo" id="ubicacion_logo" required placeholder="Ej: Pecho izquierdo, Espalda, Manga..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
-            </div>
-        </div>
-        
+        <!-- Referencias Web y Datos Adicionales al principio -->
         <div class="form-row-compact">
             <div class="form-group-compact" style="flex: 1;">
                 <label for="referencias_web">Referencias Web *</label>
-                <input type="text" name="referencias_web" id="referencias_web" required placeholder="URLs o enlaces de referencia..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="text" name="referencias_web" id="referencias_web" required value="{% if form_data %}{{ form_data.referencias_web or '' }}{% endif %}" placeholder="web, Instagram, Facebook..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
             </div>
             <div class="form-group-compact" style="flex: 1;">
                 <label for="datos_adicionales">Datos/Info Adicional *</label>
-                <input type="text" name="datos_adicionales" id="datos_adicionales" required placeholder="Información adicional relevante..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                <input type="text" name="datos_adicionales" id="datos_adicionales" required value="{% if form_data %}{{ form_data.datos_adicionales or '' }}{% endif %}" placeholder="Información adicional relevante..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
             </div>
         </div>
+        
+        <!-- Los otros cuatro campos agrupados - Prenda 1 -->
+        <div id="prendas-fabricacion-container">
+            <div class="prenda-group" data-prenda-num="1" style="margin-top: 15px; padding: 15px; background: #ffffff; border: 1px solid #dee2e6; border-radius: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h4 style="margin: 0; color: #2c3e50; font-size: 1rem;">Prenda 1</h4>
+                    <button type="button" class="btn-eliminar-prenda" onclick="eliminarPrenda(this)" style="display: none; background: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Eliminar</button>
+                </div>
+                <div class="form-row-compact">
+                    <div class="form-group-compact" style="flex: 1;">
+                        <label for="prenda1_tipo_producto">Tipo Producto *</label>
+                        <input type="text" name="prenda1_tipo_producto" id="prenda1_tipo_producto" required value="{% if form_data %}{{ form_data.prenda1_tipo_producto or form_data.tipo_producto or '' }}{% endif %}" placeholder="Ej: Camiseta, Polo, Sudadera..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                    <div class="form-group-compact" style="flex: 1;">
+                        <label for="prenda1_colores_principales">Colores Principales *</label>
+                        <input type="text" name="prenda1_colores_principales" id="prenda1_colores_principales" required value="{% if form_data %}{{ form_data.prenda1_colores_principales or form_data.colores_principales or '' }}{% endif %}" placeholder="Ej: Azul marino, Rojo, Negro..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                </div>
+                
+                <div class="form-row-compact">
+                    <div class="form-group-compact" style="flex: 1;">
+                        <label for="prenda1_colores_secundarios">Colores Secundarios *</label>
+                        <input type="text" name="prenda1_colores_secundarios" id="prenda1_colores_secundarios" required value="{% if form_data %}{{ form_data.prenda1_colores_secundarios or form_data.colores_secundarios or '' }}{% endif %}" placeholder="Ej: Blanco, Gris claro..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                    <div class="form-group-compact" style="flex: 1;">
+                        <label for="prenda1_ubicacion_logo">Logo/Ubicación del Logo *</label>
+                        <input type="text" name="prenda1_ubicacion_logo" id="prenda1_ubicacion_logo" required value="{% if form_data %}{{ form_data.prenda1_ubicacion_logo or form_data.ubicacion_logo or '' }}{% endif %}" placeholder="Ej: Logo2/manga derecha  (los logos se cargarán en las imagenes adicionales)" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <button type="button" onclick="agregarPrenda()" style="margin-top: 15px; background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
+            <span>+</span> Añadir Prenda
+        </button>
     </div>
 
     <div class="form-group">
         <label for="seguimiento">Comertarios internos y seguimiento</label>
-        <textarea name="seguimiento" id="seguimiento" rows="3" placeholder="Escribe aquí las actualizaciones y seguimiento del presupuesto..."></textarea>
+        <textarea name="seguimiento" id="seguimiento" rows="3" placeholder="Escribe aquí las actualizaciones y seguimiento del presupuesto...">{% if form_data %}{{ form_data.seguimiento or '' }}{% endif %}</textarea>
     </div>
 
     <h3>Productos del Presupuesto</h3>
@@ -291,6 +305,186 @@ header {
 </style>
 
 <script>
+// Restaurar datos del formulario si hay errores
+document.addEventListener('DOMContentLoaded', function() {
+    {% if form_data %}
+    // Restaurar cliente en el buscador
+    const clienteId = '{{ form_data.cliente_id or "" }}';
+    if (clienteId) {
+        const clienteSelect = document.getElementById('cliente_id');
+        const clienteSearch = document.getElementById('cliente_search');
+        if (clienteSelect && clienteSearch) {
+            clienteSelect.value = clienteId;
+            const selectedOption = clienteSelect.options[clienteSelect.selectedIndex];
+            if (selectedOption) {
+                clienteSearch.value = selectedOption.textContent;
+            }
+        }
+    }
+    
+    // Restaurar líneas del presupuesto desde form_data
+    {% set nombres_mostrar = form_data.getlist('nombre_mostrar[]') if form_data else [] %}
+    {% if nombres_mostrar|length > 0 %}
+    const container = document.getElementById('prendas-container');
+    if (container) {
+        // Obtener arrays de datos del formulario
+        const nombresMostrar = {{ form_data.getlist('nombre_mostrar[]')|tojson|safe }};
+        const cantidades = {{ form_data.getlist('cantidad[]')|tojson|safe }};
+        const tallas = {{ form_data.getlist('talla[]')|tojson|safe }};
+        const prendaNombres = {{ form_data.getlist('prenda_nombre[]')|tojson|safe }};
+        const prendaIds = {{ form_data.getlist('prenda_id[]')|tojson|safe }};
+        const colores = {{ form_data.getlist('color[]')|tojson|safe }};
+        const formas = {{ form_data.getlist('forma[]')|tojson|safe }};
+        const sexos = {{ form_data.getlist('sexo[]')|tojson|safe }};
+        const tejidos = {{ form_data.getlist('tejido[]')|tojson|safe }};
+        const preciosUnitarios = {{ form_data.getlist('precio_unitario[]')|tojson|safe }};
+        const descuentos = {{ form_data.getlist('descuento[]')|tojson|safe }};
+        const preciosFinales = {{ form_data.getlist('precio_final[]')|tojson|safe }};
+        
+        // Restaurar primera línea
+        const primeraLinea = container.querySelector('.linea-pedido-row');
+        if (primeraLinea && nombresMostrar.length > 0) {
+            if (nombresMostrar[0]) primeraLinea.querySelector('input[name="nombre_mostrar[]"]').value = nombresMostrar[0];
+            if (cantidades.length > 0 && cantidades[0]) primeraLinea.querySelector('input[name="cantidad[]"]').value = cantidades[0];
+            if (tallas.length > 0 && tallas[0]) primeraLinea.querySelector('input[name="talla[]"]').value = tallas[0];
+            if (prendaNombres.length > 0 && prendaNombres[0]) primeraLinea.querySelector('input[name="prenda_nombre[]"]').value = prendaNombres[0];
+            if (prendaIds.length > 0 && prendaIds[0]) primeraLinea.querySelector('input[name="prenda_id[]"]').value = prendaIds[0];
+            if (colores.length > 0 && colores[0]) primeraLinea.querySelector('input[name="color[]"]').value = colores[0];
+            if (formas.length > 0 && formas[0]) primeraLinea.querySelector('input[name="forma[]"]').value = formas[0];
+            if (sexos.length > 0 && sexos[0]) primeraLinea.querySelector('select[name="sexo[]"]').value = sexos[0];
+            if (tejidos.length > 0 && tejidos[0]) primeraLinea.querySelector('select[name="tejido[]"]').value = tejidos[0];
+            if (preciosUnitarios.length > 0 && preciosUnitarios[0]) primeraLinea.querySelector('input[name="precio_unitario[]"]').value = preciosUnitarios[0];
+            if (descuentos.length > 0 && descuentos[0]) primeraLinea.querySelector('input[name="descuento[]"]').value = descuentos[0];
+            if (preciosFinales.length > 0 && preciosFinales[0]) primeraLinea.querySelector('input[name="precio_final[]"]').value = preciosFinales[0];
+        }
+        
+        // Agregar líneas adicionales
+        for (let i = 1; i < nombresMostrar.length; i++) {
+            agregarLinea();
+            const todasLineas = container.querySelectorAll('.linea-pedido-row');
+            const nuevaLinea = todasLineas[todasLineas.length - 1];
+            if (nuevaLinea) {
+                if (nombresMostrar[i]) nuevaLinea.querySelector('input[name="nombre_mostrar[]"]').value = nombresMostrar[i];
+                if (cantidades.length > i && cantidades[i]) nuevaLinea.querySelector('input[name="cantidad[]"]').value = cantidades[i];
+                if (tallas.length > i && tallas[i]) nuevaLinea.querySelector('input[name="talla[]"]').value = tallas[i];
+                if (prendaNombres.length > i && prendaNombres[i]) nuevaLinea.querySelector('input[name="prenda_nombre[]"]').value = prendaNombres[i];
+                if (prendaIds.length > i && prendaIds[i]) nuevaLinea.querySelector('input[name="prenda_id[]"]').value = prendaIds[i];
+                if (colores.length > i && colores[i]) nuevaLinea.querySelector('input[name="color[]"]').value = colores[i];
+                if (formas.length > i && formas[i]) nuevaLinea.querySelector('input[name="forma[]"]').value = formas[i];
+                if (sexos.length > i && sexos[i]) nuevaLinea.querySelector('select[name="sexo[]"]').value = sexos[i];
+                if (tejidos.length > i && tejidos[i]) nuevaLinea.querySelector('select[name="tejido[]"]').value = tejidos[i];
+                if (preciosUnitarios.length > i && preciosUnitarios[i]) nuevaLinea.querySelector('input[name="precio_unitario[]"]').value = preciosUnitarios[i];
+                if (descuentos.length > i && descuentos[i]) nuevaLinea.querySelector('input[name="descuento[]"]').value = descuentos[i];
+                if (preciosFinales.length > i && preciosFinales[i]) nuevaLinea.querySelector('input[name="precio_final[]"]').value = preciosFinales[i];
+            }
+        }
+    }
+    {% endif %}
+    {% endif %}
+});
+
+// Funciones para gestionar prendas de fabricación
+let contadorPrendasFabricacion = 1;
+
+function agregarPrenda() {
+    contadorPrendasFabricacion++;
+    const container = document.getElementById('prendas-fabricacion-container');
+    const primeraPrenda = container.querySelector('.prenda-group');
+    
+    if (!primeraPrenda) {
+        console.error('No se encontró la primera prenda para clonar');
+        return;
+    }
+    
+    const nuevaPrenda = primeraPrenda.cloneNode(true);
+    nuevaPrenda.setAttribute('data-prenda-num', contadorPrendasFabricacion);
+    
+    // Actualizar IDs y nombres de los campos
+    nuevaPrenda.querySelector('h4').textContent = `Prenda ${contadorPrendasFabricacion}`;
+    
+    nuevaPrenda.querySelectorAll('input').forEach(input => {
+        const oldId = input.id;
+        const oldName = input.name;
+        
+        if (oldId && oldName) {
+            const newId = oldId.replace(/prenda\d+/, `prenda${contadorPrendasFabricacion}`);
+            const newName = oldName.replace(/prenda\d+/, `prenda${contadorPrendasFabricacion}`);
+            input.id = newId;
+            input.name = newName;
+            input.value = '';
+            input.required = true;
+        }
+    });
+    
+    nuevaPrenda.querySelectorAll('label').forEach(label => {
+        const oldFor = label.getAttribute('for');
+        if (oldFor) {
+            label.setAttribute('for', oldFor.replace(/prenda\d+/, `prenda${contadorPrendasFabricacion}`));
+        }
+    });
+    
+    // Mostrar botón eliminar
+    const btnEliminar = nuevaPrenda.querySelector('.btn-eliminar-prenda');
+    if (btnEliminar) {
+        btnEliminar.style.display = 'block';
+    }
+    
+    container.appendChild(nuevaPrenda);
+}
+
+function eliminarPrenda(btn) {
+    const prendaGroup = btn.closest('.prenda-group');
+    const container = document.getElementById('prendas-fabricacion-container');
+    const todasPrendas = container.querySelectorAll('.prenda-group');
+    
+    if (todasPrendas.length > 1) {
+        prendaGroup.remove();
+        // Renumerar las prendas restantes
+        renumerarPrendas();
+    } else {
+        alert('Debe haber al menos una prenda');
+    }
+}
+
+function renumerarPrendas() {
+    const container = document.getElementById('prendas-fabricacion-container');
+    const todasPrendas = container.querySelectorAll('.prenda-group');
+    
+    todasPrendas.forEach((prenda, index) => {
+        const numero = index + 1;
+        prenda.setAttribute('data-prenda-num', numero);
+        prenda.querySelector('h4').textContent = `Prenda ${numero}`;
+        
+        // Ocultar botón eliminar en la primera prenda
+        const btnEliminar = prenda.querySelector('.btn-eliminar-prenda');
+        if (numero === 1 && btnEliminar) {
+            btnEliminar.style.display = 'none';
+        } else if (btnEliminar) {
+            btnEliminar.style.display = 'block';
+        }
+        
+        // Actualizar IDs y nombres
+        prenda.querySelectorAll('input').forEach(input => {
+            const oldId = input.id;
+            const oldName = input.name;
+            
+            if (oldId && oldName) {
+                const newId = oldId.replace(/prenda\d+/, `prenda${numero}`);
+                const newName = oldName.replace(/prenda\d+/, `prenda${numero}`);
+                input.id = newId;
+                input.name = newName;
+            }
+        });
+        
+        prenda.querySelectorAll('label').forEach(label => {
+            const oldFor = label.getAttribute('for');
+            if (oldFor) {
+                label.setAttribute('for', oldFor.replace(/prenda\d+/, `prenda${numero}`));
+            }
+        });
+    });
+}
+
 // Función para mostrar/ocultar sección de imágenes
 function toggleSeccionImagenes() {
     const seccion = document.getElementById('seccion-imagenes');
