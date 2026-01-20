@@ -1404,6 +1404,7 @@ form[action*="cambiar-estado"] button:hover {
     gap: 6px;
     flex: 1;
     flex-wrap: wrap;
+    min-width: 0;
 }
 
 .linea-campo-compact {
@@ -1422,7 +1423,7 @@ form[action*="cambiar-estado"] button:hover {
 }
 
 .linea-campo-compact.cantidad {
-    width: 60px;
+    width: 53px;
 }
 
 select.linea-campo-compact {
@@ -1434,6 +1435,37 @@ input.linea-campo-compact[type="text"] {
     min-width: 80px;
     flex: 1;
     max-width: 120px;
+}
+
+/* Campo nombre para mostrar - ancho fijo 350px */
+input.linea-campo-compact[name="nombre_mostrar[]"],
+input.nombre-mostrar-campo {
+    max-width: none !important;
+    flex-shrink: 0 !important;
+}
+
+input.linea-campo-compact[name="nombre_mostrar[]"][style*="350px"],
+input.nombre-mostrar-campo[style*="350px"] {
+    flex: 0 0 350px !important;
+    width: 350px !important;
+    min-width: 350px !important;
+}
+
+/* Ocultar flechitas (spinners) en campos numéricos de precio, descuento y precio final */
+input.precio-unitario-input[type="number"],
+input.descuento-input[type="number"],
+input.precio-final-input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+input.precio-unitario-input[type="number"]::-webkit-inner-spin-button,
+input.precio-unitario-input[type="number"]::-webkit-outer-spin-button,
+input.descuento-input[type="number"]::-webkit-inner-spin-button,
+input.descuento-input[type="number"]::-webkit-outer-spin-button,
+input.precio-final-input[type="number"]::-webkit-inner-spin-button,
+input.precio-final-input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
 
 .linea-acciones {
