@@ -1733,6 +1733,36 @@ def preparar_datos_imprimir_solicitud(solicitud_id):
     tipo_iva_para_template = float(tipo_iva)
     print(f"DEBUG: Tipo IVA que se pasa al template: {tipo_iva_para_template}%")
     
+    # Obtener datos de configuración para protección de datos y número de cuenta
+    from models import Configuracion
+    texto_proteccion_datos = None
+    numero_cuenta_iban = None
+    forma_pago_texto = None
+    
+    # Buscar configuración de protección de datos
+    config_proteccion = Configuracion.query.filter_by(clave='texto_proteccion_datos').first()
+    if config_proteccion and config_proteccion.valor:
+        texto_proteccion_datos = config_proteccion.valor
+    else:
+        # Valor por defecto
+        texto_proteccion_datos = 'Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.'
+    
+    # Buscar configuración de número de cuenta/IBAN
+    config_iban = Configuracion.query.filter_by(clave='numero_cuenta_iban').first()
+    if config_iban and config_iban.valor:
+        numero_cuenta_iban = config_iban.valor
+    else:
+        # Valor por defecto
+        numero_cuenta_iban = 'ES2200495247862816942248'
+    
+    # Buscar configuración de forma de pago
+    config_forma_pago = Configuracion.query.filter_by(clave='forma_pago_texto').first()
+    if config_forma_pago and config_forma_pago.valor:
+        forma_pago_texto = config_forma_pago.valor
+    else:
+        # Valor por defecto
+        forma_pago_texto = 'Transferencia'
+    
     return {
         'presupuesto': solicitud,  # Mantener 'presupuesto' para compatibilidad con template
         'solicitud': solicitud,  # Agregar 'solicitud' también
@@ -1745,7 +1775,10 @@ def preparar_datos_imprimir_solicitud(solicitud_id):
         'imagen_portada_base64': imagen_portada_base64,
         'imagenes_adicionales_base64': imagenes_adicionales_base64,
         'descripciones_imagenes': descripciones_imagenes,
-        'prendas_info': prendas_info  # Información de todas las prendas
+        'prendas_info': prendas_info,  # Información de todas las prendas
+        'texto_proteccion_datos': texto_proteccion_datos,
+        'numero_cuenta_iban': numero_cuenta_iban,
+        'forma_pago_texto': forma_pago_texto
     }
 
 @solicitudes_bp.route('/solicitudes/<int:solicitud_id>/imprimir')
@@ -1787,6 +1820,9 @@ def descargar_albaran_solicitud(solicitud_id):
                 
                 # Cargar el HTML desde el archivo temporal
                 page.goto(f'file://{temp_html_path}')
+                
+                # Esperar a que el JavaScript actualice los números de página
+                page.wait_for_timeout(500)  # Esperar 500ms para que el script se ejecute
                 
                 # Generar PDF
                 pdf_bytes = page.pdf(
@@ -1862,6 +1898,9 @@ def descargar_pdf_solicitud(solicitud_id):
                 # Cargar el HTML desde el archivo temporal
                 page.goto(f'file://{temp_html_path}')
                 
+                # Esperar a que el JavaScript actualice los números de página
+                page.wait_for_timeout(500)  # Esperar 500ms para que el script se ejecute
+                
                 # Generar PDF
                 pdf_bytes = page.pdf(
                     format='A4',
@@ -1936,6 +1975,9 @@ def descargar_pdf_detallado_solicitud(solicitud_id):
                 # Cargar el HTML desde el archivo temporal
                 page.goto(f'file://{temp_html_path}')
                 
+                # Esperar a que el JavaScript actualice los números de página
+                page.wait_for_timeout(500)  # Esperar 500ms para que el script se ejecute
+                
                 # Generar PDF
                 pdf_bytes = page.pdf(
                     format='A4',
@@ -2009,6 +2051,9 @@ def descargar_hoja_trabajo_solicitud(solicitud_id):
                 
                 # Cargar el HTML desde el archivo temporal
                 page.goto(f'file://{temp_html_path}')
+                
+                # Esperar a que el JavaScript actualice los números de página
+                page.wait_for_timeout(500)  # Esperar 500ms para que el script se ejecute
                 
                 # Generar PDF
                 pdf_bytes = page.pdf(

@@ -43,6 +43,8 @@
                                 <a href="{{ url_for('tickets.cuadre_caja') }}">Cuadre de Caja</a>
                             </div>
                         </div>
+                        {% if current_user.rol != 'comercial' %}
+                        {# Los comerciales no ven estadísticas #}
                         <div class="dropdown">
                             <a href="#" class="dropdown-toggle">📊 Informes <span class="dropdown-arrow">▼</span></a>
                             <div class="dropdown-menu">
@@ -52,6 +54,7 @@
                                 <a href="{{ url_for('informes.iva') }}">IVA</a>
                             </div>
                         </div>
+                        {# Los comerciales no ven nada de la sección de Gastos #}
                         <div class="dropdown">
                             <a href="#" class="dropdown-toggle">💰 Gastos <span class="dropdown-arrow">▼</span></a>
                             <div class="dropdown-menu">
@@ -61,6 +64,7 @@
                                 <a href="{{ url_for('gastos.listado_nominas') }}">Nóminas</a>
                             </div>
                         </div>
+                        {% endif %}
                         {% if current_user.is_supervisor() %}
                             <a href="{{ url_for('configuracion.index') }}">⚙️ Configuración</a>
                         {% endif %}

@@ -13,16 +13,7 @@
         
         @page {
             size: A4;
-            margin: 5mm 10mm 20mm 10mm;
-        }
-        
-        body {
-            counter-reset: page-counter;
-        }
-        
-        .page {
-            counter-increment: page-counter;
-            position: relative;
+            margin: 5mm 10mm 10mm 10mm;
         }
         
         body {
@@ -49,35 +40,6 @@
         
         .contenido-presupuesto-wrapper {
             page-break-inside: auto;
-        }
-        
-        /* Estilos para cabecera repetida */
-        .cabecera-repetida {
-            display: none;
-        }
-        
-        .cabecera-repetida .presupuesto-header {
-            margin-bottom: 10px;
-            padding-bottom: 5px;
-            border-bottom: 2px solid #2c3e50;
-        }
-        
-        .cabecera-repetida .presupuesto-header .logo-section img {
-            width: 80px;
-            height: 80px;
-        }
-        
-        .cabecera-repetida .presupuesto-header .presupuesto-title h1 {
-            font-size: 1.3em;
-            margin: 0;
-        }
-        
-        .cabecera-repetida .presupuesto-header .presupuesto-info {
-            font-size: 0.75em;
-        }
-        
-        .cabecera-repetida .presupuesto-header .presupuesto-info p {
-            margin: 1px 0;
         }
         
         .page-content {
@@ -109,6 +71,7 @@
             margin-top: 15px;
             padding: 8px;
             background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
             font-size: 9px;
             color: #666;
             line-height: 1.3;
@@ -330,6 +293,7 @@
         .firma-section {
             margin-top: 8px;
             padding-top: 8px;
+            border-top: 2px solid #2c3e50;
             flex-shrink: 0;
         }
         
@@ -479,48 +443,6 @@
             display: table-header-group;
         }
         
-        .cabecera-repetida {
-            display: none;
-        }
-        
-        .cabecera-repetida .presupuesto-header {
-            margin-bottom: 10px;
-            padding-bottom: 5px;
-            border-bottom: 2px solid #2c3e50;
-        }
-        
-        .cabecera-repetida .presupuesto-header .logo-section img {
-            width: 80px;
-            height: 80px;
-        }
-        
-        .cabecera-repetida .presupuesto-header .presupuesto-title h1 {
-            font-size: 1.3em;
-            margin: 0;
-        }
-        
-        .cabecera-repetida .presupuesto-header .presupuesto-info {
-            font-size: 0.75em;
-        }
-        
-        .cabecera-repetida .presupuesto-header .presupuesto-info p {
-            margin: 1px 0;
-        }
-        
-        @media print {
-            /* Mostrar cabecera repetida cuando la tabla se divide entre páginas */
-            .cabecera-repetida {
-                display: block;
-                page-break-after: avoid;
-                margin-bottom: 10px;
-            }
-            
-            /* Ocultar en la primera página del contenido */
-            .contenido-presupuesto-wrapper:first-of-type .cabecera-repetida {
-                display: none;
-            }
-        }
-        
         .lineas-table th {
             padding: 5px 8px;
             text-align: left;
@@ -551,6 +473,7 @@
         .footer-datos-presupuesto {
             margin-top: 15px;
             padding-top: 10px;
+            border-top: 1px solid #dee2e6;
             page-break-inside: avoid;
         }
         
@@ -584,7 +507,6 @@
             border-top: 2px solid #2c3e50;
             padding-top: 8px;
             margin-top: 5px;
-            border-bottom: none;
         }
         
         .total-label {
@@ -654,25 +576,6 @@
             
             .seccion-imagenes-wrapper {
                 page-break-before: always !important;
-            }
-            
-            /* Mostrar cabecera repetida cuando la tabla se divide entre páginas */
-            /* Para que funcione con Playwright, la cabecera debe estar visible */
-            .cabecera-repetida {
-                display: block !important;
-                page-break-after: avoid;
-                margin-bottom: 10px;
-                page-break-inside: avoid;
-            }
-            
-            /* Ocultar solo en la primera página visible (si no hay portada) */
-            body > .page.contenido-presupuesto-wrapper:first-child .cabecera-repetida {
-                display: none !important;
-            }
-            
-            /* Si hay portada, ocultar en la primera página de contenido */
-            .page.portada-page ~ .page.contenido-presupuesto-wrapper:first-of-type .cabecera-repetida {
-                display: none !important;
             }
         }
     </style>
@@ -784,30 +687,6 @@
 
         
         {% if presupuesto.lineas %}
-        <!-- Cabecera repetida para páginas siguientes -->
-        <div class="cabecera-repetida">
-            <div class="presupuesto-header">
-                <div class="logo-section">
-                    {% if use_base64 is defined and use_base64 and logo_base64 %}
-                    <img src="{{ logo_base64 }}" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;">
-                    {% elif base_url is defined and base_url %}
-                    <img src="{{ base_url }}{{ url_for('static', filename='logo1.png') }}" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;">
-                    {% else %}
-                    <img src="{{ url_for('static', filename='logo1.png', _external=True) }}" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;">
-                    {% endif %}
-                </div>
-                <div class="presupuesto-title">
-                    <h1>{% if es_albaran is defined and es_albaran %}ALBARÁN{% else %}PRESUPUESTO{% endif %} {{ presupuesto.numero_solicitud or presupuesto.id }}</h1>
-                </div>
-                <div class="presupuesto-info">
-                    <p><strong>Weark Custom Tovar Sl</strong></p>
-                    <p>B06763502</p>
-                    <p>C/Marquesa de Pinares, 11</p>
-                    <p>06800-Mérida (Badajoz)</p>
-                </div>
-            </div>
-        </div>
-        
         <table class="lineas-table">
             <thead>
                 <tr>
@@ -883,38 +762,18 @@
                 <span>{{ "%.2f"|format(total_con_iva) }} €</span>
             </div>
         </div>
-        </br>
-        </br>
         {% endif %}
-        <div class="firma-section">
-            <div class="firma-box">
-                <div class="firma-cliente">
-                    <div class="firma-line"></div>
-                    <div class="firma-label">Firma y sello del CLIENTE</div>
-                </div>
-                <div class="firma-empresa">
-                    <div class="firma-line"></div>
-                    <div class="firma-label">Firma y sello de LA EMPRESA</div>
-                </div>
-            </div>
-            <!--<div style="margin-top: 10px; text-align: center; font-size: 8px; color: #666;">
-                <p style="margin: 2px 0;">Fecha: ___________________</p>
-                <p style="margin: 2px 0;">Lugar: ___________________</p>
-            </div>-->
-        </div>
         {% else %}
         <p style="padding: 30px; background: #f8f9fa; border-radius: 6px; text-align: center; color: #999;">
             Este presupuesto no tiene líneas registradas.
         </p>
         {% endif %}
-
-
         
         <!-- Pie de página con información de protección de datos -->
         <div class="footer-datos-presupuesto">
-            <p><span class="iban">Forma de Pago: {{ forma_pago_texto if forma_pago_texto is defined else 'Transferencia' }} | IBAN: {{ numero_cuenta_iban if numero_cuenta_iban is defined else 'ES2200495247862816942248' }}</span></p>
+            <p><span class="iban">Forma de Pago: Transferencia | IBAN:ES2200495247862816942248</span></p>
             </br>
-            <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> {{ texto_proteccion_datos if texto_proteccion_datos is defined else 'Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.' }}</p>
+            <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.</p>
         </div>
         </div>
     </div>
@@ -1155,6 +1014,13 @@
             </div>-->
         </div>
         </div>
+        
+        <!-- Pie de página con información de protección de datos -->
+        <div class="footer-datos">
+            <p><span class="iban">Forma de Pago: Transferencia | IBAN:ES2200495247862816942248</span></p>
+            </br>
+            <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.</p>
+        </div>
     </div>
     {% endif %}
 
@@ -1162,18 +1028,5 @@
         <button onclick="window.print()" class="btn btn-primary">Imprimir</button>
         <a href="{{ url_for('solicitudes.ver_solicitud', solicitud_id=presupuesto.id) }}" class="btn btn-secondary">Volver</a>
     </div>
-    
-    <script>
-        // Mostrar cabecera repetida cuando la tabla se divide entre páginas
-        document.addEventListener('DOMContentLoaded', function() {
-            // La cabecera repetida se mostrará automáticamente cuando sea necesario
-            // Para PDFs generados con Playwright, el CSS se encargará de mostrarla
-            const cabeceraRepetida = document.querySelector('.cabecera-repetida');
-            if (cabeceraRepetida) {
-                // En modo impresión/PDF, la cabecera se mostrará automáticamente
-                // gracias al CSS @media print
-            }
-        });
-    </script>
-    </body>
+</body>
 </html>
