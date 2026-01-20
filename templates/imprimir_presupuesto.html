@@ -808,15 +808,40 @@
             </div>
         </div>
         
+        {# Verificar si hay alguna línea con descuento (solo para presupuestos, no albaranes) #}
+        {% set ns = namespace(tiene_algun_descuento=False) %}
+        {% if not (es_albaran is defined and es_albaran) %}
+            {% for linea_check in presupuesto.lineas %}
+                {% if linea_check.descuento is not none %}
+                    {% set desc_check_val = linea_check.descuento|float %}
+                    {% if desc_check_val > 0 %}
+                        {% set ns.tiene_algun_descuento = True %}
+                    {% endif %}
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+        
         <table class="lineas-table">
             <thead>
                 <tr>
+                    {% if not (es_albaran is defined and es_albaran) and ns.tiene_algun_descuento %}
+                    <th style="width: 40%;">Nombre</th>
+                    <th style="width: 6%; text-align: center;">Cantidad</th>
+                    <th style="width: 7%; text-align: center;">Talla</th>
+                    <th style="width: 10%; text-align: right;">Precio Unit.</th>
+                    <th style="width: 8%; text-align: center;">Dto</th>
+                    <th style="width: 10%; text-align: right;">Precio Final</th>
+                    <th style="width: 19%; text-align: right;">Total</th>
+                    {% elif not (es_albaran is defined and es_albaran) %}
                     <th style="width: 55%;">Nombre</th>
                     <th style="width: 7%; text-align: center;">Cantidad</th>
                     <th style="width: 8%; text-align: center;">Talla</th>
-                    {% if not (es_albaran is defined and es_albaran) %}
                     <th style="width: 12%; text-align: right;">Precio Unit.</th>
                     <th style="width: 18%; text-align: right;">Total</th>
+                    {% else %}
+                    <th style="width: 70%;">Nombre</th>
+                    <th style="width: 10%; text-align: center;">Cantidad</th>
+                    <th style="width: 10%; text-align: center;">Talla</th>
                     {% endif %}
                 </tr>
             </thead>
@@ -830,8 +855,13 @@
                 {% set cantidad = cantidad_val|int %}
                 {% set descuento = descuento_val|float %}
                 {% set tiene_descuento = descuento > 0 %}
-                {% if tiene_descuento and precio_final_val %}
-                    {% set precio_a_usar = precio_final_val|float %}
+                {% if tiene_descuento %}
+                    {% if precio_final_val %}
+                        {% set precio_a_usar = precio_final_val|float %}
+                    {% else %}
+                        {# Calcular precio final aplicando el descuento porcentual #}
+                        {% set precio_a_usar = precio_unit * (1 - descuento / 100) %}
+                    {% endif %}
                 {% else %}
                     {% set precio_a_usar = precio_unit %}
                 {% endif %}
@@ -852,15 +882,23 @@
                     <td style="text-align: center;">{{ cantidad }}</td>
                     <td style="text-align: center;">{{ linea.talla or '-' }}</td>
                     {% if not (es_albaran is defined and es_albaran) %}
+                    <td style="text-align: right;">{{ "%.2f"|format(precio_unit) }} €</td>
+                    {% if ns.tiene_algun_descuento %}
+                    <td style="text-align: center;">
+                        {% if tiene_descuento %}
+                            {{ "%.0f"|format(descuento) }}%
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
                     <td style="text-align: right;">
                         {% if tiene_descuento %}
-                            <span style="text-decoration: line-through; color: #999; font-size: 0.9em;">{{ "%.2f"|format(precio_unit) }} €</span><br>
-                            <span style="color: #d32f2f; font-weight: bold;">{{ "%.2f"|format(precio_a_usar) }} €</span>
-                            <span style="color: #d32f2f; font-size: 0.85em;">(-{{ "%.0f"|format(descuento) }}%)</span>
+                            {{ "%.2f"|format(precio_a_usar) }} €
                         {% else %}
                             {{ "%.2f"|format(precio_unit) }} €
                         {% endif %}
                     </td>
+                    {% endif %}
                     <td style="text-align: right; font-weight: bold;">{{ "%.2f"|format(total_linea|float) }} €</td>
                     {% endif %}
                 </tr>

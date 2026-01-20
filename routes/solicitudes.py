@@ -1619,7 +1619,20 @@ def preparar_datos_imprimir_solicitud(solicitud_id):
     for linea in solicitud.lineas:
         precio_unit = Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0.00')
         cantidad = Decimal(str(linea.cantidad))
-        total_linea = precio_unit * cantidad
+        descuento = Decimal(str(linea.descuento)) if linea.descuento else Decimal('0')
+        
+        # Calcular precio final con descuento
+        precio_final = precio_unit
+        if descuento > 0:
+            # Si hay precio_final guardado, usarlo directamente
+            if linea.precio_final:
+                precio_final = Decimal(str(linea.precio_final))
+            else:
+                # Calcular precio final aplicando el descuento porcentual
+                precio_final = precio_unit * (Decimal('1') - descuento / Decimal('100'))
+        
+        # Calcular total de la línea usando el precio final (después del descuento)
+        total_linea = cantidad * precio_final
         base_imponible += total_linea
     
     iva_total = base_imponible * Decimal(str(tipo_iva)) / Decimal('100')
