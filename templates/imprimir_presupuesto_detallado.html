@@ -858,7 +858,7 @@
                 {% set tiene_descuento = descuento > 0 %}
                 {% if tiene_descuento %}
                     {% if precio_final_val %}
-                        {% set precio_a_usar = precio_final_val|float %}
+                    {% set precio_a_usar = precio_final_val|float %}
                     {% else %}
                         {# Calcular precio final aplicando el descuento porcentual #}
                         {% set precio_a_usar = precio_unit * (1 - descuento / 100) %}
@@ -1167,7 +1167,7 @@
             <h3>10. PROPIEDAD INTELECTUAL</h3>
             <p>Los diseños, logos y elementos gráficos proporcionados por EL CLIENTE para su aplicación en los productos deben ser de su propiedad o contar con las licencias necesarias. LA EMPRESA no se responsabiliza de cualquier reclamación relacionada con derechos de propiedad intelectual de terceros.</p>
             
-           
+            
             <h3>11. LEGISLACIÓN APLICABLE</h3>
             <p>El presente acuerdo se rige por la legislación española. Para cualquier controversia, las partes se someten a los juzgados y tribunales del domicilio de LA EMPRESA.</p>
             
@@ -1215,6 +1215,6 @@
             }
         });
     </script>
-    </body>
+</body>
 </html>
 

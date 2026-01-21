@@ -423,19 +423,23 @@
                     {% endif %}
                 {% endif %}
                 {% set total_linea = precio_final * cantidad %}
-                {% set talla_linea = None %}
-                {% if factura.presupuesto_id and factura.presupuesto %}
-                    {% for linea_presupuesto in factura.presupuesto.lineas %}
-                        {% if linea_presupuesto.nombre_mostrar == linea.descripcion or linea_presupuesto.nombre == linea.descripcion %}
-                            {% set talla_linea = linea_presupuesto.talla %}
-                        {% endif %}
-                    {% endfor %}
-                {% elif factura.pedido_id and factura.pedido %}
-                    {% for linea_pedido in factura.pedido.lineas %}
-                        {% if linea_pedido.nombre_mostrar == linea.descripcion or linea_pedido.nombre == linea.descripcion %}
-                            {% set talla_linea = linea_pedido.talla %}
-                        {% endif %}
-                    {% endfor %}
+                {# Primero intentar usar la talla directamente de la línea (para facturas directas) #}
+                {% set talla_linea = linea.talla if linea.talla else None %}
+                {# Si no hay talla en la línea, buscar en presupuesto o pedido #}
+                {% if not talla_linea %}
+                    {% if factura.presupuesto_id and factura.presupuesto %}
+                        {% for linea_presupuesto in factura.presupuesto.lineas %}
+                            {% if linea_presupuesto.nombre_mostrar == linea.descripcion or linea_presupuesto.nombre == linea.descripcion %}
+                                {% set talla_linea = linea_presupuesto.talla %}
+                            {% endif %}
+                        {% endfor %}
+                    {% elif factura.pedido_id and factura.pedido %}
+                        {% for linea_pedido in factura.pedido.lineas %}
+                            {% if linea_pedido.nombre_mostrar == linea.descripcion or linea_pedido.nombre == linea.descripcion %}
+                                {% set talla_linea = linea_pedido.talla %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
                 {% endif %}
                 <tr>
                     <td>{{ linea.descripcion }}</td>
@@ -471,7 +475,8 @@
                 <span>{{ "%.2f"|format(base_imponible) }} €</span>
             </div>
             <div class="total-row iva">
-                <span class="total-label">IVA ({{ tipo_iva }}%):</span>
+                {% set tipo_iva_formateado = "%.0f"|format(tipo_iva) if tipo_iva|round(1) == tipo_iva|round(0) else "%.1f"|format(tipo_iva) %}
+                <span class="total-label">IVA ({{ tipo_iva_formateado }}%):</span>
                 <span>{{ "%.2f"|format(iva_total) }} €</span>
             </div>
             <div class="total-row">

@@ -1599,7 +1599,15 @@ def preparar_datos_imprimir_factura(factura_id):
     
     # Calcular totales usando precio_unitario y descuento de las líneas
     # Usar el tipo de IVA guardado en la factura, o 21% por defecto
-    tipo_iva = float(factura.tipo_iva) if factura.tipo_iva else 21
+    # IMPORTANTE: Verificar si es None explícitamente, no usar evaluación de verdad
+    # porque tipo_iva puede ser 0 (cero) y eso sería False pero válido
+    if factura.tipo_iva is not None:
+        if isinstance(factura.tipo_iva, Decimal):
+            tipo_iva = float(factura.tipo_iva)
+        else:
+            tipo_iva = float(factura.tipo_iva)
+    else:
+        tipo_iva = 21.0
     base_imponible = Decimal('0.00')
     
     for linea in factura.lineas:

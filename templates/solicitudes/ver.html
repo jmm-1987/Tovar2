@@ -100,7 +100,7 @@
 <h2 style="margin-top: 0; margin-bottom: 10px; font-size: 1.3rem;">Solicitud {{ solicitud.numero_solicitud or solicitud.id }} - {{ solicitud.cliente.nombre if solicitud.cliente else 'Cliente N/A' }}</h2>
 
 <!-- Esquema horizontal de estados y subestados -->
-<div style="margin-bottom: 30px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+<div style="margin-bottom: 30px; background: white; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); position: relative;">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
         <h3 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 8px; margin: 0; font-size: 1.1rem; flex: 1;">Seguimiento de Estados</h3>
         <div style="display: flex; gap: 10px; margin-left: 20px;">
@@ -111,7 +111,7 @@
             <a href="{{ url_for('solicitudes.descargar_hoja_trabajo_solicitud', solicitud_id=solicitud.id) }}" class="btn" target="_blank" style="padding: 6px 12px; font-size: 0.85rem; background: #6c757d; color: white; text-decoration: none; border-radius: 4px;">📋 Hoja Trabajo</a>
         </div>
     </div>
-    <div style="overflow-x: auto; padding: 5px 0;">
+    <div style="overflow-x: auto; padding: 5px 0; position: relative;">
         <div style="display: flex; gap: 10px; min-width: max-content; align-items: flex-start;">
             {% set estados_completos = [
                 {'estado': 'presupuesto', 'subestados': []},
@@ -267,6 +267,34 @@
             {% endif %}
         </div>
     </div>
+    
+    <!-- Sección para cambiar estados - Esquina inferior izquierda -->
+    <div style="position: absolute; bottom: 150px; left: 10px; padding: 8px; background: #f8f9fa; border-radius: 6px; border: 1px solid #dee2e6; min-width: 200px; max-width: 250px;">
+        <form method="POST" action="{{ url_for('solicitudes.cambiar_estado_solicitud', solicitud_id=solicitud.id) }}" id="form_cambiar_estado" style="display: flex; flex-direction: column; gap: 6px;">
+            <select name="estado" id="estado_select" style="width: 100%; padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.75rem;" onchange="actualizarSubestados()">
+                {% for estado in estados %}
+                <option value="{{ estado }}" {% if solicitud.estado == estado %}selected{% endif %}>{{ estado|title }}</option>
+                {% endfor %}
+            </select>
+            
+            <div id="subestado_container" style="display: none;">
+                <select name="subestado" id="subestado_select" style="width: 100%; padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.75rem;" onchange="mostrarSelectorUsuario()">
+                    <option value="">-- Sin subestado --</option>
+                </select>
+            </div>
+            
+            <div id="usuario_encargado_container" style="display: none;">
+                <select name="usuario_encargado" id="usuario_encargado_select" style="width: 100%; padding: 4px 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.75rem;">
+                    <option value="">-- Seleccionar usuario --</option>
+                    {% for usuario in usuarios %}
+                    <option value="{{ usuario.id }}" {% if solicitud.mockup_encargado_a_id == usuario.id or solicitud.marcada_encargado_a_id == usuario.id %}selected{% endif %}>{{ usuario.usuario }} ({{ usuario.rol }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <button type="submit" class="btn btn-primary" style="width: 100%; padding: 4px 8px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.75rem;">Cambiar</button>
+        </form>
+    </div>
 </div>
 
 <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-bottom: 30px; width: 100%;">
@@ -334,38 +362,6 @@
             {% endif %}
         </div>
         
-        <!-- Sección para cambiar estados -->
-        <div class="card" style="background-color: white; padding: 20px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 20px;">
-                <h4 style="color: #2c3e50; margin-bottom: 10px; font-size: 14px;">Cambiar Estado</h4>
-                <p style="margin-bottom: 10px; color: #666; font-size: 12px;">Selecciona el nuevo estado de la solicitud:</p>
-                
-                <form method="POST" action="{{ url_for('solicitudes.cambiar_estado_solicitud', solicitud_id=solicitud.id) }}" id="form_cambiar_estado">
-                    <select name="estado" id="estado_select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; margin-bottom: 10px;" onchange="actualizarSubestados()">
-                        {% for estado in estados %}
-                        <option value="{{ estado }}" {% if solicitud.estado == estado %}selected{% endif %}>{{ estado|title }}</option>
-                        {% endfor %}
-                    </select>
-                    
-                    <div id="subestado_container" style="margin-bottom: 10px; display: none;">
-                        <label style="display: block; margin-bottom: 5px; font-size: 12px; color: #666;">Subestado:</label>
-                        <select name="subestado" id="subestado_select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;" onchange="mostrarSelectorUsuario()">
-                            <option value="">-- Sin subestado --</option>
-                        </select>
-                    </div>
-                    
-                    <div id="usuario_encargado_container" style="margin-bottom: 10px; display: none;">
-                        <label style="display: block; margin-bottom: 5px; font-size: 12px; color: #666;">Encargar a:</label>
-                        <select name="usuario_encargado" id="usuario_encargado_select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px;">
-                            <option value="">-- Seleccionar usuario --</option>
-                            {% for usuario in usuarios %}
-                            <option value="{{ usuario.id }}" {% if solicitud.mockup_encargado_a_id == usuario.id or solicitud.marcada_encargado_a_id == usuario.id %}selected{% endif %}>{{ usuario.usuario }} ({{ usuario.rol }})</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 8px 16px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">Cambiar Estado</button>
-                </form>
-        </div>
     </div>
     
     <!-- Columna 3: Información para la Fabricación e Imágenes -->
