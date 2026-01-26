@@ -1569,6 +1569,40 @@ Saludos cordiales,
                     db.session.add(verifactu_config)
                     db.session.commit()
                     print("Migración: Configuración verifactu_enviar_activo creada con valor por defecto 'true'")
+            
+            # Verificar y agregar columna anticipo en presupuestos
+            if 'presupuestos' in table_names:
+                columns_presupuesto = [col['name'] for col in inspector.get_columns('presupuestos')]
+                if 'anticipo' not in columns_presupuesto:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE presupuestos ADD COLUMN anticipo NUMERIC(10, 2) DEFAULT 0 NOT NULL'))
+                            conn.commit()
+                            print("Migración: Columna anticipo agregada exitosamente a presupuestos")
+                    except Exception as e:
+                        print(f"Error al agregar columna anticipo a presupuestos: {e}")
+            
+            # Verificar y agregar columnas anticipo y es_anticipo en facturas
+            if 'facturas' in table_names:
+                columns_facturas = [col['name'] for col in inspector.get_columns('facturas')]
+                if 'anticipo' not in columns_facturas:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE facturas ADD COLUMN anticipo NUMERIC(10, 2) DEFAULT 0 NOT NULL'))
+                            conn.commit()
+                            print("Migración: Columna anticipo agregada exitosamente a facturas")
+                    except Exception as e:
+                        print(f"Error al agregar columna anticipo a facturas: {e}")
+                
+                if 'es_anticipo' not in columns_facturas:
+                    try:
+                        with db.engine.connect() as conn:
+                            # SQLite usa INTEGER para BOOLEAN (0 o 1)
+                            conn.execute(text('ALTER TABLE facturas ADD COLUMN es_anticipo INTEGER DEFAULT 0 NOT NULL'))
+                            conn.commit()
+                            print("Migración: Columna es_anticipo agregada exitosamente a facturas")
+                    except Exception as e:
+                        print(f"Error al agregar columna es_anticipo a facturas: {e}")
         except Exception:
             # Si hay error, intentar crear todas las tablas
             try:

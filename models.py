@@ -333,6 +333,9 @@ class Presupuesto(db.Model):
     # Timestamp
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
     
+    # Anticipo facturado (importe con IVA incluido)
+    anticipo = db.Column(db.Numeric(10, 2), nullable=False, default=0)  # Importe del anticipo facturado
+    
     # Relación con líneas de presupuesto
     lineas = db.relationship('LineaPresupuesto', backref='presupuesto', lazy=True, cascade='all, delete-orphan')
     
@@ -499,6 +502,10 @@ class Factura(db.Model):
     # Estado de cobro de la factura
     estado_cobro = db.Column(db.String(50), nullable=False, default='pendiente')  # pendiente, cobrada_parcialmente, cobrada
     importe_pagado = db.Column(db.Numeric(10, 2), nullable=False, default=0)  # Importe que se ha pagado de la factura
+    
+    # Anticipo (para facturas anticipo)
+    anticipo = db.Column(db.Numeric(10, 2), nullable=False, default=0)  # Importe del anticipo (con IVA incluido)
+    es_anticipo = db.Column(db.Boolean, nullable=False, default=False)  # Indica si es una factura de anticipo
     
     # Timestamp
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)

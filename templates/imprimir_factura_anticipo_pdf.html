@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Factura Anticipo {{ factura.serie }}-{{ factura.numero }}</title>
+    <style type="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        @page {
+            size: A4;
+            margin: 5mm 10mm 10mm 10mm;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f5f5f5;
+            padding: 10px;
+            color: #333;
+            font-size: 12px;
+        }
+        
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            height: 297mm;
+            background: white;
+            margin: 0 auto 10px;
+            padding: 5mm 10mm 5mm 10mm;
+            padding-bottom: 25mm;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            page-break-after: auto;
+            page-break-inside: avoid;
+            overflow: hidden;
+            box-sizing: border-box;
+            position: relative;
+        }
+        
+        .footer-datos {
+            position: absolute;
+            bottom: 5mm;
+            left: 10mm;
+            right: 10mm;
+            margin-top: 30px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            font-size: 10px;
+            color: #666;
+            line-height: 1.3;
+            text-align: justify;
+        }
+        
+        .footer-datos .iban {
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .no-print {
+            text-align: center;
+            margin-top: 20px;
+            padding: 20px;
+        }
+        
+        .no-print .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 0 10px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .no-print .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .factura-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .logo-section {
+            flex: 0 0 auto;
+        }
+        
+        .logo-section img {
+            width: 120px;
+            height: 120px;
+            object-fit: contain;
+        }
+        
+        .factura-title {
+            flex: 1;
+            text-align: center;
+            align-self: center;
+        }
+        
+        .factura-title h1 {
+            font-size: 1.8em;
+            color: #2c3e50;
+            margin-bottom: 0;
+            font-weight: bold;
+        }
+        
+        .factura-info {
+            text-align: right;
+            flex: 0 0 auto;
+            min-width: 200px;
+        }
+        
+        .factura-info p {
+            margin: 3px 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .datos-section {
+            margin-bottom: 12px;
+            display: table;
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 10px;
+        }
+        
+        .datos-box {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+        
+        .datos-box h3 {
+            color: #2c3e50;
+            border-bottom: 1px solid #2c3e50;
+            padding-bottom: 3px;
+            margin-bottom: 5px;
+            font-size: 1rem;
+        }
+        
+        .datos-box p {
+            margin: 2px 0;
+            color: #495057;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        
+        .lineas-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .lineas-table thead {
+            background: #f8f9fa;
+            color: #000000;
+        }
+        
+        .lineas-table th {
+            padding: 10px;
+            text-align: left;
+            font-weight: 600;
+            border: 1px solid #dee2e6;
+            font-size: 0.9em;
+            color: #000000;
+        }
+        
+        .lineas-table td {
+            padding: 10px;
+            border: 1px solid #e9ecef;
+            color: #495057;
+            font-size: 0.9em;
+        }
+        
+        .lineas-table tbody tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .lineas-table th:first-child {
+            width: 70%;
+        }
+        
+        .lineas-table th:last-child {
+            width: 30%;
+            text-align: right;
+        }
+        
+        .lineas-table td:last-child {
+            text-align: right;
+            font-weight: bold;
+        }
+        
+        .totales-section {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 2px solid #2c3e50;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 0.95em;
+        }
+        
+        .total-row.base {
+            color: #495057;
+        }
+        
+        .total-row.iva {
+            color: #495057;
+        }
+        
+        .total-row.final {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #27ae60;
+            border-top: 2px solid #2c3e50;
+            padding-top: 8px;
+            margin-top: 5px;
+        }
+        
+        .total-label {
+            font-weight: 600;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .no-print {
+                display: none;
+            }
+            
+            .page {
+                margin: 0;
+                box-shadow: none;
+                page-break-after: auto;
+                page-break-inside: avoid;
+                overflow: hidden;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="factura-header">
+            <div class="logo-section">
+                {% if use_base64 is defined and use_base64 and logo_base64 %}
+                <img src="{{ logo_base64 }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
+                {% elif base_url is defined and base_url %}
+                <img src="{{ base_url }}{{ url_for('static', filename='logo1.png') }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
+                {% else %}
+                <img src="{{ url_for('static', filename='logo1.png', _external=True) }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
+                {% endif %}
+            </div>
+            <div class="factura-title">
+                <h1>FACTURA</h1>
+            </div>
+            <div class="factura-info">
+                <p><strong>Weark Custom Tovar Sl</strong></p>
+                <p>B06763502</p>
+                <p>C/Marquesa de Pinares, 11</p>
+                <p>06800-Mérida (Badajoz)</p>
+            </div>
+        </div>
+
+        <div class="datos-section">
+            <div class="datos-box">
+                <h3>Datos de la Factura</h3>
+                <p><strong>Número:</strong> {{ factura.serie }}-{{ factura.numero }}</p>
+                <p><strong>Fecha:</strong> {{ factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else 'N/A' }}</p>
+                
+                <h3 style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;">Datos del Cliente</h3>
+                {% set cliente_data_source = None %}
+                {% if presupuesto and presupuesto.cliente %}
+                    {% set cliente_data_source = presupuesto.cliente %}
+                {% endif %}
+                
+                {% if cliente_data_source %}
+                    <p><strong>{{ cliente_data_source.nombre }}</strong></p>
+                    {% if cliente_data_source.direccion %}
+                    <p>{{ cliente_data_source.direccion }}</p>
+                    {% endif %}
+                    {% if cliente_data_source.codigo_postal or cliente_data_source.poblacion or cliente_data_source.provincia %}
+                    <p>
+                        {% if cliente_data_source.codigo_postal %}{{ cliente_data_source.codigo_postal }}{% endif %}
+                        {% if cliente_data_source.codigo_postal and cliente_data_source.poblacion %}-{% endif %}
+                        {% if cliente_data_source.poblacion %}{{ cliente_data_source.poblacion }}{% endif %}
+                        {% if (cliente_data_source.codigo_postal or cliente_data_source.poblacion) and cliente_data_source.provincia %}-{% endif %}
+                        {% if cliente_data_source.provincia %}{{ cliente_data_source.provincia }}{% endif %}
+                    </p>
+                    {% endif %}
+                    {% if cliente_data_source.nif %}
+                    <p><strong>NIF/CIF:</strong> {{ cliente_data_source.nif }}</p>
+                    {% endif %}
+                {% else %}
+                    <p><strong>{{ factura.nombre }}</strong></p>
+                    {% if factura.nif %}
+                    <p><strong>NIF/CIF:</strong> {{ factura.nif }}</p>
+                    {% endif %}
+                {% endif %}
+            </div>
+            <div class="datos-box">
+                {% if factura.descripcion %}
+                <h3>Descripción</h3>
+                <p>{{ factura.descripcion }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <table class="lineas-table">
+            <thead>
+                <tr>
+                    <th>Descripción</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Anticipo del pedido (solicitud de referencia: {{ presupuesto.numero_solicitud or presupuesto.id }})</td>
+                    <td>{{ "%.2f"|format(factura.importe_total) }} €</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="totales-section">
+            <div class="total-row base">
+                <span class="total-label">Base Imponible:</span>
+                <span>{{ "%.2f"|format(base_imponible) }} €</span>
+            </div>
+            <div class="total-row iva">
+                {% set tipo_iva_formateado = "%.0f"|format(tipo_iva) if tipo_iva|round(1) == tipo_iva|round(0) else "%.1f"|format(tipo_iva) %}
+                <span class="total-label">IVA ({{ tipo_iva_formateado }}%):</span>
+                <span>{{ "%.2f"|format(iva_total) }} €</span>
+            </div>
+            <div class="total-row final">
+                <span class="total-label">TOTAL:</span>
+                <span>{{ "%.2f"|format(factura.importe_total) }} €</span>
+            </div>
+        </div>
+        
+        <div class="footer-datos">
+            <p><span class="iban">Número de cuenta | IBAN:ES2200495247862816942248</span></p>
+            </br>
+            <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.</p>
+        </div>
+    </div>
+
+    <div class="no-print">
+        <button onclick="window.print()" class="btn btn-primary">Imprimir</button>
+        <a href="{{ url_for('facturacion.facturacion') }}" class="btn btn-secondary">Volver</a>
+    </div>
+</body>
+</html>
+

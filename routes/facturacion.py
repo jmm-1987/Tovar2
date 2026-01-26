@@ -38,13 +38,21 @@ def facturacion():
     
     if tipo_vista == 'pendientes':
         # Obtener prefacturas: solicitudes aceptadas que aún no tienen factura formalizada
-        # Filtrar solo facturas con presupuesto_id (excluir facturas directas)
-        presupuestos_con_factura_ids = [f.presupuesto_id for f in Factura.query.with_entities(Factura.presupuesto_id).filter(Factura.presupuesto_id.isnot(None)).all()]
+        # Filtrar solo facturas formales (no anticipos) con presupuesto_id (excluir facturas directas)
+        presupuestos_con_factura_formal_ids = [
+            f.presupuesto_id for f in Factura.query.with_entities(Factura.presupuesto_id)
+            .filter(
+                and_(
+                    Factura.presupuesto_id.isnot(None),
+                    or_(Factura.es_anticipo == False, Factura.es_anticipo.is_(None))
+                )
+            ).all()
+        ]
         
-        # Obtener solicitudes (presupuestos) aceptadas sin factura
+        # Obtener solicitudes (presupuestos) aceptadas sin factura formal (pueden tener anticipo)
         query_solicitudes = Presupuesto.query.filter(Presupuesto.estado == 'aceptado')
-        if presupuestos_con_factura_ids:
-            query_solicitudes = query_solicitudes.filter(not_(Presupuesto.id.in_(presupuestos_con_factura_ids)))
+        if presupuestos_con_factura_formal_ids:
+            query_solicitudes = query_solicitudes.filter(not_(Presupuesto.id.in_(presupuestos_con_factura_formal_ids)))
         
         # Aplicar filtro de estado a solicitudes
         if estado_filtro:
@@ -179,10 +187,29 @@ def ver_factura_solicitud(presupuesto_id):
     """Vista detallada de una factura para introducir importes desde una solicitud"""
     presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
     
-    # Verificar si ya existe una factura para este presupuesto
-    factura_existente = Factura.query.filter_by(presupuesto_id=presupuesto_id).first()
+    # Verificar si ya existe una factura formal (no anticipo) para este presupuesto
+    factura_existente = Factura.query.filter(
+        and_(Factura.presupuesto_id == presupuesto_id, 
+             or_(Factura.es_anticipo == False, Factura.es_anticipo.is_(None)))
+    ).first()
     
-    return render_template('ver_factura_solicitud.html', solicitud=presupuesto, factura_existente=factura_existente)
+    # Obtener factura de anticipo si existe
+    factura_anticipo = Factura.query.filter(
+        and_(Factura.presupuesto_id == presupuesto_id, Factura.es_anticipo == True)
+    ).first()
+    
+    # Calcular anticipo total facturado
+    anticipo_facturado = Decimal('0')
+    if factura_anticipo:
+        anticipo_facturado = factura_anticipo.importe_total if factura_anticipo.importe_total else Decimal('0')
+    elif presupuesto.anticipo:
+        anticipo_facturado = Decimal(str(presupuesto.anticipo))
+    
+    return render_template('ver_factura_solicitud.html', 
+                         solicitud=presupuesto, 
+                         factura_existente=factura_existente,
+                         factura_anticipo=factura_anticipo,
+                         anticipo_facturado=anticipo_facturado)
 
 @facturacion_bp.route('/facturacion/solicitud/<int:presupuesto_id>/formalizar', methods=['POST'])
 @login_required
@@ -192,8 +219,10 @@ def formalizar_factura_solicitud(presupuesto_id):
     try:
         presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
         
-        # Verificar si ya existe una factura para este presupuesto
-        factura_existente = Factura.query.filter_by(presupuesto_id=presupuesto_id).first()
+        # Verificar si ya existe una factura final (no anticipo) para este presupuesto
+        factura_existente = Factura.query.filter(
+            and_(Factura.presupuesto_id == presupuesto_id, Factura.es_anticipo == False)
+        ).first()
         if factura_existente:
             return jsonify({'success': False, 'error': 'Esta solicitud ya tiene una factura formalizada.'}), 400
         
@@ -244,6 +273,13 @@ def formalizar_factura_solicitud(presupuesto_id):
             importe_total = subtotal - descuento_aplicado
         else:
             importe_total = subtotal
+        
+        # Restar el anticipo si existe
+        anticipo_presupuesto = Decimal(str(presupuesto.anticipo)) if presupuesto.anticipo else Decimal('0')
+        if anticipo_presupuesto > 0:
+            importe_total = importe_total - anticipo_presupuesto
+            if importe_total < 0:
+                importe_total = Decimal('0')
         
         # Crear factura
         cliente = presupuesto.cliente if presupuesto.cliente else None
@@ -409,6 +445,213 @@ def formalizar_factura_solicitud(presupuesto_id):
             'success': False,
             'error': f'Error al formalizar la factura: {str(e)}'
         }), 500
+
+@facturacion_bp.route('/facturacion/crear_factura_anticipo', methods=['GET', 'POST'])
+@login_required
+@not_usuario_required
+def crear_factura_anticipo():
+    """Seleccionar solicitud y crear factura anticipo"""
+    if request.method == 'POST':
+        # Obtener solicitud seleccionada
+        presupuesto_id = request.form.get('presupuesto_id', '')
+        if not presupuesto_id:
+            flash('Debe seleccionar una solicitud', 'error')
+            return redirect(url_for('facturacion.crear_factura_anticipo'))
+        
+        presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+        
+        # Obtener importe anticipado
+        importe_anticipo_str = request.form.get('importe_anticipo', '')
+        if not importe_anticipo_str:
+            flash('Debe introducir un importe anticipado', 'error')
+            return redirect(url_for('facturacion.crear_factura_anticipo_seleccionar', presupuesto_id=presupuesto_id))
+        
+        try:
+            importe_anticipo = Decimal(importe_anticipo_str)
+            if importe_anticipo <= 0:
+                flash('El importe anticipado debe ser mayor que 0', 'error')
+                return redirect(url_for('facturacion.crear_factura_anticipo_seleccionar', presupuesto_id=presupuesto_id))
+        except:
+            flash('El importe anticipado no es válido', 'error')
+            return redirect(url_for('facturacion.crear_factura_anticipo_seleccionar', presupuesto_id=presupuesto_id))
+        
+        # Obtener fecha de expedición
+        fecha_expedicion_str = request.form.get('fecha_expedicion', '')
+        if not fecha_expedicion_str:
+            flash('La fecha de expedición es obligatoria', 'error')
+            return redirect(url_for('facturacion.crear_factura_anticipo_seleccionar', presupuesto_id=presupuesto_id))
+        
+        fecha_expedicion = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d').date()
+        
+        # Calcular base imponible e IVA del anticipo
+        cliente = presupuesto.cliente
+        tipo_iva_valor = float(cliente.tipo_iva) if cliente and cliente.tipo_iva else 21.0
+        tipo_iva = Decimal(str(tipo_iva_valor))
+        
+        # El importe_anticipo viene con IVA incluido, calcular base imponible
+        base_imponible = importe_anticipo / (Decimal('1') + tipo_iva / Decimal('100'))
+        base_imponible = base_imponible.quantize(Decimal('0.01'))
+        iva_total = importe_anticipo - base_imponible
+        iva_total = iva_total.quantize(Decimal('0.01'))
+        
+        # Generar número de factura automáticamente
+        serie = 'A'  # Serie fija
+        numero = obtener_siguiente_numero_factura(fecha_expedicion)
+        
+        # Crear factura anticipo
+        factura = Factura(
+            presupuesto_id=presupuesto_id,
+            pedido_id=None,
+            serie=serie,
+            numero=numero,
+            fecha_expedicion=fecha_expedicion,
+            tipo_factura='F1',
+            descripcion=f'Anticipo del pedido {presupuesto.numero_solicitud or presupuesto.id}',
+            nif=cliente.nif if cliente and cliente.nif else '',
+            nombre=cliente.nombre if cliente else 'Sin cliente',
+            importe_total=importe_anticipo,
+            descuento_pronto_pago=Decimal('0'),
+            tipo_iva=tipo_iva,
+            estado='pendiente',
+            anticipo=importe_anticipo,
+            es_anticipo=True
+        )
+        
+        db.session.add(factura)
+        db.session.flush()
+        
+        # Crear una línea de factura para el anticipo (sin desglose)
+        linea_factura = LineaFactura(
+            factura_id=factura.id,
+            linea_pedido_id=None,
+            descripcion=f'Anticipo de la solicitud {presupuesto.numero_solicitud or presupuesto.id}',
+            cantidad=Decimal('1'),
+            talla=None,
+            precio_unitario=base_imponible,
+            descuento=Decimal('0'),
+            precio_final=base_imponible,
+            importe=base_imponible
+        )
+        db.session.add(linea_factura)
+        
+        # Actualizar el anticipo en el presupuesto
+        presupuesto.anticipo = importe_anticipo
+        
+        # Verificar si el envío a Verifactu está activado
+        from models import Configuracion
+        config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+        verifactu_enviar_activo = True
+        if config:
+            verifactu_enviar_activo = config.valor.lower() == 'true'
+        
+        # Enviar a Verifactu si está activado
+        verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
+        verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
+        
+        if verifactu_token and verifactu_enviar_activo:
+            # Preparar payload para Verifactu
+            payload = {
+                'serie': factura.serie,
+                'numero': factura.numero,
+                'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
+                'tipo_factura': factura.tipo_factura,
+                'descripcion': factura.descripcion,
+                'lineas': [{
+                    'base_imponible': str(base_imponible),
+                    'tipo_impositivo': str(int(tipo_iva)),
+                    'cuota_repercutida': str(iva_total)
+                }],
+                'importe_total': str(importe_anticipo),
+                'nombre': factura.nombre,
+                'nif': factura.nif if factura.nif else None
+            }
+            
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {verifactu_token}'
+            }
+            
+            try:
+                response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
+                
+                if response.status_code == 200 or response.status_code == 201:
+                    response_data = response.json()
+                    factura.huella_verifactu = json.dumps(response_data)
+                    factura.estado = 'confirmado'
+                    factura.fecha_confirmacion = datetime.utcnow()
+                    flash('Factura anticipo creada y enviada a Verifactu correctamente.', 'success')
+                else:
+                    factura.estado = 'error'
+                    factura.huella_verifactu = json.dumps({
+                        'error': response.text,
+                        'status_code': response.status_code
+                    })
+                    flash(f'Error al enviar a Verifactu: {response.status_code} - {response.text}', 'error')
+            except requests.exceptions.RequestException as e:
+                factura.estado = 'error'
+                factura.huella_verifactu = json.dumps({'error': str(e)})
+                flash(f'Error de conexión con Verifactu: {str(e)}', 'error')
+        elif not verifactu_enviar_activo:
+            factura.estado = 'pendiente'
+            flash('Factura anticipo creada. El envío automático a Verifactu está desactivado.', 'info')
+        else:
+            factura.estado = 'pendiente'
+            flash('Factura anticipo creada. Configure VERIFACTU_TOKEN para enviar automáticamente.', 'warning')
+        
+        db.session.commit()
+        return redirect(url_for('facturacion.facturacion'))
+    
+    # GET: mostrar solicitudes pendientes de facturar
+    # Obtener solicitudes aceptadas que aún no tienen factura formalizada (o solo tienen factura anticipo)
+    presupuestos_con_factura_ids = [f.presupuesto_id for f in Factura.query.with_entities(Factura.presupuesto_id).filter(
+        and_(Factura.presupuesto_id.isnot(None), Factura.es_anticipo == False)
+    ).all()]
+    
+    query_solicitudes = Presupuesto.query.filter(Presupuesto.estado == 'aceptado')
+    if presupuestos_con_factura_ids:
+        query_solicitudes = query_solicitudes.filter(not_(Presupuesto.id.in_(presupuestos_con_factura_ids)))
+    
+    solicitudes = query_solicitudes.order_by(Presupuesto.id.desc()).all()
+    
+    return render_template('facturacion/seleccionar_solicitud_anticipo.html', solicitudes=solicitudes)
+
+@facturacion_bp.route('/facturacion/crear_factura_anticipo/<int:presupuesto_id>', methods=['GET', 'POST'])
+@login_required
+@not_usuario_required
+def crear_factura_anticipo_seleccionar(presupuesto_id):
+    """Mostrar formulario para introducir importe anticipado"""
+    presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+    
+    # Calcular total de la solicitud
+    cliente = presupuesto.cliente
+    tipo_iva_valor = float(cliente.tipo_iva) if cliente and cliente.tipo_iva else 21.0
+    tipo_iva = Decimal(str(tipo_iva_valor))
+    
+    base_imponible = Decimal('0.00')
+    for linea in presupuesto.lineas:
+        precio_unit = Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0.00')
+        cantidad = Decimal(str(linea.cantidad))
+        descuento = Decimal(str(linea.descuento)) if linea.descuento else Decimal('0')
+        
+        precio_final = precio_unit
+        if descuento > 0:
+            if linea.precio_final:
+                precio_final = Decimal(str(linea.precio_final))
+            else:
+                precio_final = precio_unit * (Decimal('1') - descuento / Decimal('100'))
+        
+        total_linea = cantidad * precio_final
+        base_imponible += total_linea
+    
+    iva_total = base_imponible * tipo_iva / Decimal('100')
+    total_con_iva = base_imponible + iva_total
+    
+    fecha_hoy = datetime.now().strftime('%Y-%m-%d')
+    
+    return render_template('facturacion/formulario_anticipo.html', 
+                         presupuesto=presupuesto,
+                         total_con_iva=total_con_iva,
+                         fecha_hoy=fecha_hoy)
 
 @facturacion_bp.route('/facturacion/<int:pedido_id>')
 @login_required
@@ -935,12 +1178,12 @@ def nueva_factura():
 @login_required
 @not_usuario_required
 def editar_factura(factura_id):
-    """Editar una factura directa existente"""
+    """Editar una factura existente (directa, desde solicitud o anticipo)"""
     factura = Factura.query.get_or_404(factura_id)
     
-    # Verificar que es una factura directa (sin pedido ni presupuesto)
-    if factura.pedido_id is not None or factura.presupuesto_id is not None:
-        flash('Esta factura no es una factura directa y no se puede editar desde aquí', 'error')
+    # No permitir editar facturas que vienen de pedidos (solo directas o desde solicitudes)
+    if factura.pedido_id is not None:
+        flash('Las facturas que vienen de pedidos no se pueden editar desde aquí', 'error')
         return redirect(url_for('facturacion.facturacion', tipo_vista='formalizadas'))
     
     if request.method == 'POST':
@@ -1089,12 +1332,35 @@ def editar_factura(factura_id):
     
     # GET: mostrar formulario con datos existentes
     clientes = Cliente.query.order_by(Cliente.nombre).all()
-    cliente_directo = factura.cliente if factura.cliente_id else None
+    
+    # Obtener cliente: primero desde factura.cliente, luego desde presupuesto si existe
+    cliente_directo = None
+    if factura.cliente_id:
+        cliente_directo = factura.cliente
+    elif factura.presupuesto_id and factura.presupuesto and factura.presupuesto.cliente:
+        cliente_directo = factura.presupuesto.cliente
+        # Si no hay cliente_id en la factura pero hay cliente en el presupuesto, asignarlo
+        if not factura.cliente_id:
+            factura.cliente_id = cliente_directo.id
+            db.session.commit()
+    
+    # Calcular anticipo facturado si la factura viene de un presupuesto
+    anticipo_facturado = Decimal('0')
+    if factura.presupuesto_id:
+        # Buscar factura de anticipo para este presupuesto
+        factura_anticipo = Factura.query.filter(
+            and_(Factura.presupuesto_id == factura.presupuesto_id, Factura.es_anticipo == True)
+        ).first()
+        if factura_anticipo:
+            anticipo_facturado = factura_anticipo.importe_total if factura_anticipo.importe_total else Decimal('0')
+        elif factura.presupuesto and factura.presupuesto.anticipo:
+            anticipo_facturado = Decimal(str(factura.presupuesto.anticipo))
     
     return render_template('facturacion/editar_factura.html', 
                          factura=factura,
                          clientes=clientes,
-                         cliente_directo=cliente_directo)
+                         cliente_directo=cliente_directo,
+                         anticipo_facturado=anticipo_facturado)
 
 @facturacion_bp.route('/facturacion/nuevo_albaran', methods=['GET', 'POST'])
 @login_required
@@ -1642,6 +1908,25 @@ def preparar_datos_imprimir_factura(factura_id):
     else:
         total_con_iva = subtotal
     
+    # Calcular anticipo facturado si la factura viene de un presupuesto
+    anticipo_facturado = Decimal('0')
+    if presupuesto:
+        # Buscar factura de anticipo para este presupuesto
+        factura_anticipo = Factura.query.filter(
+            and_(Factura.presupuesto_id == presupuesto.id, Factura.es_anticipo == True)
+        ).first()
+        if factura_anticipo:
+            anticipo_facturado = factura_anticipo.importe_total if factura_anticipo.importe_total else Decimal('0')
+        elif presupuesto.anticipo:
+            anticipo_facturado = Decimal(str(presupuesto.anticipo))
+        
+        # Restar anticipo del total si existe
+        if anticipo_facturado > 0:
+            total_con_iva = total_con_iva - anticipo_facturado
+            if total_con_iva < 0:
+                total_con_iva = Decimal('0')
+            total_con_iva = total_con_iva.quantize(Decimal('0.01'))
+    
     # Función auxiliar para convertir imagen a base64
     def convertir_imagen_a_base64(ruta_imagen):
         """Convertir imagen a base64"""
@@ -1687,16 +1972,173 @@ def preparar_datos_imprimir_factura(factura_id):
         'total_con_iva': float(total_con_iva),
         'tipo_iva': tipo_iva,
         'logo_base64': logo_base64,
-        'es_albaran': es_albaran
+        'es_albaran': es_albaran,
+        'anticipo_facturado': float(anticipo_facturado)
     }
+
+@facturacion_bp.route('/facturacion/factura/<int:factura_id>/imprimir_anticipo')
+@login_required
+@not_usuario_required
+def imprimir_factura_anticipo(factura_id):
+    """Imprimir factura anticipo"""
+    factura = Factura.query.get_or_404(factura_id)
+    
+    if not factura.es_anticipo:
+        flash('Esta no es una factura anticipo', 'error')
+        return redirect(url_for('facturacion.facturacion'))
+    
+    presupuesto = factura.presupuesto if factura.presupuesto_id else None
+    
+    # Calcular base imponible e IVA
+    tipo_iva = Decimal(str(factura.tipo_iva)) if factura.tipo_iva else Decimal('21')
+    base_imponible = factura.importe_total / (Decimal('1') + tipo_iva / Decimal('100'))
+    base_imponible = base_imponible.quantize(Decimal('0.01'))
+    iva_total = factura.importe_total - base_imponible
+    iva_total = iva_total.quantize(Decimal('0.01'))
+    
+    # Obtener logo en base64
+    logo_path = os.path.join(current_app.static_folder, 'logo1.png')
+    logo_base64 = None
+    if os.path.exists(logo_path):
+        with open(logo_path, 'rb') as f:
+            logo_data = f.read()
+            logo_base64 = base64.b64encode(logo_data).decode('utf-8')
+            logo_base64 = f'data:image/png;base64,{logo_base64}'
+    
+    return render_template('imprimir_factura_anticipo_pdf.html',
+                         factura=factura,
+                         presupuesto=presupuesto,
+                         base_imponible=base_imponible,
+                         iva_total=iva_total,
+                         tipo_iva=tipo_iva,
+                         logo_base64=logo_base64,
+                         use_base64=True)
+
+@facturacion_bp.route('/facturacion/factura/<int:factura_id>/descargar-pdf-anticipo')
+@login_required
+@not_usuario_required
+def descargar_pdf_factura_anticipo(factura_id):
+    """Descargar factura anticipo en formato PDF"""
+    try:
+        factura = Factura.query.get_or_404(factura_id)
+        
+        if not factura.es_anticipo:
+            flash('Esta no es una factura anticipo', 'error')
+            return redirect(url_for('facturacion.facturacion'))
+        
+        presupuesto = factura.presupuesto if factura.presupuesto_id else None
+        
+        # Calcular base imponible e IVA
+        tipo_iva = Decimal(str(factura.tipo_iva)) if factura.tipo_iva else Decimal('21')
+        base_imponible = factura.importe_total / (Decimal('1') + tipo_iva / Decimal('100'))
+        base_imponible = base_imponible.quantize(Decimal('0.01'))
+        iva_total = factura.importe_total - base_imponible
+        iva_total = iva_total.quantize(Decimal('0.01'))
+        
+        # Obtener logo en base64
+        logo_path = os.path.join(current_app.static_folder, 'logo1.png')
+        logo_base64 = None
+        if os.path.exists(logo_path):
+            with open(logo_path, 'rb') as f:
+                logo_data = f.read()
+                logo_base64 = base64.b64encode(logo_data).decode('utf-8')
+                logo_base64 = f'data:image/png;base64,{logo_base64}'
+        
+        html = render_template('imprimir_factura_anticipo_pdf.html',
+                              factura=factura,
+                              presupuesto=presupuesto,
+                              base_imponible=base_imponible,
+                              iva_total=iva_total,
+                              tipo_iva=tipo_iva,
+                              logo_base64=logo_base64,
+                              use_base64=True)
+        
+        # Crear el PDF en memoria usando playwright
+        pdf_buffer = BytesIO()
+        
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+                temp_file.write(html)
+                temp_html_path = temp_file.name
+            
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                page.goto(f'file://{temp_html_path}')
+                
+                pdf_bytes = page.pdf(
+                    format='A4',
+                    print_background=True,
+                    margin={
+                        'top': '10mm',
+                        'right': '10mm',
+                        'bottom': '10mm',
+                        'left': '10mm'
+                    }
+                )
+                
+                browser.close()
+                pdf_buffer.write(pdf_bytes)
+                pdf_buffer.seek(0)
+            
+            os.unlink(temp_html_path)
+            
+        except Exception as e:
+            if os.path.exists(temp_html_path):
+                try:
+                    os.unlink(temp_html_path)
+                except:
+                    pass
+            raise e
+        
+        response = make_response(pdf_buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=factura_anticipo_{factura.serie}_{factura.numero}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        return redirect(url_for('facturacion.facturacion'))
 
 @facturacion_bp.route('/facturacion/factura/<int:factura_id>/imprimir')
 @login_required
 @not_usuario_required
 def imprimir_factura(factura_id):
     """Vista de impresión de una factura formalizada"""
-    datos = preparar_datos_imprimir_factura(factura_id)
-    return render_template('imprimir_factura.html', **datos)
+    factura = Factura.query.get_or_404(factura_id)
+    
+    # Si es una factura anticipo, usar el template específico
+    if factura.es_anticipo is True:
+        presupuesto = factura.presupuesto if factura.presupuesto_id else None
+        
+        # Calcular base imponible e IVA
+        tipo_iva = Decimal(str(factura.tipo_iva)) if factura.tipo_iva else Decimal('21')
+        base_imponible = factura.importe_total / (Decimal('1') + tipo_iva / Decimal('100'))
+        base_imponible = base_imponible.quantize(Decimal('0.01'))
+        iva_total = factura.importe_total - base_imponible
+        iva_total = iva_total.quantize(Decimal('0.01'))
+        
+        # Obtener logo en base64
+        logo_path = os.path.join(current_app.static_folder, 'logo1.png')
+        logo_base64 = None
+        if os.path.exists(logo_path):
+            with open(logo_path, 'rb') as f:
+                logo_data = f.read()
+                logo_base64 = base64.b64encode(logo_data).decode('utf-8')
+                logo_base64 = f'data:image/png;base64,{logo_base64}'
+        
+        return render_template('imprimir_factura_anticipo_pdf.html',
+                             factura=factura,
+                             presupuesto=presupuesto,
+                             base_imponible=base_imponible,
+                             iva_total=iva_total,
+                             tipo_iva=tipo_iva,
+                             logo_base64=logo_base64,
+                             use_base64=True)
+    else:
+        datos = preparar_datos_imprimir_factura(factura_id)
+        return render_template('imprimir_factura.html', **datos)
 
 def preparar_datos_imprimir_albaran(factura_id=None, pedido_id=None):
     """Función auxiliar para preparar todos los datos necesarios para imprimir el albarán"""
@@ -1758,20 +2200,74 @@ def preparar_datos_imprimir_albaran(factura_id=None, pedido_id=None):
 def descargar_pdf_factura(factura_id):
     """Descargar factura en formato PDF (con precios) o albarán si es tipo albarán"""
     try:
-        datos = preparar_datos_imprimir_factura(factura_id)
+        factura = Factura.query.get_or_404(factura_id)
+        html = None  # Inicializar html
+        datos = None  # Inicializar datos
+        es_anticipo = factura.es_anticipo is True  # Guardar si es anticipo
+        datos_albaran = None  # Inicializar datos_albaran
         
-        # Si es un albarán, usar el template de albarán (sin precios)
-        if datos.get('es_albaran', False):
-            # Preparar datos para albarán
-            datos_albaran = preparar_datos_imprimir_albaran(factura_id=factura_id)
-            html = render_template('imprimir_albaran_pdf.html', 
-                                 **datos_albaran,
+        # Si es una factura anticipo, usar el template específico
+        if es_anticipo:
+            presupuesto = factura.presupuesto if factura.presupuesto_id else None
+            
+            # Calcular base imponible e IVA
+            tipo_iva = Decimal(str(factura.tipo_iva)) if factura.tipo_iva else Decimal('21')
+            base_imponible = factura.importe_total / (Decimal('1') + tipo_iva / Decimal('100'))
+            base_imponible = base_imponible.quantize(Decimal('0.01'))
+            iva_total = factura.importe_total - base_imponible
+            iva_total = iva_total.quantize(Decimal('0.01'))
+            
+            # Obtener logo en base64
+            logo_path = os.path.join(current_app.static_folder, 'logo1.png')
+            logo_base64 = None
+            if os.path.exists(logo_path):
+                with open(logo_path, 'rb') as f:
+                    logo_data = f.read()
+                    logo_base64 = base64.b64encode(logo_data).decode('utf-8')
+                    logo_base64 = f'data:image/png;base64,{logo_base64}'
+            
+            html = render_template('imprimir_factura_anticipo_pdf.html',
+                                 factura=factura,
+                                 presupuesto=presupuesto,
+                                 base_imponible=base_imponible,
+                                 iva_total=iva_total,
+                                 tipo_iva=tipo_iva,
+                                 logo_base64=logo_base64,
                                  use_base64=True)
         else:
-            # Renderizar el HTML como factura (con precios)
-            html = render_template('imprimir_factura_pdf.html', 
-                                 **datos,
-                                 use_base64=True)
+            try:
+                datos = preparar_datos_imprimir_factura(factura_id)
+                
+                if datos is None:
+                    flash('Error al preparar los datos de la factura', 'error')
+                    return redirect(url_for('facturacion.facturacion'))
+                
+                # Si es un albarán, usar el template de albarán (sin precios)
+                if datos.get('es_albaran', False):
+                    # Preparar datos para albarán
+                    datos_albaran = preparar_datos_imprimir_albaran(factura_id=factura_id)
+                    if datos_albaran:
+                        html = render_template('imprimir_albaran_pdf.html', 
+                                             **datos_albaran,
+                                             use_base64=True)
+                    else:
+                        flash('Error al preparar los datos del albarán', 'error')
+                        return redirect(url_for('facturacion.facturacion'))
+                else:
+                    # Renderizar el HTML como factura (con precios)
+                    html = render_template('imprimir_factura_pdf.html', 
+                                         **datos,
+                                         use_base64=True)
+            except Exception as e:
+                flash(f'Error al preparar el PDF: {str(e)}', 'error')
+                import traceback
+                traceback.print_exc()
+                return redirect(url_for('facturacion.facturacion'))
+        
+        # Verificar que html se haya definido
+        if html is None:
+            flash('Error al preparar el PDF de la factura', 'error')
+            return redirect(url_for('facturacion.facturacion'))
         
         # Crear el PDF en memoria usando playwright
         pdf_buffer = BytesIO()
@@ -1826,12 +2322,16 @@ def descargar_pdf_factura(factura_id):
         response = make_response(pdf_buffer.read())
         response.headers['Content-Type'] = 'application/pdf'
         
-        # Nombre del archivo según si es albarán o factura
-        if datos.get('es_albaran', False):
+        # Nombre del archivo según el tipo de factura
+        if es_anticipo:
+            response.headers['Content-Disposition'] = f'inline; filename=factura_anticipo_{factura.serie}_{factura.numero}.pdf'
+        elif datos_albaran:
             numero_pedido = datos_albaran['pedido'].id if datos_albaran.get('pedido') else 'N/A'
             response.headers['Content-Disposition'] = f'inline; filename=albaran_pedido_{numero_pedido}.pdf'
+        elif datos:
+            response.headers['Content-Disposition'] = f'inline; filename=factura_{factura.serie}_{factura.numero}.pdf'
         else:
-            response.headers['Content-Disposition'] = f'inline; filename=factura_{datos["factura"].serie}_{datos["factura"].numero}.pdf'
+            response.headers['Content-Disposition'] = f'inline; filename=factura_{factura.serie}_{factura.numero}.pdf'
         
         return response
         

@@ -117,16 +117,23 @@ function cambiarTipoVista(tipo) {
             </div>
         </div>
     </div>
-    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-        <a href="{{ url_for('facturacion.nueva_factura') }}" class="btn btn-success" style="padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(40,167,69,0.3); transition: all 0.3s ease;">
-            ➕ Crear Factura Directa
-        </a>
-        <a href="{{ url_for('facturacion.nuevo_albaran') }}" class="btn btn-primary" style="padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
-            📄 Nuevo Albarán
-        </a>
-        <a href="{{ url_for('facturacion.facturar_albaranes') }}" class="btn btn-warning" style="padding: 10px 20px; background: #ffc107; color: #212529; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(255,193,7,0.3); transition: all 0.3s ease;">
-            🧾 Facturar Albaranes
-        </a>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="{{ url_for('facturacion.nueva_factura') }}" class="btn btn-success" style="padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(40,167,69,0.3); transition: all 0.3s ease;">
+                ➕ Crear Factura Directa
+            </a>
+            <a href="{{ url_for('facturacion.nuevo_albaran') }}" class="btn btn-primary" style="padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
+                📄 Nuevo Albarán
+            </a>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="{{ url_for('facturacion.facturar_albaranes') }}" class="btn btn-warning" style="padding: 10px 20px; background: #ffc107; color: #212529; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(255,193,7,0.3); transition: all 0.3s ease;">
+                🧾 Facturar Albaranes
+            </a>
+            <a href="{{ url_for('facturacion.crear_factura_anticipo') }}" class="btn btn-info" style="padding: 10px 20px; background: #17a2b8; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(23,162,184,0.3); transition: all 0.3s ease;">
+                💰 Crear Factura Anticipo
+            </a>
+        </div>
     </div>
 </div>
 
@@ -259,12 +266,12 @@ function cambiarTipoVista(tipo) {
                 <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; width: 40px; font-size: 0.85rem;">
                     <input type="checkbox" id="selectAllFacturas" onchange="toggleAllFacturas(this)" style="cursor: pointer;">
                 </th>
-                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Serie-Nº</th>
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem; width: 100px;">Serie-Nº</th>
                 <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Cliente</th>
-                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Fecha Expedición</th>
-                <th style="padding: 8px 10px; text-align: right; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Importe Total</th>
-                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Estado Cobro</th>
-                <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Acciones</th>
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem; width: 110px;">Fecha Expedición</th>
+                <th style="padding: 8px 10px; text-align: right; color: #ffffff; font-weight: 600; font-size: 0.85rem; width: 120px;">Importe Total</th>
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem; width: 130px;">Estado Cobro</th>
+                <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; font-size: 0.85rem; width: 280px;">Acciones</th>
             </tr>
         </thead>
         <tbody>
@@ -301,36 +308,24 @@ function cambiarTipoVista(tipo) {
                         </div>
                     {% endif %}
                 </td>
-                <td style="padding: 8px 10px; text-align: center;">
-                    <div style="display: flex; gap: 2px; justify-content: center; flex-wrap: wrap;">
-                    {% if factura.presupuesto_id %}
-                        <a href="{{ url_for('facturacion.ver_factura_solicitud', presupuesto_id=factura.presupuesto_id) }}" 
-                           class="btn btn-secondary" 
-                               style="padding: 2px 5px; font-size: 0.65rem; text-decoration: none; display: inline-block; white-space: nowrap;">
-                            Ver
+                <td style="padding: 8px 10px; text-align: center; min-width: 280px;">
+                    <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
+                    {% if not factura.pedido_id %}
+                        <a href="{{ url_for('facturacion.editar_factura', factura_id=factura.id) }}" 
+                           class="btn btn-warning" 
+                           style="padding: 2px 5px; font-size: 0.65rem; text-decoration: none; display: inline-block; white-space: nowrap; background-color: #ffc107; color: #212529; border: none; border-radius: 4px;">
+                            ✏️ Edit
                         </a>
-                    {% elif factura.pedido_id %}
-                        <a href="{{ url_for('facturacion.ver_factura', pedido_id=factura.pedido_id) }}" 
-                           class="btn btn-secondary" 
-                               style="padding: 2px 5px; font-size: 0.65rem; text-decoration: none; display: inline-block; white-space: nowrap;">
-                            Ver
-                        </a>
-                    {% else %}
-                            <a href="{{ url_for('facturacion.editar_factura', factura_id=factura.id) }}" 
-                               class="btn btn-warning" 
-                               style="padding: 2px 5px; font-size: 0.65rem; text-decoration: none; display: inline-block; white-space: nowrap; background-color: #ffc107; color: #212529; border: none;">
-                                ✏️ Edit
-                            </a>
                     {% endif %}
                     <a href="{{ url_for('facturacion.descargar_pdf_factura', factura_id=factura.id) }}" 
                        class="btn btn-danger" 
-                           style="padding: 2px 5px; font-size: 0.65rem; text-decoration: none; display: inline-block; white-space: nowrap; background-color: #dc3545; color: white; border: none;"
+                           style="padding: 2px 5px; font-size: 0.65rem; text-decoration: none; display: inline-block; white-space: nowrap; background-color: #dc3545; color: white; border: none; border-radius: 4px;"
                        target="_blank">
                         📄 PDF
                     </a>
                     <a href="{{ url_for('facturacion.descargar_pdf_albaran_factura', factura_id=factura.id) }}" 
                        class="btn btn-info" 
-                           style="padding: 2px 5px; font-size: 0.65rem; text-decoration: none; display: inline-block; white-space: nowrap;"
+                           style="padding: 2px 5px; font-size: 0.65rem; text-decoration: none; display: inline-block; white-space: nowrap; border-radius: 4px;"
                        target="_blank">
                         📋 Alb
                     </a>
@@ -338,8 +333,8 @@ function cambiarTipoVista(tipo) {
                         <button type="button" 
                                 class="btn btn-primary" 
                                 onclick="abrirModalCobrar({{ factura.id }}, '{{ factura.serie }}', '{{ factura.numero }}', {{ importe_total_val }}, {{ importe_pagado_val }}, {{ importe_pendiente_val }})"
-                                style="padding: 2px 5px; font-size: 0.65rem; white-space: nowrap; background-color: #28a745; color: white; border: none; border-radius: 2px; cursor: pointer;">
-                            💰 Cobrar
+                                style="padding: 2px 5px; font-size: 0.65rem; white-space: nowrap; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Cobrar
                         </button>
                     {% endif %}
                     </div>

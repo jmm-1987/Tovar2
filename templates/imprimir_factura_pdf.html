@@ -492,6 +492,12 @@
                 <span style="color: #856404;">-{{ "%.2f"|format(descuento_pronto_pago_aplicado) }} €</span>
             </div>
             {% endif %}
+            {% if anticipo_facturado is defined and anticipo_facturado > 0 %}
+            <div class="total-row" style="background: #e7f3ff; color: #0066cc;">
+                <span class="total-label">Anticipo ya facturado:</span>
+                <span style="color: #0066cc; font-weight: bold;">-{{ "%.2f"|format(anticipo_facturado) }} €</span>
+            </div>
+            {% endif %}
             <div class="total-row final">
                 <span class="total-label">TOTAL:</span>
                 <span>{{ "%.2f"|format(total_con_iva) }} €</span>

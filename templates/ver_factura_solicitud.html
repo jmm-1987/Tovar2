@@ -151,6 +151,19 @@
                             <span class="descuento-pronto-pago" data-solicitud-id="{{ solicitud.id }}" style="font-weight: bold; color: #856404;">0.00 €</span>
                         </td>
                     </tr>
+                    {% if anticipo_facturado and anticipo_facturado > 0 %}
+                    <tr style="background: #e7f3ff; border-top: 2px solid #b3d9ff;">
+                        <td colspan="5" style="padding: 15px; text-align: right; font-weight: bold; color: #0066cc;">
+                            Anticipo ya facturado:
+                            {% if factura_anticipo %}
+                            <span style="font-size: 0.9rem; color: #666; margin-left: 10px;">(Factura {{ factura_anticipo.serie }}-{{ factura_anticipo.numero }})</span>
+                            {% endif %}
+                        </td>
+                        <td colspan="2" style="padding: 15px; text-align: right;">
+                            <span class="anticipo-facturado" data-solicitud-id="{{ solicitud.id }}" style="font-weight: bold; color: #0066cc;">{{ "%.2f"|format(anticipo_facturado|float) }} €</span>
+                        </td>
+                    </tr>
+                    {% endif %}
                     <tr style="border-top: 3px solid #2c3e50; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
                         <td colspan="5" style="padding: 20px 15px; text-align: right; font-weight: bold; color: #2c3e50; font-size: 1.1rem;">Total Factura (€):</td>
                         <td colspan="2" style="padding: 20px 15px; text-align: right;">
@@ -289,7 +302,17 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Calcular descuento por pronto pago sobre el subtotal
         const descuentoProntoPagoAplicado = subtotal * (descuentoProntoPago / 100);
-        const totalFactura = subtotal - descuentoProntoPagoAplicado;
+        let totalFactura = subtotal - descuentoProntoPagoAplicado;
+        
+        // Restar anticipo ya facturado si existe
+        const anticipoFacturadoSpan = document.querySelector(`.anticipo-facturado[data-solicitud-id="${solicitudId}"]`);
+        if (anticipoFacturadoSpan) {
+            const anticipoFacturado = parseFloat(anticipoFacturadoSpan.textContent.replace(' €', '').replace(',', '.')) || 0;
+            totalFactura = totalFactura - anticipoFacturado;
+            if (totalFactura < 0) {
+                totalFactura = 0;
+            }
+        }
         
         // Actualizar base imponible
         const baseImponibleSpan = document.querySelector(`.base-imponible[data-solicitud-id="${solicitudId}"]`);
@@ -430,12 +453,31 @@ document.addEventListener('DOMContentLoaded', function() {
             const descuentoProntoPagoInput = document.getElementById('descuento-pronto-pago');
             const descuentoProntoPagoPorcentaje = parseFloat(descuentoProntoPagoInput ? descuentoProntoPagoInput.value : 0) || 0;
             
+            // Obtener anticipo facturado si existe
+            const anticipoFacturadoSpan = document.querySelector(`.anticipo-facturado[data-solicitud-id="${solicitudId}"]`);
+            let anticipoFacturado = 0;
+            if (anticipoFacturadoSpan) {
+                anticipoFacturado = parseFloat(anticipoFacturadoSpan.textContent.replace(' €', '').replace(',', '.')) || 0;
+            }
+            
+            // Calcular total final restando anticipo
+            let totalFinal = totalFactura;
+            if (anticipoFacturado > 0) {
+                totalFinal = totalFactura - anticipoFacturado;
+                if (totalFinal < 0) {
+                    totalFinal = 0;
+                }
+            }
+            
             // Confirmar formalización
             let mensajeConfirmacion = `¿Está seguro de que desea formalizar la factura de la solicitud #${solicitudId}?\n\nBase Imponible: ${baseImponible.toFixed(2)}€\nIVA (21%): ${ivaTotal.toFixed(2)}€\nSubtotal: ${subtotal.toFixed(2)}€`;
             if (descuentoProntoPagoPorcentaje > 0) {
                 mensajeConfirmacion += `\nDescuento Pronto Pago (${descuentoProntoPagoPorcentaje.toFixed(2)}%): -${descuentoProntoPago.toFixed(2)}€`;
             }
-            mensajeConfirmacion += `\nTotal: ${totalFactura.toFixed(2)}€\n\nEl número de factura se generará automáticamente.`;
+            if (anticipoFacturado > 0) {
+                mensajeConfirmacion += `\nAnticipo ya facturado: -${anticipoFacturado.toFixed(2)}€`;
+            }
+            mensajeConfirmacion += `\nTotal: ${totalFinal.toFixed(2)}€\n\nEl número de factura se generará automáticamente.`;
             
             if (confirm(mensajeConfirmacion)) {
                 // Preparar datos de las líneas (el importe incluye IVA)

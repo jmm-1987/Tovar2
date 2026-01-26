@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 
-{% block title %}Editar Factura Directa{% endblock %}
+{% block title %}Editar Factura{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width: 1400px; margin-top: 10px;">
     <form method="POST" id="facturaForm">
         <!-- Título y campos principales en la misma línea -->
         <div style="display: flex; align-items: flex-end; gap: 15px; margin-bottom: 10px; flex-wrap: wrap;">
-            <h2 style="margin: 0; flex: 0 0 auto;">Editar Factura Directa</h2>
+            <h2 style="margin: 0; flex: 0 0 auto;">Editar Factura</h2>
             
             <div class="form-group" style="flex: 0 0 180px;">
                 <label for="fecha_expedicion">Fecha de Expedición *</label>
@@ -162,6 +162,12 @@
                 <strong style="color: #28a745;">Descuento aplicado:</strong>
                 <span id="descuento-aplicado" style="color: #28a745;">0.00</span> €
             </div>
+            {% if factura.presupuesto_id and anticipo_facturado and anticipo_facturado > 0 %}
+            <div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding-top: 10px; border-top: 1px solid #dee2e6; background: #e7f3ff; padding: 10px; border-radius: 4px;">
+                <strong style="color: #0066cc;">Anticipo ya facturado:</strong>
+                <span id="anticipo-facturado" style="color: #0066cc; font-weight: bold;">{{ "%.2f"|format(anticipo_facturado|float) }}</span> €
+            </div>
+            {% endif %}
             <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #dee2e6;">
                 <strong style="font-size: 1.2rem;">Total:</strong>
                 <strong style="font-size: 1.2rem;"><span id="importe-total">0.00</span> €</strong>
@@ -254,7 +260,17 @@ document.addEventListener('DOMContentLoaded', function() {
         // Calcular descuento por pronto pago sobre el subtotal
         const descuentoProntoPago = parseFloat(document.getElementById('descuento_pronto_pago').value) || 0;
         const descuentoAplicado = subtotal * (descuentoProntoPago / 100);
-        const total = subtotal - descuentoAplicado;
+        let total = subtotal - descuentoAplicado;
+        
+        // Restar anticipo ya facturado si existe
+        const anticipoFacturadoSpan = document.getElementById('anticipo-facturado');
+        if (anticipoFacturadoSpan) {
+            const anticipoFacturado = parseFloat(anticipoFacturadoSpan.textContent) || 0;
+            total = total - anticipoFacturado;
+            if (total < 0) {
+                total = 0;
+            }
+        }
         
         // Formatear números con signo negativo si es necesario
         const formatearNumero = (num) => {
