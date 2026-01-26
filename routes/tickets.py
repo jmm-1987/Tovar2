@@ -416,6 +416,109 @@ def descargar_pdf_ticket(ticket_id):
         flash(f'Error al generar PDF: {str(e)}', 'error')
         return redirect(url_for('tickets.ver_ticket', ticket_id=ticket_id))
 
+@tickets_bp.route('/tickets/<int:ticket_id>/editar', methods=['GET', 'POST'])
+@login_required
+@not_usuario_required
+def editar_ticket(ticket_id):
+    """Editar un ticket existente"""
+    ticket = Ticket.query.get_or_404(ticket_id)
+    
+    if request.method == 'POST':
+        try:
+            # Actualizar datos básicos del ticket
+            ticket.fecha_expedicion = datetime.strptime(request.form.get('fecha_expedicion'), '%Y-%m-%d').date()
+            ticket.descripcion = request.form.get('descripcion', '')
+            ticket.forma_pago = request.form.get('forma_pago', '')
+            ticket.tipo_calculo_iva = request.form.get('tipo_calculo_iva', 'desglosar')
+            
+            # Actualizar datos del cliente
+            nombre_cliente = request.form.get('nombre')
+            nif_cliente = request.form.get('nif', '')
+            email_cliente = request.form.get('email', '')
+            categoria_cliente = request.form.get('categoria', '')
+            
+            ticket.nombre = nombre_cliente
+            ticket.nif = nif_cliente if nif_cliente else None
+            ticket.email = email_cliente if email_cliente else None
+            ticket.categoria = categoria_cliente
+            
+            # Actualizar o crear cliente de tienda
+            cliente_tienda = ClienteTienda.query.filter_by(
+                nombre=nombre_cliente,
+                nif=nif_cliente if nif_cliente else None
+            ).first()
+            
+            if not cliente_tienda:
+                cliente_tienda = ClienteTienda(
+                    nombre=nombre_cliente,
+                    nif=nif_cliente if nif_cliente else None,
+                    email=email_cliente if email_cliente else None,
+                    categoria=categoria_cliente
+                )
+                db.session.add(cliente_tienda)
+            else:
+                if email_cliente:
+                    cliente_tienda.email = email_cliente
+                if categoria_cliente:
+                    cliente_tienda.categoria = categoria_cliente
+            
+            # Eliminar líneas existentes
+            for linea in ticket.lineas:
+                db.session.delete(linea)
+            
+            # Crear nuevas líneas
+            descripciones = request.form.getlist('descripcion_linea[]')
+            cantidades = request.form.getlist('cantidad[]')
+            tallas = request.form.getlist('talla[]')
+            precios_unitarios = request.form.getlist('precio_unitario[]')
+            
+            tipo_iva = Decimal('21')  # IVA al 21%
+            importe_total = Decimal('0.00')
+            
+            for i in range(len(descripciones)):
+                if descripciones[i] and cantidades[i] and precios_unitarios[i]:
+                    cantidad = Decimal(cantidades[i])
+                    precio_unitario_input = Decimal(precios_unitarios[i])
+                    talla = tallas[i] if i < len(tallas) else None
+                    
+                    # Siempre guardar precio sin IVA
+                    precio_unitario_sin_iva = precio_unitario_input
+                    
+                    # Calcular importe sin IVA
+                    importe_sin_iva = cantidad * precio_unitario_sin_iva
+                    
+                    # Calcular importe con IVA para el total del ticket
+                    importe_con_iva = importe_sin_iva * (Decimal('1') + tipo_iva / Decimal('100'))
+                    importe_total += importe_con_iva
+                    
+                    # Guardar precio sin IVA e importe sin IVA en la línea
+                    linea = LineaTicket(
+                        ticket_id=ticket.id,
+                        descripcion=descripciones[i],
+                        cantidad=cantidad,
+                        talla=talla,
+                        precio_unitario=precio_unitario_sin_iva,
+                        importe=importe_sin_iva
+                    )
+                    db.session.add(linea)
+            
+            # Actualizar importe total del ticket
+            ticket.importe_total = importe_total
+            
+            db.session.commit()
+            flash('Ticket actualizado correctamente.', 'success')
+            return redirect(url_for('tickets.ver_ticket', ticket_id=ticket_id))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al actualizar el ticket: {str(e)}', 'error')
+            import traceback
+            traceback.print_exc()
+            return redirect(url_for('tickets.editar_ticket', ticket_id=ticket_id))
+    
+    # GET: mostrar formulario con datos del ticket
+    return render_template('editar_ticket.html', ticket=ticket)
+
 @tickets_bp.route('/tickets/<int:ticket_id>/eliminar', methods=['POST'])
 @login_required
 @not_usuario_required

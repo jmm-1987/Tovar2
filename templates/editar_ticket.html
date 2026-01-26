@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Ticket {{ ticket.serie }}-{{ ticket.numero }} - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<h2>Editar Ticket {{ ticket.serie }}-{{ ticket.numero }} (Factura Simplificada)</h2>
+
+<form method="POST" id="ticket-form">
+    <div style="margin-bottom: 20px; padding: 15px; background: #fff3cd; border-radius: 6px; border: 1px solid #ffc107;">
+        <p style="margin: 0; color: #856404; font-weight: 600;">ℹ️ Editando ticket existente: <strong>{{ ticket.serie }}-{{ ticket.numero }}</strong></p>
+    </div>
+
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="fecha_expedicion">Fecha Expedición *</label>
+            <input type="date" name="fecha_expedicion" id="fecha_expedicion" value="{{ ticket.fecha_expedicion.strftime('%Y-%m-%d') }}" required>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="tipo_factura">Tipo Factura *</label>
+            <select name="tipo_factura" id="tipo_factura" required disabled>
+                <option value="F2" selected>F2 - Factura Simplificada</option>
+            </select>
+            <input type="hidden" name="tipo_factura" value="F2">
+        </div>
+        
+        <div class="form-group-compact">
+            <label for="tipo_calculo_iva">Tipo de Cálculo de IVA *</label>
+            <select name="tipo_calculo_iva" id="tipo_calculo_iva" required>
+                <option value="desglosar" {% if ticket.tipo_calculo_iva == 'desglosar' %}selected{% endif %}>Desglosar (precio incluye IVA)</option>
+                <option value="incrementar" {% if ticket.tipo_calculo_iva == 'incrementar' %}selected{% endif %}>Incrementar (precio base + IVA)</option>
+            </select>
+        </div>
+        
+        <div class="form-group-compact">
+            <label for="forma_pago">Forma de Pago *</label>
+            <select name="forma_pago" id="forma_pago" required>
+                <option value="">Seleccione una forma de pago</option>
+                <option value="efectivo" {% if ticket.forma_pago == 'efectivo' %}selected{% endif %}>Efectivo</option>
+                <option value="tarjeta" {% if ticket.forma_pago == 'tarjeta' %}selected{% endif %}>Tarjeta</option>
+                <option value="bizum" {% if ticket.forma_pago == 'bizum' %}selected{% endif %}>Bizum</option>
+                <option value="transferencia" {% if ticket.forma_pago == 'transferencia' %}selected{% endif %}>Transferencia</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-row-compact">
+        <div class="form-group-compact" style="flex: 1 1 100%;">
+            <label for="descripcion">Descripción</label>
+            <input type="text" name="descripcion" id="descripcion" value="{{ ticket.descripcion or '' }}" placeholder="Descripcion de la operacion">
+        </div>
+    </div>
+
+    <h3>Datos del Cliente</h3>
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="nombre">Nombre *</label>
+            <input type="text" name="nombre" id="nombre" value="{{ ticket.nombre }}" required>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="nif">NIF</label>
+            <input type="text" name="nif" id="nif" value="{{ ticket.nif or '' }}" placeholder="A15022510">
+        </div>
+        
+        <div class="form-group-compact">
+            <label for="email">Email</label>
+            <input type="email" name="email" id="email" value="{{ ticket.email or '' }}" placeholder="cliente@ejemplo.com">
+        </div>
+        
+        <div class="form-group-compact">
+            <label for="categoria">Categoría *</label>
+            <select name="categoria" id="categoria" required>
+                <option value="">Seleccione una categoría</option>
+                <option value="hosteleria" {% if ticket.categoria == 'hosteleria' %}selected{% endif %}>Hostelería</option>
+                <option value="clinica" {% if ticket.categoria == 'clinica' %}selected{% endif %}>Clínica</option>
+                <option value="colegio" {% if ticket.categoria == 'colegio' %}selected{% endif %}>Colegio</option>
+                <option value="emerita" {% if ticket.categoria == 'emerita' %}selected{% endif %}>Emerita</option>
+                <option value="carnaval" {% if ticket.categoria == 'carnaval' %}selected{% endif %}>Carnaval</option>
+                <option value="transporte" {% if ticket.categoria == 'transporte' %}selected{% endif %}>Transporte</option>
+                <option value="varios" {% if ticket.categoria == 'varios' %}selected{% endif %}>Varios</option>
+            </select>
+        </div>
+    </div>
+
+    <h3>Líneas del Ticket</h3>
+    <div id="lineas-container">
+        {% if ticket.lineas %}
+            {% for linea in ticket.lineas %}
+            <div class="linea-ticket-row">
+                <div class="linea-ticket-numero">#{{ loop.index }}</div>
+                <div class="linea-ticket-campos">
+                    <input type="text" name="descripcion_linea[]" value="{{ linea.descripcion }}" placeholder="Descripción del producto" required style="flex: 2;">
+                    <input type="number" name="cantidad[]" value="{{ "%.2f"|format(linea.cantidad) }}" placeholder="Cantidad" step="0.01" min="0" required style="flex: 1;" class="linea-cantidad">
+                    <input type="text" name="talla[]" value="{{ linea.talla or '' }}" placeholder="Talla" style="flex: 0 0 80px; width: 80px;">
+                    <input type="number" name="precio_unitario[]" value="{{ "%.2f"|format(linea.precio_unitario) }}" placeholder="Precio unitario (sin IVA)" step="0.01" min="0" required style="flex: 1;" class="precio-unitario">
+                    <span class="importe-linea" style="flex: 1; padding: 8px; text-align: right; font-weight: bold;">{{ "%.2f"|format(linea.importe) }} €</span>
+                    <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="linea-ticket-row">
+            <div class="linea-ticket-numero">#1</div>
+            <div class="linea-ticket-campos">
+                <input type="text" name="descripcion_linea[]" placeholder="Descripción del producto" required style="flex: 2;">
+                <input type="number" name="cantidad[]" placeholder="Cantidad" step="0.01" min="0" required style="flex: 1;">
+                <input type="text" name="talla[]" placeholder="Talla" style="flex: 0 0 80px; width: 80px;">
+                <input type="number" name="precio_unitario[]" placeholder="Precio unitario (sin IVA)" step="0.01" min="0" required style="flex: 1;" class="precio-unitario">
+                <span class="importe-linea" style="flex: 1; padding: 8px; text-align: right; font-weight: bold;">0.00 €</span>
+                <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div style="margin-top: 15px;">
+        <button type="button" id="agregar-linea" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">+ Agregar Línea</button>
+    </div>
+
+    <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <strong>Base Imponible:</strong>
+            <span id="base-imponible">{{ "%.2f"|format((ticket.importe_total|float / 1.21)|round(2)) }}</span> €
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <strong>IVA (21%):</strong>
+            <span id="iva-total">{{ "%.2f"|format((ticket.importe_total|float - (ticket.importe_total|float / 1.21)|round(2))|round(2)) }}</span> €
+        </div>
+        <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #dee2e6;">
+            <strong style="font-size: 1.2rem;">Total:</strong>
+            <strong style="font-size: 1.2rem;"><span id="importe-total">{{ "%.2f"|format(ticket.importe_total) }}</span> €</strong>
+        </div>
+    </div>
+
+    <div style="margin-top: 30px; display: flex; gap: 10px;">
+        <button type="submit" class="btn btn-success" style="padding: 10px 20px;">Actualizar Ticket</button>
+        <a href="{{ url_for('tickets.ver_ticket', ticket_id=ticket.id) }}" class="btn btn-secondary" style="padding: 10px 20px; text-decoration: none;">Cancelar</a>
+    </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const lineasContainer = document.getElementById('lineas-container');
+    let lineaCount = {{ ticket.lineas|length if ticket.lineas else 1 }};
+
+    // Agregar nueva línea
+    document.getElementById('agregar-linea').addEventListener('click', function() {
+        lineaCount++;
+        const nuevaLinea = document.createElement('div');
+        nuevaLinea.className = 'linea-ticket-row';
+        nuevaLinea.innerHTML = `
+            <div class="linea-ticket-numero">#${lineaCount}</div>
+            <div class="linea-ticket-campos">
+                <input type="text" name="descripcion_linea[]" placeholder="Descripción del producto" required style="flex: 2;">
+                <input type="number" name="cantidad[]" placeholder="Cantidad" step="0.01" min="0" required style="flex: 1;" class="linea-cantidad">
+                <input type="text" name="talla[]" placeholder="Talla" style="flex: 0 0 80px; width: 80px;">
+                <input type="number" name="precio_unitario[]" placeholder="Precio unitario (sin IVA)" step="0.01" min="0" required style="flex: 1;" class="precio-unitario">
+                <span class="importe-linea" style="flex: 1; padding: 8px; text-align: right; font-weight: bold;">0.00 €</span>
+                <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>
+            </div>
+        `;
+        lineasContainer.appendChild(nuevaLinea);
+        
+        // Agregar event listeners a los nuevos campos
+        const cantidadInput = nuevaLinea.querySelector('.linea-cantidad');
+        const precioInput = nuevaLinea.querySelector('.precio-unitario');
+        const importeSpan = nuevaLinea.querySelector('.importe-linea');
+        
+        cantidadInput.addEventListener('input', calcularImporte);
+        precioInput.addEventListener('input', calcularImporte);
+        
+        nuevaLinea.querySelector('.btn-eliminar-linea').addEventListener('click', function() {
+            nuevaLinea.remove();
+            calcularTotal();
+        });
+    });
+
+    // Calcular importe de línea y total con IVA
+    function calcularImporte() {
+        const rows = document.querySelectorAll('.linea-ticket-row');
+        const tipoIva = 21; // IVA al 21%
+        
+        let baseImponible = 0;
+
+        rows.forEach(row => {
+            const cantidadInput = row.querySelector('input[name="cantidad[]"]');
+            const precioInput = row.querySelector('input[name="precio_unitario[]"]');
+            const importeSpan = row.querySelector('.importe-linea');
+
+            if (cantidadInput && precioInput && importeSpan) {
+                const cantidad = parseFloat(cantidadInput.value) || 0;
+                const precio = parseFloat(precioInput.value) || 0;
+                
+                // Siempre calcular como precio sin IVA
+                const importeSinIva = cantidad * precio;
+                
+                // Mostrar importe sin IVA en la línea
+                importeSpan.textContent = importeSinIva.toFixed(2) + ' €';
+                baseImponible += importeSinIva;
+            }
+        });
+
+        // Calcular IVA total (21% sobre la base imponible)
+        const ivaTotal = baseImponible * (tipoIva / 100);
+        const totalConIva = baseImponible + ivaTotal;
+
+        document.getElementById('base-imponible').textContent = baseImponible.toFixed(2);
+        document.getElementById('iva-total').textContent = ivaTotal.toFixed(2);
+        document.getElementById('importe-total').textContent = totalConIva.toFixed(2);
+    }
+
+    function calcularTotal() {
+        calcularImporte();
+    }
+
+    // Event listeners para calcular automáticamente
+    document.addEventListener('input', function(e) {
+        if (e.target.matches('input[name="cantidad[]"], input[name="precio_unitario[]"]')) {
+            calcularImporte();
+        }
+    });
+    
+    // Recalcular cuando cambia el tipo de cálculo de IVA
+    document.getElementById('tipo_calculo_iva').addEventListener('change', function() {
+        calcularImporte();
+    });
+
+    // Eliminar línea
+    document.addEventListener('click', function(e) {
+        if (e.target.classList.contains('btn-eliminar-linea')) {
+            e.target.closest('.linea-ticket-row').remove();
+            calcularTotal();
+        }
+    });
+    
+    // Calcular total inicial
+    calcularImporte();
+});
+</script>
+
+<style>
+.linea-ticket-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    padding: 10px;
+    background: #f8f9fa;
+    border-radius: 6px;
+}
+
+.linea-ticket-numero {
+    font-weight: bold;
+    color: #2c3e50;
+    min-width: 40px;
+}
+
+.linea-ticket-campos {
+    display: flex;
+    gap: 10px;
+    flex: 1;
+    align-items: center;
+}
+
+.linea-ticket-campos input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+</style>
+{% endblock %}
+

@@ -367,8 +367,12 @@ header {
 
     <div class="actions">
         <button type="submit" class="btn btn-success">Actualizar Solicitud</button>
-        <a href="{{ url_for('solicitudes.listado_solicitudes') }}" class="btn btn-danger">Cancelar</a>
+        <a href="{{ url_for('solicitudes.listado_solicitudes') }}" class="btn btn-secondary">Cancelar</a>
+        <button type="button" class="btn btn-danger" onclick="confirmarEliminacion()" style="background-color: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 14px;">Eliminar Solicitud</button>
     </div>
+</form>
+
+<form id="formEliminar" method="POST" action="{{ url_for('solicitudes.eliminar_solicitud', solicitud_id=solicitud.id) }}" style="display: none;">
 </form>
 
 <style>
@@ -1216,6 +1220,16 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+// Función para confirmar eliminación
+function confirmarEliminacion() {
+    const numeroSolicitud = '{{ solicitud.numero_solicitud or solicitud.id }}';
+    const clienteNombre = '{{ solicitud.cliente.nombre if solicitud.cliente else "N/A" }}';
+    
+    if (confirm(`¿Está seguro de que desea eliminar la solicitud #${numeroSolicitud} del cliente "${clienteNombre}"?\n\nEsta acción no se puede deshacer.`)) {
+        document.getElementById('formEliminar').submit();
+    }
+}
 </script>
 
 <!-- Modal para crear cliente desde presupuesto -->

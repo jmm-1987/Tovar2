@@ -7,6 +7,9 @@
     <a href="{{ url_for('tickets.listado_tickets') }}" class="btn btn-primary" style="padding: 10px 20px; text-decoration: none; display: inline-block;">
         ← Volver al Listado
     </a>
+    <a href="{{ url_for('tickets.editar_ticket', ticket_id=ticket.id) }}" class="btn btn-warning" style="padding: 10px 20px; text-decoration: none; display: inline-block; margin-left: 10px; background-color: #ffc107; color: #000;">
+        ✏️ Editar
+    </a>
     <a href="{{ url_for('tickets.imprimir_ticket', ticket_id=ticket.id) }}" target="_blank" class="btn btn-success" style="padding: 10px 20px; text-decoration: none; display: inline-block; margin-left: 10px;">
         🖨️ Imprimir
     </a>

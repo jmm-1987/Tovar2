@@ -7,7 +7,7 @@ import os
 import tempfile
 from io import BytesIO
 from extensions import db
-from models import Comercial, Cliente, Prenda, Presupuesto, LineaPresupuesto, Usuario, RegistroEstadoSolicitud, CategoriaCliente, DireccionEnvio, PersonaContacto
+from models import Comercial, Cliente, Prenda, Presupuesto, LineaPresupuesto, Usuario, RegistroEstadoSolicitud, CategoriaCliente, DireccionEnvio, PersonaContacto, Pedido
 from sqlalchemy.orm import joinedload
 from flask import jsonify
 from playwright.sync_api import sync_playwright
@@ -1313,6 +1313,42 @@ def editar_solicitud(solicitud_id):
                          categorias=categorias,
                          form_data=None,
                          prendas_info=prendas_info)  # Pasar prendas parseadas
+
+
+@solicitudes_bp.route('/solicitudes/<int:solicitud_id>/eliminar', methods=['POST'])
+@login_required
+def eliminar_solicitud(solicitud_id):
+    """Eliminar una solicitud (presupuesto)"""
+    try:
+        solicitud = Presupuesto.query.get_or_404(solicitud_id)
+        
+        # Verificar si hay pedidos relacionados
+        pedidos_relacionados = Pedido.query.filter_by(presupuesto_id=solicitud_id).all()
+        num_pedidos = len(pedidos_relacionados)
+        
+        if num_pedidos > 0:
+            flash(f'Advertencia: Esta solicitud tiene {num_pedidos} pedido(s) relacionado(s). La solicitud se eliminará pero los pedidos permanecerán.', 'warning')
+        
+        # Eliminar registros de estado
+        registros_estado = RegistroEstadoSolicitud.query.filter_by(presupuesto_id=solicitud_id).all()
+        for registro in registros_estado:
+            db.session.delete(registro)
+        
+        # Las líneas se eliminan automáticamente por cascade='all, delete-orphan'
+        
+        # Eliminar la solicitud
+        db.session.delete(solicitud)
+        db.session.commit()
+        
+        flash('Solicitud eliminada correctamente.', 'success')
+        return redirect(url_for('solicitudes.listado_solicitudes'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al eliminar la solicitud: {str(e)}', 'error')
+        import traceback
+        traceback.print_exc()
+        return redirect(url_for('solicitudes.editar_solicitud', solicitud_id=solicitud_id))
 
 
 @solicitudes_bp.route('/solicitudes/crear-cliente-ajax', methods=['POST'])
