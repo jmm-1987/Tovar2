@@ -99,6 +99,7 @@
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 15px;
+            table-layout: fixed;
         }
         
         .lineas-table th {
@@ -108,12 +109,30 @@
             text-align: left;
             font-weight: 600;
             font-size: 11px;
+            vertical-align: top;
+        }
+        
+        .lineas-table th:nth-child(1) {
+            width: 45%;
+        }
+        
+        .lineas-table th:nth-child(2) {
+            width: 15%;
+        }
+        
+        .lineas-table th:nth-child(3) {
+            width: 20%;
+        }
+        
+        .lineas-table th:nth-child(4) {
+            width: 20%;
         }
         
         .lineas-table td {
             padding: 8px 10px;
             border-bottom: 1px solid #e0e0e0;
             font-size: 11px;
+            vertical-align: top;
         }
         
         .lineas-table tbody tr:hover {
@@ -126,6 +145,17 @@
         
         .text-center {
             text-align: center;
+        }
+        
+        .lineas-table th.text-right,
+        .lineas-table td.text-right {
+            padding-right: 10px;
+        }
+        
+        .lineas-table th.text-center,
+        .lineas-table td.text-center {
+            padding-left: 10px;
+            padding-right: 10px;
         }
         
         /* Totales */

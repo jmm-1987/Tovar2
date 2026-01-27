@@ -25,14 +25,6 @@
         </div>
         
         <div class="form-group-compact">
-            <label for="tipo_calculo_iva">Tipo de Cálculo de IVA *</label>
-            <select name="tipo_calculo_iva" id="tipo_calculo_iva" required>
-                <option value="desglosar" {% if ticket.tipo_calculo_iva == 'desglosar' %}selected{% endif %}>Desglosar (precio incluye IVA)</option>
-                <option value="incrementar" {% if ticket.tipo_calculo_iva == 'incrementar' %}selected{% endif %}>Incrementar (precio base + IVA)</option>
-            </select>
-        </div>
-        
-        <div class="form-group-compact">
             <label for="forma_pago">Forma de Pago *</label>
             <select name="forma_pago" id="forma_pago" required>
                 <option value="">Seleccione una forma de pago</option>
@@ -84,18 +76,34 @@
     </div>
 
     <h3>Líneas del Ticket</h3>
+    <div class="linea-ticket-header">
+        <div class="linea-ticket-numero-header">#</div>
+        <div class="linea-ticket-campos-header">
+            <div class="header-col" style="flex: 2;">Descripción</div>
+            <div class="header-col" style="flex: 1;">Cantidad</div>
+            <div class="header-col" style="flex: 0 0 80px;">Talla</div>
+            <div class="header-col" style="flex: 1;">P. Unitario</div>
+            <div class="header-col" style="flex: 0 0 80px;">IVA %</div>
+            <div class="header-col" style="flex: 1;">Total</div>
+        </div>
+    </div>
     <div id="lineas-container">
         {% if ticket.lineas %}
             {% for linea in ticket.lineas %}
+            {% set precio_unitario_calc = linea.precio_unitario|float %}
+            {% set iva_linea = 21 %}
+            {% set base_linea = precio_unitario_calc * linea.cantidad|float %}
+            {% set total_calc = base_linea * (1 + iva_linea / 100) %}
             <div class="linea-ticket-row">
                 <div class="linea-ticket-numero">#{{ loop.index }}</div>
                 <div class="linea-ticket-campos">
                     <input type="text" name="descripcion_linea[]" value="{{ linea.descripcion }}" placeholder="Descripción del producto" required style="flex: 2;">
                     <input type="number" name="cantidad[]" value="{{ "%.2f"|format(linea.cantidad) }}" placeholder="Cantidad" step="0.01" min="0" required style="flex: 1;" class="linea-cantidad">
                     <input type="text" name="talla[]" value="{{ linea.talla or '' }}" placeholder="Talla" style="flex: 0 0 80px; width: 80px;">
-                    <input type="number" name="precio_unitario[]" value="{{ "%.2f"|format(linea.precio_unitario) }}" placeholder="Precio unitario (sin IVA)" step="0.01" min="0" required style="flex: 1;" class="precio-unitario">
-                    <span class="importe-linea" style="flex: 1; padding: 8px; text-align: right; font-weight: bold;">{{ "%.2f"|format(linea.importe) }} €</span>
-                    <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>
+                    <input type="number" name="precio_unitario[]" value="{{ "%.2f"|format(precio_unitario_calc) }}" placeholder="P. Unitario" step="0.01" min="0" style="flex: 1;" class="precio-unitario">
+                    <input type="number" name="tipo_iva[]" placeholder="IVA %" step="0.01" min="0" max="100" value="{{ iva_linea }}" style="flex: 0 0 80px; width: 80px;" class="tipo-iva-linea">
+                    <input type="number" name="total_linea[]" placeholder="Total" step="0.01" min="0" value="{{ "%.2f"|format(total_calc) }}" style="flex: 1;" class="total-linea">
+                    <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; {% if ticket.lineas|length > 1 %}display: block;{% else %}display: none;{% endif %} flex: 0 0 30px;">×</button>
                 </div>
             </div>
             {% endfor %}
@@ -104,11 +112,12 @@
             <div class="linea-ticket-numero">#1</div>
             <div class="linea-ticket-campos">
                 <input type="text" name="descripcion_linea[]" placeholder="Descripción del producto" required style="flex: 2;">
-                <input type="number" name="cantidad[]" placeholder="Cantidad" step="0.01" min="0" required style="flex: 1;">
+                <input type="number" name="cantidad[]" placeholder="Cantidad" step="0.01" min="0" required style="flex: 1;" class="linea-cantidad">
                 <input type="text" name="talla[]" placeholder="Talla" style="flex: 0 0 80px; width: 80px;">
-                <input type="number" name="precio_unitario[]" placeholder="Precio unitario (sin IVA)" step="0.01" min="0" required style="flex: 1;" class="precio-unitario">
-                <span class="importe-linea" style="flex: 1; padding: 8px; text-align: right; font-weight: bold;">0.00 €</span>
-                <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>
+                <input type="number" name="precio_unitario[]" placeholder="P. Unitario" step="0.01" min="0" style="flex: 1;" class="precio-unitario">
+                <input type="number" name="tipo_iva[]" placeholder="IVA %" step="0.01" min="0" max="100" value="21" style="flex: 0 0 80px; width: 80px;" class="tipo-iva-linea">
+                <input type="number" name="total_linea[]" placeholder="Total" step="0.01" min="0" style="flex: 1;" class="total-linea">
+                <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; display: none; flex: 0 0 30px;">×</button>
             </div>
         </div>
         {% endif %}
@@ -118,18 +127,16 @@
         <button type="button" id="agregar-linea" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">+ Agregar Línea</button>
     </div>
 
-    <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
-        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-            <strong>Base Imponible:</strong>
-            <span id="base-imponible">{{ "%.2f"|format((ticket.importe_total|float / 1.21)|round(2)) }}</span> €
-        </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-            <strong>IVA (21%):</strong>
-            <span id="iva-total">{{ "%.2f"|format((ticket.importe_total|float - (ticket.importe_total|float / 1.21)|round(2))|round(2)) }}</span> €
-        </div>
-        <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #dee2e6;">
-            <strong style="font-size: 1.2rem;">Total:</strong>
-            <strong style="font-size: 1.2rem;"><span id="importe-total">{{ "%.2f"|format(ticket.importe_total) }}</span> €</strong>
+    <!-- Fila de totales alineada con las columnas -->
+    <div class="linea-ticket-row" style="background: #e7f3ff; border-top: 2px solid #2c3e50; margin-top: 15px; font-weight: bold;">
+        <div class="linea-ticket-numero" style="font-weight: bold;">TOTAL</div>
+        <div class="linea-ticket-campos">
+            <div style="flex: 2; padding: 8px; text-align: left; font-weight: bold;">TOTALES</div>
+            <div style="flex: 1; padding: 8px; text-align: right;"></div>
+            <div style="flex: 0 0 80px; padding: 8px; text-align: right;"></div>
+            <div style="flex: 1; padding: 8px; text-align: right; font-weight: bold;" id="base-imponible">{{ "%.2f"|format((ticket.importe_total|float / 1.21)|round(2)) }} €</div>
+            <div style="flex: 0 0 80px; padding: 8px; text-align: right; font-weight: bold;" id="iva-total">{{ "%.2f"|format((ticket.importe_total|float - (ticket.importe_total|float / 1.21)|round(2))|round(2)) }} €</div>
+            <div style="flex: 1; padding: 8px; text-align: right; font-weight: bold; font-size: 1.1rem;" id="importe-total">{{ "%.2f"|format(ticket.importe_total) }} €</div>
         </div>
     </div>
 
@@ -147,128 +154,266 @@ document.addEventListener('DOMContentLoaded', function() {
     // Agregar nueva línea
     document.getElementById('agregar-linea').addEventListener('click', function() {
         lineaCount++;
-        const nuevaLinea = document.createElement('div');
-        nuevaLinea.className = 'linea-ticket-row';
-        nuevaLinea.innerHTML = `
-            <div class="linea-ticket-numero">#${lineaCount}</div>
-            <div class="linea-ticket-campos">
-                <input type="text" name="descripcion_linea[]" placeholder="Descripción del producto" required style="flex: 2;">
-                <input type="number" name="cantidad[]" placeholder="Cantidad" step="0.01" min="0" required style="flex: 1;" class="linea-cantidad">
-                <input type="text" name="talla[]" placeholder="Talla" style="flex: 0 0 80px; width: 80px;">
-                <input type="number" name="precio_unitario[]" placeholder="Precio unitario (sin IVA)" step="0.01" min="0" required style="flex: 1;" class="precio-unitario">
-                <span class="importe-linea" style="flex: 1; padding: 8px; text-align: right; font-weight: bold;">0.00 €</span>
-                <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">×</button>
-            </div>
-        `;
-        lineasContainer.appendChild(nuevaLinea);
+        const primeraLinea = lineasContainer.querySelector('.linea-ticket-row');
+        const nuevaLinea = primeraLinea.cloneNode(true);
         
-        // Agregar event listeners a los nuevos campos
-        const cantidadInput = nuevaLinea.querySelector('.linea-cantidad');
-        const precioInput = nuevaLinea.querySelector('.precio-unitario');
-        const importeSpan = nuevaLinea.querySelector('.importe-linea');
-        
-        cantidadInput.addEventListener('input', calcularImporte);
-        precioInput.addEventListener('input', calcularImporte);
-        
-        nuevaLinea.querySelector('.btn-eliminar-linea').addEventListener('click', function() {
-            nuevaLinea.remove();
-            calcularTotal();
-        });
-    });
-
-    // Calcular importe de línea y total con IVA
-    function calcularImporte() {
-        const rows = document.querySelectorAll('.linea-ticket-row');
-        const tipoIva = 21; // IVA al 21%
-        
-        let baseImponible = 0;
-
-        rows.forEach(row => {
-            const cantidadInput = row.querySelector('input[name="cantidad[]"]');
-            const precioInput = row.querySelector('input[name="precio_unitario[]"]');
-            const importeSpan = row.querySelector('.importe-linea');
-
-            if (cantidadInput && precioInput && importeSpan) {
-                const cantidad = parseFloat(cantidadInput.value) || 0;
-                const precio = parseFloat(precioInput.value) || 0;
-                
-                // Siempre calcular como precio sin IVA
-                const importeSinIva = cantidad * precio;
-                
-                // Mostrar importe sin IVA en la línea
-                importeSpan.textContent = importeSinIva.toFixed(2) + ' €';
-                baseImponible += importeSinIva;
+        // Limpiar valores
+        nuevaLinea.querySelectorAll('input').forEach(input => {
+            if (input.type === 'number') {
+                if (input.classList.contains('tipo-iva-linea')) {
+                    input.value = '21';
+                } else {
+                    input.value = '';
+                }
+            } else {
+                input.value = '';
             }
         });
+        
+        // Actualizar número
+        nuevaLinea.querySelector('.linea-ticket-numero').textContent = '#' + lineaCount;
+        
+        // Mostrar botón eliminar
+        nuevaLinea.querySelector('.btn-eliminar-linea').style.display = 'block';
+        
+        // Añadir event listeners
+        const cantidadInput = nuevaLinea.querySelector('.linea-cantidad');
+        const precioInput = nuevaLinea.querySelector('.precio-unitario');
+        const ivaInput = nuevaLinea.querySelector('.tipo-iva-linea');
+        const totalInput = nuevaLinea.querySelector('.total-linea');
+        
+        cantidadInput.addEventListener('input', function() { calcularLinea(nuevaLinea); });
+        precioInput.addEventListener('input', function() { calcularLinea(nuevaLinea); });
+        ivaInput.addEventListener('input', function() { calcularLinea(nuevaLinea); });
+        totalInput.addEventListener('input', function() { calcularDesdeTotal(nuevaLinea); });
+        
+        nuevaLinea.querySelector('.btn-eliminar-linea').addEventListener('click', function() {
+            if (lineasContainer.querySelectorAll('.linea-ticket-row').length > 1) {
+                nuevaLinea.remove();
+                renumerarLineas();
+                calcularTotales();
+            } else {
+                alert('Debe haber al menos una línea en el ticket');
+            }
+        });
+        
+        lineasContainer.appendChild(nuevaLinea);
+    });
 
-        // Calcular IVA total (21% sobre la base imponible)
-        const ivaTotal = baseImponible * (tipoIva / 100);
+    // Calcular línea desde precio unitario (cantidad * precio * (1 + IVA/100))
+    function calcularLinea(lineaRow) {
+        const cantidadInput = lineaRow.querySelector('.linea-cantidad');
+        const precioInput = lineaRow.querySelector('.precio-unitario');
+        const ivaInput = lineaRow.querySelector('.tipo-iva-linea');
+        const totalInput = lineaRow.querySelector('.total-linea');
+        
+        if (!cantidadInput || !precioInput || !ivaInput || !totalInput) return;
+        
+        const cantidad = parseFloat(cantidadInput.value) || 0;
+        const precio = parseFloat(precioInput.value) || 0;
+        const iva = parseFloat(ivaInput.value) || 0;
+        
+        if (cantidad > 0 && precio > 0) {
+            const base = cantidad * precio;
+            const total = base * (1 + iva / 100);
+            totalInput.value = total.toFixed(2);
+        } else {
+            totalInput.value = '';
+        }
+        
+        calcularTotales();
+    }
+    
+    // Calcular desde total introducido directamente (calcular base e IVA)
+    function calcularDesdeTotal(lineaRow) {
+        const cantidadInput = lineaRow.querySelector('.linea-cantidad');
+        const precioInput = lineaRow.querySelector('.precio-unitario');
+        const ivaInput = lineaRow.querySelector('.tipo-iva-linea');
+        const totalInput = lineaRow.querySelector('.total-linea');
+        
+        if (!cantidadInput || !precioInput || !ivaInput || !totalInput) return;
+        
+        const total = parseFloat(totalInput.value) || 0;
+        const iva = parseFloat(ivaInput.value) || 0;
+        const cantidad = parseFloat(cantidadInput.value) || 0;
+        
+        if (total > 0 && iva >= 0 && cantidad > 0) {
+            // Calcular base: total / (1 + IVA/100)
+            const baseTotal = total / (1 + iva / 100);
+            const precioUnitario = baseTotal / cantidad;
+            precioInput.value = precioUnitario.toFixed(2);
+        }
+        
+        calcularTotales();
+    }
+    
+    // Calcular totales generales
+    function calcularTotales() {
+        const rows = document.querySelectorAll('.linea-ticket-row');
+        let baseImponible = 0;
+        let ivaTotal = 0;
+        
+        rows.forEach(row => {
+            const cantidadInput = row.querySelector('.linea-cantidad');
+            const precioInput = row.querySelector('.precio-unitario');
+            const ivaInput = row.querySelector('.tipo-iva-linea');
+            const totalInput = row.querySelector('.total-linea');
+            
+            if (cantidadInput && precioInput && ivaInput && totalInput) {
+                const cantidad = parseFloat(cantidadInput.value) || 0;
+                const precio = parseFloat(precioInput.value) || 0;
+                const iva = parseFloat(ivaInput.value) || 0;
+                const total = parseFloat(totalInput.value) || 0;
+                
+                if (cantidad > 0 && precio > 0) {
+                    const base = cantidad * precio;
+                    baseImponible += base;
+                    ivaTotal += (total - base);
+                } else if (total > 0 && iva >= 0 && cantidad > 0) {
+                    const base = total / (1 + iva / 100);
+                    baseImponible += base;
+                    ivaTotal += (total - base);
+                }
+            }
+        });
+        
         const totalConIva = baseImponible + ivaTotal;
-
-        document.getElementById('base-imponible').textContent = baseImponible.toFixed(2);
-        document.getElementById('iva-total').textContent = ivaTotal.toFixed(2);
-        document.getElementById('importe-total').textContent = totalConIva.toFixed(2);
+        
+        document.getElementById('base-imponible').textContent = baseImponible.toFixed(2) + ' €';
+        document.getElementById('iva-total').textContent = ivaTotal.toFixed(2) + ' €';
+        document.getElementById('importe-total').textContent = totalConIva.toFixed(2) + ' €';
     }
-
-    function calcularTotal() {
-        calcularImporte();
+    
+    // Renumerar líneas
+    function renumerarLineas() {
+        document.querySelectorAll('.linea-ticket-row').forEach((linea, index) => {
+            linea.querySelector('.linea-ticket-numero').textContent = '#' + (index + 1);
+        });
     }
-
-    // Event listeners para calcular automáticamente
-    document.addEventListener('input', function(e) {
-        if (e.target.matches('input[name="cantidad[]"], input[name="precio_unitario[]"]')) {
-            calcularImporte();
+    
+    // Event listeners para todas las líneas existentes
+    document.querySelectorAll('.linea-ticket-row').forEach(lineaRow => {
+        const cantidadInput = lineaRow.querySelector('.linea-cantidad');
+        const precioInput = lineaRow.querySelector('.precio-unitario');
+        const ivaInput = lineaRow.querySelector('.tipo-iva-linea');
+        const totalInput = lineaRow.querySelector('.total-linea');
+        
+        if (cantidadInput) {
+            cantidadInput.addEventListener('input', function() { calcularLinea(lineaRow); });
+        }
+        if (precioInput) {
+            precioInput.addEventListener('input', function() { calcularLinea(lineaRow); });
+        }
+        if (ivaInput) {
+            ivaInput.addEventListener('input', function() { calcularLinea(lineaRow); });
+        }
+        if (totalInput) {
+            totalInput.addEventListener('input', function() { calcularDesdeTotal(lineaRow); });
+        }
+        
+        // Botón eliminar
+        const btnEliminar = lineaRow.querySelector('.btn-eliminar-linea');
+        if (btnEliminar) {
+            btnEliminar.addEventListener('click', function() {
+                const lineasContainer = document.getElementById('lineas-container');
+                if (lineasContainer.querySelectorAll('.linea-ticket-row').length > 1) {
+                    lineaRow.remove();
+                    renumerarLineas();
+                    calcularTotales();
+                } else {
+                    alert('Debe haber al menos una línea en el ticket');
+                }
+            });
         }
     });
     
-    // Recalcular cuando cambia el tipo de cálculo de IVA
-    document.getElementById('tipo_calculo_iva').addEventListener('change', function() {
-        calcularImporte();
-    });
-
-    // Eliminar línea
-    document.addEventListener('click', function(e) {
-        if (e.target.classList.contains('btn-eliminar-linea')) {
-            e.target.closest('.linea-ticket-row').remove();
-            calcularTotal();
-        }
-    });
-    
-    // Calcular total inicial
-    calcularImporte();
+    // Calcular totales iniciales
+    calcularTotales();
 });
 </script>
 
 <style>
-.linea-ticket-row {
+.linea-ticket-header {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 8px;
+    background: #e9ecef;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #495057;
+}
+
+.linea-ticket-numero-header {
+    font-weight: bold;
+    min-width: 35px;
+    width: 35px;
+    text-align: center;
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 10px;
-    padding: 10px;
+    justify-content: center;
+}
+
+.linea-ticket-campos-header {
+    display: flex;
+    gap: 8px;
+    flex: 1;
+    align-items: stretch;
+}
+
+.header-col {
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #495057;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    display: flex;
+    align-items: center;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background: transparent;
+}
+
+.linea-ticket-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 8px;
     background: #f8f9fa;
     border-radius: 6px;
 }
 
 .linea-ticket-numero {
     font-weight: bold;
-    color: #2c3e50;
-    min-width: 40px;
+    color: #495057;
+    min-width: 35px;
+    width: 35px;
+    font-size: 0.9rem;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .linea-ticket-campos {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     flex: 1;
-    align-items: center;
+    align-items: stretch;
 }
 
 .linea-ticket-campos input {
-    padding: 8px;
-    border: 1px solid #ddd;
+    padding: 6px 8px;
+    border: 1px solid #dee2e6;
     border-radius: 4px;
+    font-size: 0.85rem;
+    box-sizing: border-box;
 }
 </style>
 {% endblock %}
+
 
 

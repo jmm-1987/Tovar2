@@ -123,7 +123,7 @@ def nuevo_ticket():
                 email=email_cliente,
                 categoria=categoria_cliente,
                 forma_pago=request.form.get('forma_pago', ''),
-                tipo_calculo_iva=request.form.get('tipo_calculo_iva', 'desglosar'),
+                tipo_calculo_iva='desglosar',  # Mantener por compatibilidad pero ya no se usa
                 importe_total=Decimal('0.00'),
                 estado='pendiente'
             )
@@ -136,28 +136,39 @@ def nuevo_ticket():
             cantidades = request.form.getlist('cantidad[]')
             tallas = request.form.getlist('talla[]')
             precios_unitarios = request.form.getlist('precio_unitario[]')
-            
-            tipo_calculo_iva = request.form.get('tipo_calculo_iva', 'desglosar')
-            tipo_iva = Decimal('21')  # IVA al 21%
+            tipos_iva = request.form.getlist('tipo_iva[]')
+            totales_linea = request.form.getlist('total_linea[]')
             
             importe_total = Decimal('0.00')
             
             for i in range(len(descripciones)):
-                if descripciones[i] and cantidades[i] and precios_unitarios[i]:
+                if descripciones[i] and cantidades[i]:
                     cantidad = Decimal(cantidades[i])
-                    precio_unitario_input = Decimal(precios_unitarios[i])
                     talla = tallas[i] if i < len(tallas) else None
                     
-                    # Siempre guardar precio sin IVA
-                    # El precio que viene del formulario ya es sin IVA (después de los cambios en el frontend)
-                    precio_unitario_sin_iva = precio_unitario_input
+                    # Obtener IVA de la línea (por defecto 21%)
+                    tipo_iva_linea = Decimal(tipos_iva[i]) if i < len(tipos_iva) and tipos_iva[i] else Decimal('21')
                     
-                    # Calcular importe sin IVA
-                    importe_sin_iva = cantidad * precio_unitario_sin_iva
-                    
-                    # Calcular importe con IVA para el total del ticket
-                    importe_con_iva = importe_sin_iva * (Decimal('1') + tipo_iva / Decimal('100'))
-                    importe_total += importe_con_iva
+                    # Si hay total_linea, usarlo directamente; si no, calcular desde precio_unitario
+                    if i < len(totales_linea) and totales_linea[i]:
+                        total_linea = Decimal(totales_linea[i])
+                        importe_total += total_linea
+                        
+                        # Calcular precio unitario desde el total
+                        if cantidad > 0:
+                            base_linea = total_linea / (Decimal('1') + tipo_iva_linea / Decimal('100'))
+                            precio_unitario_sin_iva = base_linea / cantidad
+                            importe_sin_iva = base_linea
+                        else:
+                            precio_unitario_sin_iva = Decimal('0')
+                            importe_sin_iva = Decimal('0')
+                    elif i < len(precios_unitarios) and precios_unitarios[i]:
+                        precio_unitario_sin_iva = Decimal(precios_unitarios[i])
+                        importe_sin_iva = cantidad * precio_unitario_sin_iva
+                        total_linea = importe_sin_iva * (Decimal('1') + tipo_iva_linea / Decimal('100'))
+                        importe_total += total_linea
+                    else:
+                        continue  # Saltar línea si no tiene datos suficientes
                     
                     # Guardar precio sin IVA e importe sin IVA en la línea
                     linea = LineaTicket(
@@ -173,97 +184,101 @@ def nuevo_ticket():
             # Actualizar importe total del ticket
             ticket.importe_total = importe_total
             
-            # Verificar si el envío a Verifactu está activado
-            from models import Configuracion
-            config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
-            verifactu_enviar_activo = True  # Por defecto activado
-            if config:
-                verifactu_enviar_activo = config.valor.lower() == 'true'
+            # ============================================
+            # CÓDIGO VERIFACTU COMENTADO - Se puede restaurar más adelante
+            # ============================================
+            # # Verificar si el envío a Verifactu está activado
+            # from models import Configuracion
+            # config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+            # verifactu_enviar_activo = True  # Por defecto activado
+            # if config:
+            #     verifactu_enviar_activo = config.valor.lower() == 'true'
+            # 
+            # # Enviar a Verifactu solo si está activado y hay token
+            # verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
+            # verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
+            # 
+            # if verifactu_token and verifactu_enviar_activo:
+            #     # Preparar datos para la API
+            #     # Calcular base imponible e IVA para cada línea
+            #     # Asumimos que el importe incluye IVA al 21%
+            #     tipo_impositivo = 21  # IVA estándar en España
+            #     lineas_payload = []
+            #     total_base_imponible = Decimal('0.00')
+            #     total_cuota_repercutida = Decimal('0.00')
+            #     
+            #     for linea in ticket.lineas:
+            #         # Si el importe incluye IVA, calcular base imponible
+            #         importe_con_iva = Decimal(str(linea.importe))
+            #         # Calcular base imponible: importe / (1 + tipo_impositivo/100)
+            #         base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
+            #         # Calcular cuota repercutida: base_imponible * (tipo_impositivo/100)
+            #         cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
+            #         
+            #         # Redondear a 2 decimales
+            #         base_imponible = base_imponible.quantize(Decimal('0.01'))
+            #         cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
+            #         
+            #         total_base_imponible += base_imponible
+            #         total_cuota_repercutida += cuota_repercutida
+            #         
+            #         lineas_payload.append({
+            #             'base_imponible': str(base_imponible),
+            #             'tipo_impositivo': str(tipo_impositivo),
+            #             'cuota_repercutida': str(cuota_repercutida)
+            #         })
+            #     
+            #     # Para facturas simplificadas (F2) no se envían nombre, nif ni id_otro
+            #     payload = {
+            #         'serie': ticket.serie,
+            #         'numero': ticket.numero,
+            #         'fecha_expedicion': ticket.fecha_expedicion.strftime('%d-%m-%Y'),
+            #         'tipo_factura': ticket.tipo_factura,
+            #         'descripcion': ticket.descripcion or 'Descripcion de la operacion',
+            #         'lineas': lineas_payload,
+            #         'importe_total': str(ticket.importe_total)
+            #     }
+            #     
+            #     headers = {
+            #         'Content-Type': 'application/json',
+            #         'Authorization': f'Bearer {verifactu_token}'
+            #     }
+            #     
+            #     try:
+            #         response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
+            #         
+            #         if response.status_code == 200 or response.status_code == 201:
+            #             # Éxito: guardar la huella
+            #             response_data = response.json()
+            #             ticket.huella_verifactu = json.dumps(response_data)
+            #             ticket.estado = 'confirmado'
+            #             ticket.fecha_confirmacion = datetime.utcnow()
+            #             flash('Ticket creado y enviado a Verifactu correctamente.', 'success')
+            #         else:
+            #             # Error en la API
+            #             ticket.estado = 'error'
+            #             ticket.huella_verifactu = json.dumps({
+            #                 'error': response.text,
+            #                 'status_code': response.status_code
+            #             })
+            #             flash(f'Error al enviar a Verifactu: {response.status_code} - {response.text}', 'error')
+            #     except requests.exceptions.RequestException as e:
+            #         # Error de conexión
+            #         ticket.estado = 'error'
+            #         ticket.huella_verifactu = json.dumps({'error': str(e)})
+            #         flash(f'Error de conexión con Verifactu: {str(e)}', 'error')
+            # elif not verifactu_enviar_activo:
+            #     # Envío desactivado, solo guardar como pendiente
+            #     ticket.estado = 'pendiente'
+            #     flash('Ticket creado. El envío automático a Verifactu está desactivado.', 'info')
+            # else:
+            #     # Sin token, solo guardar como pendiente
+            #     ticket.estado = 'pendiente'
+            #     flash('Ticket creado. Configure VERIFACTU_TOKEN para enviar automáticamente.', 'warning')
             
-            # Enviar a Verifactu solo si está activado y hay token
-            verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
-            verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
-            
-            if verifactu_token and verifactu_enviar_activo:
-                # Preparar datos para la API
-                # Calcular base imponible e IVA para cada línea
-                # Asumimos que el importe incluye IVA al 21%
-                tipo_impositivo = 21  # IVA estándar en España
-                lineas_payload = []
-                total_base_imponible = Decimal('0.00')
-                total_cuota_repercutida = Decimal('0.00')
-                
-                for linea in ticket.lineas:
-                    # Si el importe incluye IVA, calcular base imponible
-                    importe_con_iva = Decimal(str(linea.importe))
-                    # Calcular base imponible: importe / (1 + tipo_impositivo/100)
-                    base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
-                    # Calcular cuota repercutida: base_imponible * (tipo_impositivo/100)
-                    cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
-                    
-                    # Redondear a 2 decimales
-                    base_imponible = base_imponible.quantize(Decimal('0.01'))
-                    cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
-                    
-                    total_base_imponible += base_imponible
-                    total_cuota_repercutida += cuota_repercutida
-                    
-                    lineas_payload.append({
-                        'base_imponible': str(base_imponible),
-                        'tipo_impositivo': str(tipo_impositivo),
-                        'cuota_repercutida': str(cuota_repercutida)
-                    })
-                
-                # Para facturas simplificadas (F2) no se envían nombre, nif ni id_otro
-                payload = {
-                    'serie': ticket.serie,
-                    'numero': ticket.numero,
-                    'fecha_expedicion': ticket.fecha_expedicion.strftime('%d-%m-%Y'),
-                    'tipo_factura': ticket.tipo_factura,
-                    'descripcion': ticket.descripcion or 'Descripcion de la operacion',
-                    'lineas': lineas_payload,
-                    'importe_total': str(ticket.importe_total)
-                }
-                
-                # Solo agregar nombre y nif si NO es factura simplificada (aunque para F2 no debería ser necesario)
-                # Pero por seguridad, no los incluimos para F2
-                
-                headers = {
-                    'Content-Type': 'application/json',
-                    'Authorization': f'Bearer {verifactu_token}'
-                }
-                
-                try:
-                    response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
-                    
-                    if response.status_code == 200 or response.status_code == 201:
-                        # Éxito: guardar la huella
-                        response_data = response.json()
-                        ticket.huella_verifactu = json.dumps(response_data)
-                        ticket.estado = 'confirmado'
-                        ticket.fecha_confirmacion = datetime.utcnow()
-                        flash('Ticket creado y enviado a Verifactu correctamente.', 'success')
-                    else:
-                        # Error en la API
-                        ticket.estado = 'error'
-                        ticket.huella_verifactu = json.dumps({
-                            'error': response.text,
-                            'status_code': response.status_code
-                        })
-                        flash(f'Error al enviar a Verifactu: {response.status_code} - {response.text}', 'error')
-                except requests.exceptions.RequestException as e:
-                    # Error de conexión
-                    ticket.estado = 'error'
-                    ticket.huella_verifactu = json.dumps({'error': str(e)})
-                    flash(f'Error de conexión con Verifactu: {str(e)}', 'error')
-            elif not verifactu_enviar_activo:
-                # Envío desactivado, solo guardar como pendiente
-                ticket.estado = 'pendiente'
-                flash('Ticket creado. El envío automático a Verifactu está desactivado.', 'info')
-            else:
-                # Sin token, solo guardar como pendiente
-                ticket.estado = 'pendiente'
-                flash('Ticket creado. Configure VERIFACTU_TOKEN para enviar automáticamente.', 'warning')
+            # Estado por defecto sin Verifactu
+            ticket.estado = 'pendiente'
+            flash('Ticket creado correctamente.', 'success')
             
             db.session.commit()
             return redirect(url_for('tickets.listado_tickets'))
@@ -429,7 +444,7 @@ def editar_ticket(ticket_id):
             ticket.fecha_expedicion = datetime.strptime(request.form.get('fecha_expedicion'), '%Y-%m-%d').date()
             ticket.descripcion = request.form.get('descripcion', '')
             ticket.forma_pago = request.form.get('forma_pago', '')
-            ticket.tipo_calculo_iva = request.form.get('tipo_calculo_iva', 'desglosar')
+            # tipo_calculo_iva ya no se usa pero lo mantenemos por compatibilidad
             
             # Actualizar datos del cliente
             nombre_cliente = request.form.get('nombre')
@@ -471,25 +486,39 @@ def editar_ticket(ticket_id):
             cantidades = request.form.getlist('cantidad[]')
             tallas = request.form.getlist('talla[]')
             precios_unitarios = request.form.getlist('precio_unitario[]')
+            tipos_iva = request.form.getlist('tipo_iva[]')
+            totales_linea = request.form.getlist('total_linea[]')
             
-            tipo_iva = Decimal('21')  # IVA al 21%
             importe_total = Decimal('0.00')
             
             for i in range(len(descripciones)):
-                if descripciones[i] and cantidades[i] and precios_unitarios[i]:
+                if descripciones[i] and cantidades[i]:
                     cantidad = Decimal(cantidades[i])
-                    precio_unitario_input = Decimal(precios_unitarios[i])
                     talla = tallas[i] if i < len(tallas) else None
                     
-                    # Siempre guardar precio sin IVA
-                    precio_unitario_sin_iva = precio_unitario_input
+                    # Obtener IVA de la línea (por defecto 21%)
+                    tipo_iva_linea = Decimal(tipos_iva[i]) if i < len(tipos_iva) and tipos_iva[i] else Decimal('21')
                     
-                    # Calcular importe sin IVA
-                    importe_sin_iva = cantidad * precio_unitario_sin_iva
-                    
-                    # Calcular importe con IVA para el total del ticket
-                    importe_con_iva = importe_sin_iva * (Decimal('1') + tipo_iva / Decimal('100'))
-                    importe_total += importe_con_iva
+                    # Si hay total_linea, usarlo directamente; si no, calcular desde precio_unitario
+                    if i < len(totales_linea) and totales_linea[i]:
+                        total_linea = Decimal(totales_linea[i])
+                        importe_total += total_linea
+                        
+                        # Calcular precio unitario desde el total
+                        if cantidad > 0:
+                            base_linea = total_linea / (Decimal('1') + tipo_iva_linea / Decimal('100'))
+                            precio_unitario_sin_iva = base_linea / cantidad
+                            importe_sin_iva = base_linea
+                        else:
+                            precio_unitario_sin_iva = Decimal('0')
+                            importe_sin_iva = Decimal('0')
+                    elif i < len(precios_unitarios) and precios_unitarios[i]:
+                        precio_unitario_sin_iva = Decimal(precios_unitarios[i])
+                        importe_sin_iva = cantidad * precio_unitario_sin_iva
+                        total_linea = importe_sin_iva * (Decimal('1') + tipo_iva_linea / Decimal('100'))
+                        importe_total += total_linea
+                    else:
+                        continue  # Saltar línea si no tiene datos suficientes
                     
                     # Guardar precio sin IVA e importe sin IVA en la línea
                     linea = LineaTicket(
@@ -610,107 +639,110 @@ def cuadre_caja():
 @login_required
 @not_usuario_required
 def reenviar_ticket(ticket_id):
-    """Reenviar un ticket a Verifactu"""
-    try:
-        ticket = Ticket.query.get_or_404(ticket_id)
-        
-        # Verificar si el envío a Verifactu está activado
-        from models import Configuracion
-        config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
-        verifactu_enviar_activo = True  # Por defecto activado
-        if config:
-            verifactu_enviar_activo = config.valor.lower() == 'true'
-        
-        verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
-        verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
-        
-        if not verifactu_token:
-            flash('No se ha configurado VERIFACTU_TOKEN.', 'error')
-            return redirect(url_for('tickets.ver_ticket', ticket_id=ticket_id))
-        
-        if not verifactu_enviar_activo:
-            flash('El envío automático a Verifactu está desactivado. Actívalo en Configuración > Verifactu para reenviar.', 'warning')
-            return redirect(url_for('tickets.ver_ticket', ticket_id=ticket_id))
-        
-        # Preparar datos para la API
-        # Calcular base imponible e IVA para cada línea
-        # Asumimos que el importe incluye IVA al 21%
-        tipo_impositivo = 21  # IVA estándar en España
-        lineas_payload = []
-        total_base_imponible = Decimal('0.00')
-        total_cuota_repercutida = Decimal('0.00')
-        
-        for linea in ticket.lineas:
-            # Si el importe incluye IVA, calcular base imponible
-            importe_con_iva = Decimal(str(linea.importe))
-            # Calcular base imponible: importe / (1 + tipo_impositivo/100)
-            base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
-            # Calcular cuota repercutida: base_imponible * (tipo_impositivo/100)
-            cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
-            
-            # Redondear a 2 decimales
-            base_imponible = base_imponible.quantize(Decimal('0.01'))
-            cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
-            
-            total_base_imponible += base_imponible
-            total_cuota_repercutida += cuota_repercutida
-            
-            lineas_payload.append({
-                'base_imponible': str(base_imponible),
-                'tipo_impositivo': str(tipo_impositivo),
-                'cuota_repercutida': str(cuota_repercutida)
-            })
-        
-        # Para facturas simplificadas (F2) no se envían nombre, nif ni id_otro
-        payload = {
-            'serie': ticket.serie,
-            'numero': ticket.numero,
-            'fecha_expedicion': ticket.fecha_expedicion.strftime('%d-%m-%Y'),
-            'tipo_factura': ticket.tipo_factura,
-            'descripcion': ticket.descripcion or 'Descripcion de la operacion',
-            'lineas': lineas_payload,
-            'importe_total': str(ticket.importe_total)
-        }
-        
-        # Solo agregar nombre y nif si NO es factura simplificada (aunque para F2 no debería ser necesario)
-        # Pero por seguridad, no los incluimos para F2
-        
-        headers = {
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {verifactu_token}'
-        }
-        
-        try:
-            response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
-            
-            if response.status_code == 200 or response.status_code == 201:
-                # Éxito: guardar la huella
-                response_data = response.json()
-                ticket.huella_verifactu = json.dumps(response_data)
-                ticket.estado = 'confirmado'
-                ticket.fecha_confirmacion = datetime.utcnow()
-                db.session.commit()
-                flash('Ticket reenviado a Verifactu correctamente.', 'success')
-            else:
-                # Error en la API
-                ticket.estado = 'error'
-                ticket.huella_verifactu = json.dumps({
-                    'error': response.text,
-                    'status_code': response.status_code
-                })
-                db.session.commit()
-                flash(f'Error al reenviar a Verifactu: {response.status_code} - {response.text}', 'error')
-        except requests.exceptions.RequestException as e:
-            # Error de conexión
-            ticket.estado = 'error'
-            ticket.huella_verifactu = json.dumps({'error': str(e)})
-            db.session.commit()
-            flash(f'Error de conexión con Verifactu: {str(e)}', 'error')
-        
-        return redirect(url_for('tickets.ver_ticket', ticket_id=ticket_id))
-        
-    except Exception as e:
-        db.session.rollback()
-        flash(f'Error al reenviar el ticket: {str(e)}', 'error')
-        return redirect(url_for('tickets.ver_ticket', ticket_id=ticket_id))
+    """Reenviar un ticket a Verifactu - FUNCIONALIDAD DESACTIVADA"""
+    # ============================================
+    # CÓDIGO VERIFACTU COMENTADO - Se puede restaurar más adelante
+    # ============================================
+    flash('La funcionalidad de Verifactu está desactivada temporalmente.', 'info')
+    return redirect(url_for('tickets.ver_ticket', ticket_id=ticket_id))
+    
+    # try:
+    #     ticket = Ticket.query.get_or_404(ticket_id)
+    #     
+    #     # Verificar si el envío a Verifactu está activado
+    #     from models import Configuracion
+    #     config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+    #     verifactu_enviar_activo = True  # Por defecto activado
+    #     if config:
+    #         verifactu_enviar_activo = config.valor.lower() == 'true'
+    #     
+    #     verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
+    #     verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
+    #     
+    #     if not verifactu_token:
+    #         flash('No se ha configurado VERIFACTU_TOKEN.', 'error')
+    #         return redirect(url_for('tickets.ver_ticket', ticket_id=ticket_id))
+    #     
+    #     if not verifactu_enviar_activo:
+    #         flash('El envío automático a Verifactu está desactivado. Actívalo en Configuración > Verifactu para reenviar.', 'warning')
+    #         return redirect(url_for('tickets.ver_ticket', ticket_id=ticket_id))
+    #     
+    #     # Preparar datos para la API
+    #     # Calcular base imponible e IVA para cada línea
+    #     # Asumimos que el importe incluye IVA al 21%
+    #     tipo_impositivo = 21  # IVA estándar en España
+    #     lineas_payload = []
+    #     total_base_imponible = Decimal('0.00')
+    #     total_cuota_repercutida = Decimal('0.00')
+    #     
+    #     for linea in ticket.lineas:
+    #         # Si el importe incluye IVA, calcular base imponible
+    #         importe_con_iva = Decimal(str(linea.importe))
+    #         # Calcular base imponible: importe / (1 + tipo_impositivo/100)
+    #         base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
+    #         # Calcular cuota repercutida: base_imponible * (tipo_impositivo/100)
+    #         cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
+    #         
+    #         # Redondear a 2 decimales
+    #         base_imponible = base_imponible.quantize(Decimal('0.01'))
+    #         cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
+    #         
+    #         total_base_imponible += base_imponible
+    #         total_cuota_repercutida += cuota_repercutida
+    #         
+    #         lineas_payload.append({
+    #             'base_imponible': str(base_imponible),
+    #             'tipo_impositivo': str(tipo_impositivo),
+    #             'cuota_repercutida': str(cuota_repercutida)
+    #         })
+    #     
+    #     # Para facturas simplificadas (F2) no se envían nombre, nif ni id_otro
+    #     payload = {
+    #         'serie': ticket.serie,
+    #         'numero': ticket.numero,
+    #         'fecha_expedicion': ticket.fecha_expedicion.strftime('%d-%m-%Y'),
+    #         'tipo_factura': ticket.tipo_factura,
+    #         'descripcion': ticket.descripcion or 'Descripcion de la operacion',
+    #         'lineas': lineas_payload,
+    #         'importe_total': str(ticket.importe_total)
+    #     }
+    #     
+    #     headers = {
+    #         'Content-Type': 'application/json',
+    #         'Authorization': f'Bearer {verifactu_token}'
+    #     }
+    #     
+    #     try:
+    #         response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
+    #         
+    #         if response.status_code == 200 or response.status_code == 201:
+    #             # Éxito: guardar la huella
+    #             response_data = response.json()
+    #             ticket.huella_verifactu = json.dumps(response_data)
+    #             ticket.estado = 'confirmado'
+    #             ticket.fecha_confirmacion = datetime.utcnow()
+    #             db.session.commit()
+    #             flash('Ticket reenviado a Verifactu correctamente.', 'success')
+    #         else:
+    #             # Error en la API
+    #             ticket.estado = 'error'
+    #             ticket.huella_verifactu = json.dumps({
+    #                 'error': response.text,
+    #                 'status_code': response.status_code
+    #             })
+    #             db.session.commit()
+    #             flash(f'Error al reenviar a Verifactu: {response.status_code} - {response.text}', 'error')
+    #     except requests.exceptions.RequestException as e:
+    #         # Error de conexión
+    #         ticket.estado = 'error'
+    #         ticket.huella_verifactu = json.dumps({'error': str(e)})
+    #         db.session.commit()
+    #         flash(f'Error de conexión con Verifactu: {str(e)}', 'error')
+    #     
+    #     return redirect(url_for('tickets.ver_ticket', ticket_id=ticket_id))
+    #     
+    # except Exception as e:
+    #     db.session.rollback()
+    #     flash(f'Error al reenviar el ticket: {str(e)}', 'error')
+    #     return redirect(url_for('tickets.ver_ticket', ticket_id=ticket_id))
 

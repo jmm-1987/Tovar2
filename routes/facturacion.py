@@ -346,98 +346,107 @@ def formalizar_factura_solicitud(presupuesto_id):
             )
             db.session.add(linea_factura)
         
-        # Verificar si el envío a Verifactu está activado
-        from models import Configuracion
-        config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
-        verifactu_enviar_activo = True  # Por defecto activado
-        if config:
-            verifactu_enviar_activo = config.valor.lower() == 'true'
+        # ============================================
+        # CÓDIGO VERIFACTU COMENTADO - Se puede restaurar más adelante
+        # ============================================
+        # # Verificar si el envío a Verifactu está activado
+        # from models import Configuracion
+        # config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+        # verifactu_enviar_activo = True  # Por defecto activado
+        # if config:
+        #     verifactu_enviar_activo = config.valor.lower() == 'true'
+        # 
+        # # Enviar a Verifactu solo si está activado y hay token
+        # verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
+        # verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
+        # 
+        # if verifactu_token and verifactu_enviar_activo:
+        #     # Preparar datos para la API
+        #     tipo_impositivo = 21  # IVA estándar en España
+        #     lineas_payload = []
+        #     total_base_imponible = Decimal('0.00')
+        #     total_cuota_repercutida = Decimal('0.00')
+        #     
+        #     for linea in factura.lineas:
+        #         importe_con_iva = Decimal(str(linea.importe))
+        #         base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
+        #         cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
+        #         
+        #         base_imponible = base_imponible.quantize(Decimal('0.01'))
+        #         cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
+        #         
+        #         total_base_imponible += base_imponible
+        #         total_cuota_repercutida += cuota_repercutida
+        #         
+        #         lineas_payload.append({
+        #             'base_imponible': str(base_imponible),
+        #             'tipo_impositivo': str(tipo_impositivo),
+        #             'cuota_repercutida': str(cuota_repercutida)
+        #         })
+        #     
+        #     payload = {
+        #         'serie': factura.serie,
+        #         'numero': factura.numero,
+        #         'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
+        #         'tipo_factura': factura.tipo_factura,
+        #         'descripcion': factura.descripcion or 'Descripcion de la operacion',
+        #         'nif': factura.nif or '',
+        #         'nombre': factura.nombre,
+        #         'lineas': lineas_payload,
+        #         'importe_total': str(factura.importe_total)
+        #     }
+        #     
+        #     headers = {
+        #         'Content-Type': 'application/json',
+        #         'Authorization': f'Bearer {verifactu_token}'
+        #     }
+        #     
+        #     try:
+        #         response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
+        #         
+        #         if response.status_code == 200 or response.status_code == 201:
+        #             response_data = response.json()
+        #             factura.huella_verifactu = json.dumps(response_data)
+        #             factura.estado = 'confirmado'
+        #             factura.fecha_confirmacion = datetime.utcnow()
+        #             db.session.commit()
+        #             flash('Factura formalizada y enviada a Verifactu correctamente.', 'success')
+        #             return redirect(url_for('facturacion.facturacion'))
+        #         else:
+        #             factura.estado = 'error'
+        #             factura.huella_verifactu = json.dumps({
+        #                 'error': response.text,
+        #                 'status_code': response.status_code
+        #             })
+        #             db.session.commit()
+        #             return jsonify({
+        #                 'success': False,
+        #                 'error': f'Error al enviar a Verifactu: {response.status_code} - {response.text}'
+        #             }), 400
+        #     except requests.exceptions.RequestException as e:
+        #         factura.estado = 'error'
+        #         factura.huella_verifactu = json.dumps({'error': str(e)})
+        #         db.session.commit()
+        #         return jsonify({
+        #             'success': False,
+        #             'error': f'Error de conexión con Verifactu: {str(e)}'
+        #         }), 400
+        # elif not verifactu_enviar_activo:
+        #     factura.estado = 'pendiente'
+        #     db.session.commit()
+        #     flash('Factura creada. El envío automático a Verifactu está desactivado.', 'success')
+        #     return redirect(url_for('facturacion.facturacion'))
+        # else:
+        #     factura.estado = 'pendiente'
+        #     db.session.commit()
+        #     flash('Factura creada. Configure VERIFACTU_TOKEN para enviar automáticamente.', 'success')
+        #     return redirect(url_for('facturacion.facturacion'))
         
-        # Enviar a Verifactu solo si está activado y hay token
-        verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
-        verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
-        
-        if verifactu_token and verifactu_enviar_activo:
-            # Preparar datos para la API
-            tipo_impositivo = 21  # IVA estándar en España
-            lineas_payload = []
-            total_base_imponible = Decimal('0.00')
-            total_cuota_repercutida = Decimal('0.00')
-            
-            for linea in factura.lineas:
-                importe_con_iva = Decimal(str(linea.importe))
-                base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
-                cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
-                
-                base_imponible = base_imponible.quantize(Decimal('0.01'))
-                cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
-                
-                total_base_imponible += base_imponible
-                total_cuota_repercutida += cuota_repercutida
-                
-                lineas_payload.append({
-                    'base_imponible': str(base_imponible),
-                    'tipo_impositivo': str(tipo_impositivo),
-                    'cuota_repercutida': str(cuota_repercutida)
-                })
-            
-            payload = {
-                'serie': factura.serie,
-                'numero': factura.numero,
-                'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
-                'tipo_factura': factura.tipo_factura,
-                'descripcion': factura.descripcion or 'Descripcion de la operacion',
-                'nif': factura.nif or '',
-                'nombre': factura.nombre,
-                'lineas': lineas_payload,
-                'importe_total': str(factura.importe_total)
-            }
-            
-            headers = {
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {verifactu_token}'
-            }
-            
-            try:
-                response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
-                
-                if response.status_code == 200 or response.status_code == 201:
-                    response_data = response.json()
-                    factura.huella_verifactu = json.dumps(response_data)
-                    factura.estado = 'confirmado'
-                    factura.fecha_confirmacion = datetime.utcnow()
-                    db.session.commit()
-                    flash('Factura formalizada y enviada a Verifactu correctamente.', 'success')
-                    return redirect(url_for('facturacion.facturacion'))
-                else:
-                    factura.estado = 'error'
-                    factura.huella_verifactu = json.dumps({
-                        'error': response.text,
-                        'status_code': response.status_code
-                    })
-                    db.session.commit()
-                    return jsonify({
-                        'success': False,
-                        'error': f'Error al enviar a Verifactu: {response.status_code} - {response.text}'
-                    }), 400
-            except requests.exceptions.RequestException as e:
-                factura.estado = 'error'
-                factura.huella_verifactu = json.dumps({'error': str(e)})
-                db.session.commit()
-                return jsonify({
-                    'success': False,
-                    'error': f'Error de conexión con Verifactu: {str(e)}'
-                }), 400
-        elif not verifactu_enviar_activo:
-            factura.estado = 'pendiente'
-            db.session.commit()
-            flash('Factura creada. El envío automático a Verifactu está desactivado.', 'success')
-            return redirect(url_for('facturacion.facturacion'))
-        else:
-            factura.estado = 'pendiente'
-            db.session.commit()
-            flash('Factura creada. Configure VERIFACTU_TOKEN para enviar automáticamente.', 'success')
-            return redirect(url_for('facturacion.facturacion'))
+        # Estado por defecto sin Verifactu
+        factura.estado = 'pendiente'
+        db.session.commit()
+        flash('Factura formalizada correctamente.', 'success')
+        return redirect(url_for('facturacion.facturacion'))
             
     except Exception as e:
         db.session.rollback()
@@ -537,66 +546,73 @@ def crear_factura_anticipo():
         # Actualizar el anticipo en el presupuesto
         presupuesto.anticipo = importe_anticipo
         
-        # Verificar si el envío a Verifactu está activado
-        from models import Configuracion
-        config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
-        verifactu_enviar_activo = True
-        if config:
-            verifactu_enviar_activo = config.valor.lower() == 'true'
+        # ============================================
+        # CÓDIGO VERIFACTU COMENTADO - Se puede restaurar más adelante
+        # ============================================
+        # # Verificar si el envío a Verifactu está activado
+        # from models import Configuracion
+        # config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+        # verifactu_enviar_activo = True
+        # if config:
+        #     verifactu_enviar_activo = config.valor.lower() == 'true'
+        # 
+        # # Enviar a Verifactu si está activado
+        # verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
+        # verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
+        # 
+        # if verifactu_token and verifactu_enviar_activo:
+        #     # Preparar payload para Verifactu
+        #     payload = {
+        #         'serie': factura.serie,
+        #         'numero': factura.numero,
+        #         'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
+        #         'tipo_factura': factura.tipo_factura,
+        #         'descripcion': factura.descripcion,
+        #         'lineas': [{
+        #             'base_imponible': str(base_imponible),
+        #             'tipo_impositivo': str(int(tipo_iva)),
+        #             'cuota_repercutida': str(iva_total)
+        #         }],
+        #         'importe_total': str(importe_anticipo),
+        #         'nombre': factura.nombre,
+        #         'nif': factura.nif if factura.nif else None
+        #     }
+        #     
+        #     headers = {
+        #         'Content-Type': 'application/json',
+        #         'Authorization': f'Bearer {verifactu_token}'
+        #     }
+        #     
+        #     try:
+        #         response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
+        #         
+        #         if response.status_code == 200 or response.status_code == 201:
+        #             response_data = response.json()
+        #             factura.huella_verifactu = json.dumps(response_data)
+        #             factura.estado = 'confirmado'
+        #             factura.fecha_confirmacion = datetime.utcnow()
+        #             flash('Factura anticipo creada y enviada a Verifactu correctamente.', 'success')
+        #         else:
+        #             factura.estado = 'error'
+        #             factura.huella_verifactu = json.dumps({
+        #                 'error': response.text,
+        #                 'status_code': response.status_code
+        #             })
+        #             flash(f'Error al enviar a Verifactu: {response.status_code} - {response.text}', 'error')
+        #     except requests.exceptions.RequestException as e:
+        #         factura.estado = 'error'
+        #         factura.huella_verifactu = json.dumps({'error': str(e)})
+        #         flash(f'Error de conexión con Verifactu: {str(e)}', 'error')
+        # elif not verifactu_enviar_activo:
+        #     factura.estado = 'pendiente'
+        #     flash('Factura anticipo creada. El envío automático a Verifactu está desactivado.', 'info')
+        # else:
+        #     factura.estado = 'pendiente'
+        #     flash('Factura anticipo creada. Configure VERIFACTU_TOKEN para enviar automáticamente.', 'warning')
         
-        # Enviar a Verifactu si está activado
-        verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
-        verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
-        
-        if verifactu_token and verifactu_enviar_activo:
-            # Preparar payload para Verifactu
-            payload = {
-                'serie': factura.serie,
-                'numero': factura.numero,
-                'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
-                'tipo_factura': factura.tipo_factura,
-                'descripcion': factura.descripcion,
-                'lineas': [{
-                    'base_imponible': str(base_imponible),
-                    'tipo_impositivo': str(int(tipo_iva)),
-                    'cuota_repercutida': str(iva_total)
-                }],
-                'importe_total': str(importe_anticipo),
-                'nombre': factura.nombre,
-                'nif': factura.nif if factura.nif else None
-            }
-            
-            headers = {
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {verifactu_token}'
-            }
-            
-            try:
-                response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
-                
-                if response.status_code == 200 or response.status_code == 201:
-                    response_data = response.json()
-                    factura.huella_verifactu = json.dumps(response_data)
-                    factura.estado = 'confirmado'
-                    factura.fecha_confirmacion = datetime.utcnow()
-                    flash('Factura anticipo creada y enviada a Verifactu correctamente.', 'success')
-                else:
-                    factura.estado = 'error'
-                    factura.huella_verifactu = json.dumps({
-                        'error': response.text,
-                        'status_code': response.status_code
-                    })
-                    flash(f'Error al enviar a Verifactu: {response.status_code} - {response.text}', 'error')
-            except requests.exceptions.RequestException as e:
-                factura.estado = 'error'
-                factura.huella_verifactu = json.dumps({'error': str(e)})
-                flash(f'Error de conexión con Verifactu: {str(e)}', 'error')
-        elif not verifactu_enviar_activo:
-            factura.estado = 'pendiente'
-            flash('Factura anticipo creada. El envío automático a Verifactu está desactivado.', 'info')
-        else:
-            factura.estado = 'pendiente'
-            flash('Factura anticipo creada. Configure VERIFACTU_TOKEN para enviar automáticamente.', 'warning')
+        # Estado por defecto sin Verifactu
+        factura.estado = 'pendiente'
+        flash('Factura anticipo creada correctamente.', 'success')
         
         db.session.commit()
         return redirect(url_for('facturacion.facturacion'))
@@ -751,118 +767,130 @@ def formalizar_factura(pedido_id):
             )
             db.session.add(linea_factura)
         
-        # Verificar si el envío a Verifactu está activado
-        from models import Configuracion
-        config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
-        verifactu_enviar_activo = True  # Por defecto activado
-        if config:
-            verifactu_enviar_activo = config.valor.lower() == 'true'
+        # ============================================
+        # CÓDIGO VERIFACTU COMENTADO - Se puede restaurar más adelante
+        # ============================================
+        # # Verificar si el envío a Verifactu está activado
+        # from models import Configuracion
+        # config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+        # verifactu_enviar_activo = True  # Por defecto activado
+        # if config:
+        #     verifactu_enviar_activo = config.valor.lower() == 'true'
+        # 
+        # # Enviar a Verifactu solo si está activado y hay token
+        # verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
+        # verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
+        # 
+        # if verifactu_token and verifactu_enviar_activo:
+        #     # Preparar datos para la API
+        #     # Calcular base imponible e IVA para cada línea
+        #     # Asumimos que el importe incluye IVA al 21%
+        #     tipo_impositivo = 21  # IVA estándar en España
+        #     lineas_payload = []
+        #     total_base_imponible = Decimal('0.00')
+        #     total_cuota_repercutida = Decimal('0.00')
+        #     
+        #     for linea in factura.lineas:
+        #         # Si el importe incluye IVA, calcular base imponible
+        #         importe_con_iva = Decimal(str(linea.importe))
+        #         # Calcular base imponible: importe / (1 + tipo_impositivo/100)
+        #         base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
+        #         # Calcular cuota repercutida: base_imponible * (tipo_impositivo/100)
+        #         cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
+        #         
+        #         # Redondear a 2 decimales
+        #         base_imponible = base_imponible.quantize(Decimal('0.01'))
+        #         cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
+        #         
+        #         total_base_imponible += base_imponible
+        #         total_cuota_repercutida += cuota_repercutida
+        #         
+        #         lineas_payload.append({
+        #             'base_imponible': str(base_imponible),
+        #             'tipo_impositivo': str(tipo_impositivo),
+        #             'cuota_repercutida': str(cuota_repercutida)
+        #         })
+        #     
+        #     payload = {
+        #         'serie': factura.serie,
+        #         'numero': factura.numero,
+        #         'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
+        #         'tipo_factura': factura.tipo_factura,
+        #         'descripcion': factura.descripcion or 'Descripcion de la operacion',
+        #         'nif': factura.nif or '',
+        #         'nombre': factura.nombre,
+        #         'lineas': lineas_payload,
+        #         'importe_total': str(factura.importe_total)
+        #     }
+        #     
+        #     headers = {
+        #         'Content-Type': 'application/json',
+        #         'Authorization': f'Bearer {verifactu_token}'
+        #     }
+        #     
+        #     try:
+        #         response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
+        #         
+        #         if response.status_code == 200 or response.status_code == 201:
+        #             # Éxito: guardar la huella
+        #             response_data = response.json()
+        #             factura.huella_verifactu = json.dumps(response_data)
+        #             factura.estado = 'confirmado'
+        #             factura.fecha_confirmacion = datetime.utcnow()
+        #             db.session.commit()
+        #             return jsonify({
+        #                 'success': True,
+        #                 'message': 'Factura formalizada y enviada a Verifactu correctamente.',
+        #                 'factura_id': factura.id
+        #             })
+        #         else:
+        #             # Error en la API
+        #             factura.estado = 'error'
+        #             factura.huella_verifactu = json.dumps({
+        #                 'error': response.text,
+        #                 'status_code': response.status_code
+        #             })
+        #             db.session.commit()
+        #             return jsonify({
+        #                 'success': False,
+        #                 'error': f'Error al enviar a Verifactu: {response.status_code} - {response.text}'
+        #             }), 400
+        #     except requests.exceptions.RequestException as e:
+        #         # Error de conexión
+        #         factura.estado = 'error'
+        #         factura.huella_verifactu = json.dumps({'error': str(e)})
+        #         db.session.commit()
+        #         return jsonify({
+        #             'success': False,
+        #             'error': f'Error de conexión con Verifactu: {str(e)}'
+        #         }), 400
+        # elif not verifactu_enviar_activo:
+        #     # Envío desactivado, solo guardar como pendiente
+        #     factura.estado = 'pendiente'
+        #     db.session.commit()
+        #     return jsonify({
+        #         'success': True,
+        #         'message': 'Factura creada. El envío automático a Verifactu está desactivado.',
+        #         'factura_id': factura.id
+        #     })
+        # else:
+        #     # Sin token, solo guardar como pendiente
+        #     factura.estado = 'pendiente'
+        #     db.session.commit()
+        #     return jsonify({
+        #         'success': True,
+        #         'message': 'Factura creada. Configure VERIFACTU_TOKEN para enviar automáticamente.',
+        #         'factura_id': factura.id
+        #     })
         
-        # Enviar a Verifactu solo si está activado y hay token
-        verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
-        verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
-        
-        if verifactu_token and verifactu_enviar_activo:
-            # Preparar datos para la API
-            # Calcular base imponible e IVA para cada línea
-            # Asumimos que el importe incluye IVA al 21%
-            tipo_impositivo = 21  # IVA estándar en España
-            lineas_payload = []
-            total_base_imponible = Decimal('0.00')
-            total_cuota_repercutida = Decimal('0.00')
-            
-            for linea in factura.lineas:
-                # Si el importe incluye IVA, calcular base imponible
-                importe_con_iva = Decimal(str(linea.importe))
-                # Calcular base imponible: importe / (1 + tipo_impositivo/100)
-                base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
-                # Calcular cuota repercutida: base_imponible * (tipo_impositivo/100)
-                cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
-                
-                # Redondear a 2 decimales
-                base_imponible = base_imponible.quantize(Decimal('0.01'))
-                cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
-                
-                total_base_imponible += base_imponible
-                total_cuota_repercutida += cuota_repercutida
-                
-                lineas_payload.append({
-                    'base_imponible': str(base_imponible),
-                    'tipo_impositivo': str(tipo_impositivo),
-                    'cuota_repercutida': str(cuota_repercutida)
-                })
-            
-            payload = {
-                'serie': factura.serie,
-                'numero': factura.numero,
-                'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
-                'tipo_factura': factura.tipo_factura,
-                'descripcion': factura.descripcion or 'Descripcion de la operacion',
-                'nif': factura.nif or '',
-                'nombre': factura.nombre,
-                'lineas': lineas_payload,
-                'importe_total': str(factura.importe_total)
-            }
-            
-            headers = {
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {verifactu_token}'
-            }
-            
-            try:
-                response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
-                
-                if response.status_code == 200 or response.status_code == 201:
-                    # Éxito: guardar la huella
-                    response_data = response.json()
-                    factura.huella_verifactu = json.dumps(response_data)
-                    factura.estado = 'confirmado'
-                    factura.fecha_confirmacion = datetime.utcnow()
-                    db.session.commit()
-                    return jsonify({
-                        'success': True,
-                        'message': 'Factura formalizada y enviada a Verifactu correctamente.',
-                        'factura_id': factura.id
-                    })
-                else:
-                    # Error en la API
-                    factura.estado = 'error'
-                    factura.huella_verifactu = json.dumps({
-                        'error': response.text,
-                        'status_code': response.status_code
-                    })
-                    db.session.commit()
-                    return jsonify({
-                        'success': False,
-                        'error': f'Error al enviar a Verifactu: {response.status_code} - {response.text}'
-                    }), 400
-            except requests.exceptions.RequestException as e:
-                # Error de conexión
-                factura.estado = 'error'
-                factura.huella_verifactu = json.dumps({'error': str(e)})
-                db.session.commit()
-                return jsonify({
-                    'success': False,
-                    'error': f'Error de conexión con Verifactu: {str(e)}'
-                }), 400
-        elif not verifactu_enviar_activo:
-            # Envío desactivado, solo guardar como pendiente
-            factura.estado = 'pendiente'
-            db.session.commit()
-            return jsonify({
-                'success': True,
-                'message': 'Factura creada. El envío automático a Verifactu está desactivado.',
-                'factura_id': factura.id
-            })
-        else:
-            # Sin token, solo guardar como pendiente
-            factura.estado = 'pendiente'
-            db.session.commit()
-            return jsonify({
-                'success': True,
-                'message': 'Factura creada. Configure VERIFACTU_TOKEN para enviar automáticamente.',
-                'factura_id': factura.id
-            })
+        # Estado por defecto sin Verifactu
+        factura.estado = 'pendiente'
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': 'Factura formalizada correctamente.',
+            'factura_id': factura.id
+        })
             
     except Exception as e:
         db.session.rollback()
@@ -1075,88 +1103,96 @@ def nueva_factura():
                 )
                 db.session.add(linea_factura)
             
-            # Verificar si el envío a Verifactu está activado
-            from models import Configuracion
-            config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
-            verifactu_enviar_activo = True  # Por defecto activado
-            if config:
-                verifactu_enviar_activo = config.valor.lower() == 'true'
+            # ============================================
+            # CÓDIGO VERIFACTU COMENTADO - Se puede restaurar más adelante
+            # ============================================
+            # # Verificar si el envío a Verifactu está activado
+            # from models import Configuracion
+            # config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+            # verifactu_enviar_activo = True  # Por defecto activado
+            # if config:
+            #     verifactu_enviar_activo = config.valor.lower() == 'true'
+            # 
+            # # Enviar a Verifactu solo si está activado y hay token
+            # verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
+            # verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
+            # 
+            # if verifactu_token and verifactu_enviar_activo:
+            #     # Preparar datos para la API
+            #     tipo_impositivo = 21  # IVA estándar en España
+            #     lineas_payload = []
+            #     total_base_imponible = Decimal('0.00')
+            #     total_cuota_repercutida = Decimal('0.00')
+            #     
+            #     for linea_data in lineas_data:
+            #         importe_con_iva = linea_data['importe']
+            #         base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
+            #         cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
+            #         
+            #         base_imponible = base_imponible.quantize(Decimal('0.01'))
+            #         cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
+            #         
+            #         total_base_imponible += base_imponible
+            #         total_cuota_repercutida += cuota_repercutida
+            #         
+            #         lineas_payload.append({
+            #             'base_imponible': str(base_imponible),
+            #             'tipo_impositivo': str(tipo_impositivo),
+            #             'cuota_repercutida': str(cuota_repercutida)
+            #         })
+            #     
+            #     payload = {
+            #         'serie': factura.serie,
+            #         'numero': factura.numero,
+            #         'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
+            #         'tipo_factura': factura.tipo_factura,
+            #         'descripcion': factura.descripcion or 'Descripcion de la operacion',
+            #         'nif': factura.nif or '',
+            #         'nombre': factura.nombre,
+            #         'lineas': lineas_payload,
+            #         'importe_total': str(factura.importe_total)
+            #     }
+            #     
+            #     headers = {
+            #         'Content-Type': 'application/json',
+            #         'Authorization': f'Bearer {verifactu_token}'
+            #     }
+            #     
+            #     try:
+            #         response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
+            #         
+            #         if response.status_code == 200 or response.status_code == 201:
+            #             response_data = response.json()
+            #             factura.huella_verifactu = json.dumps(response_data)
+            #             factura.estado = 'confirmado'
+            #             db.session.commit()
+            #             flash('Factura creada y enviada a Verifactu correctamente.', 'success')
+            #         else:
+            #             factura.estado = 'error'
+            #             factura.huella_verifactu = json.dumps({
+            #                 'error': response.text,
+            #                 'status_code': response.status_code
+            #             })
+            #             db.session.commit()
+            #             flash(f'Error al enviar a Verifactu: {response.status_code} - {response.text}', 'error')
+            #     except requests.exceptions.RequestException as e:
+            #         factura.estado = 'error'
+            #         factura.huella_verifactu = json.dumps({'error': str(e)})
+            #         db.session.commit()
+            #         flash(f'Error de conexión con Verifactu: {str(e)}', 'error')
+            # elif not verifactu_enviar_activo:
+            #     factura.estado = 'pendiente'
+            #     db.session.commit()
+            #     flash('Factura creada. El envío automático a Verifactu está desactivado.', 'info')
+            # else:
+            #     factura.estado = 'pendiente'
+            #     db.session.commit()
+            #     flash('Factura creada. Configure VERIFACTU_TOKEN para enviar automáticamente.', 'warning')
             
-            # Enviar a Verifactu solo si está activado y hay token
-            verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
-            verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
-            
-            if verifactu_token and verifactu_enviar_activo:
-                # Preparar datos para la API
-                tipo_impositivo = 21  # IVA estándar en España
-                lineas_payload = []
-                total_base_imponible = Decimal('0.00')
-                total_cuota_repercutida = Decimal('0.00')
-                
-                for linea_data in lineas_data:
-                    importe_con_iva = linea_data['importe']
-                    base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
-                    cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
-                    
-                    base_imponible = base_imponible.quantize(Decimal('0.01'))
-                    cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
-                    
-                    total_base_imponible += base_imponible
-                    total_cuota_repercutida += cuota_repercutida
-                    
-                    lineas_payload.append({
-                        'base_imponible': str(base_imponible),
-                        'tipo_impositivo': str(tipo_impositivo),
-                        'cuota_repercutida': str(cuota_repercutida)
-                    })
-                
-                payload = {
-                    'serie': factura.serie,
-                    'numero': factura.numero,
-                    'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
-                    'tipo_factura': factura.tipo_factura,
-                    'descripcion': factura.descripcion or 'Descripcion de la operacion',
-                    'nif': factura.nif or '',
-                    'nombre': factura.nombre,
-                    'lineas': lineas_payload,
-                    'importe_total': str(factura.importe_total)
-                }
-                
-                headers = {
-                    'Content-Type': 'application/json',
-                    'Authorization': f'Bearer {verifactu_token}'
-                }
-                
-                try:
-                    response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
-                    
-                    if response.status_code == 200 or response.status_code == 201:
-                        response_data = response.json()
-                        factura.huella_verifactu = json.dumps(response_data)
-                        factura.estado = 'confirmado'
-                        db.session.commit()
-                        flash('Factura creada y enviada a Verifactu correctamente.', 'success')
-                    else:
-                        factura.estado = 'error'
-                        factura.huella_verifactu = json.dumps({
-                            'error': response.text,
-                            'status_code': response.status_code
-                        })
-                        db.session.commit()
-                        flash(f'Error al enviar a Verifactu: {response.status_code} - {response.text}', 'error')
-                except requests.exceptions.RequestException as e:
-                    factura.estado = 'error'
-                    factura.huella_verifactu = json.dumps({'error': str(e)})
-                    db.session.commit()
-                    flash(f'Error de conexión con Verifactu: {str(e)}', 'error')
-            elif not verifactu_enviar_activo:
-                factura.estado = 'pendiente'
-                db.session.commit()
-                flash('Factura creada. El envío automático a Verifactu está desactivado.', 'info')
-            else:
-                factura.estado = 'pendiente'
-                db.session.commit()
-                flash('Factura creada. Configure VERIFACTU_TOKEN para enviar automáticamente.', 'warning')
+            # Estado por defecto sin Verifactu
+            factura.estado = 'pendiente'
+            db.session.commit()
+            flash('Factura creada correctamente.', 'success')
             
             return redirect(url_for('facturacion.facturacion', tipo_vista='formalizadas'))
             
@@ -2668,89 +2704,97 @@ def procesar_facturacion_albaranes():
         for albaran in albaranes:
             albaran.estado = 'confirmado'
         
-        # Verificar si el envío a Verifactu está activado
-        from models import Configuracion
-        config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
-        verifactu_enviar_activo = True
-        if config:
-            verifactu_enviar_activo = config.valor.lower() == 'true'
+        # ============================================
+        # CÓDIGO VERIFACTU COMENTADO - Se puede restaurar más adelante
+        # ============================================
+        # # Verificar si el envío a Verifactu está activado
+        # from models import Configuracion
+        # config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+        # verifactu_enviar_activo = True
+        # if config:
+        #     verifactu_enviar_activo = config.valor.lower() == 'true'
+        # 
+        # # Enviar a Verifactu solo si está activado y hay token
+        # verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
+        # verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
+        # 
+        # if verifactu_token and verifactu_enviar_activo:
+        #     # Preparar datos para la API
+        #     tipo_impositivo = 21
+        #     lineas_payload = []
+        #     total_base_imponible = Decimal('0.00')
+        #     total_cuota_repercutida = Decimal('0.00')
+        #     
+        #     for linea_data in lineas_data:
+        #         importe_con_iva = linea_data['importe']
+        #         base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
+        #         cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
+        #         
+        #         base_imponible = base_imponible.quantize(Decimal('0.01'))
+        #         cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
+        #         
+        #         total_base_imponible += base_imponible
+        #         total_cuota_repercutida += cuota_repercutida
+        #         
+        #         lineas_payload.append({
+        #             'base_imponible': str(base_imponible),
+        #             'tipo_impositivo': str(tipo_impositivo),
+        #             'cuota_repercutida': str(cuota_repercutida)
+        #         })
+        #     
+        #     payload = {
+        #         'serie': factura.serie,
+        #         'numero': factura.numero,
+        #         'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
+        #         'tipo_factura': factura.tipo_factura,
+        #         'descripcion': factura.descripcion or 'Descripcion de la operacion',
+        #         'nif': factura.nif or '',
+        #         'nombre': factura.nombre,
+        #         'lineas': lineas_payload,
+        #         'importe_total': str(factura.importe_total)
+        #     }
+        #     
+        #     headers = {
+        #         'Content-Type': 'application/json',
+        #         'Authorization': f'Bearer {verifactu_token}'
+        #     }
+        #     
+        #     try:
+        #         response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
+        #         
+        #         if response.status_code == 200 or response.status_code == 201:
+        #             response_data = response.json()
+        #             factura.huella_verifactu = json.dumps(response_data)
+        #             factura.estado = 'confirmado'
+        #             factura.fecha_confirmacion = datetime.utcnow()
+        #             db.session.commit()
+        #             flash(f'Factura {factura.serie}-{factura.numero} creada y enviada a Verifactu correctamente. {len(albaranes)} albarán(es) facturado(s).', 'success')
+        #         else:
+        #             factura.estado = 'error'
+        #             factura.huella_verifactu = json.dumps({
+        #                 'error': response.text,
+        #                 'status_code': response.status_code
+        #             })
+        #             db.session.commit()
+        #             flash(f'Error al enviar a Verifactu: {response.status_code} - {response.text}', 'error')
+        #     except requests.exceptions.RequestException as e:
+        #         factura.estado = 'error'
+        #         factura.huella_verifactu = json.dumps({'error': str(e)})
+        #         db.session.commit()
+        #         flash(f'Error de conexión con Verifactu: {str(e)}', 'error')
+        # elif not verifactu_enviar_activo:
+        #     factura.estado = 'pendiente'
+        #     db.session.commit()
+        #     flash(f'Factura {factura.serie}-{factura.numero} creada. El envío automático a Verifactu está desactivado. {len(albaranes)} albarán(es) facturado(s).', 'info')
+        # else:
+        #     factura.estado = 'pendiente'
+        #     db.session.commit()
+        #     flash(f'Factura {factura.serie}-{factura.numero} creada. Configure VERIFACTU_TOKEN para enviar automáticamente. {len(albaranes)} albarán(es) facturado(s).', 'warning')
         
-        # Enviar a Verifactu solo si está activado y hay token
-        verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
-        verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
-        
-        if verifactu_token and verifactu_enviar_activo:
-            # Preparar datos para la API
-            tipo_impositivo = 21
-            lineas_payload = []
-            total_base_imponible = Decimal('0.00')
-            total_cuota_repercutida = Decimal('0.00')
-            
-            for linea_data in lineas_data:
-                importe_con_iva = linea_data['importe']
-                base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
-                cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
-                
-                base_imponible = base_imponible.quantize(Decimal('0.01'))
-                cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
-                
-                total_base_imponible += base_imponible
-                total_cuota_repercutida += cuota_repercutida
-                
-                lineas_payload.append({
-                    'base_imponible': str(base_imponible),
-                    'tipo_impositivo': str(tipo_impositivo),
-                    'cuota_repercutida': str(cuota_repercutida)
-                })
-            
-            payload = {
-                'serie': factura.serie,
-                'numero': factura.numero,
-                'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
-                'tipo_factura': factura.tipo_factura,
-                'descripcion': factura.descripcion or 'Descripcion de la operacion',
-                'nif': factura.nif or '',
-                'nombre': factura.nombre,
-                'lineas': lineas_payload,
-                'importe_total': str(factura.importe_total)
-            }
-            
-            headers = {
-                'Content-Type': 'application/json',
-                'Authorization': f'Bearer {verifactu_token}'
-            }
-            
-            try:
-                response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
-                
-                if response.status_code == 200 or response.status_code == 201:
-                    response_data = response.json()
-                    factura.huella_verifactu = json.dumps(response_data)
-                    factura.estado = 'confirmado'
-                    factura.fecha_confirmacion = datetime.utcnow()
-                    db.session.commit()
-                    flash(f'Factura {factura.serie}-{factura.numero} creada y enviada a Verifactu correctamente. {len(albaranes)} albarán(es) facturado(s).', 'success')
-                else:
-                    factura.estado = 'error'
-                    factura.huella_verifactu = json.dumps({
-                        'error': response.text,
-                        'status_code': response.status_code
-                    })
-                    db.session.commit()
-                    flash(f'Error al enviar a Verifactu: {response.status_code} - {response.text}', 'error')
-            except requests.exceptions.RequestException as e:
-                factura.estado = 'error'
-                factura.huella_verifactu = json.dumps({'error': str(e)})
-                db.session.commit()
-                flash(f'Error de conexión con Verifactu: {str(e)}', 'error')
-        elif not verifactu_enviar_activo:
-            factura.estado = 'pendiente'
-            db.session.commit()
-            flash(f'Factura {factura.serie}-{factura.numero} creada. El envío automático a Verifactu está desactivado. {len(albaranes)} albarán(es) facturado(s).', 'info')
-        else:
-            factura.estado = 'pendiente'
-            db.session.commit()
-            flash(f'Factura {factura.serie}-{factura.numero} creada. Configure VERIFACTU_TOKEN para enviar automáticamente. {len(albaranes)} albarán(es) facturado(s).', 'warning')
+        # Estado por defecto sin Verifactu
+        factura.estado = 'pendiente'
+        db.session.commit()
+        flash(f'Factura {factura.serie}-{factura.numero} creada correctamente. {len(albaranes)} albarán(es) facturado(s).', 'success')
         
         return redirect(url_for('facturacion.facturacion', tipo_vista='formalizadas'))
         

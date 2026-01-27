@@ -122,7 +122,7 @@ select.filtro-input {
             <td>{{ "%.2f"|format(ticket.importe_total) }} €</td>
             <td>
                 <div style="display: flex; gap: 4px; align-items: center; flex-wrap: nowrap;">
-                    <a href="{{ url_for('tickets.ver_ticket', ticket_id=ticket.id) }}" class="btn btn-info" style="padding: 4px 8px; font-size: 0.75rem;">Ver</a>
+                    <a href="{{ url_for('tickets.descargar_pdf_ticket', ticket_id=ticket.id) }}" class="btn btn-info" style="padding: 4px 8px; font-size: 0.75rem; background-color: #17a2b8; color: white; text-decoration: none; border: none; border-radius: 4px; cursor: pointer;">PDF</a>
                     <a href="{{ url_for('tickets.editar_ticket', ticket_id=ticket.id) }}" class="btn btn-warning" style="padding: 4px 8px; font-size: 0.75rem; background-color: #ffc107; color: #000; text-decoration: none; border: none; border-radius: 4px; cursor: pointer;">Editar</a>
                     <form method="POST" action="{{ url_for('tickets.eliminar_ticket', ticket_id=ticket.id) }}" style="display: inline;" onsubmit="return confirm('¿Estás seguro de que deseas eliminar el ticket {{ ticket.serie }}-{{ ticket.numero }}? Esta acción no se puede deshacer.');">
                         <button type="submit" class="btn-eliminar-lista" title="Eliminar ticket">×</button>

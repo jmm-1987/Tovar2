@@ -139,34 +139,40 @@ def eliminar_usuario(id):
 @login_required
 @supervisor_required
 def verifactu_info():
-    """Información y configuración de API Verifactu"""
-    if request.method == 'POST':
-        try:
-            # Obtener o crear la configuración
-            config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
-            if not config:
-                config = Configuracion(
-                    clave='verifactu_enviar_activo',
-                    descripcion='Activar/desactivar el envío automático de facturas y tickets a Verifactu'
-                )
-                db.session.add(config)
-            
-            # Actualizar el valor según el checkbox
-            config.valor = 'true' if request.form.get('verifactu_enviar_activo') == 'on' else 'false'
-            config.fecha_actualizacion = datetime.utcnow()
-            
-            db.session.commit()
-            flash('Configuración de Verifactu actualizada correctamente', 'success')
-            return redirect(url_for('configuracion.verifactu_info'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error al actualizar configuración: {str(e)}', 'error')
+    """Información y configuración de API Verifactu - FUNCIONALIDAD DESACTIVADA TEMPORALMENTE"""
+    # ============================================
+    # CÓDIGO VERIFACTU COMENTADO - Se puede restaurar más adelante
+    # ============================================
+    # if request.method == 'POST':
+    #     try:
+    #         # Obtener o crear la configuración
+    #         config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+    #         if not config:
+    #             config = Configuracion(
+    #                 clave='verifactu_enviar_activo',
+    #                 descripcion='Activar/desactivar el envío automático de facturas y tickets a Verifactu'
+    #             )
+    #             db.session.add(config)
+    #         
+    #         # Actualizar el valor según el checkbox
+    #         config.valor = 'true' if request.form.get('verifactu_enviar_activo') == 'on' else 'false'
+    #         config.fecha_actualizacion = datetime.utcnow()
+    #         
+    #         db.session.commit()
+    #         flash('Configuración de Verifactu actualizada correctamente', 'success')
+    #         return redirect(url_for('configuracion.verifactu_info'))
+    #     except Exception as e:
+    #         db.session.rollback()
+    #         flash(f'Error al actualizar configuración: {str(e)}', 'error')
+    # 
+    # # Obtener la configuración actual
+    # config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+    # verifactu_activo = True  # Por defecto activado
+    # if config:
+    #     verifactu_activo = config.valor.lower() == 'true'
     
-    # Obtener la configuración actual
-    config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
-    verifactu_activo = True  # Por defecto activado
-    if config:
-        verifactu_activo = config.valor.lower() == 'true'
+    # Mostrar como desactivado
+    verifactu_activo = False
     
     return render_template('configuracion/verifactu.html', verifactu_activo=verifactu_activo)
 
