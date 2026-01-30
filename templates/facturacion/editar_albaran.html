@@ -90,6 +90,7 @@
         <h3 style="margin-top: 10px; margin-bottom: 8px; font-size: 1.1rem;">Líneas del Albarán</h3>
         <!-- Cabeceras de las columnas -->
         <div class="linea-factura-header">
+            <div class="linea-factura-drag-header" style="flex: 0 0 30px; width: 30px;"></div>
             <div class="linea-factura-numero-header">#</div>
             <div class="linea-factura-campos-header">
                 <div class="header-col" style="flex: 1; min-width: 500px;">Descripción</div>
@@ -106,7 +107,8 @@
             {% if factura.lineas %}
                 {% for linea in factura.lineas %}
                 {% set es_linea_texto = (linea.cantidad == 0 or not linea.cantidad) and (not linea.precio_unitario or linea.precio_unitario == 0) and (not linea.importe or linea.importe == 0) %}
-                <div class="linea-factura-row {% if es_linea_texto %}linea-texto{% endif %}">
+                <div class="linea-factura-row {% if es_linea_texto %}linea-texto{% endif %}" draggable="true">
+                    <div class="linea-factura-drag-handle" title="Arrastrar para reordenar">☰</div>
                     <div class="linea-factura-numero">#{{ loop.index }}</div>
                     <div class="linea-factura-campos">
                         {% if es_linea_texto %}
@@ -134,7 +136,8 @@
                 </div>
                 {% endfor %}
             {% else %}
-            <div class="linea-factura-row">
+            <div class="linea-factura-row" draggable="true">
+                <div class="linea-factura-drag-handle" title="Arrastrar para reordenar">☰</div>
                 <div class="linea-factura-numero">#1</div>
                 <div class="linea-factura-campos">
                     <input type="text" name="descripcion_linea[]" placeholder="Descripción" required class="linea-campo-compact" style="flex: 1; min-width: 500px;">
@@ -323,6 +326,18 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const nuevaLinea = primeraLineaNormal.cloneNode(true);
         
+        // Asegurarse de que sea draggable
+        nuevaLinea.setAttribute('draggable', 'true');
+        
+        // Asegurarse de que tenga el drag handle
+        if (!nuevaLinea.querySelector('.linea-factura-drag-handle')) {
+            const dragHandle = document.createElement('div');
+            dragHandle.className = 'linea-factura-drag-handle';
+            dragHandle.setAttribute('title', 'Arrastrar para reordenar');
+            dragHandle.textContent = '☰';
+            nuevaLinea.insertBefore(dragHandle, nuevaLinea.firstChild);
+        }
+        
         // Asegurarse de que no sea una línea de texto
         nuevaLinea.classList.remove('linea-texto');
         
@@ -428,8 +443,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Mostrar botón eliminar
         nuevaLinea.querySelector('.btn-eliminar-linea').style.display = 'block';
         
-        // Añadir event listener para botón duplicar
+        // Añadir event listener para botón duplicar - eliminar onclick primero
         if (btnDuplicar) {
+            btnDuplicar.removeAttribute('onclick');
             btnDuplicar.addEventListener('click', function() {
                 duplicarLineaAlbaran(this);
             });
@@ -477,6 +493,9 @@ document.addEventListener('DOMContentLoaded', function() {
         });
         
         lineasContainer.appendChild(nuevaLinea);
+        
+        // Reinicializar drag and drop
+        setTimeout(initDragAndDrop, 100);
     });
     
     // Agregar línea de texto (solo descripción, sin precios ni cantidades)
@@ -484,7 +503,9 @@ document.addEventListener('DOMContentLoaded', function() {
         lineaCount++;
         const nuevaLineaTexto = document.createElement('div');
         nuevaLineaTexto.className = 'linea-factura-row linea-texto';
+        nuevaLineaTexto.setAttribute('draggable', 'true');
         nuevaLineaTexto.innerHTML = `
+            <div class="linea-factura-drag-handle" title="Arrastrar para reordenar">☰</div>
             <div class="linea-factura-numero">#${lineaCount}</div>
             <div class="linea-factura-campos">
                 <input type="text" name="descripcion_linea[]" placeholder="Texto informativo..." required class="linea-campo-compact" style="flex: 1; min-width: 500px; font-style: italic;">
@@ -527,8 +548,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 lineasContainer.appendChild(nuevaLineaTexto);
             }
         }
-        
+
         renumerarLineas();
+        
+        // Reinicializar drag and drop
+        setTimeout(initDragAndDrop, 100);
     });
     
     // Renumerar líneas
@@ -604,6 +628,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const lineaRow = btn.closest('.linea-factura-row');
         const nuevaLinea = lineaRow.cloneNode(true);
         const container = document.getElementById('lineas-container');
+        
+        // Asegurarse de que sea draggable
+        nuevaLinea.setAttribute('draggable', 'true');
+        
+        // Asegurarse de que tenga el drag handle
+        if (!nuevaLinea.querySelector('.linea-factura-drag-handle')) {
+            const dragHandle = document.createElement('div');
+            dragHandle.className = 'linea-factura-drag-handle';
+            dragHandle.setAttribute('title', 'Arrastrar para reordenar');
+            dragHandle.textContent = '☰';
+            nuevaLinea.insertBefore(dragHandle, nuevaLinea.firstChild);
+        }
         
         // Obtener valores de los campos originales antes de limpiar
         const descripcionInputOriginal = lineaRow.querySelector('input[name="descripcion_linea[]"]');
@@ -696,10 +732,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        // Botón duplicar
-        nuevaLinea.querySelector('.btn-duplicar-linea').addEventListener('click', function() {
-            duplicarLineaAlbaran(this);
-        });
+        // Botón duplicar - eliminar onclick y añadir event listener
+        const btnDuplicarNuevo = nuevaLinea.querySelector('.btn-duplicar-linea');
+        if (btnDuplicarNuevo) {
+            btnDuplicarNuevo.removeAttribute('onclick');
+            btnDuplicarNuevo.addEventListener('click', function() {
+                duplicarLineaAlbaran(this);
+            });
+        }
         
         // Mostrar botón eliminar
         nuevaLinea.querySelector('.btn-eliminar-linea').style.display = 'block';
@@ -712,10 +752,102 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Actualizar totales
         actualizarTotales();
+        
+        // Reinicializar drag and drop
+        setTimeout(initDragAndDrop, 100);
     };
     
     // Calcular totales iniciales
     actualizarTotales();
+    
+    // Funcionalidad de drag and drop para reordenar líneas
+    let draggedElement = null;
+    
+    function initDragAndDrop() {
+        const lineasContainer = document.getElementById('lineas-container');
+        const lineas = lineasContainer.querySelectorAll('.linea-factura-row');
+        
+        lineas.forEach(linea => {
+            linea.setAttribute('draggable', 'true');
+            
+            // Asegurarse de que tenga el drag handle
+            if (!linea.querySelector('.linea-factura-drag-handle')) {
+                const dragHandle = document.createElement('div');
+                dragHandle.className = 'linea-factura-drag-handle';
+                dragHandle.setAttribute('title', 'Arrastrar para reordenar');
+                dragHandle.textContent = '☰';
+                linea.insertBefore(dragHandle, linea.firstChild);
+            }
+            
+            linea.addEventListener('dragstart', function(e) {
+                draggedElement = this;
+                this.style.opacity = '0.5';
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            
+            linea.addEventListener('dragend', function() {
+                this.style.opacity = '1';
+                lineas.forEach(l => l.classList.remove('drag-over'));
+            });
+            
+            linea.addEventListener('dragover', function(e) {
+                if (e.preventDefault) {
+                    e.preventDefault();
+                }
+                e.dataTransfer.dropEffect = 'move';
+                if (this !== draggedElement) {
+                    this.classList.add('drag-over');
+                }
+                return false;
+            });
+            
+            linea.addEventListener('dragleave', function() {
+                this.classList.remove('drag-over');
+            });
+            
+            linea.addEventListener('drop', function(e) {
+                if (e.stopPropagation) {
+                    e.stopPropagation();
+                }
+                
+                if (draggedElement !== this) {
+                    const allLineas = Array.from(lineasContainer.querySelectorAll('.linea-factura-row'));
+                    const draggedIndex = allLineas.indexOf(draggedElement);
+                    const targetIndex = allLineas.indexOf(this);
+                    
+                    if (draggedIndex < targetIndex) {
+                        lineasContainer.insertBefore(draggedElement, this.nextSibling);
+                    } else {
+                        lineasContainer.insertBefore(draggedElement, this);
+                    }
+                    
+                    renumerarLineas();
+                }
+                
+                this.classList.remove('drag-over');
+                return false;
+            });
+        });
+    }
+    
+    // Inicializar drag and drop al cargar
+    initDragAndDrop();
+    
+    // Reinicializar drag and drop después de añadir/duplicar líneas
+    const originalAgregarLinea = document.getElementById('agregar-linea');
+    const originalAgregarLineaTexto = document.getElementById('agregar-linea-texto');
+    
+    if (originalAgregarLinea) {
+        originalAgregarLinea.addEventListener('click', function() {
+            setTimeout(initDragAndDrop, 100);
+        });
+    }
+    
+    if (originalAgregarLineaTexto) {
+        originalAgregarLineaTexto.addEventListener('click', function() {
+            setTimeout(initDragAndDrop, 100);
+        });
+    }
 });
 </script>
 
@@ -771,6 +903,30 @@ document.addEventListener('DOMContentLoaded', function() {
     padding: 8px;
     background: #f8f9fa;
     border-radius: 6px;
+}
+
+.linea-factura-drag-handle {
+    cursor: move;
+    color: #6c757d;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 30px;
+    width: 30px;
+    user-select: none;
+    padding: 4px;
+}
+
+.linea-factura-drag-handle:hover {
+    color: #495057;
+    background-color: #e9ecef;
+    border-radius: 4px;
+}
+
+.linea-factura-row.drag-over {
+    border: 2px dashed #007bff;
+    background-color: #e7f3ff;
 }
 
 .linea-factura-numero {

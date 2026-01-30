@@ -1603,6 +1603,25 @@ Saludos cordiales,
                             print("Migración: Columna es_anticipo agregada exitosamente a facturas")
                     except Exception as e:
                         print(f"Error al agregar columna es_anticipo a facturas: {e}")
+                
+                if 'es_rectificativa' not in columns_facturas:
+                    try:
+                        with db.engine.connect() as conn:
+                            # SQLite usa INTEGER para BOOLEAN (0 o 1)
+                            conn.execute(text('ALTER TABLE facturas ADD COLUMN es_rectificativa INTEGER DEFAULT 0 NOT NULL'))
+                            conn.commit()
+                            print("Migración: Columna es_rectificativa agregada exitosamente a facturas")
+                    except Exception as e:
+                        print(f"Error al agregar columna es_rectificativa a facturas: {e}")
+                
+                if 'factura_rectificada_id' not in columns_facturas:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text('ALTER TABLE facturas ADD COLUMN factura_rectificada_id INTEGER'))
+                            conn.commit()
+                            print("Migración: Columna factura_rectificada_id agregada exitosamente a facturas")
+                    except Exception as e:
+                        print(f"Error al agregar columna factura_rectificada_id a facturas: {e}")
         except Exception:
             # Si hay error, intentar crear todas las tablas
             try:

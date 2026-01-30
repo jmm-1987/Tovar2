@@ -1,13 +1,31 @@
 {% extends "base.html" %}
 
-{% block title %}Nueva Factura Directa{% endblock %}
+{% block title %}{% if es_rectificativa is defined and es_rectificativa %}Nueva Factura Rectificativa{% else %}Nueva Factura Directa{% endif %}{% endblock %}
 
 {% block content %}
+{% if es_rectificativa is defined and es_rectificativa and factura_original %}
+<!-- Información de la factura original -->
+<div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 15px; margin-bottom: 20px;">
+    <h3 style="margin: 0 0 10px 0; color: #856404;">📋 Factura Original a Rectificar</h3>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 0.9rem;">
+        <div><strong>Número:</strong> {{ factura_original.serie }}-{{ factura_original.numero }}</div>
+        <div><strong>Fecha:</strong> {{ fecha_expedicion_str if fecha_expedicion_str else 'N/A' }}</div>
+        <div><strong>Cliente:</strong> {{ factura_original.nombre }}</div>
+        <div><strong>Total Original:</strong> {{ "%.2f"|format(factura_original.importe_total) }} €</div>
+        <div><strong>Tipo:</strong> {{ factura_original.tipo_factura }}</div>
+        <div><strong>IVA:</strong> {{ "%.2f"|format(factura_original.tipo_iva) }}%</div>
+    </div>
+</div>
+{% endif %}
+
 <div class="container" style="max-width: 1400px; margin-top: 10px;">
-    <form method="POST" id="facturaForm">
+    <form method="POST" id="facturaForm" action="{% if es_rectificativa is defined and es_rectificativa and factura_original %}{{ url_for('facturacion.crear_factura_rectificativa', factura_id=factura_original.id) }}{% else %}{{ url_for('facturacion.nueva_factura') }}{% endif %}">
+        {% if es_rectificativa is defined and es_rectificativa and factura_original %}
+        <input type="hidden" name="factura_original_id" value="{{ factura_original.id }}">
+        {% endif %}
         <!-- Título y campos principales en la misma línea -->
         <div style="display: flex; align-items: flex-end; gap: 15px; margin-bottom: 10px; flex-wrap: wrap;">
-            <h2 style="margin: 0; flex: 0 0 auto;">Nueva Factura Directa</h2>
+            <h2 style="margin: 0; flex: 0 0 auto;">{% if es_rectificativa is defined and es_rectificativa %}Nueva Factura Rectificativa{% else %}Nueva Factura Directa{% endif %}</h2>
             
             <div class="form-group" style="flex: 0 0 180px;">
                 <label for="fecha_expedicion">Fecha de Expedición *</label>
@@ -17,8 +35,13 @@
             <div class="form-group" style="flex: 0 0 200px;">
                 <label for="tipo_factura">Tipo de Factura *</label>
                 <select name="tipo_factura" id="tipo_factura" required class="form-control" style="width: 100%;">
+                    {% if es_rectificativa is defined and es_rectificativa %}
+                    <option value="R1" selected>R1 - Rectificativa Completa</option>
+                    <option value="R2">R2 - Rectificativa Simplificada</option>
+                    {% else %}
                     <option value="F1">F1 - Factura Completa</option>
                     <option value="F2">F2 - Factura Simplificada</option>
+                    {% endif %}
                 </select>
             </div>
             
@@ -27,12 +50,14 @@
                 <div style="display: flex; gap: 5px;">
                     <div style="position: relative; flex: 1;">
                         <input type="text" id="cliente_search" placeholder="🔍 Buscar cliente..." 
+                               value="{% if es_rectificativa is defined and es_rectificativa and factura_original %}{{ factura_original.nombre }}{% endif %}"
                                style="width: 100%; padding: 10px 35px 10px 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; box-sizing: border-box;"
                                autocomplete="off">
                         <select name="cliente_id" id="cliente_id" onchange="setTimeout(function(){ cargarDatosCliente(); }, 10);" style="display: none;">
                             <option value="">Seleccionar cliente...</option>
                             {% for cliente in clientes %}
                             <option value="{{ cliente.id }}" 
+                                    {% if es_rectificativa is defined and es_rectificativa and factura_original and factura_original.cliente_id == cliente.id %}selected{% endif %}
                                     data-nombre="{{ cliente.nombre|lower }}"
                                     data-nombre-display="{{ cliente.nombre }}"
                                     data-nif="{{ cliente.nif or '' }}"
@@ -61,57 +86,58 @@
         <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; margin-bottom: 8px;">
             <div class="form-group">
                 <label for="nombre_cliente">Nombre del Cliente *</label>
-                <input type="text" name="nombre_cliente" id="nombre_cliente" required class="form-control" placeholder="Nombre completo del cliente" style="width: 100%;">
+                <input type="text" name="nombre_cliente" id="nombre_cliente" value="{% if es_rectificativa is defined and es_rectificativa and factura_original %}{{ factura_original.nombre }}{% endif %}" required class="form-control" placeholder="Nombre completo del cliente" style="width: 100%;">
             </div>
             
             <div class="form-group">
                 <label for="nif_cliente">NIF/CIF del Cliente *</label>
-                <input type="text" name="nif_cliente" id="nif_cliente" required class="form-control" placeholder="NIF o CIF" style="width: 100%;">
+                <input type="text" name="nif_cliente" id="nif_cliente" value="{% if es_rectificativa is defined and es_rectificativa and factura_original %}{{ factura_original.nif or '' }}{% endif %}" required class="form-control" placeholder="NIF o CIF" style="width: 100%;">
             </div>
         </div>
         
         <div class="form-group" style="margin-bottom: 8px;">
             <label for="direccion_cliente">Dirección *</label>
-            <input type="text" name="direccion_cliente" id="direccion_cliente" required class="form-control" placeholder="Dirección completa" style="width: 100%;">
+            <input type="text" name="direccion_cliente" id="direccion_cliente" value="{% if es_rectificativa is defined and es_rectificativa and cliente_original %}{{ cliente_original.direccion or '' }}{% endif %}" required class="form-control" placeholder="Dirección completa" style="width: 100%;">
         </div>
         
         <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-bottom: 8px;">
             <div class="form-group">
                 <label for="poblacion_cliente">Población *</label>
-                <input type="text" name="poblacion_cliente" id="poblacion_cliente" required class="form-control" placeholder="Población" style="width: 100%;">
+                <input type="text" name="poblacion_cliente" id="poblacion_cliente" value="{% if es_rectificativa is defined and es_rectificativa and cliente_original %}{{ cliente_original.poblacion or '' }}{% endif %}" required class="form-control" placeholder="Población" style="width: 100%;">
             </div>
             
             <div class="form-group">
                 <label for="provincia_cliente">Provincia *</label>
-                <input type="text" name="provincia_cliente" id="provincia_cliente" required class="form-control" placeholder="Provincia" style="width: 100%;">
+                <input type="text" name="provincia_cliente" id="provincia_cliente" value="{% if es_rectificativa is defined and es_rectificativa and cliente_original %}{{ cliente_original.provincia or '' }}{% endif %}" required class="form-control" placeholder="Provincia" style="width: 100%;">
             </div>
             
             <div class="form-group">
                 <label for="codigo_postal_cliente">Código Postal *</label>
-                <input type="text" name="codigo_postal_cliente" id="codigo_postal_cliente" required class="form-control" placeholder="CP" style="width: 100%;">
+                <input type="text" name="codigo_postal_cliente" id="codigo_postal_cliente" value="{% if es_rectificativa is defined and es_rectificativa and cliente_original %}{{ cliente_original.codigo_postal or '' }}{% endif %}" required class="form-control" placeholder="CP" style="width: 100%;">
             </div>
         </div>
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
             <div class="form-group">
                 <label for="telefono_cliente">Teléfono</label>
-                <input type="text" name="telefono_cliente" id="telefono_cliente" class="form-control" placeholder="Teléfono" style="width: 100%;">
+                <input type="text" name="telefono_cliente" id="telefono_cliente" value="{% if es_rectificativa is defined and es_rectificativa and cliente_original %}{{ cliente_original.telefono or '' }}{% endif %}" class="form-control" placeholder="Teléfono" style="width: 100%;">
             </div>
             
             <div class="form-group">
                 <label for="email_cliente">Email</label>
-                <input type="email" name="email_cliente" id="email_cliente" class="form-control" placeholder="Email" style="width: 100%;">
+                <input type="email" name="email_cliente" id="email_cliente" value="{% if es_rectificativa is defined and es_rectificativa and cliente_original %}{{ cliente_original.email or '' }}{% endif %}" class="form-control" placeholder="Email" style="width: 100%;">
             </div>
         </div>
         
         <div class="form-group" style="margin-bottom: 10px;">
             <label for="descripcion">Descripción de la Operación</label>
-            <textarea name="descripcion" id="descripcion" rows="2" class="form-control" placeholder="Descripción general de la factura" style="width: 100%; max-width: 520px;"></textarea>
+            <textarea name="descripcion" id="descripcion" rows="2" class="form-control" placeholder="Descripción general de la factura" style="width: 100%; max-width: 520px;">{% if es_rectificativa is defined and es_rectificativa and factura_original %}Rectificativa de factura {{ factura_original.serie }}-{{ factura_original.numero }}{% endif %}</textarea>
         </div>
         
         <h3 style="margin-top: 10px; margin-bottom: 8px; font-size: 1.1rem;">Líneas de la Factura</h3>
         <!-- Cabeceras de las columnas -->
         <div class="linea-factura-header">
+            <div class="linea-factura-drag-handle-header"></div>
             <div class="linea-factura-numero-header">#</div>
             <div class="linea-factura-campos-header">
                 <div class="header-col" style="flex: 1; min-width: 500px;">Descripción</div>
@@ -125,7 +151,27 @@
             </div>
         </div>
         <div id="lineas-container">
-            <div class="linea-factura-row">
+            {% if es_rectificativa is defined and es_rectificativa and lineas_prellenadas is defined and lineas_prellenadas %}
+                {% for linea in lineas_prellenadas %}
+                <div class="linea-factura-row" draggable="true">
+                    <div class="linea-factura-drag-handle" title="Arrastrar para reordenar">☰</div>
+                    <div class="linea-factura-numero">#{{ loop.index }}</div>
+                    <div class="linea-factura-campos">
+                        <input type="text" name="descripcion_linea[]" value="{{ linea.descripcion }}" placeholder="Descripción" required class="linea-campo-compact" style="flex: 1; min-width: 500px;">
+                        <input type="number" name="cantidad[]" placeholder="Cant." step="0.01" value="{{ linea.cantidad }}" required class="linea-campo-compact linea-cantidad" style="flex: 0 0 80px; width: 80px;">
+                        <input type="text" name="talla[]" value="{{ linea.talla }}" placeholder="Talla" class="linea-campo-compact" style="flex: 0 0 80px; width: 80px;">
+                        <input type="number" name="precio_unitario[]" placeholder="P. Unit." step="0.01" value="{{ linea.precio_unitario }}" required class="linea-campo-compact precio-unitario" style="flex: 0 0 100px; width: 100px;">
+                        <input type="number" name="descuento[]" class="linea-campo-compact descuento-input" step="0.01" min="0" max="100" value="{{ linea.descuento }}" placeholder="Desc. %" title="Descuento (%)" style="flex: 0 0 80px; width: 80px;">
+                        <input type="number" name="precio_final[]" class="linea-campo-compact precio-final-input" step="0.01" value="{{ linea.precio_final }}" placeholder="P. Final" title="Precio Final" readonly style="flex: 0 0 100px; width: 100px; background: #f0f0f0;">
+                        <span class="importe-linea" style="flex: 0 0 100px; padding: 8px; text-align: right; font-weight: bold;">{{ "%.2f"|format(linea.importe) }} €</span>
+                        <button type="button" class="btn-duplicar-linea" onclick="duplicarLineaFactura(this)" title="Duplicar línea (mantiene todo excepto talla y cantidad)" style="padding: 4px 8px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; flex: 0 0 30px; font-size: 0.9rem;">📋</button>
+                        <button type="button" class="btn-eliminar-linea" {% if lineas_prellenadas|length <= 1 %}style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; display: none; flex: 0 0 30px;"{% else %}style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; display: block; flex: 0 0 30px;"{% endif %}>×</button>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+            <div class="linea-factura-row" draggable="true">
+                <div class="linea-factura-drag-handle" title="Arrastrar para reordenar">☰</div>
                 <div class="linea-factura-numero">#1</div>
                 <div class="linea-factura-campos">
                     <input type="text" name="descripcion_linea[]" placeholder="Descripción" required class="linea-campo-compact" style="flex: 1; min-width: 500px;">
@@ -139,10 +185,12 @@
                     <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; display: none; flex: 0 0 30px;">×</button>
                 </div>
             </div>
+            {% endif %}
         </div>
         
-        <div style="margin-top: 15px;">
+        <div style="margin-top: 15px; display: flex; gap: 10px;">
             <button type="button" id="agregar-linea" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">+ Agregar Línea</button>
+            <button type="button" id="agregar-linea-texto" class="btn btn-info" style="padding: 8px 16px; font-size: 0.85rem; background-color: #17a2b8; border-color: #17a2b8;">+ Agregar Línea de Texto</button>
         </div>
         
         <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 6px; max-width: 400px;">
@@ -246,9 +294,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Función para actualizar totales
     function actualizarTotales() {
         // Sumar todas las líneas (sin IVA) - permitir números negativos
+        // Ignorar líneas de texto (que tienen importe "-")
         let baseImponible = 0;
         document.querySelectorAll('.importe-linea').forEach(span => {
             let texto = span.textContent.replace(' €', '').trim();
+            // Ignorar líneas de texto (que muestran "-")
+            if (texto === '-' || texto === '') {
+                return;
+            }
             // Manejar números negativos - el texto puede tener el signo menos
             // parseFloat maneja correctamente los números negativos
             const valor = parseFloat(texto) || 0;
@@ -363,40 +416,91 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
         
-        // Añadir event listeners
-        const cantidadInput = nuevaLinea.querySelector('.linea-cantidad');
-        const precioUnitarioInput = nuevaLinea.querySelector('.precio-unitario');
-        const descuentoInput = nuevaLinea.querySelector('.descuento-input');
-        const precioFinalInput = nuevaLinea.querySelector('.precio-final-input');
-        
-        cantidadInput.addEventListener('input', function() {
-            calcularImporteLinea(nuevaLinea);
-        });
-        
-        precioUnitarioInput.addEventListener('input', function() {
-            calcularPrecioFinal(nuevaLinea);
-        });
-        
-        descuentoInput.addEventListener('input', function() {
-            calcularPrecioFinal(nuevaLinea);
-        });
-        
-        precioFinalInput.addEventListener('input', function() {
-            calcularImporteLinea(nuevaLinea);
-        });
+        // Añadir event listeners usando la función centralizada
+        inicializarEventListenersLinea(nuevaLinea);
         
         // Botón eliminar
-        nuevaLinea.querySelector('.btn-eliminar-linea').addEventListener('click', function() {
-            if (lineasContainer.querySelectorAll('.linea-factura-row').length > 1) {
-                nuevaLinea.remove();
-                renumerarLineas();
-                actualizarTotales();
-            } else {
-                alert('Debe haber al menos una línea en la factura');
-            }
-        });
+        const btnEliminar = nuevaLinea.querySelector('.btn-eliminar-linea');
+        if (btnEliminar) {
+            btnEliminar.addEventListener('click', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                if (lineasContainer.querySelectorAll('.linea-factura-row').length > 1) {
+                    nuevaLinea.remove();
+                    renumerarLineas();
+                    actualizarTotales();
+                    initDragAndDrop(); // Reinicializar drag and drop después de eliminar
+                    inicializarBotonesEliminar(); // Reinicializar botones eliminar
+                } else {
+                    alert('Debe haber al menos una línea en la factura');
+                }
+                return false;
+            });
+        }
+        
+        // Asegurarse de que sea draggable
+        nuevaLinea.setAttribute('draggable', 'true');
+        
+        // Asegurarse de que tenga el drag handle
+        if (!nuevaLinea.querySelector('.linea-factura-drag-handle')) {
+            const dragHandle = document.createElement('div');
+            dragHandle.className = 'linea-factura-drag-handle';
+            dragHandle.setAttribute('title', 'Arrastrar para reordenar');
+            dragHandle.textContent = '☰';
+            nuevaLinea.insertBefore(dragHandle, nuevaLinea.firstChild);
+        }
         
         lineasContainer.appendChild(nuevaLinea);
+        renumerarLineas();
+        initDragAndDrop();
+        inicializarBotonesEliminar(); // Reinicializar botones eliminar
+    });
+    
+    // Agregar línea de texto
+    document.getElementById('agregar-linea-texto').addEventListener('click', function() {
+        lineaCount++;
+        const nuevaLineaTexto = document.createElement('div');
+        nuevaLineaTexto.className = 'linea-factura-row linea-texto';
+        nuevaLineaTexto.setAttribute('draggable', 'true');
+        nuevaLineaTexto.innerHTML = `
+            <div class="linea-factura-drag-handle" title="Arrastrar para reordenar">☰</div>
+            <div class="linea-factura-numero">#${lineaCount}</div>
+            <div class="linea-factura-campos">
+                <input type="text" name="descripcion_linea[]" placeholder="Texto informativo..." required class="linea-campo-compact" style="flex: 1; min-width: 500px; font-style: italic;">
+                <input type="hidden" name="cantidad[]" value="0">
+                <input type="hidden" name="talla[]" value="">
+                <input type="hidden" name="precio_unitario[]" value="0">
+                <input type="hidden" name="descuento[]" value="0">
+                <input type="hidden" name="precio_final[]" value="0">
+                <span class="importe-linea" style="flex: 0 0 100px; padding: 8px; text-align: right; font-weight: bold; color: #6c757d;">-</span>
+                <button type="button" class="btn-duplicar-linea" onclick="duplicarLineaFactura(this)" title="Duplicar línea" style="padding: 4px 8px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; flex: 0 0 30px; font-size: 0.9rem; display: none;">📋</button>
+                <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; display: block; flex: 0 0 30px;">×</button>
+            </div>
+        `;
+        
+        // Botón eliminar
+        const btnEliminarTexto = nuevaLineaTexto.querySelector('.btn-eliminar-linea');
+        if (btnEliminarTexto) {
+            btnEliminarTexto.addEventListener('click', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                if (lineasContainer.querySelectorAll('.linea-factura-row').length > 1) {
+                    nuevaLineaTexto.remove();
+                    renumerarLineas();
+                    actualizarTotales();
+                    initDragAndDrop(); // Reinicializar drag and drop después de eliminar
+                    inicializarBotonesEliminar(); // Reinicializar botones eliminar
+                } else {
+                    alert('Debe haber al menos una línea en la factura');
+                }
+                return false;
+            });
+        }
+        
+        lineasContainer.appendChild(nuevaLineaTexto);
+        renumerarLineas();
+        initDragAndDrop();
+        inicializarBotonesEliminar(); // Reinicializar botones eliminar
     });
     
     // Renumerar líneas
@@ -459,57 +563,55 @@ document.addEventListener('DOMContentLoaded', function() {
             importeSpan.textContent = '0.00 €';
         }
         
+        // Asegurarse de que sea draggable
+        nuevaLinea.setAttribute('draggable', 'true');
+        
+        // Asegurarse de que tenga el drag handle
+        if (!nuevaLinea.querySelector('.linea-factura-drag-handle')) {
+            const dragHandle = document.createElement('div');
+            dragHandle.className = 'linea-factura-drag-handle';
+            dragHandle.setAttribute('title', 'Arrastrar para reordenar');
+            dragHandle.textContent = '☰';
+            nuevaLinea.insertBefore(dragHandle, nuevaLinea.firstChild);
+        }
+        
         // Actualizar número de línea
         renumerarLineas();
         
-        // Añadir event listeners a la nueva línea
-        const cantidadInputNuevo = nuevaLinea.querySelector('.linea-cantidad');
-        const precioUnitarioInputNuevo2 = nuevaLinea.querySelector('.precio-unitario');
-        const descuentoInputNuevo2 = nuevaLinea.querySelector('.descuento-input');
-        const precioFinalInputNuevo2 = nuevaLinea.querySelector('.precio-final-input');
-        
-        if (cantidadInputNuevo) {
-            cantidadInputNuevo.addEventListener('input', function() {
-                calcularImporteLinea(nuevaLinea);
-            });
-        }
-        
-        if (precioUnitarioInputNuevo2) {
-            precioUnitarioInputNuevo2.addEventListener('input', function() {
-                calcularPrecioFinal(nuevaLinea);
-            });
-        }
-        
-        if (descuentoInputNuevo2) {
-            descuentoInputNuevo2.addEventListener('input', function() {
-                calcularPrecioFinal(nuevaLinea);
-            });
-        }
-        
-        if (precioFinalInputNuevo2) {
-            precioFinalInputNuevo2.addEventListener('input', function() {
-                calcularImporteLinea(nuevaLinea);
-            });
-        }
+        // Añadir event listeners usando la función centralizada
+        inicializarEventListenersLinea(nuevaLinea);
         
         // Botón eliminar
-        nuevaLinea.querySelector('.btn-eliminar-linea').addEventListener('click', function() {
-            if (container.querySelectorAll('.linea-factura-row').length > 1) {
-                nuevaLinea.remove();
-                renumerarLineas();
-                actualizarTotales();
-            } else {
-                alert('Debe haber al menos una línea en la factura');
-            }
-        });
+        const btnEliminarDuplicado = nuevaLinea.querySelector('.btn-eliminar-linea');
+        if (btnEliminarDuplicado) {
+            btnEliminarDuplicado.addEventListener('click', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                if (container.querySelectorAll('.linea-factura-row').length > 1) {
+                    nuevaLinea.remove();
+                    renumerarLineas();
+                    actualizarTotales();
+                    initDragAndDrop(); // Reinicializar drag and drop después de eliminar
+                    inicializarBotonesEliminar(); // Reinicializar botones eliminar
+                } else {
+                    alert('Debe haber al menos una línea en la factura');
+                }
+                return false;
+            });
+        }
         
         // Botón duplicar
-        nuevaLinea.querySelector('.btn-duplicar-linea').addEventListener('click', function() {
-            duplicarLineaFactura(this);
-        });
+        const btnDuplicarDuplicado = nuevaLinea.querySelector('.btn-duplicar-linea');
+        if (btnDuplicarDuplicado) {
+            btnDuplicarDuplicado.addEventListener('click', function() {
+                duplicarLineaFactura(this);
+            });
+        }
         
         // Mostrar botón eliminar
-        nuevaLinea.querySelector('.btn-eliminar-linea').style.display = 'block';
+        if (btnEliminarDuplicado) {
+            btnEliminarDuplicado.style.display = 'block';
+        }
         
         // Insertar después de la línea actual
         lineaRow.parentNode.insertBefore(nuevaLinea, lineaRow.nextSibling);
@@ -519,23 +621,198 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Actualizar totales
         actualizarTotales();
+        
+        // Reinicializar drag and drop
+        initDragAndDrop();
+        inicializarBotonesEliminar(); // Reinicializar botones eliminar
     };
     
-    // Event listeners para la primera línea
-    document.querySelectorAll('.linea-cantidad, .precio-unitario, .descuento-input').forEach(input => {
-        input.addEventListener('input', function() {
-            const lineaRow = input.closest('.linea-factura-row');
-            if (input.classList.contains('precio-unitario') || input.classList.contains('descuento-input')) {
-                calcularPrecioFinal(lineaRow);
-            } else {
+    // Función para inicializar event listeners de una línea
+    function inicializarEventListenersLinea(lineaRow) {
+        const cantidadInput = lineaRow.querySelector('.linea-cantidad');
+        const precioUnitarioInput = lineaRow.querySelector('.precio-unitario');
+        const descuentoInput = lineaRow.querySelector('.descuento-input');
+        const precioFinalInput = lineaRow.querySelector('.precio-final-input');
+        
+        if (cantidadInput) {
+            cantidadInput.addEventListener('input', function() {
                 calcularImporteLinea(lineaRow);
+            });
+        }
+        
+        if (precioUnitarioInput) {
+            precioUnitarioInput.addEventListener('input', function() {
+                calcularPrecioFinal(lineaRow);
+            });
+        }
+        
+        if (descuentoInput) {
+            descuentoInput.addEventListener('input', function() {
+                calcularPrecioFinal(lineaRow);
+            });
+        }
+        
+        if (precioFinalInput) {
+            precioFinalInput.addEventListener('input', function() {
+                calcularImporteLinea(lineaRow);
+            });
+        }
+        
+        // Calcular importe inicial si hay valores
+        if (precioUnitarioInput && precioUnitarioInput.value) {
+            calcularPrecioFinal(lineaRow);
+        } else if (cantidadInput && cantidadInput.value && precioUnitarioInput && precioUnitarioInput.value) {
+            calcularImporteLinea(lineaRow);
+        }
+    }
+    
+    // Función para inicializar drag and drop
+    let draggedElement = null;
+    function initDragAndDrop() {
+        const lineas = lineasContainer.querySelectorAll('.linea-factura-row');
+        
+        lineas.forEach(linea => {
+            // Asegurarse de que sea draggable
+            linea.setAttribute('draggable', 'true');
+            
+            // Asegurarse de que tenga el drag handle
+            if (!linea.querySelector('.linea-factura-drag-handle')) {
+                const dragHandle = document.createElement('div');
+                dragHandle.className = 'linea-factura-drag-handle';
+                dragHandle.setAttribute('title', 'Arrastrar para reordenar');
+                dragHandle.textContent = '☰';
+                linea.insertBefore(dragHandle, linea.firstChild);
             }
+            
+            // Solo añadir listeners de drag si no los tiene ya (evitar duplicados)
+            if (!linea.hasAttribute('data-drag-initialized')) {
+                linea.setAttribute('data-drag-initialized', 'true');
+                
+                // Añadir listeners de drag and drop
+                linea.addEventListener('dragstart', function(e) {
+                    draggedElement = this;
+                    this.style.opacity = '0.5';
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+                
+                linea.addEventListener('dragend', function() {
+                    this.style.opacity = '1';
+                    lineas.forEach(l => l.classList.remove('drag-over'));
+                });
+                
+                linea.addEventListener('dragover', function(e) {
+                    if (e.preventDefault) {
+                        e.preventDefault();
+                    }
+                    e.dataTransfer.dropEffect = 'move';
+                    if (this !== draggedElement) {
+                        this.classList.add('drag-over');
+                    }
+                    return false;
+                });
+                
+                linea.addEventListener('dragleave', function() {
+                    this.classList.remove('drag-over');
+                });
+                
+                linea.addEventListener('drop', function(e) {
+                    if (e.stopPropagation) {
+                        e.stopPropagation();
+                    }
+                    
+                    if (draggedElement !== this) {
+                        const allLineas = Array.from(lineasContainer.querySelectorAll('.linea-factura-row'));
+                        const draggedIndex = allLineas.indexOf(draggedElement);
+                        const targetIndex = allLineas.indexOf(this);
+                        
+                        if (draggedIndex < targetIndex) {
+                            lineasContainer.insertBefore(draggedElement, this.nextSibling);
+                        } else {
+                            lineasContainer.insertBefore(draggedElement, this);
+                        }
+                        
+                        renumerarLineas();
+                        inicializarBotonesEliminar(); // Reinicializar botones eliminar después de reordenar
+                        // Reinicializar event listeners de cálculo después de reordenar
+                        inicializarEventListenersLinea(draggedElement);
+                        inicializarEventListenersLinea(this);
+                    }
+                    
+                    this.classList.remove('drag-over');
+                    return false;
+                });
+            }
+            
+            // Asegurar que tenga los event listeners de cálculo
+            inicializarEventListenersLinea(linea);
         });
+    }
+    
+    // Inicializar drag and drop al cargar
+    initDragAndDrop();
+    
+    // Añadir event listeners a todos los botones eliminar existentes
+    function inicializarBotonesEliminar() {
+        const numLineas = lineasContainer.querySelectorAll('.linea-factura-row').length;
+        
+        document.querySelectorAll('.btn-eliminar-linea').forEach(btn => {
+            // Remover listeners anteriores si existen
+            const nuevoBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(nuevoBtn, btn);
+            
+            // Mostrar/ocultar botón según el número de líneas
+            if (numLineas > 1) {
+                nuevoBtn.style.display = 'block';
+            } else {
+                nuevoBtn.style.display = 'none';
+            }
+            
+            nuevoBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                const lineaRow = nuevoBtn.closest('.linea-factura-row');
+                if (lineaRow && lineasContainer.querySelectorAll('.linea-factura-row').length > 1) {
+                    lineaRow.remove();
+                    renumerarLineas();
+                    actualizarTotales();
+                    initDragAndDrop(); // Reinicializar drag and drop después de eliminar
+                    inicializarBotonesEliminar(); // Reinicializar botones eliminar
+                } else {
+                    alert('Debe haber al menos una línea en la factura');
+                }
+                return false;
+            });
+        });
+    }
+    
+    // Inicializar botones eliminar al cargar
+    inicializarBotonesEliminar();
+    
+    // Inicializar event listeners para todas las líneas existentes
+    document.querySelectorAll('.linea-factura-row').forEach(lineaRow => {
+        inicializarEventListenersLinea(lineaRow);
     });
     
     // Sistema de búsqueda de cliente
     const clienteSearch = document.getElementById('cliente_search');
     const clienteSelect = document.getElementById('cliente_id');
+    
+    // Si es factura rectificativa, cargar datos del cliente y calcular totales iniciales
+    {% if es_rectificativa is defined and es_rectificativa and factura_original %}
+    setTimeout(function() {
+        if (clienteSelect && clienteSelect.value) {
+            // Cargar datos del cliente automáticamente
+            cargarDatosCliente();
+        }
+        
+        // Calcular totales de las líneas prellenadas
+        document.querySelectorAll('.linea-factura-row').forEach(function(lineaRow) {
+            calcularPrecioFinal(lineaRow);
+            calcularImporteLinea(lineaRow);
+        });
+        actualizarTotales();
+    }, 200);
+    {% endif %}
     const clienteResults = document.getElementById('cliente_results');
     let clientes = Array.from(clienteSelect.options).slice(1).map(opt => ({
         id: opt.value,
@@ -1126,6 +1403,11 @@ document.addEventListener('DOMContentLoaded', function() {
     color: #495057;
 }
 
+.linea-factura-drag-handle-header {
+    min-width: 30px;
+    width: 30px;
+}
+
 .linea-factura-numero-header {
     font-weight: bold;
     min-width: 35px;
@@ -1164,6 +1446,35 @@ document.addEventListener('DOMContentLoaded', function() {
     padding: 8px;
     background: #f8f9fa;
     border-radius: 6px;
+}
+
+.linea-factura-drag-handle {
+    cursor: move;
+    color: #6c757d;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 30px;
+    width: 30px;
+    user-select: none;
+    padding: 4px;
+}
+
+.linea-factura-drag-handle:hover {
+    color: #495057;
+    background-color: #e9ecef;
+    border-radius: 4px;
+}
+
+.linea-factura-row.drag-over {
+    border: 2px dashed #007bff;
+    background-color: #e7f3ff;
+}
+
+.linea-factura-row.linea-texto {
+    background-color: #fff9e6;
+    border-left: 3px solid #ffc107;
 }
 
 .linea-factura-numero {

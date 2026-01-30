@@ -332,9 +332,26 @@
                 {% endif %}
                 {% elif factura %}
                     <p><strong>{{ factura.nombre }}</strong></p>
+                    {% if factura.cliente_id and factura.cliente %}
+                        {% if factura.cliente.direccion %}
+                        <p>{{ factura.cliente.direccion }}</p>
+                        {% endif %}
+                        {% set cp = factura.cliente.codigo_postal or '' %}
+                        {% set poblacion = factura.cliente.poblacion or '' %}
+                        {% set provincia = factura.cliente.provincia or '' %}
+                        {% if cp or poblacion or provincia %}
+                            <p>
+                                {% if cp %}{{ cp }}{% endif %}
+                                {% if cp and poblacion %}-{% endif %}
+                                {% if poblacion %}{{ poblacion }}{% endif %}
+                                {% if (cp or poblacion) and provincia %}-{% endif %}
+                                {% if provincia %}{{ provincia }}{% endif %}
+                            </p>
+                        {% endif %}
+                    {% endif %}
                     {% if factura.nif %}
                     <p><strong>NIF/CIF:</strong> {{ factura.nif }}</p>
-                {% endif %}
+                    {% endif %}
                 {% endif %}
             </div>
             <div class="datos-box">

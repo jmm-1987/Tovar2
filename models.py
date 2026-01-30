@@ -507,6 +507,11 @@ class Factura(db.Model):
     anticipo = db.Column(db.Numeric(10, 2), nullable=False, default=0)  # Importe del anticipo (con IVA incluido)
     es_anticipo = db.Column(db.Boolean, nullable=False, default=False)  # Indica si es una factura de anticipo
     
+    # Factura rectificativa
+    es_rectificativa = db.Column(db.Boolean, nullable=False, default=False)  # Indica si es una factura rectificativa
+    factura_rectificada_id = db.Column(db.Integer, db.ForeignKey('facturas.id'), nullable=True)  # ID de la factura que se rectifica
+    factura_rectificada = db.relationship('Factura', remote_side=[id], backref='rectificativas')  # Relación con la factura original
+    
     # Timestamp
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
     fecha_confirmacion = db.Column(db.DateTime)  # Fecha en que se recibió la huella

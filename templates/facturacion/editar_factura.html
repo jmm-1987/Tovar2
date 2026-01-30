@@ -7,7 +7,14 @@
     <form method="POST" id="facturaForm">
         <!-- Título y campos principales en la misma línea -->
         <div style="display: flex; align-items: flex-end; gap: 15px; margin-bottom: 10px; flex-wrap: wrap;">
-            <h2 style="margin: 0; flex: 0 0 auto;">Editar Factura</h2>
+            <h2 style="margin: 0; flex: 0 0 auto;">Editar Factura{% if factura.es_rectificativa %} (Rectificativa){% endif %}</h2>
+            {% if not factura.es_rectificativa and factura.pedido_id is none and factura.presupuesto_id is none %}
+            <a href="{{ url_for('facturacion.crear_factura_rectificativa', factura_id=factura.id) }}" 
+               class="btn btn-warning" 
+               style="padding: 8px 16px; background: #ffc107; color: #212529; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; margin-left: auto;">
+                🔄 Crear Factura Rectificativa
+            </a>
+            {% endif %}
             
             <div class="form-group" style="flex: 0 0 180px;">
                 <label for="fecha_expedicion">Fecha de Expedición *</label>
@@ -19,6 +26,9 @@
                 <select name="tipo_factura" id="tipo_factura" required class="form-control" style="width: 100%;">
                     <option value="F1" {% if factura.tipo_factura == 'F1' %}selected{% endif %}>F1 - Factura Completa</option>
                     <option value="F2" {% if factura.tipo_factura == 'F2' %}selected{% endif %}>F2 - Factura Simplificada</option>
+                    {% if factura.tipo_factura == 'R1' or factura.es_rectificativa %}
+                    <option value="R1" selected>R1 - Factura Rectificativa</option>
+                    {% endif %}
                 </select>
             </div>
             
@@ -98,6 +108,7 @@
         <h3 style="margin-top: 10px; margin-bottom: 8px; font-size: 1.1rem;">Líneas de la Factura</h3>
         <!-- Cabeceras de las columnas -->
         <div class="linea-factura-header">
+            <div class="linea-factura-drag-handle-header"></div>
             <div class="linea-factura-numero-header">#</div>
             <div class="linea-factura-campos-header">
                 <div class="header-col" style="flex: 1; min-width: 500px;">Descripción</div>
@@ -112,9 +123,21 @@
         </div>
         <div id="lineas-container">
             {% for linea in factura.lineas %}
-            <div class="linea-factura-row">
+            {% set es_linea_texto = (linea.cantidad == 0 or not linea.cantidad) and (not linea.precio_unitario or linea.precio_unitario == 0) and (not linea.importe or linea.importe == 0) %}
+            <div class="linea-factura-row {% if es_linea_texto %}linea-texto{% endif %}" draggable="true">
+                <div class="linea-factura-drag-handle" title="Arrastrar para reordenar">☰</div>
                 <div class="linea-factura-numero">#{{ loop.index }}</div>
                 <div class="linea-factura-campos">
+                    {% if es_linea_texto %}
+                    <input type="text" name="descripcion_linea[]" value="{{ linea.descripcion or '' }}" placeholder="Texto informativo..." required class="linea-campo-compact" style="flex: 1; min-width: 500px; font-style: italic;">
+                    <input type="hidden" name="cantidad[]" value="0" class="linea-cantidad">
+                    <input type="hidden" name="talla[]" value="">
+                    <input type="hidden" name="precio_unitario[]" value="0" class="precio-unitario">
+                    <input type="hidden" name="descuento[]" value="0" class="descuento-input">
+                    <input type="hidden" name="precio_final[]" value="0" class="precio-final-input">
+                    <span class="importe-linea" style="flex: 0 0 100px; padding: 8px; text-align: right; font-weight: bold; color: #6c757d;">-</span>
+                    <button type="button" class="btn-duplicar-linea" onclick="duplicarLineaFactura(this)" title="Duplicar línea" style="padding: 4px 8px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; flex: 0 0 30px; font-size: 0.9rem; display: none;">📋</button>
+                    {% else %}
                     <input type="text" name="descripcion_linea[]" value="{{ linea.descripcion }}" placeholder="Descripción" required class="linea-campo-compact" style="flex: 1; min-width: 500px;">
                     <input type="number" name="cantidad[]" value="{{ linea.cantidad }}" placeholder="Cant." step="0.01" required class="linea-campo-compact linea-cantidad" style="flex: 0 0 80px; width: 80px;">
                     <input type="text" name="talla[]" value="{{ linea.talla or '' }}" placeholder="Talla" class="linea-campo-compact" style="flex: 0 0 80px; width: 80px;">
@@ -122,14 +145,17 @@
                     <input type="number" name="descuento[]" value="{{ linea.descuento or 0 }}" class="linea-campo-compact descuento-input" step="0.01" min="0" max="100" placeholder="Desc. %" title="Descuento (%)" style="flex: 0 0 80px; width: 80px;">
                     <input type="number" name="precio_final[]" value="{{ linea.precio_final or '' }}" class="linea-campo-compact precio-final-input" step="0.01" placeholder="P. Final" title="Precio Final" readonly style="flex: 0 0 100px; width: 100px; background: #f0f0f0;">
                     <span class="importe-linea" style="flex: 0 0 100px; padding: 8px; text-align: right; font-weight: bold;">{{ "%.2f"|format(linea.importe) }} €</span>
+                    <button type="button" class="btn-duplicar-linea" onclick="duplicarLineaFactura(this)" title="Duplicar línea (mantiene todo excepto talla y cantidad)" style="padding: 4px 8px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; flex: 0 0 30px; font-size: 0.9rem;">📋</button>
+                    {% endif %}
                     <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; {% if factura.lineas|length > 1 %}display: block;{% else %}display: none;{% endif %} flex: 0 0 30px;">×</button>
                 </div>
             </div>
             {% endfor %}
         </div>
         
-        <div style="margin-top: 15px;">
+        <div style="margin-top: 15px; display: flex; gap: 10px;">
             <button type="button" id="agregar-linea" class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.85rem;">+ Agregar Línea</button>
+            <button type="button" id="agregar-linea-texto" class="btn btn-info" style="padding: 8px 16px; font-size: 0.85rem; background-color: #17a2b8; border-color: #17a2b8;">+ Agregar Línea de Texto</button>
         </div>
         
         <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 6px; max-width: 400px;">
@@ -238,6 +264,10 @@ document.addEventListener('DOMContentLoaded', function() {
         let baseImponible = 0;
         document.querySelectorAll('.importe-linea').forEach(span => {
             let texto = span.textContent.replace(' €', '').trim();
+            // Ignorar líneas de texto (que muestran "-")
+            if (texto === '-' || texto === '') {
+                return;
+            }
             // Manejar números negativos - el texto puede tener el signo menos
             // parseFloat maneja correctamente los números negativos
             const valor = parseFloat(texto) || 0;
@@ -391,7 +421,63 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
+        // Asegurarse de que sea draggable
+        nuevaLinea.setAttribute('draggable', 'true');
+        
+        // Asegurarse de que tenga el drag handle
+        if (!nuevaLinea.querySelector('.linea-factura-drag-handle')) {
+            const dragHandle = document.createElement('div');
+            dragHandle.className = 'linea-factura-drag-handle';
+            dragHandle.setAttribute('title', 'Arrastrar para reordenar');
+            dragHandle.textContent = '☰';
+            nuevaLinea.insertBefore(dragHandle, nuevaLinea.firstChild);
+        }
+        
         lineasContainer.appendChild(nuevaLinea);
+        renumerarLineas();
+        initDragAndDrop();
+        inicializarBotonesEliminar();
+    });
+    
+    // Agregar línea de texto
+    document.getElementById('agregar-linea-texto').addEventListener('click', function() {
+        lineaCount++;
+        const nuevaLineaTexto = document.createElement('div');
+        nuevaLineaTexto.className = 'linea-factura-row linea-texto';
+        nuevaLineaTexto.setAttribute('draggable', 'true');
+        nuevaLineaTexto.innerHTML = `
+            <div class="linea-factura-drag-handle" title="Arrastrar para reordenar">☰</div>
+            <div class="linea-factura-numero">#${lineaCount}</div>
+            <div class="linea-factura-campos">
+                <input type="text" name="descripcion_linea[]" placeholder="Texto informativo..." required class="linea-campo-compact" style="flex: 1; min-width: 500px; font-style: italic;">
+                <input type="hidden" name="cantidad[]" value="0">
+                <input type="hidden" name="talla[]" value="">
+                <input type="hidden" name="precio_unitario[]" value="0">
+                <input type="hidden" name="descuento[]" value="0">
+                <input type="hidden" name="precio_final[]" value="0">
+                <span class="importe-linea" style="flex: 0 0 100px; padding: 8px; text-align: right; font-weight: bold; color: #6c757d;">-</span>
+                <button type="button" class="btn-duplicar-linea" onclick="duplicarLineaFactura(this)" title="Duplicar línea" style="padding: 4px 8px; background: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; flex: 0 0 30px; font-size: 0.9rem; display: none;">📋</button>
+                <button type="button" class="btn-eliminar-linea" style="padding: 4px 8px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; display: block; flex: 0 0 30px;">×</button>
+            </div>
+        `;
+        
+        // Botón eliminar
+        nuevaLineaTexto.querySelector('.btn-eliminar-linea').addEventListener('click', function() {
+            if (lineasContainer.querySelectorAll('.linea-factura-row').length > 1) {
+                nuevaLineaTexto.remove();
+                renumerarLineas();
+                actualizarTotales();
+                initDragAndDrop();
+                inicializarBotonesEliminar();
+            } else {
+                alert('Debe haber al menos una línea en la factura');
+            }
+        });
+        
+        lineasContainer.appendChild(nuevaLineaTexto);
+        renumerarLineas();
+        initDragAndDrop();
+        inicializarBotonesEliminar();
     });
     
     // Renumerar líneas
@@ -446,6 +532,117 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
     });
+    
+    // Función para inicializar drag and drop
+    let draggedElement = null;
+    function initDragAndDrop() {
+        const lineas = lineasContainer.querySelectorAll('.linea-factura-row');
+        
+        lineas.forEach(linea => {
+            // Asegurarse de que sea draggable
+            linea.setAttribute('draggable', 'true');
+            
+            // Asegurarse de que tenga el drag handle
+            if (!linea.querySelector('.linea-factura-drag-handle')) {
+                const dragHandle = document.createElement('div');
+                dragHandle.className = 'linea-factura-drag-handle';
+                dragHandle.setAttribute('title', 'Arrastrar para reordenar');
+                dragHandle.textContent = '☰';
+                linea.insertBefore(dragHandle, linea.firstChild);
+            }
+            
+            // Solo añadir listeners de drag si no los tiene ya
+            if (!linea.hasAttribute('data-drag-initialized')) {
+                linea.setAttribute('data-drag-initialized', 'true');
+                
+                linea.addEventListener('dragstart', function(e) {
+                    draggedElement = this;
+                    this.style.opacity = '0.5';
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+                
+                linea.addEventListener('dragend', function() {
+                    this.style.opacity = '1';
+                    lineas.forEach(l => l.classList.remove('drag-over'));
+                });
+                
+                linea.addEventListener('dragover', function(e) {
+                    if (e.preventDefault) {
+                        e.preventDefault();
+                    }
+                    e.dataTransfer.dropEffect = 'move';
+                    if (this !== draggedElement) {
+                        this.classList.add('drag-over');
+                    }
+                    return false;
+                });
+                
+                linea.addEventListener('dragleave', function() {
+                    this.classList.remove('drag-over');
+                });
+                
+                linea.addEventListener('drop', function(e) {
+                    if (e.stopPropagation) {
+                        e.stopPropagation();
+                    }
+                    
+                    if (draggedElement !== this) {
+                        const allLineas = Array.from(lineasContainer.querySelectorAll('.linea-factura-row'));
+                        const draggedIndex = allLineas.indexOf(draggedElement);
+                        const targetIndex = allLineas.indexOf(this);
+                        
+                        if (draggedIndex < targetIndex) {
+                            lineasContainer.insertBefore(draggedElement, this.nextSibling);
+                        } else {
+                            lineasContainer.insertBefore(draggedElement, this);
+                        }
+                        
+                        renumerarLineas();
+                        inicializarBotonesEliminar();
+                    }
+                    
+                    this.classList.remove('drag-over');
+                    return false;
+                });
+            }
+        });
+    }
+    
+    // Función para inicializar botones eliminar
+    function inicializarBotonesEliminar() {
+        const numLineas = lineasContainer.querySelectorAll('.linea-factura-row').length;
+        
+        document.querySelectorAll('.btn-eliminar-linea').forEach(btn => {
+            const nuevoBtn = btn.cloneNode(true);
+            btn.parentNode.replaceChild(nuevoBtn, btn);
+            
+            if (numLineas > 1) {
+                nuevoBtn.style.display = 'block';
+            } else {
+                nuevoBtn.style.display = 'none';
+            }
+            
+            nuevoBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                e.preventDefault();
+                const lineaRow = nuevoBtn.closest('.linea-factura-row');
+                if (lineaRow && lineasContainer.querySelectorAll('.linea-factura-row').length > 1) {
+                    lineaRow.remove();
+                    renumerarLineas();
+                    actualizarTotales();
+                    initDragAndDrop();
+                    inicializarBotonesEliminar();
+                } else {
+                    alert('Debe haber al menos una línea en la factura');
+                }
+                return false;
+            });
+        });
+    }
+    
+    // Inicializar drag and drop y botones eliminar al cargar
+    initDragAndDrop();
+    inicializarBotonesEliminar();
     
     // Cargar datos del cliente
     window.cargarDatosCliente = function() {
@@ -537,6 +734,35 @@ document.addEventListener('DOMContentLoaded', function() {
     padding: 8px;
     background: #f8f9fa;
     border-radius: 6px;
+}
+
+.linea-factura-drag-handle {
+    cursor: move;
+    color: #6c757d;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 30px;
+    width: 30px;
+    user-select: none;
+    padding: 4px;
+}
+
+.linea-factura-drag-handle:hover {
+    color: #495057;
+    background-color: #e9ecef;
+    border-radius: 4px;
+}
+
+.linea-factura-row.drag-over {
+    border: 2px dashed #007bff;
+    background-color: #e7f3ff;
+}
+
+.linea-factura-row.linea-texto {
+    background-color: #fff9e6;
+    border-left: 3px solid #ffc107;
 }
 
 .linea-factura-numero {

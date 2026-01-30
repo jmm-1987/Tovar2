@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% if es_albaran is defined and es_albaran %}Albarán{% else %}Factura{% endif %} {{ factura.serie }}-{{ factura.numero }}</title>
+    <title>{% if es_albaran is defined and es_albaran %}Albarán{% elif factura.es_rectificativa %}Factura Rectificativa{% else %}Factura{% endif %} {{ factura.serie }}-{{ factura.numero }}</title>
     <style type="text/css">
         * {
             margin: 0;
@@ -289,7 +289,7 @@
                 {% endif %}
             </div>
             <div class="factura-title">
-                <h1>{% if es_albaran is defined and es_albaran %}ALBARÁN{% else %}FACTURA{% endif %}</h1>
+                <h1>{% if es_albaran is defined and es_albaran %}ALBARÁN{% elif factura.es_rectificativa %}FACTURA RECTIFICATIVA{% else %}FACTURA{% endif %}</h1>
             </div>
             <div class="factura-info">
                 <p><strong>Weark Custom Tovar Sl</strong></p>
@@ -302,9 +302,12 @@
 
         <div class="datos-section">
             <div class="datos-box">
-                <h3>Datos del {% if es_albaran is defined and es_albaran %}Albarán{% else %}Factura{% endif %}</h3>
+                <h3>Datos del {% if es_albaran is defined and es_albaran %}Albarán{% elif factura.es_rectificativa %}Factura Rectificativa{% else %}Factura{% endif %}</h3>
                 <p><strong>Número:</strong> {{ factura.serie }}-{{ factura.numero }}</p>
                 <p><strong>Fecha:</strong> {{ factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else 'N/A' }}</p>
+                {% if factura.es_rectificativa and factura.factura_rectificada %}
+                <p><strong>Rectifica a:</strong> {{ factura.factura_rectificada.serie }}-{{ factura.factura_rectificada.numero }} ({{ factura.factura_rectificada.fecha_expedicion.strftime('%d/%m/%Y') if factura.factura_rectificada.fecha_expedicion else 'N/A' }})</p>
+                {% endif %}
                 {% if pedido %}
                 <p><strong>Pedido:</strong> #{{ pedido.id }}{% if pedido.presupuesto_id %} (Presupuesto #{{ pedido.presupuesto_id }}){% endif %}</p>
                 {% endif %}
@@ -391,16 +394,28 @@
         
         
         {% if factura.lineas %}
+        {# Verificar si hay algún descuento mayor que 0 en alguna línea #}
+        {% set hay_descuentos = False %}
+        {% for linea_check in factura.lineas %}
+            {% set descuento_check = (linea_check.descuento if linea_check.descuento else 0)|float %}
+            {% if descuento_check > 0 %}
+                {% set hay_descuentos = True %}
+            {% endif %}
+        {% endfor %}
         <table class="lineas-table">
             <thead>
                 <tr>
-                    <th style="width: 48%;">Descripción</th>
+                    <th style="width: {% if hay_descuentos and not (es_albaran is defined and es_albaran) %}48%{% elif not (es_albaran is defined and es_albaran) %}52%{% else %}60%{% endif %};">Descripción</th>
                     <th style="width: 7%; text-align: center;">Cantidad</th>
                     <th style="width: 8%; text-align: center;">Talla</th>
                     {% if not (es_albaran is defined and es_albaran) %}
                     <th style="width: 10%; text-align: right;">Precio Unit.</th>
+                    {% if hay_descuentos %}
                     <th style="width: 8%; text-align: right;">Descuento</th>
                     <th style="width: 10%; text-align: right;">Precio Final</th>
+                    {% else %}
+                    <th style="width: 18%; text-align: right;">Precio Final</th>
+                    {% endif %}
                     <th style="width: 9%; text-align: right;">Total</th>
                     {% endif %}
                 </tr>
@@ -414,6 +429,7 @@
                 {% set precio_unit = precio_unitario_val|float %}
                 {% set cantidad = cantidad_val|float %}
                 {% set descuento = descuento_val|float %}
+                {% set es_linea_texto = cantidad == 0 and (not precio_unitario_val or precio_unitario_val == 0) %}
                 {% if precio_final_val %}
                     {% set precio_final = precio_final_val|float %}
                 {% else %}
@@ -442,16 +458,24 @@
                     {% endif %}
                 {% endif %}
                 <tr>
+                    {% if es_linea_texto %}
+                        {% if es_albaran is defined and es_albaran %}
+                        <td colspan="3" style="font-style: italic; color: #666;">{{ linea.descripcion }}</td>
+                        {% else %}
+                        <td colspan="{% if hay_descuentos %}7{% else %}6{% endif %}" style="font-style: italic; color: #666;">{{ linea.descripcion }}</td>
+                        {% endif %}
+                    {% else %}
                     <td>{{ linea.descripcion }}</td>
                     <td style="text-align: center;">{{ "%.2f"|format(cantidad) }}</td>
                     <td style="text-align: center;">{{ talla_linea or '-' }}</td>
                     {% if not (es_albaran is defined and es_albaran) %}
                     <td style="text-align: right;">{{ "%.2f"|format(precio_unit) }} €</td>
+                    {% if hay_descuentos %}
                     <td style="text-align: right;">
                         {% if descuento > 0 %}
                             <span style="color: #d32f2f; font-weight: bold;">{{ "%.0f"|format(descuento) }}%</span>
                         {% else %}
-                            <span style="color: #999;">0%</span>
+                            <span style="color: #999;">-</span>
                         {% endif %}
                     </td>
                     <td style="text-align: right;">
@@ -461,7 +485,11 @@
                             <span>{{ "%.2f"|format(precio_unit) }} €</span>
                         {% endif %}
                     </td>
+                    {% else %}
+                    <td style="text-align: right;">{{ "%.2f"|format(precio_unit) }} €</td>
+                    {% endif %}
                     <td style="text-align: right; font-weight: bold;">{{ "%.2f"|format(total_linea|float) }} €</td>
+                    {% endif %}
                     {% endif %}
                 </tr>
                 {% endfor %}

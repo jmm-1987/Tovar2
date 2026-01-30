@@ -1210,6 +1210,241 @@ def nueva_factura():
     fecha_hoy = datetime.now().strftime('%Y-%m-%d')
     return render_template('facturacion/nueva_factura.html', clientes=clientes, comerciales=comerciales, fecha_hoy=fecha_hoy)
 
+@facturacion_bp.route('/facturacion/factura/<int:factura_id>/rectificativa', methods=['GET', 'POST'])
+@login_required
+@not_usuario_required
+def crear_factura_rectificativa(factura_id):
+    """Crear una factura rectificativa desde una factura directa"""
+    factura_original = Factura.query.get_or_404(factura_id)
+    
+    # Solo permitir crear rectificativas desde facturas directas (sin pedido_id ni presupuesto_id)
+    if factura_original.pedido_id is not None or factura_original.presupuesto_id is not None:
+        flash('Solo se pueden crear facturas rectificativas desde facturas directas', 'error')
+        return redirect(url_for('facturacion.facturacion', tipo_vista='formalizadas'))
+    
+    if request.method == 'POST':
+        try:
+            # Obtener datos del formulario
+            fecha_expedicion_str = request.form.get('fecha_expedicion', '')
+            tipo_factura = request.form.get('tipo_factura', 'R1')  # R1 = Rectificativa completa, R2 = Rectificativa simplificada
+            descripcion = request.form.get('descripcion', '')
+            nombre_cliente = request.form.get('nombre_cliente', '')
+            nif_cliente = request.form.get('nif_cliente', '')
+            direccion_cliente = request.form.get('direccion_cliente', '')
+            poblacion_cliente = request.form.get('poblacion_cliente', '')
+            provincia_cliente = request.form.get('provincia_cliente', '')
+            codigo_postal_cliente = request.form.get('codigo_postal_cliente', '')
+            telefono_cliente = request.form.get('telefono_cliente', '')
+            email_cliente = request.form.get('email_cliente', '')
+            cliente_id = request.form.get('cliente_id', '')
+            descuento_pronto_pago = request.form.get('descuento_pronto_pago', '0') or '0'
+            tipo_iva = request.form.get('tipo_iva', '21') or '21'
+            
+            # Obtener líneas de factura
+            descripciones = request.form.getlist('descripcion_linea[]')
+            cantidades = request.form.getlist('cantidad[]')
+            tallas = request.form.getlist('talla[]')
+            precios_unitarios = request.form.getlist('precio_unitario[]')
+            descuentos = request.form.getlist('descuento[]')
+            precios_finales = request.form.getlist('precio_final[]')
+            
+            if not fecha_expedicion_str:
+                flash('La fecha de expedición es obligatoria', 'error')
+                return redirect(url_for('facturacion.crear_factura_rectificativa', factura_id=factura_id))
+            
+            if not nombre_cliente:
+                flash('El nombre del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.crear_factura_rectificativa', factura_id=factura_id))
+            
+            # Procesar fecha
+            fecha_expedicion = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d').date()
+            
+            # Procesar tipo de IVA
+            tipo_iva_decimal = Decimal(str(tipo_iva))
+            
+            # Procesar descuento por pronto pago
+            descuento_pronto_pago_decimal = Decimal('0')
+            try:
+                descuento_pronto_pago_decimal = Decimal(str(descuento_pronto_pago))
+            except:
+                descuento_pronto_pago_decimal = Decimal('0')
+            
+            # Procesar líneas de factura (con valores negativos para rectificativa)
+            lineas_data = []
+            base_imponible = Decimal('0')
+            
+            for i in range(len(descripciones)):
+                if not descripciones[i]:
+                    continue
+                
+                cantidad = Decimal(str(cantidades[i])) if cantidades[i] else Decimal('0')
+                precio_unitario = Decimal(str(precios_unitarios[i])) if precios_unitarios[i] else Decimal('0')
+                descuento = Decimal(str(descuentos[i])) if descuentos[i] else Decimal('0')
+                precio_final = Decimal(str(precios_finales[i])) if precios_finales[i] else Decimal('0')
+                
+                # Para factura rectificativa, los valores deben ser negativos
+                cantidad = -abs(cantidad)
+                precio_unitario = -abs(precio_unitario)
+                precio_final = -abs(precio_final)
+                
+                # Calcular importe (negativo)
+                importe = precio_final * abs(cantidad)
+                base_imponible += importe
+                
+                lineas_data.append({
+                    'descripcion': descripciones[i],
+                    'cantidad': cantidad,
+                    'talla': tallas[i] if i < len(tallas) else '',
+                    'precio_unitario': precio_unitario,
+                    'descuento': descuento,
+                    'precio_final': precio_final,
+                    'importe': importe
+                })
+            
+            if not lineas_data:
+                flash('Debe añadir al menos una línea a la factura', 'error')
+                return redirect(url_for('facturacion.crear_factura_rectificativa', factura_id=factura_id))
+            
+            # Calcular IVA y total (valores negativos)
+            base_imponible = abs(base_imponible)  # Tomar valor absoluto para cálculos
+            iva = base_imponible * (tipo_iva_decimal / Decimal('100'))
+            subtotal = base_imponible + iva
+            
+            # Aplicar descuento por pronto pago
+            if descuento_pronto_pago_decimal > 0:
+                descuento_aplicado = subtotal * (descuento_pronto_pago_decimal / Decimal('100'))
+                importe_total = subtotal - descuento_aplicado
+            else:
+                importe_total = subtotal
+            
+            # El importe total debe ser negativo para la rectificativa
+            importe_total = -importe_total
+            
+            # Obtener siguiente número de factura rectificativa
+            serie = factura_original.serie
+            numero = obtener_siguiente_numero_factura(fecha_expedicion)
+            
+            # Procesar cliente_id
+            cliente_id_int = None
+            if cliente_id:
+                try:
+                    cliente_id_int = int(cliente_id)
+                except:
+                    cliente_id_int = None
+            
+            # Crear factura rectificativa
+            factura_rectificativa = Factura(
+                pedido_id=None,
+                cliente_id=cliente_id_int,
+                serie=serie,
+                numero=numero,
+                fecha_expedicion=fecha_expedicion,
+                tipo_factura=tipo_factura,  # R1 o R2
+                descripcion=descripcion or f'Rectificativa de factura {factura_original.serie}-{factura_original.numero}',
+                nif=nif_cliente,
+                nombre=nombre_cliente,
+                importe_total=importe_total,
+                descuento_pronto_pago=descuento_pronto_pago_decimal,
+                tipo_iva=tipo_iva_decimal,
+                estado='pendiente',
+                es_rectificativa=True,
+                factura_rectificada_id=factura_id
+            )
+            
+            db.session.add(factura_rectificativa)
+            db.session.flush()
+            
+            # Crear líneas de factura rectificativa (con valores negativos)
+            for linea_data in lineas_data:
+                linea_factura = LineaFactura(
+                    factura_id=factura_rectificativa.id,
+                    linea_pedido_id=None,
+                    descripcion=linea_data['descripcion'],
+                    cantidad=linea_data['cantidad'],
+                    talla=linea_data.get('talla'),
+                    precio_unitario=linea_data['precio_unitario'],
+                    descuento=linea_data['descuento'],
+                    precio_final=linea_data['precio_final'],
+                    importe=linea_data['importe']
+                )
+                db.session.add(linea_factura)
+            
+            factura_rectificativa.estado = 'pendiente'
+            db.session.commit()
+            flash(f'Factura rectificativa {factura_rectificativa.serie}-{factura_rectificativa.numero} creada correctamente', 'success')
+            return redirect(url_for('facturacion.editar_factura', factura_id=factura_rectificativa.id))
+        
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al crear la factura rectificativa: {str(e)}', 'error')
+            return redirect(url_for('facturacion.crear_factura_rectificativa', factura_id=factura_id))
+    
+    # GET: mostrar formulario de factura rectificativa prellenado con datos de la factura original
+    clientes = Cliente.query.order_by(Cliente.nombre).all()
+    comerciales = []  # No necesario para rectificativas
+    
+    # Obtener cliente completo de la factura original
+    cliente_original = None
+    if factura_original.cliente_id:
+        cliente_original = Cliente.query.get(factura_original.cliente_id)
+    
+    # Preparar líneas con valores negativos
+    lineas_rectificativas = []
+    for linea in factura_original.lineas:
+        lineas_rectificativas.append({
+            'descripcion': linea.descripcion,
+            'cantidad': -abs(Decimal(str(linea.cantidad)) if linea.cantidad else Decimal('0')),
+            'talla': linea.talla or '',
+            'precio_unitario': -abs(Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0')),
+            'descuento': Decimal(str(linea.descuento)) if linea.descuento else Decimal('0'),
+            'precio_final': -abs(Decimal(str(linea.precio_final)) if linea.precio_final else Decimal('0')),
+            'importe': -abs(Decimal(str(linea.importe)) if linea.importe else Decimal('0'))
+        })
+    
+    fecha_hoy = datetime.now().strftime('%Y-%m-%d')
+    
+    # Preparar datos para usar el mismo template que nueva_factura.html
+    # Prellenar líneas con valores negativos de la factura original
+    lineas_prellenadas = []
+    for linea in factura_original.lineas:
+        cantidad_negativa = -abs(Decimal(str(linea.cantidad)) if linea.cantidad else Decimal('0'))
+        precio_unitario_negativo = -abs(Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0'))
+        precio_final_negativo = -abs(Decimal(str(linea.precio_final)) if linea.precio_final else Decimal('0'))
+        importe_negativo = -abs(Decimal(str(linea.importe)) if linea.importe else Decimal('0'))
+        
+        lineas_prellenadas.append({
+            'descripcion': linea.descripcion,
+            'cantidad': cantidad_negativa,
+            'talla': linea.talla or '',
+            'precio_unitario': precio_unitario_negativo,
+            'descuento': Decimal(str(linea.descuento)) if linea.descuento else Decimal('0'),
+            'precio_final': precio_final_negativo,
+            'importe': importe_negativo
+        })
+    
+    # Formatear fecha_expedicion como string para evitar problemas en el template
+    fecha_expedicion_str = None
+    if factura_original.fecha_expedicion:
+        try:
+            if isinstance(factura_original.fecha_expedicion, str):
+                fecha_expedicion_str = factura_original.fecha_expedicion
+            elif hasattr(factura_original.fecha_expedicion, 'strftime'):
+                fecha_expedicion_str = factura_original.fecha_expedicion.strftime('%d/%m/%Y')
+            else:
+                fecha_expedicion_str = str(factura_original.fecha_expedicion)
+        except Exception:
+            fecha_expedicion_str = str(factura_original.fecha_expedicion) if factura_original.fecha_expedicion else 'N/A'
+    
+    return render_template('facturacion/nueva_factura.html', 
+                         factura_original=factura_original,
+                         fecha_expedicion_str=fecha_expedicion_str,
+                         cliente_original=cliente_original,
+                         clientes=clientes,
+                         comerciales=comerciales,
+                         fecha_hoy=fecha_hoy,
+                         es_rectificativa=True,
+                         lineas_prellenadas=lineas_prellenadas)
+
 @facturacion_bp.route('/facturacion/factura/<int:factura_id>/editar', methods=['GET', 'POST'])
 @login_required
 @not_usuario_required
@@ -1888,7 +2123,8 @@ def preparar_datos_imprimir_factura(factura_id):
         joinedload(Factura.cliente),  # Cliente directo de la factura
         joinedload(Factura.pedido).joinedload(Pedido.cliente),
         joinedload(Factura.pedido).joinedload(Pedido.presupuesto).joinedload(Presupuesto.cliente),
-        joinedload(Factura.presupuesto).joinedload(Presupuesto.cliente)
+        joinedload(Factura.presupuesto).joinedload(Presupuesto.cliente),
+        joinedload(Factura.factura_rectificada)  # Factura original que se rectifica
     ).get_or_404(factura_id)
     
     pedido = factura.pedido
@@ -2182,7 +2418,8 @@ def preparar_datos_imprimir_albaran(factura_id=None, pedido_id=None):
     
     if factura_id:
         # Si tenemos factura_id, obtener factura y pedido
-        factura = Factura.query.get_or_404(factura_id)
+        from sqlalchemy.orm import joinedload
+        factura = Factura.query.options(joinedload(Factura.cliente)).get_or_404(factura_id)
         pedido = factura.pedido
         presupuesto = factura.presupuesto
         lineas = factura.lineas
@@ -2544,7 +2781,6 @@ def facturar_albaranes():
         cliente = Cliente.query.get_or_404(cliente_id)
         
         # Obtener albaranes pendientes del cliente (por NIF)
-        from sqlalchemy import and_
         albaranes = Factura.query.filter(
             and_(
                 Factura.estado == 'pendiente',
@@ -2566,7 +2802,17 @@ def facturar_albaranes():
                              fecha_hoy=fecha_hoy)
     
     # GET: mostrar formulario de selección de cliente
-    clientes = Cliente.query.order_by(Cliente.nombre).all()
+    # Solo mostrar clientes que tengan albaranes pendientes
+    clientes = Cliente.query.join(
+        Factura, Cliente.nif == Factura.nif
+    ).filter(
+        and_(
+            Factura.estado == 'pendiente',
+            Factura.presupuesto_id.is_(None),
+            Factura.pedido_id.is_(None),
+            Factura.numero.like('A%_%')
+        )
+    ).distinct().order_by(Cliente.nombre).all()
     return render_template('facturacion/seleccionar_cliente_albaranes.html', clientes=clientes)
 
 @facturacion_bp.route('/facturacion/facturar_albaranes/procesar', methods=['POST'])
