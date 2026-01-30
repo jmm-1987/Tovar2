@@ -8,7 +8,7 @@
 <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 6px; padding: 15px; margin-bottom: 20px;">
     <h3 style="margin: 0 0 10px 0; color: #856404;">📋 Factura Original a Rectificar</h3>
     <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 0.9rem;">
-        <div><strong>Número:</strong> {{ factura_original.serie }}-{{ factura_original.numero }}</div>
+        <div><strong>Numero:</strong> {{ factura_original.serie }}-{{ factura_original.numero }}</div>
         <div><strong>Fecha:</strong> {{ fecha_expedicion_str if fecha_expedicion_str else 'N/A' }}</div>
         <div><strong>Cliente:</strong> {{ factura_original.nombre }}</div>
         <div><strong>Total Original:</strong> {{ "%.2f"|format(factura_original.importe_total) }} €</div>
