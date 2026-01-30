@@ -4,11 +4,13 @@ __pycache__/
 *.so
 .Python
 instance/
-.db
-.db-shm
-.db-wal
-.sqlite
-.sqlite3
+instance/pedidos.db
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+pedidos.db
 .env
 venv/
 ENV/
@@ -17,4 +19,4 @@ env/
 static/uploads/
 *.log
 .vscode/launch.json
-Tovar2/
+
