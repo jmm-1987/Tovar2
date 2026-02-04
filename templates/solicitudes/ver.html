@@ -108,6 +108,7 @@
             <a href="{{ url_for('solicitudes.editar_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-warning" style="padding: 6px 12px; font-size: 0.85rem;">Editar</a>
             <a href="{{ url_for('solicitudes.descargar_pdf_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-success" target="_blank" style="padding: 6px 12px; font-size: 0.85rem;">📄 PDF</a>
             <a href="{{ url_for('solicitudes.descargar_pdf_detallado_solicitud', solicitud_id=solicitud.id) }}" class="btn" target="_blank" style="padding: 6px 12px; font-size: 0.85rem; background: #17a2b8; color: white; text-decoration: none; border-radius: 4px;">📋 Det.</a>
+            <a href="{{ url_for('solicitudes.descargar_albaran_solicitud', solicitud_id=solicitud.id) }}" class="btn" target="_blank" style="padding: 6px 12px; font-size: 0.85rem; background: #28a745; color: white; text-decoration: none; border-radius: 4px;">📦 Albarán</a>
             <a href="{{ url_for('solicitudes.descargar_hoja_trabajo_solicitud', solicitud_id=solicitud.id) }}" class="btn" target="_blank" style="padding: 6px 12px; font-size: 0.85rem; background: #6c757d; color: white; text-decoration: none; border-radius: 4px;">📋 Hoja Trabajo</a>
         </div>
     </div>

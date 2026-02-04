@@ -117,6 +117,7 @@ header {
                         <a href="{{ url_for('solicitudes.editar_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-sm btn-secondary" style="padding: 4px 8px; font-size: 0.75rem; white-space: nowrap;">Editar</a>
                         <a href="{{ url_for('solicitudes.descargar_pdf_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-sm" style="padding: 4px 8px; font-size: 0.75rem; background: #dc3545; color: white; text-decoration: none; border-radius: 4px; white-space: nowrap;" target="_blank" title="Descargar PDF">📄 PDF</a>
                         <a href="{{ url_for('solicitudes.descargar_pdf_detallado_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-sm" style="padding: 4px 8px; font-size: 0.75rem; background: #17a2b8; color: white; text-decoration: none; border-radius: 4px; white-space: nowrap;" target="_blank" title="Descargar PDF Detallado">📋 Det.</a>
+                        <a href="{{ url_for('solicitudes.descargar_albaran_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-sm" style="padding: 4px 8px; font-size: 0.75rem; background: #28a745; color: white; text-decoration: none; border-radius: 4px; white-space: nowrap;" target="_blank" title="Descargar Albarán">📦 Alb</a>
                     </div>
                 </td>
             </tr>

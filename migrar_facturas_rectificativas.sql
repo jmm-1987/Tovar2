@@ -7,3 +7,4 @@ ALTER TABLE facturas ADD COLUMN es_rectificativa INTEGER DEFAULT 0 NOT NULL;
 -- Añadir columna factura_rectificada_id (Foreign Key a la factura original)
 ALTER TABLE facturas ADD COLUMN factura_rectificada_id INTEGER;
 
+
