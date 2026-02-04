@@ -659,9 +659,16 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // Calcular importe inicial si hay valores
+        // Si hay precio unitario, calcular precio final primero
         if (precioUnitarioInput && precioUnitarioInput.value) {
             calcularPrecioFinal(lineaRow);
-        } else if (cantidadInput && cantidadInput.value && precioUnitarioInput && precioUnitarioInput.value) {
+        } 
+        // Si hay precio final establecido directamente (como en líneas prellenadas), calcular importe directamente
+        else if (precioFinalInput && precioFinalInput.value && cantidadInput && cantidadInput.value) {
+            calcularImporteLinea(lineaRow);
+        }
+        // Si hay cantidad y precio unitario, calcular importe
+        else if (cantidadInput && cantidadInput.value && precioUnitarioInput && precioUnitarioInput.value) {
             calcularImporteLinea(lineaRow);
         }
     }

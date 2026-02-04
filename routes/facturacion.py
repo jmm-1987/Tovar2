@@ -1214,13 +1214,8 @@ def nueva_factura():
 @login_required
 @not_usuario_required
 def crear_factura_rectificativa(factura_id):
-    """Crear una factura rectificativa desde una factura directa"""
+    """Crear una factura rectificativa desde una factura"""
     factura_original = Factura.query.get_or_404(factura_id)
-    
-    # Solo permitir crear rectificativas desde facturas directas (sin pedido_id ni presupuesto_id)
-    if factura_original.pedido_id is not None or factura_original.presupuesto_id is not None:
-        flash('Solo se pueden crear facturas rectificativas desde facturas directas', 'error')
-        return redirect(url_for('facturacion.facturacion', tipo_vista='formalizadas'))
     
     if request.method == 'POST':
         try:
@@ -1388,39 +1383,26 @@ def crear_factura_rectificativa(factura_id):
     if factura_original.cliente_id:
         cliente_original = Cliente.query.get(factura_original.cliente_id)
     
-    # Preparar líneas con valores negativos
-    lineas_rectificativas = []
+    # Calcular la base imponible total de la factura original
+    base_imponible_total = Decimal('0')
     for linea in factura_original.lineas:
-        lineas_rectificativas.append({
-            'descripcion': linea.descripcion,
-            'cantidad': -abs(Decimal(str(linea.cantidad)) if linea.cantidad else Decimal('0')),
-            'talla': linea.talla or '',
-            'precio_unitario': -abs(Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0')),
-            'descuento': Decimal(str(linea.descuento)) if linea.descuento else Decimal('0'),
-            'precio_final': -abs(Decimal(str(linea.precio_final)) if linea.precio_final else Decimal('0')),
-            'importe': -abs(Decimal(str(linea.importe)) if linea.importe else Decimal('0'))
-        })
+        importe_linea = Decimal(str(linea.importe)) if linea.importe else Decimal('0')
+        base_imponible_total += abs(importe_linea)
     
     fecha_hoy = datetime.now().strftime('%Y-%m-%d')
     
     # Preparar datos para usar el mismo template que nueva_factura.html
-    # Prellenar líneas con valores negativos de la factura original
-    lineas_prellenadas = []
-    for linea in factura_original.lineas:
-        cantidad_negativa = -abs(Decimal(str(linea.cantidad)) if linea.cantidad else Decimal('0'))
-        precio_unitario_negativo = -abs(Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0'))
-        precio_final_negativo = -abs(Decimal(str(linea.precio_final)) if linea.precio_final else Decimal('0'))
-        importe_negativo = -abs(Decimal(str(linea.importe)) if linea.importe else Decimal('0'))
-        
-        lineas_prellenadas.append({
-            'descripcion': linea.descripcion,
-            'cantidad': cantidad_negativa,
-            'talla': linea.talla or '',
-            'precio_unitario': precio_unitario_negativo,
-            'descuento': Decimal(str(linea.descuento)) if linea.descuento else Decimal('0'),
-            'precio_final': precio_final_negativo,
-            'importe': importe_negativo
-        })
+    # Crear solo una línea con el concepto "Abono" y el total de la base imponible en negativo
+    # Usar cantidad positiva (1) y precio negativo para que el importe sea negativo
+    lineas_prellenadas = [{
+        'descripcion': 'Abono',
+        'cantidad': Decimal('1'),
+        'talla': '',
+        'precio_unitario': -base_imponible_total,
+        'descuento': Decimal('0'),
+        'precio_final': -base_imponible_total,
+        'importe': -base_imponible_total
+    }]
     
     # Formatear fecha_expedicion como string para evitar problemas en el template
     fecha_expedicion_str = None

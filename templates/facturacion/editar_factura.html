@@ -8,7 +8,7 @@
         <!-- Título y campos principales en la misma línea -->
         <div style="display: flex; align-items: flex-end; gap: 15px; margin-bottom: 10px; flex-wrap: wrap;">
             <h2 style="margin: 0; flex: 0 0 auto;">Editar Factura{% if factura.es_rectificativa %} (Rectificativa){% endif %}</h2>
-            {% if not factura.es_rectificativa and factura.pedido_id is none and factura.presupuesto_id is none %}
+            {% if not factura.es_rectificativa %}
             <a href="{{ url_for('facturacion.crear_factura_rectificativa', factura_id=factura.id) }}" 
                class="btn btn-warning" 
                style="padding: 8px 16px; background: #ffc107; color: #212529; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; margin-left: auto;">

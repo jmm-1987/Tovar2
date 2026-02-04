@@ -8,3 +8,4 @@ ALTER TABLE facturas ADD COLUMN es_rectificativa INTEGER DEFAULT 0 NOT NULL;
 ALTER TABLE facturas ADD COLUMN factura_rectificada_id INTEGER;
 
 
+
