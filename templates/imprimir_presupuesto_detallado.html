@@ -733,6 +733,9 @@
                 {% if presupuesto.forma_pago %}
                 <p><strong>Forma de Pago:</strong> {{ presupuesto.forma_pago }}</p>
                 {% endif %}
+                {% if presupuesto.comentarios_cliente %}
+                <p style="margin-top: 10px; white-space: pre-wrap;"><strong>Comentarios:</strong> {{ presupuesto.comentarios_cliente }}</p>
+                {% endif %}
                 
                 <h3 style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;">Datos del Cliente</h3>
                 <p><strong>{{ presupuesto.cliente.nombre if presupuesto.cliente else 'N/A' }}</strong></p>

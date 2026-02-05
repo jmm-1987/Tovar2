@@ -12,6 +12,7 @@ from openpyxl.styles import Font, PatternFill, Alignment
 from werkzeug.utils import secure_filename
 import os
 import shutil
+import sqlite3
 
 configuracion_bp = Blueprint('configuracion', __name__)
 
@@ -1039,4 +1040,38 @@ def gestion_dias_festivos():
                          dias_festivos=dias_festivos,
                          excluir_sabados=excluir_sabados,
                          excluir_domingos=excluir_domingos)
+
+@configuracion_bp.route('/configuracion/migrar-comentarios-cliente')
+@login_required
+@supervisor_required
+def migrar_comentarios_cliente():
+    """Migración temporal: Añadir columna comentarios_cliente a presupuestos"""
+    try:
+        # Obtener la ruta de la base de datos desde la configuración
+        database_uri = current_app.config['SQLALCHEMY_DATABASE_URI']
+        # Extraer la ruta del archivo (sqlite:///ruta/archivo.db)
+        database_path = database_uri.replace('sqlite:///', '').replace('sqlite:///', '')
+        
+        # Conectar a la base de datos
+        conn = sqlite3.connect(database_path)
+        cursor = conn.cursor()
+        
+        # Verificar si la columna ya existe
+        cursor.execute("PRAGMA table_info(presupuestos)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'comentarios_cliente' in columns:
+            flash('La columna comentarios_cliente ya existe en la tabla presupuestos', 'info')
+        else:
+            # Añadir la columna
+            cursor.execute("ALTER TABLE presupuestos ADD COLUMN comentarios_cliente TEXT")
+            conn.commit()
+            flash('Columna comentarios_cliente añadida exitosamente', 'success')
+        
+        conn.close()
+        return redirect(url_for('configuracion.index'))
+        
+    except Exception as e:
+        flash(f'Error al ejecutar la migración: {str(e)}', 'error')
+        return redirect(url_for('configuracion.index'))
 

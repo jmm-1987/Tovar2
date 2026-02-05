@@ -135,6 +135,7 @@ def nueva_solicitud():
             tipo_pedido = request.form.get('tipo_pedido')
             forma_pago = request.form.get('forma_pago', '')
             seguimiento = request.form.get('seguimiento', '')
+            comentarios_cliente = request.form.get('comentarios_cliente', '')
             fecha_objetivo_str = request.form.get('fecha_objetivo', '')
             
             # Información para la fabricación
@@ -255,6 +256,7 @@ def nueva_solicitud():
                 tipo_pedido=tipo_pedido,
                 forma_pago=forma_pago,
                 seguimiento=seguimiento,
+                comentarios_cliente=comentarios_cliente,
                 tipo_producto=tipo_producto,
                 colores_principales=colores_principales,
                 colores_secundarios=colores_secundarios,
@@ -846,6 +848,7 @@ def editar_solicitud(solicitud_id):
             solicitud.tipo_pedido = request.form.get('tipo_pedido')
             solicitud.forma_pago = request.form.get('forma_pago', '')
             solicitud.seguimiento = request.form.get('seguimiento', '')
+            solicitud.comentarios_cliente = request.form.get('comentarios_cliente', '')
             
             # Actualizar información para la fabricación
             referencias_web = request.form.get('referencias_web', '')

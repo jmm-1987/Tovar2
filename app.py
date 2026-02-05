@@ -638,8 +638,18 @@ def migrate_database():
             if 'presupuestos' not in table_names:
                 db.create_all()
             else:
-                # Verificar si existe la columna seguimiento
+                # Verificar si existe la columna seguimiento y comentarios_cliente
                 columns_presupuesto = [col['name'] for col in inspector.get_columns('presupuestos')]
+                
+                # Migración: Añadir columna comentarios_cliente si no existe
+                if 'comentarios_cliente' not in columns_presupuesto:
+                    try:
+                        with db.engine.connect() as conn:
+                            conn.execute(text("ALTER TABLE presupuestos ADD COLUMN comentarios_cliente TEXT"))
+                            conn.commit()
+                        print("Migración: Columna comentarios_cliente añadida a presupuestos")
+                    except Exception as e:
+                        print(f"Error al añadir columna comentarios_cliente: {e}")
                 
                 # Migrar estados antiguos a nuevos estados unificados
                 try:

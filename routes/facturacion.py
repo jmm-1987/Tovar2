@@ -37,7 +37,7 @@ def facturacion():
     facturas = []
     
     if tipo_vista == 'pendientes':
-        # Obtener prefacturas: solicitudes aceptadas que aún no tienen factura formalizada
+        # Obtener prefacturas: solicitudes en cualquier estado posterior a 'presupuesto' que aún no tienen factura formalizada
         # Filtrar solo facturas formales (no anticipos) con presupuesto_id (excluir facturas directas)
         presupuestos_con_factura_formal_ids = [
             f.presupuesto_id for f in Factura.query.with_entities(Factura.presupuesto_id)
@@ -49,8 +49,10 @@ def facturacion():
             ).all()
         ]
         
-        # Obtener solicitudes (presupuestos) aceptadas sin factura formal (pueden tener anticipo)
-        query_solicitudes = Presupuesto.query.filter(Presupuesto.estado == 'aceptado')
+        # Obtener solicitudes (presupuestos) sin factura formal (pueden tener anticipo)
+        # Permitir cualquier estado posterior a 'presupuesto' (rechazado, aceptado, mockup, en preparacion, etc.)
+        # No se requiere que hayan pasado por estado 'aceptado' para poder facturar
+        query_solicitudes = Presupuesto.query.filter(Presupuesto.estado != 'presupuesto')
         if presupuestos_con_factura_formal_ids:
             query_solicitudes = query_solicitudes.filter(not_(Presupuesto.id.in_(presupuestos_con_factura_formal_ids)))
         
@@ -618,12 +620,14 @@ def crear_factura_anticipo():
         return redirect(url_for('facturacion.facturacion'))
     
     # GET: mostrar solicitudes pendientes de facturar
-    # Obtener solicitudes aceptadas que aún no tienen factura formalizada (o solo tienen factura anticipo)
+    # Obtener solicitudes que aún no tienen factura formalizada (o solo tienen factura anticipo)
+    # Permitir cualquier estado posterior a 'presupuesto' (rechazado, aceptado, mockup, en preparacion, etc.)
+    # No se requiere que hayan pasado por estado 'aceptado' para poder facturar
     presupuestos_con_factura_ids = [f.presupuesto_id for f in Factura.query.with_entities(Factura.presupuesto_id).filter(
         and_(Factura.presupuesto_id.isnot(None), Factura.es_anticipo == False)
     ).all()]
     
-    query_solicitudes = Presupuesto.query.filter(Presupuesto.estado == 'aceptado')
+    query_solicitudes = Presupuesto.query.filter(Presupuesto.estado != 'presupuesto')
     if presupuestos_con_factura_ids:
         query_solicitudes = query_solicitudes.filter(not_(Presupuesto.id.in_(presupuestos_con_factura_ids)))
     

@@ -292,6 +292,9 @@ class Presupuesto(db.Model):
     # Campo de seguimiento para actualizaciones de comerciales
     seguimiento = db.Column(db.Text)
     
+    # Comentarios visibles al cliente (aparecen en los PDFs)
+    comentarios_cliente = db.Column(db.Text)
+    
     # Información para la fabricación
     tipo_producto = db.Column(db.String(200), nullable=False)  # Tipo de producto
     colores_principales = db.Column(db.String(200), nullable=False)  # Colores principales

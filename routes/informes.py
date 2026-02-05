@@ -1,5 +1,5 @@
 """Rutas para informes y reportes"""
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, send_file
 from flask_login import login_required
 from datetime import datetime
 from decimal import Decimal
@@ -7,6 +7,9 @@ from extensions import db
 from models import Factura, FacturaProveedor, Nomina, Empleado, LineaFactura, Cliente
 from sqlalchemy import func, extract, not_
 from utils.auth import not_usuario_required
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+import io
 
 informes_bp = Blueprint('informes', __name__)
 
@@ -83,6 +86,153 @@ def facturacion_emitida():
                          clientes=clientes,
                          cliente_id=cliente_id,
                          cliente_seleccionado=cliente_seleccionado)
+
+@informes_bp.route('/informes/facturacion-emitida/exportar-excel')
+@login_required
+@not_usuario_required
+def facturacion_emitida_exportar_excel():
+    """Exportar informe de facturación emitida a Excel"""
+    # Obtener parámetros de filtro (mismos que en el informe principal)
+    tipo_filtro = request.args.get('tipo', 'mes')
+    año = request.args.get('año', datetime.now().year, type=int)
+    periodo = request.args.get('periodo', None, type=int)
+    cliente_id = request.args.get('cliente_id', None, type=int)
+    
+    # Base query - Excluir albaranes (formato A2601_XXX)
+    query = Factura.query.filter(
+        extract('year', Factura.fecha_expedicion) == año,
+        not_(Factura.numero.like('A%_%'))
+    )
+    
+    # Aplicar filtro por cliente si está seleccionado
+    if cliente_id:
+        query = query.filter(Factura.cliente_id == cliente_id)
+    
+    if tipo_filtro == 'mes' and periodo:
+        query = query.filter(extract('month', Factura.fecha_expedicion) == periodo)
+        periodo_label = f"{['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][periodo]} {año}"
+    elif tipo_filtro == 'trimestre' and periodo:
+        mes_inicio = (periodo - 1) * 3 + 1
+        mes_fin = periodo * 3
+        query = query.filter(extract('month', Factura.fecha_expedicion).between(mes_inicio, mes_fin))
+        trimestres = {1: '1T', 2: '2T', 3: '3T', 4: '4T'}
+        periodo_label = f"{trimestres.get(periodo, '')} {año}"
+    else:
+        periodo_label = f"Año {año}"
+    
+    facturas = query.order_by(Factura.fecha_expedicion.desc()).all()
+    
+    # Crear libro de Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Facturación Emitida"
+    
+    # Estilos para encabezados
+    header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+    header_font = Font(bold=True, color="FFFFFF", size=12)
+    header_alignment = Alignment(horizontal="center", vertical="center")
+    
+    # Escribir encabezados
+    headers = ['DNI/CIF', 'Nombre Cliente', 'Número Factura', 'Fecha', 'Base Imponible', 'IVA', 'Total', 'Estado Cobro']
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_alignment
+    
+    # Escribir datos
+    for row_idx, factura in enumerate(facturas, 2):
+        # Obtener DNI/CIF (de factura.nif o factura.cliente.nif)
+        dni_cif = factura.nif if factura.nif else ''
+        if not dni_cif and factura.cliente:
+            dni_cif = factura.cliente.nif if factura.cliente.nif else ''
+        
+        # Nombre del cliente
+        nombre_cliente = factura.nombre if factura.nombre else ''
+        if not nombre_cliente and factura.cliente:
+            nombre_cliente = factura.cliente.nombre if factura.cliente.nombre else ''
+        
+        # Número de factura
+        numero_factura = f"{factura.serie}-{factura.numero}"
+        
+        # Fecha de expedición
+        fecha_expedicion = factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else ''
+        
+        # Calcular base imponible e IVA
+        tipo_iva_val = float(factura.tipo_iva) if factura.tipo_iva else 21.0
+        importe_total_val = float(factura.importe_total) if factura.importe_total else 0.0
+        descuento_pronto_pago_val = float(factura.descuento_pronto_pago) if factura.descuento_pronto_pago else 0.0
+        
+        if descuento_pronto_pago_val > 0:
+            # Si hay descuento por pronto pago, el importe_total ya lo tiene aplicado
+            subtotal_sin_descuento = importe_total_val / (1 - descuento_pronto_pago_val / 100)
+            base_imponible = subtotal_sin_descuento / (1 + tipo_iva_val / 100)
+            importe_iva = subtotal_sin_descuento - base_imponible
+        else:
+            # Sin descuento: importe_total = base + iva = base * (1 + tipo_iva/100)
+            base_imponible = importe_total_val / (1 + tipo_iva_val / 100)
+            importe_iva = importe_total_val - base_imponible
+        
+        # Estado del cobro
+        estado_cobro = factura.estado_cobro if factura.estado_cobro else 'pendiente'
+        estado_cobro_texto = {
+            'pendiente': 'Pendiente',
+            'cobrada_parcialmente': 'Cobrada Parcialmente',
+            'cobrada': 'Cobrada'
+        }.get(estado_cobro, estado_cobro.title())
+        
+        # Escribir fila
+        ws.cell(row=row_idx, column=1, value=dni_cif)
+        ws.cell(row=row_idx, column=2, value=nombre_cliente)
+        ws.cell(row=row_idx, column=3, value=numero_factura)
+        ws.cell(row=row_idx, column=4, value=fecha_expedicion)
+        ws.cell(row=row_idx, column=5, value=round(base_imponible, 2))
+        ws.cell(row=row_idx, column=6, value=round(importe_iva, 2))
+        ws.cell(row=row_idx, column=7, value=round(importe_total_val, 2))
+        ws.cell(row=row_idx, column=8, value=estado_cobro_texto)
+        
+        # Formato numérico para columnas de importes
+        ws.cell(row=row_idx, column=5).number_format = '#,##0.00'
+        ws.cell(row=row_idx, column=6).number_format = '#,##0.00'
+        ws.cell(row=row_idx, column=7).number_format = '#,##0.00'
+    
+    # Ajustar ancho de columnas automáticamente según el contenido
+    for col in ws.columns:
+        max_length = 0
+        col_letter = col[0].column_letter
+        for cell in col:
+            try:
+                if cell.value:
+                    # Para números, calcular longitud considerando formato
+                    if isinstance(cell.value, (int, float)):
+                        cell_length = len(f"{cell.value:,.2f}")
+                    else:
+                        cell_length = len(str(cell.value))
+                    if cell_length > max_length:
+                        max_length = cell_length
+            except:
+                pass
+        # Añadir un poco de espacio extra y establecer límites mínimos y máximos
+        adjusted_width = min(max(max_length + 2, 12), 50)
+        ws.column_dimensions[col_letter].width = adjusted_width
+    
+    # Ajustar altura de fila de encabezado
+    ws.row_dimensions[1].height = 25
+    
+    # Guardar en memoria
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    # Nombre del archivo con el período
+    filename = f'facturacion_emitida_{periodo_label.replace(" ", "_")}.xlsx'
+    
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=filename
+    )
 
 @informes_bp.route('/informes/facturacion-soportada')
 @login_required

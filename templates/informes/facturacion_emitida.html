@@ -65,7 +65,10 @@
     <div class="resumen-box">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h3 style="margin: 0;">Resumen - {{ periodo_label }}</h3>
-            <a href="{{ url_for('informes.facturacion_emitida_detalle', tipo=tipo_filtro, año=año, periodo=periodo) }}{% if cliente_id %}&cliente_id={{ cliente_id }}{% endif %}" class="btn btn-light" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">Ver Detalle</a>
+            <div style="display: flex; gap: 10px;">
+                <a href="{{ url_for('informes.facturacion_emitida_detalle', tipo=tipo_filtro, año=año, periodo=periodo) }}{% if cliente_id %}&cliente_id={{ cliente_id }}{% endif %}" class="btn btn-light" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">Ver Detalle</a>
+                <a href="{{ url_for('informes.facturacion_emitida_exportar_excel', tipo=tipo_filtro, año=año, periodo=periodo) }}{% if cliente_id %}&cliente_id={{ cliente_id }}{% endif %}" class="btn btn-light" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">📊 Exportar a Excel</a>
+            </div>
         </div>
         <div class="resumen-grid">
             <div class="resumen-item">
@@ -136,9 +139,12 @@
 
 <style>
 .informes-container {
-    max-width: 1400px;
+    max-width: 100%;
     margin: 0 auto;
-    padding: 20px;
+    padding-top: 20px;
+    padding-bottom: 20px;
+    padding-left: 5px;
+    padding-right: 5px;
 }
 
 .filtros-box {

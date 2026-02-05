@@ -94,6 +94,7 @@
                     <th>Proveedor</th>
                     <th>Número Factura</th>
                     <th>Fecha</th>
+                    <th>Vencimiento</th>
                     <th>Base Imponible</th>
                     <th>IVA</th>
                     <th>Total</th>
@@ -108,6 +109,7 @@
                     <td>{{ factura.proveedor.nombre if factura.proveedor else 'N/A' }}</td>
                     <td>{{ factura.numero_factura }}</td>
                     <td>{{ factura.fecha_factura.strftime('%d/%m/%Y') if factura.fecha_factura else '-' }}</td>
+                    <td>{{ factura.fecha_vencimiento.strftime('%d/%m/%Y') if factura.fecha_vencimiento else '-' }}</td>
                     <td>{{ "%.2f"|format(factura.base_imponible) }} €</td>
                     <td>{{ "%.2f"|format(factura.importe_iva) }} € ({{ "%.0f"|format(factura.tipo_iva) }}%)</td>
                     <td><strong>{{ "%.2f"|format(factura.total) }} €</strong></td>
@@ -117,9 +119,9 @@
                         </span>
                     </td>
                     <td class="acciones-cell">
-                        <a href="{{ url_for('gastos.editar_factura_proveedor', factura_id=factura.id) }}" class="btn btn-sm btn-primary">Editar</a>
+                        <a href="{{ url_for('gastos.editar_factura_proveedor', factura_id=factura.id) }}" class="btn btn-xs btn-primary" style="padding: 2px 6px; font-size: 0.7rem;">Editar</a>
                         <form method="POST" action="{{ url_for('gastos.eliminar_factura_proveedor', factura_id=factura.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar esta factura?');">
-                            <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                            <button type="submit" class="btn btn-xs btn-danger" style="padding: 2px 6px; font-size: 0.7rem;">Eliminar</button>
                         </form>
                     </td>
                 </tr>

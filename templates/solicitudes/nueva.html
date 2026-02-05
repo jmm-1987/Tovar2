@@ -196,6 +196,11 @@ header {
     </div>
 
     <div class="form-group">
+        <label for="comentarios_cliente">Comentarios visibles al cliente (aparecen en el PDF)</label>
+        <textarea name="comentarios_cliente" id="comentarios_cliente" rows="3" placeholder="Escribe aquí comentarios que el cliente podrá ver en el PDF del presupuesto...">{% if form_data %}{{ form_data.comentarios_cliente or '' }}{% endif %}</textarea>
+    </div>
+
+    <div class="form-group">
         <label for="seguimiento">Comertarios internos y seguimiento</label>
         <textarea name="seguimiento" id="seguimiento" rows="3" placeholder="Escribe aquí las actualizaciones y seguimiento del presupuesto...">{% if form_data %}{{ form_data.seguimiento or '' }}{% endif %}</textarea>
     </div>
