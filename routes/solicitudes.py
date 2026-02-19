@@ -64,7 +64,11 @@ ESTADOS_FECHAS = {
 @login_required
 def listado_solicitudes():
     """Listado de solicitudes con filtros"""
-    query = Presupuesto.query
+    query = Presupuesto.query.options(
+        joinedload(Presupuesto.lineas),
+        joinedload(Presupuesto.cliente),
+        joinedload(Presupuesto.comercial)
+    )
     
     # Filtro por estado específico
     estado_filtro = request.args.get('estado', '')
@@ -105,7 +109,76 @@ def listado_solicitudes():
         except ValueError:
             pass
     
-    solicitudes = query.order_by(Presupuesto.fecha_creacion.desc()).all()
+    # Ordenación
+    sort_by = request.args.get('sort_by', 'fecha_creacion')
+    sort_order = request.args.get('sort_order', 'desc')
+    
+    if sort_by == 'numero_solicitud':
+        if sort_order == 'asc':
+            query = query.order_by(Presupuesto.numero_solicitud.asc().nullslast(), Presupuesto.id.asc())
+        else:
+            query = query.order_by(Presupuesto.numero_solicitud.desc().nullslast(), Presupuesto.id.desc())
+    elif sort_by == 'fecha_creacion':
+        if sort_order == 'asc':
+            query = query.order_by(Presupuesto.fecha_creacion.asc())
+        else:
+            query = query.order_by(Presupuesto.fecha_creacion.desc())
+    elif sort_by == 'cliente':
+        query = query.join(Cliente)
+        if sort_order == 'asc':
+            query = query.order_by(Cliente.nombre.asc())
+        else:
+            query = query.order_by(Cliente.nombre.desc())
+    elif sort_by == 'comercial':
+        query = query.join(Comercial).join(Usuario)
+        if sort_order == 'asc':
+            query = query.order_by(Usuario.usuario.asc())
+        else:
+            query = query.order_by(Usuario.usuario.desc())
+    elif sort_by == 'tipo_pedido':
+        if sort_order == 'asc':
+            query = query.order_by(Presupuesto.tipo_pedido.asc())
+        else:
+            query = query.order_by(Presupuesto.tipo_pedido.desc())
+    elif sort_by == 'estado':
+        if sort_order == 'asc':
+            query = query.order_by(Presupuesto.estado.asc())
+        else:
+            query = query.order_by(Presupuesto.estado.desc())
+    else:
+        # Por defecto ordenar por fecha descendente
+        query = query.order_by(Presupuesto.fecha_creacion.desc())
+    
+    solicitudes = query.all()
+    
+    # Calcular base imponible para cada solicitud
+    solicitudes_con_base = []
+    for solicitud in solicitudes:
+        base_imponible = Decimal('0.00')
+        for linea in solicitud.lineas:
+            cantidad = Decimal(str(linea.cantidad)) if linea.cantidad else Decimal('0')
+            precio_unit = Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0.00')
+            descuento = Decimal(str(linea.descuento)) if linea.descuento else Decimal('0')
+            
+            # Calcular precio final con descuento
+            precio_final = precio_unit
+            if descuento > 0:
+                if linea.precio_final:
+                    precio_final = Decimal(str(linea.precio_final))
+                else:
+                    precio_final = precio_unit * (Decimal('1') - descuento / Decimal('100'))
+            
+            total_linea = cantidad * precio_final
+            base_imponible += total_linea
+        
+        solicitudes_con_base.append({
+            'solicitud': solicitud,
+            'base_imponible': base_imponible
+        })
+    
+    # Ordenar por base imponible si es necesario (después de calcular)
+    if sort_by == 'base_imponible':
+        solicitudes_con_base.sort(key=lambda x: x['base_imponible'], reverse=(sort_order == 'desc'))
     
     # Obtener datos para filtros
     clientes = Cliente.query.order_by(Cliente.nombre).all()
@@ -113,7 +186,7 @@ def listado_solicitudes():
     comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
     
     return render_template('solicitudes/listado.html',
-                         solicitudes=solicitudes,
+                         solicitudes_con_base=solicitudes_con_base,
                          estados=ESTADOS_SOLICITUD,
                          clientes=clientes,
                          comerciales=comerciales,
@@ -121,7 +194,9 @@ def listado_solicitudes():
                          fecha_desde=fecha_desde,
                          fecha_hasta=fecha_hasta,
                          cliente_id=cliente_id,
-                         comercial_id=comercial_id)
+                         comercial_id=comercial_id,
+                         sort_by=sort_by,
+                         sort_order=sort_order)
 
 @solicitudes_bp.route('/solicitudes/nueva', methods=['GET', 'POST'])
 @login_required

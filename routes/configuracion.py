@@ -1074,4 +1074,3 @@ def migrar_comentarios_cliente():
     except Exception as e:
         flash(f'Error al ejecutar la migración: {str(e)}', 'error')
         return redirect(url_for('configuracion.index'))
-
