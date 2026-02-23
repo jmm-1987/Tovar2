@@ -9,7 +9,8 @@ import json
 import tempfile
 import base64
 from io import BytesIO
-from sqlalchemy import not_, or_, and_
+from sqlalchemy import not_, or_, and_, text
+from sqlalchemy.orm import joinedload
 from extensions import db
 from models import Factura, LineaFactura, Cliente, Presupuesto, LineaPresupuesto, Pedido
 from utils.numeracion import obtener_siguiente_numero_factura, obtener_siguiente_numero_albaran
@@ -187,7 +188,7 @@ def facturacion():
 @not_usuario_required
 def ver_factura_solicitud(presupuesto_id):
     """Vista detallada de una factura para introducir importes desde una solicitud"""
-    presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+    presupuesto = Presupuesto.query.options(joinedload(Presupuesto.cliente)).get_or_404(presupuesto_id)
     
     # Verificar si ya existe una factura formal (no anticipo) para este presupuesto
     factura_existente = Factura.query.filter(
@@ -207,11 +208,32 @@ def ver_factura_solicitud(presupuesto_id):
     elif presupuesto.anticipo:
         anticipo_facturado = Decimal(str(presupuesto.anticipo))
     
+    # IVA por defecto: leer directamente de la tabla clientes para asegurar el valor de la ficha
+    tipo_iva_default = 21
+    if presupuesto.cliente_id:
+        try:
+            raw = db.session.execute(
+                text('SELECT tipo_iva FROM clientes WHERE id = :id'),
+                {'id': presupuesto.cliente_id}
+            ).scalar()
+            # Aceptar 0 explícitamente (en BD es 0 o 0.0; no usar "if raw" porque 0 es falsy)
+            if raw is not None:
+                v = int(round(float(str(raw))))
+                if v in (0, 4, 10, 21):
+                    tipo_iva_default = v
+        except (ValueError, TypeError, AttributeError) as e:
+            current_app.logger.warning('ver_factura_solicitud: no se pudo leer tipo_iva del cliente %s: %s',
+                                      presupuesto.cliente_id, e)
+    
+    # Forzar entero para la plantilla (evitar Decimal/float que Jinja pueda comparar mal)
+    tipo_iva_default = int(tipo_iva_default)
+    
     return render_template('ver_factura_solicitud.html', 
                          solicitud=presupuesto, 
                          factura_existente=factura_existente,
                          factura_anticipo=factura_anticipo,
-                         anticipo_facturado=anticipo_facturado)
+                         anticipo_facturado=anticipo_facturado,
+                         tipo_iva_default=tipo_iva_default)
 
 @facturacion_bp.route('/facturacion/solicitud/<int:presupuesto_id>/formalizar', methods=['POST'])
 @login_required
@@ -234,6 +256,7 @@ def formalizar_factura_solicitud(presupuesto_id):
         fecha_expedicion_str = data.get('fecha_expedicion', '')
         descripcion = data.get('descripcion', '')
         descuento_pronto_pago = data.get('descuento_pronto_pago', 0)
+        tipo_iva_form = data.get('tipo_iva')
         lineas_data = data.get('lineas', [])
         
         if not fecha_expedicion_str:
@@ -255,10 +278,17 @@ def formalizar_factura_solicitud(presupuesto_id):
             importe = Decimal(str(linea_data.get('importe', 0)))
             base_imponible += importe
         
-        # Calcular IVA usando el tipo_iva del cliente (por defecto 21%)
+        # Tipo de IVA: el indicado en el formulario o el de la ficha del cliente (por defecto 21%)
         cliente = presupuesto.cliente
-        tipo_iva_valor = float(cliente.tipo_iva) if cliente and cliente.tipo_iva else 21.0
-        tipo_iva = Decimal(str(tipo_iva_valor))
+        if tipo_iva_form not in (None, ''):
+            try:
+                tipo_iva = Decimal(str(tipo_iva_form))
+            except (ValueError, TypeError):
+                tipo_iva_valor = float(cliente.tipo_iva) if cliente and cliente.tipo_iva else 21.0
+                tipo_iva = Decimal(str(tipo_iva_valor))
+        else:
+            tipo_iva_valor = float(cliente.tipo_iva) if cliente and cliente.tipo_iva else 21.0
+            tipo_iva = Decimal(str(tipo_iva_valor))
         iva_total = base_imponible * (tipo_iva / Decimal('100'))
         subtotal = base_imponible + iva_total
         
@@ -2782,10 +2812,20 @@ def facturar_albaranes():
             return redirect(url_for('facturacion.facturar_albaranes'))
         
         fecha_hoy = datetime.now().strftime('%Y-%m-%d')
+        # IVA por defecto: el de la ficha del cliente (21 si no tiene o no es uno de los permitidos)
+        tipo_iva_default = 21
+        if cliente.tipo_iva is not None:
+            try:
+                v = int(float(cliente.tipo_iva))
+                if v in (0, 4, 10, 21):
+                    tipo_iva_default = v
+            except (ValueError, TypeError):
+                pass
         return render_template('facturacion/seleccionar_albaranes.html', 
                              cliente=cliente, 
                              albaranes=albaranes,
-                             fecha_hoy=fecha_hoy)
+                             fecha_hoy=fecha_hoy,
+                             tipo_iva_default=tipo_iva_default)
     
     # GET: mostrar formulario de selección de cliente
     # Solo mostrar clientes que tengan albaranes pendientes
@@ -2812,6 +2852,7 @@ def procesar_facturacion_albaranes():
         fecha_expedicion_str = request.form.get('fecha_expedicion', '')
         descripcion = request.form.get('descripcion', '')
         descuento_pronto_pago = request.form.get('descuento_pronto_pago', '0') or '0'
+        tipo_iva_form = request.form.get('tipo_iva', '')
         albaranes_ids = request.form.getlist('albaranes_seleccionados[]')
         
         if not cliente_id:
@@ -2831,6 +2872,15 @@ def procesar_facturacion_albaranes():
         
         # Obtener cliente
         cliente = Cliente.query.get_or_404(cliente_id)
+        
+        # Tipo de IVA: el de la ficha del cliente por defecto, o el indicado en el formulario
+        if tipo_iva_form not in ('', None):
+            try:
+                tipo_iva_decimal = Decimal(str(tipo_iva_form))
+            except (ValueError, TypeError):
+                tipo_iva_decimal = Decimal(str(cliente.tipo_iva)) if cliente.tipo_iva is not None else Decimal('21.00')
+        else:
+            tipo_iva_decimal = Decimal(str(cliente.tipo_iva)) if cliente.tipo_iva is not None else Decimal('21.00')
         
         # Obtener albaranes seleccionados
         albaranes = Factura.query.filter(
@@ -2879,9 +2929,9 @@ def procesar_facturacion_albaranes():
                     'albaran_id': albaran.id
                 })
         
-        # Calcular IVA (21% sobre la base imponible)
+        # Calcular IVA con el tipo indicado (cliente o formulario)
         base_imponible = importe_total
-        iva = base_imponible * Decimal('0.21')
+        iva = base_imponible * (tipo_iva_decimal / Decimal('100'))
         subtotal = base_imponible + iva
         
         # Procesar descuento por pronto pago
@@ -2911,6 +2961,7 @@ def procesar_facturacion_albaranes():
             nombre=cliente.nombre,
             importe_total=importe_total,
             descuento_pronto_pago=descuento_pronto_pago_decimal,
+            tipo_iva=tipo_iva_decimal,
             estado='pendiente'
         )
         

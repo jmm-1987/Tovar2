@@ -122,9 +122,18 @@
                         </td>
                     </tr>
                     <tr style="background: #f8f9fa;">
-                        <td colspan="5" style="padding: 15px; text-align: right; font-weight: bold; color: #2c3e50;">IVA (21%) (€):</td>
+                        <td colspan="4" style="padding: 15px; text-align: right; font-weight: bold; color: #2c3e50;">Tipo de IVA:</td>
+                        <td style="padding: 15px; text-align: center;">
+                            <select id="tipo-iva" data-initial="{{ tipo_iva_default|int }}" style="width: 90px; padding: 6px 8px; border: 2px solid #2c3e50; border-radius: 4px; font-size: 1rem; font-weight: 600; color: #2c3e50;">
+                                <option value="21" {% if (tipo_iva_default|int) == 21 %}selected{% endif %}>21%</option>
+                                <option value="10" {% if (tipo_iva_default|int) == 10 %}selected{% endif %}>10%</option>
+                                <option value="4" {% if (tipo_iva_default|int) == 4 %}selected{% endif %}>4%</option>
+                                <option value="0" {% if (tipo_iva_default|int) == 0 %}selected{% endif %}>0%</option>
+                            </select>
+                        </td>
                         <td colspan="2" style="padding: 15px; text-align: right;">
-                            <span class="iva-total" data-solicitud-id="{{ solicitud.id }}" style="font-weight: bold; color: #2c3e50;">0.00</span>
+                            <span id="iva-label-text" style="font-weight: bold; color: #2c3e50;">IVA ({{ tipo_iva_default|int }}%)</span>
+                            <span class="iva-total" data-solicitud-id="{{ solicitud.id }}" style="font-weight: bold; color: #2c3e50; margin-left: 8px;">0.00 €</span>
                         </td>
                     </tr>
                     <tr style="background: #f8f9fa;">
@@ -188,11 +197,9 @@
         <div style="margin-bottom: 20px; padding: 15px; background: #e7f3ff; border-radius: 6px; border: 1px solid #b3d9ff;">
             <p style="margin: 0; color: #2c3e50; font-weight: 600;">ℹ️ El número de factura se generará automáticamente con el formato: <strong>F + año + contador</strong> (ejemplo: F251, F252...)</p>
         </div>
-        <div style="display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 20px;">
-            <div>
-                <label for="fecha-expedicion" style="display: block; margin-bottom: 5px; font-weight: 600; color: #2c3e50;">Fecha Expedición *</label>
-                <input type="date" id="fecha-expedicion" required style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
-            </div>
+        <div style="margin-bottom: 20px;">
+            <label for="fecha-expedicion" style="display: block; margin-bottom: 5px; font-weight: 600; color: #2c3e50;">Fecha Expedición *</label>
+            <input type="date" id="fecha-expedicion" required style="width: 100%; max-width: 300px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
         </div>
         <div style="margin-bottom: 20px;">
             <label for="descripcion-factura" style="display: block; margin-bottom: 5px; font-weight: 600; color: #2c3e50;">Descripción</label>
@@ -222,6 +229,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const fechaExpedicionInput = document.getElementById('fecha-expedicion');
     if (fechaExpedicionInput && !fechaExpedicionInput.value) {
         fechaExpedicionInput.value = today;
+    }
+    
+    // Forzar valor del Tipo de IVA desde el servidor (ficha del cliente)
+    const selectTipoIva = document.getElementById('tipo-iva');
+    if (selectTipoIva && selectTipoIva.dataset.initial !== undefined) {
+        const initial = String(selectTipoIva.dataset.initial);
+        if (selectTipoIva.querySelector('option[value="' + initial + '"]')) {
+            selectTipoIva.value = initial;
+        }
     }
     
     // Función para calcular el total de una línea
@@ -272,7 +288,16 @@ document.addEventListener('DOMContentLoaded', function() {
     function calcularTotalFactura(solicitudId) {
         const inputs = document.querySelectorAll(`.importe-unitario[data-solicitud-id="${solicitudId}"]`);
         let baseImponible = 0;
-        const tipoIva = 21; // IVA al 21%
+        const tipoIvaInput = document.getElementById('tipo-iva');
+        let tipoIva = 21;
+        if (tipoIvaInput) {
+            const v = parseFloat(tipoIvaInput.value);
+            if (!isNaN(v)) tipoIva = v;
+        }
+        
+        // Actualizar etiqueta IVA
+        const ivaLabel = document.getElementById('iva-label-text');
+        if (ivaLabel) ivaLabel.textContent = 'IVA (' + tipoIva + '%)';
         
         inputs.forEach(input => {
             const lineaId = input.dataset.lineaId;
@@ -404,6 +429,14 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    const tipoIvaSelect = document.getElementById('tipo-iva');
+    if (tipoIvaSelect) {
+        tipoIvaSelect.addEventListener('change', function() {
+            const solicitudId = document.querySelector('.importe-unitario')?.dataset.solicitudId;
+            if (solicitudId) calcularTotalFactura(solicitudId);
+        });
+    }
+    
     // Event listeners para botones de formalizar factura
     document.querySelectorAll('.formalizar-factura').forEach(button => {
         button.addEventListener('click', function() {
@@ -469,8 +502,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             
+            const tipoIvaEl = document.getElementById('tipo-iva');
+            let tipoIvaPorcentaje = 21;
+            if (tipoIvaEl) {
+                const v = parseFloat(tipoIvaEl.value);
+                if (!isNaN(v)) tipoIvaPorcentaje = v;
+            }
             // Confirmar formalización
-            let mensajeConfirmacion = `¿Está seguro de que desea formalizar la factura de la solicitud #${solicitudId}?\n\nBase Imponible: ${baseImponible.toFixed(2)}€\nIVA (21%): ${ivaTotal.toFixed(2)}€\nSubtotal: ${subtotal.toFixed(2)}€`;
+            let mensajeConfirmacion = `¿Está seguro de que desea formalizar la factura de la solicitud #${solicitudId}?\n\nBase Imponible: ${baseImponible.toFixed(2)}€\nIVA (${tipoIvaPorcentaje}%): ${ivaTotal.toFixed(2)}€\nSubtotal: ${subtotal.toFixed(2)}€`;
             if (descuentoProntoPagoPorcentaje > 0) {
                 mensajeConfirmacion += `\nDescuento Pronto Pago (${descuentoProntoPagoPorcentaje.toFixed(2)}%): -${descuentoProntoPago.toFixed(2)}€`;
             }
@@ -521,8 +560,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 button.disabled = true;
                 button.textContent = 'Procesando...';
                 
-                // Obtener descuento por pronto pago
+                // Obtener descuento por pronto pago y tipo de IVA
                 const descuentoProntoPago = parseFloat(descuentoProntoPagoInput ? descuentoProntoPagoInput.value : 0) || 0;
+                const tipoIva = document.getElementById('tipo-iva') ? document.getElementById('tipo-iva').value : '21';
                 
                 // Enviar datos al servidor
                 fetch(`/facturacion/solicitud/${solicitudId}/formalizar`, {
@@ -534,6 +574,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         fecha_expedicion: fechaExpedicion,
                         descripcion: descripcion,
                         descuento_pronto_pago: descuentoProntoPago,
+                        tipo_iva: tipoIva,
                         lineas: lineas
                     })
                 })
@@ -563,6 +604,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+    
+    // Recalcular totales una vez más con el IVA de la ficha del cliente (select ya forzado al inicio)
+    const sid = document.querySelector('.importe-unitario')?.dataset?.solicitudId;
+    if (sid && typeof calcularTotalFactura === 'function') {
+        calcularTotalFactura(sid);
+    }
     
     // Efecto hover en las filas de la tabla
     document.querySelectorAll('.linea-factura').forEach(row => {
