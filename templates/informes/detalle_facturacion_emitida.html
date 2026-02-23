@@ -21,11 +21,13 @@
                     <th>Base Imponible</th>
                     <th>IVA</th>
                     <th>Importe Total</th>
+                    <th>Estado Cobro</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
                 {% for factura in facturas %}
+                {% set estado_cobro_val = factura.estado_cobro if factura.estado_cobro else 'pendiente' %}
                 <tr>
                     <td>{{ factura.serie }}-{{ factura.numero }}</td>
                     <td>{{ factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else '-' }}</td>
@@ -63,7 +65,26 @@
                     </td>
                     <td style="text-align: right;"><strong>{{ "%.2f"|format(importe_total_val) }} €</strong></td>
                     <td>
+                        <span class="badge badge-{{ 'success' if estado_cobro_val == 'cobrada' else 'warning' if estado_cobro_val == 'cobrada_parcialmente' else 'secondary' }}">
+                            {{ estado_cobro_val|replace('_', ' ')|title }}
+                        </span>
+                    </td>
+                    <td>
                         <a href="{{ url_for('facturacion.imprimir_factura', factura_id=factura.id) }}" class="btn btn-sm btn-primary" target="_blank">Ver Factura</a>
+                        {% if estado_cobro_val in ('cobrada', 'cobrada_parcialmente') %}
+                        <form method="POST" action="{{ url_for('facturacion.anular_cobro_factura') }}" style="display: inline; margin-left: 4px;" onsubmit="return confirm('¿Anular el cobro de esta factura?');">
+                            <input type="hidden" name="factura_id" value="{{ factura.id }}">
+                            <button type="submit" class="btn btn-sm btn-warning" style="padding: 2px 6px; font-size: 0.75rem;">
+                                <svg width="14" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle;">
+                                    <rect x="0.5" y="0.5" width="13" height="9" rx="1" fill="#28a745"/>
+                                    <line x1="1" y1="2.8" x2="13" y2="2.8" stroke="white" stroke-width="0.4" opacity="0.9"/>
+                                    <line x1="4.5" y1="0.5" x2="4.5" y2="9.5" stroke="white" stroke-width="0.3" opacity="0.7"/>
+                                    <line x1="9.5" y1="0.5" x2="9.5" y2="9.5" stroke="white" stroke-width="0.3" opacity="0.7"/>
+                                    <path d="M2 2L12 8M12 2L2 8" stroke="#dc3545" stroke-width="1" stroke-linecap="round"/>
+                                </svg>
+                            </button>
+                        </form>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -109,6 +130,7 @@
                         {% set total_facturacion = facturas|sum(attribute='importe_total') %}
                         <strong>{{ "%.2f"|format(total_facturacion) }} €</strong>
                     </td>
+                    <td></td>
                     <td></td>
                 </tr>
             </tfoot>

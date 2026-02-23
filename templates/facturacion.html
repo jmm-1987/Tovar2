@@ -337,6 +337,21 @@ function cambiarTipoVista(tipo) {
                             Cobrar
                         </button>
                     {% endif %}
+                    {% if estado_cobro_val in ('cobrada', 'cobrada_parcialmente') %}
+                        <button type="button" 
+                                class="btn btn-warning btn-anular-cobro" 
+                                onclick="anularCobro({{ factura.id }}, '{{ factura.serie }}-{{ factura.numero }}')"
+                                style="padding: 2px 5px; font-size: 0.65rem; white-space: nowrap; background-color: #fd7e14; color: white; border: none; border-radius: 4px; cursor: pointer;"
+                                title="Anular cobro">
+                            <svg width="14" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle;">
+                                <rect x="0.5" y="0.5" width="13" height="9" rx="1" fill="#28a745"/>
+                                <line x1="1" y1="2.8" x2="13" y2="2.8" stroke="white" stroke-width="0.4" opacity="0.9"/>
+                                <line x1="4.5" y1="0.5" x2="4.5" y2="9.5" stroke="white" stroke-width="0.3" opacity="0.7"/>
+                                <line x1="9.5" y1="0.5" x2="9.5" y2="9.5" stroke="white" stroke-width="0.3" opacity="0.7"/>
+                                <path d="M2 2L12 8M12 2L2 8" stroke="#dc3545" stroke-width="1" stroke-linecap="round"/>
+                            </svg>
+                        </button>
+                    {% endif %}
                     </div>
                 </td>
             </tr>
@@ -500,6 +515,32 @@ function procesarCobro(event) {
     .catch(error => {
         console.error('Error:', error);
         alert('Error al procesar el cobro');
+    });
+}
+
+function anularCobro(facturaId, serieNumero) {
+    if (!confirm('¿Anular el cobro de la factura ' + serieNumero + '? El estado pasará a Pendiente y el importe pagado a 0.')) {
+        return;
+    }
+    const formData = new FormData();
+    formData.append('factura_id', facturaId);
+
+    fetch('{{ url_for("facturacion.anular_cobro_factura") }}', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'No se pudo anular el cobro'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al anular el cobro');
     });
 }
 

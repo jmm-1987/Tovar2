@@ -3103,3 +3103,39 @@ def procesar_cobro_factura():
         traceback.print_exc()
         return jsonify({'success': False, 'error': f'Error al procesar el cobro: {str(e)}'}), 500
 
+
+@facturacion_bp.route('/facturacion/anular-cobro-factura', methods=['POST'])
+@login_required
+@not_usuario_required
+def anular_cobro_factura():
+    """Anular el cobro de una factura: estado_cobro a pendiente e importe_pagado a 0"""
+    try:
+        factura_id = request.form.get('factura_id')
+        if not factura_id:
+            if request.accept_mimetypes.best == 'application/json':
+                return jsonify({'success': False, 'error': 'ID de factura no proporcionado'}), 400
+            flash('ID de factura no proporcionado', 'error')
+            return redirect(request.referrer or url_for('facturacion.facturacion', tipo_vista='formalizadas'))
+
+        factura = Factura.query.get_or_404(int(factura_id))
+
+        factura.estado_cobro = 'pendiente'
+        factura.importe_pagado = Decimal('0')
+        db.session.commit()
+
+        if request.accept_mimetypes.best == 'application/json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'success': True,
+                'message': 'Cobro anulado correctamente.'
+            })
+        flash('Cobro anulado correctamente.', 'success')
+        return redirect(request.referrer or url_for('facturacion.facturacion', tipo_vista='formalizadas'))
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        if request.accept_mimetypes.best == 'application/json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': str(e)}), 500
+        flash('Error al anular el cobro: ' + str(e), 'error')
+        return redirect(request.referrer or url_for('facturacion.facturacion', tipo_vista='formalizadas'))
+
