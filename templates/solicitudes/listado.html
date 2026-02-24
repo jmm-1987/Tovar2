@@ -113,8 +113,14 @@ header {
                 <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; font-size: 0.8rem; cursor: pointer;" onclick="sortTable('estado')">
                     Estado {% if sort_by == 'estado' %}{% if sort_order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                 </th>
-                <th style="padding: 8px 10px; text-align: right; color: #ffffff; font-weight: 600; font-size: 0.8rem; cursor: pointer;" onclick="sortTable('base_imponible')">
-                    Base Imponible {% if sort_by == 'base_imponible' %}{% if sort_order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
+                <th style="padding: 8px 10px; text-align: right; color: #ffffff; font-weight: 600; font-size: 0.8rem; cursor: pointer; min-width: 100px;" onclick="sortTable('base_imponible')">
+                    Base {% if sort_by == 'base_imponible' %}{% if sort_order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
+                </th>
+                <th style="padding: 8px 10px; text-align: right; color: #ffffff; font-weight: 600; font-size: 0.8rem; cursor: pointer; min-width: 100px;" onclick="sortTable('iva_total')">
+                    IVA {% if sort_by == 'iva_total' %}{% if sort_order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
+                </th>
+                <th style="padding: 8px 10px; text-align: right; color: #ffffff; font-weight: 600; font-size: 0.8rem; cursor: pointer; min-width: 100px;" onclick="sortTable('total_con_iva')">
+                    Total {% if sort_by == 'total_con_iva' %}{% if sort_order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                 </th>
                 <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; font-size: 0.8rem;">Acciones</th>
             </tr>
@@ -123,6 +129,8 @@ header {
             {% for item in solicitudes_con_base %}
             {% set solicitud = item.solicitud %}
             {% set base_imponible = item.base_imponible %}
+            {% set iva_total = item.iva_total %}
+            {% set total_con_iva = item.total_con_iva %}
             <tr style="border-bottom: 1px solid #e9ecef; transition: background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
                 <td style="padding: 8px 10px; color: #495057; font-weight: 600; font-size: 0.8rem;">{{ solicitud.numero_solicitud or solicitud.id }}</td>
                 <td style="padding: 8px 10px; color: #495057; font-size: 0.8rem;">{{ solicitud.fecha_creacion.strftime('%d/%m/%Y') if solicitud.fecha_creacion else 'N/A' }}</td>
@@ -134,7 +142,9 @@ header {
                         {{ solicitud.estado|title }}
                     </span>
                 </td>
-                <td style="padding: 8px 10px; text-align: right; color: #495057; font-size: 0.8rem; font-weight: 600;">{{ "%.2f"|format(base_imponible) }} €</td>
+                <td style="padding: 8px 10px; text-align: right; color: #495057; font-size: 0.8rem; font-weight: 600; min-width: 100px;">{{ "%.2f"|format(base_imponible) }} €</td>
+                <td style="padding: 8px 10px; text-align: right; color: #495057; font-size: 0.8rem; min-width: 100px;">{{ "%.2f"|format(iva_total) }} €</td>
+                <td style="padding: 8px 10px; text-align: right; color: #495057; font-size: 0.8rem; font-weight: 600; min-width: 100px;">{{ "%.2f"|format(total_con_iva) }} €</td>
                 <td style="padding: 8px 10px; text-align: center;">
                     <div style="display: flex; gap: 2px; justify-content: center; align-items: center; flex-wrap: nowrap;">
                         <a href="{{ url_for('solicitudes.ver_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-xs btn-primary" style="padding: 2px 6px; font-size: 0.65rem; white-space: nowrap;">Ver</a>

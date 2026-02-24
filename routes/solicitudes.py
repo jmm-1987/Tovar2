@@ -151,7 +151,7 @@ def listado_solicitudes():
     
     solicitudes = query.all()
     
-    # Calcular base imponible para cada solicitud
+    # Calcular base imponible, IVA y total para cada solicitud
     solicitudes_con_base = []
     for solicitud in solicitudes:
         base_imponible = Decimal('0.00')
@@ -171,14 +171,30 @@ def listado_solicitudes():
             total_linea = cantidad * precio_final
             base_imponible += total_linea
         
+        # IVA según cliente (por defecto 21 %)
+        tipo_iva = Decimal('21')
+        if solicitud.cliente and getattr(solicitud.cliente, 'tipo_iva', None) is not None:
+            try:
+                tipo_iva = Decimal(str(solicitud.cliente.tipo_iva))
+            except (ValueError, TypeError):
+                pass
+        iva_total = base_imponible * tipo_iva / Decimal('100')
+        total_con_iva = base_imponible + iva_total
+        
         solicitudes_con_base.append({
             'solicitud': solicitud,
-            'base_imponible': base_imponible
+            'base_imponible': base_imponible,
+            'iva_total': iva_total,
+            'total_con_iva': total_con_iva
         })
     
-    # Ordenar por base imponible si es necesario (después de calcular)
+    # Ordenar por base imponible, IVA o total si es necesario (después de calcular)
     if sort_by == 'base_imponible':
         solicitudes_con_base.sort(key=lambda x: x['base_imponible'], reverse=(sort_order == 'desc'))
+    elif sort_by == 'iva_total':
+        solicitudes_con_base.sort(key=lambda x: x['iva_total'], reverse=(sort_order == 'desc'))
+    elif sort_by == 'total_con_iva':
+        solicitudes_con_base.sort(key=lambda x: x['total_con_iva'], reverse=(sort_order == 'desc'))
     
     # Obtener datos para filtros
     clientes = Cliente.query.order_by(Cliente.nombre).all()
