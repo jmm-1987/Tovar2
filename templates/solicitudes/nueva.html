@@ -41,7 +41,7 @@ header {
                             <select name="cliente_id" id="cliente_id" required style="display: none;">
                                 <option value="">Seleccione un cliente</option>
                                 {% for cliente in clientes %}
-                                <option value="{{ cliente.id }}" data-nombre="{{ cliente.nombre|lower }}">{{ cliente.nombre }}</option>
+                                <option value="{{ cliente.id }}" data-nombre="{{ cliente.nombre|lower }}" data-tipo-iva="{% if cliente.tipo_iva is not none %}{{ (cliente.tipo_iva|float)|int }}{% else %}21{% endif %}">{{ cliente.nombre }}</option>
                                 {% endfor %}
                             </select>
                             <div id="cliente_results" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px; max-height: 200px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
@@ -208,6 +208,7 @@ header {
     <h3>Productos del Presupuesto</h3>
     <!-- Cabecera con nombres de campos -->
     <div class="linea-pedido-row linea-pedido-header" style="background: #f8f9fa; font-weight: 600; color: #495057; border-bottom: 2px solid #dee2e6; margin-bottom: 8px;">
+        <div class="linea-pedido-drag-handle-header"></div>
         <div class="linea-pedido-numero" style="color: #495057;">#</div>
         <div class="linea-pedido-campos">
             <div style="flex: 0 0 350px; width: 350px; padding: 6px 8px; font-size: 0.75rem; text-align: left;">Nombre para mostrar</div>
@@ -227,7 +228,8 @@ header {
         </div>-->
     </div>
     <div id="prendas-container">
-        <div class="linea-pedido-row">
+        <div class="linea-pedido-row" draggable="true">
+            <div class="linea-pedido-drag-handle" title="Arrastrar para reordenar">☰</div>
             <div class="linea-pedido-numero">#1</div>
             <div class="linea-pedido-campos">
                 <!-- Orden: nombre_mostrar, unidades, talla, modelo, color, forma, sexo, tejido, precio -->
@@ -280,6 +282,34 @@ header {
 
     <button type="button" class="btn btn-primary" onclick="agregarLinea()">Agregar Prenda</button>
 
+    <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 6px; max-width: 400px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <strong>Base Imponible:</strong>
+            <span id="solicitud-base-imponible">0.00</span> €
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center;">
+            <label for="tipo_iva_solicitud" style="margin: 0; font-weight: 500;">Tipo de IVA (%):</label>
+            <select id="tipo_iva_solicitud" class="form-control" style="width: 100px; padding: 4px 8px; border: 1px solid #dee2e6; border-radius: 4px;">
+                <option value="21" selected>21%</option>
+                <option value="10">10%</option>
+                <option value="4">4%</option>
+                <option value="0">0%</option>
+            </select>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <strong id="solicitud-iva-label">IVA (21%):</strong>
+            <span id="solicitud-iva-total">0.00</span> €
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding-top: 10px; border-top: 1px solid #dee2e6;">
+            <strong>Subtotal:</strong>
+            <span id="solicitud-subtotal">0.00</span> €
+        </div>
+        <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #dee2e6;">
+            <strong style="font-size: 1.2rem;">Total:</strong>
+            <strong style="font-size: 1.2rem;"><span id="solicitud-importe-total">0.00</span> €</strong>
+        </div>
+    </div>
+
     <!-- Datalist para formas (disponible para todos los inputs de forma) -->
     <datalist id="formas-list">
         <option value="Abt Cremallera">
@@ -306,6 +336,37 @@ header {
     border-color: #3498db;
     background: #e3f2fd;
     transform: scale(1.05);
+}
+
+.linea-pedido-drag-handle-header {
+    flex: 0 0 30px;
+    width: 30px;
+    min-width: 30px;
+}
+
+.linea-pedido-drag-handle {
+    cursor: move;
+    color: #6c757d;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 30px;
+    width: 30px;
+    min-width: 30px;
+    user-select: none;
+    padding: 4px;
+}
+
+.linea-pedido-drag-handle:hover {
+    color: #495057;
+    background-color: #e9ecef;
+    border-radius: 4px;
+}
+
+#prendas-container .linea-pedido-row.drag-over {
+    border: 2px dashed #007bff;
+    background-color: #e7f3ff;
 }
 </style>
 
@@ -632,6 +693,7 @@ function agregarLinea() {
     const container = document.getElementById('prendas-container');
     const primeraLinea = container.querySelector('.linea-pedido-row');
     const nuevaLinea = primeraLinea.cloneNode(true);
+    nuevaLinea.removeAttribute('data-drag-initialized');
     
     // Limpiar valores
     nuevaLinea.querySelectorAll('input').forEach(input => {
@@ -682,10 +744,16 @@ function agregarLinea() {
     renumerarPrendas();
     
     container.appendChild(nuevaLinea);
+    var cantInput = nuevaLinea.querySelector('input[name="cantidad[]"]');
+    if (cantInput) cantInput.addEventListener('input', actualizarTotalesSolicitud);
+    actualizarTotalesSolicitud();
+    initDragAndDropSolicitud();
 }
 
 function renumerarPrendas() {
-    const todasLineas = document.querySelectorAll('.linea-pedido-row');
+    const container = document.getElementById('prendas-container');
+    if (!container) return;
+    const todasLineas = container.querySelectorAll('.linea-pedido-row');
     todasLineas.forEach((linea, index) => {
         const numero = linea.querySelector('.linea-pedido-numero');
         if (numero) {
@@ -714,6 +782,108 @@ function calcularPrecioFinal(event) {
     } else {
         precioFinalInput.value = '';
     }
+    actualizarTotalesSolicitud();
+}
+
+function actualizarTotalesSolicitud() {
+    let baseImponible = 0;
+    const filas = document.querySelectorAll('#prendas-container .linea-pedido-row');
+    filas.forEach(function(row) {
+        if (row.classList.contains('linea-pedido-header')) return;
+        const cantidad = parseFloat(row.querySelector('input[name="cantidad[]"]')?.value) || 0;
+        const precioFinalVal = row.querySelector('.precio-final-input')?.value;
+        const precioUnitVal = row.querySelector('.precio-unitario-input')?.value;
+        const precio = (precioFinalVal !== '' && !isNaN(parseFloat(precioFinalVal))) ? parseFloat(precioFinalVal) : (parseFloat(precioUnitVal) || 0);
+        baseImponible += cantidad * precio;
+    });
+    const tipoIvaEl = document.getElementById('tipo_iva_solicitud');
+    let tipoIva = 21;
+    if (tipoIvaEl) {
+        const v = parseFloat(tipoIvaEl.value);
+        if (!isNaN(v)) tipoIva = v;
+    }
+    const iva = baseImponible * (tipoIva / 100);
+    const subtotal = baseImponible + iva;
+    const total = subtotal;
+    function fmt(n) { return (typeof n === 'number' && !isNaN(n)) ? n.toFixed(2) : '0.00'; }
+    const baseEl = document.getElementById('solicitud-base-imponible');
+    const ivaEl = document.getElementById('solicitud-iva-total');
+    const subEl = document.getElementById('solicitud-subtotal');
+    const totalEl = document.getElementById('solicitud-importe-total');
+    const labelIva = document.getElementById('solicitud-iva-label');
+    if (baseEl) baseEl.textContent = fmt(baseImponible);
+    if (ivaEl) ivaEl.textContent = fmt(iva);
+    if (subEl) subEl.textContent = fmt(subtotal);
+    if (totalEl) totalEl.textContent = fmt(total);
+    if (labelIva) labelIva.textContent = 'IVA (' + tipoIva + '%):';
+}
+
+function syncTipoIvaFromCliente() {
+    var sel = document.getElementById('cliente_id');
+    var tipoIvaSel = document.getElementById('tipo_iva_solicitud');
+    if (!sel || !tipoIvaSel) return;
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.value) return;
+    var tipoIva = opt.getAttribute('data-tipo-iva');
+    if (tipoIva !== null && tipoIva !== '' && ['0','4','10','21'].indexOf(String(tipoIva)) !== -1) {
+        tipoIvaSel.value = tipoIva;
+        actualizarTotalesSolicitud();
+    }
+}
+
+var draggedElementSolicitud = null;
+function initDragAndDropSolicitud() {
+    var container = document.getElementById('prendas-container');
+    if (!container) return;
+    var lineas = container.querySelectorAll('.linea-pedido-row');
+    lineas.forEach(function(linea) {
+        linea.setAttribute('draggable', 'true');
+        if (!linea.querySelector('.linea-pedido-drag-handle')) {
+            var dragHandle = document.createElement('div');
+            dragHandle.className = 'linea-pedido-drag-handle';
+            dragHandle.setAttribute('title', 'Arrastrar para reordenar');
+            dragHandle.textContent = '\u2630';
+            linea.insertBefore(dragHandle, linea.firstChild);
+        }
+        if (!linea.hasAttribute('data-drag-initialized')) {
+            linea.setAttribute('data-drag-initialized', 'true');
+            linea.addEventListener('dragstart', function(e) {
+                draggedElementSolicitud = this;
+                this.style.opacity = '0.5';
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            linea.addEventListener('dragend', function() {
+                this.style.opacity = '1';
+                lineas.forEach(function(l) { l.classList.remove('drag-over'); });
+            });
+            linea.addEventListener('dragover', function(e) {
+                if (e.preventDefault) e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (this !== draggedElementSolicitud) this.classList.add('drag-over');
+                return false;
+            });
+            linea.addEventListener('dragleave', function() {
+                this.classList.remove('drag-over');
+            });
+            linea.addEventListener('drop', function(e) {
+                if (e.stopPropagation) e.stopPropagation();
+                if (draggedElementSolicitud && draggedElementSolicitud !== this) {
+                    var allLineas = Array.from(container.querySelectorAll('.linea-pedido-row'));
+                    var draggedIndex = allLineas.indexOf(draggedElementSolicitud);
+                    var targetIndex = allLineas.indexOf(this);
+                    if (draggedIndex < targetIndex) {
+                        container.insertBefore(draggedElementSolicitud, this.nextSibling);
+                    } else {
+                        container.insertBefore(draggedElementSolicitud, this);
+                    }
+                    renumerarPrendas();
+                    actualizarTotalesSolicitud();
+                }
+                this.classList.remove('drag-over');
+                return false;
+            });
+        }
+    });
 }
 
 // Añadir event listeners a todas las líneas existentes al cargar la página
@@ -721,6 +891,21 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.precio-unitario-input, .descuento-input').forEach(input => {
         input.addEventListener('input', calcularPrecioFinal);
     });
+    document.querySelectorAll('#prendas-container input[name="cantidad[]"]').forEach(input => {
+        input.addEventListener('input', actualizarTotalesSolicitud);
+    });
+    const tipoIvaSelect = document.getElementById('tipo_iva_solicitud');
+    if (tipoIvaSelect) {
+        tipoIvaSelect.addEventListener('change', actualizarTotalesSolicitud);
+        tipoIvaSelect.addEventListener('input', actualizarTotalesSolicitud);
+    }
+    var clienteSelect = document.getElementById('cliente_id');
+    if (clienteSelect) {
+        clienteSelect.addEventListener('change', syncTipoIvaFromCliente);
+    }
+    actualizarTotalesSolicitud();
+    syncTipoIvaFromCliente();
+    initDragAndDropSolicitud();
 });
 
 function eliminarLinea(btn) {
@@ -728,6 +913,7 @@ function eliminarLinea(btn) {
     if (lineas.length > 1) {
         btn.closest('.linea-pedido-row').remove();
         renumerarPrendas();
+        actualizarTotalesSolicitud();
     } else {
         alert('Debe haber al menos una prenda en el presupuesto');
     }
@@ -769,6 +955,7 @@ function togglePersonalizar(btn) {
 function duplicarLinea(btn) {
     const lineaRow = btn.closest('.linea-pedido-row');
     const nuevaLinea = lineaRow.cloneNode(true);
+    nuevaLinea.removeAttribute('data-drag-initialized');
     const container = document.getElementById('prendas-container');
     
     // Obtener valores de los selects originales antes de limpiar
@@ -861,6 +1048,10 @@ function duplicarLinea(btn) {
     if (descuentoInputListener) {
         descuentoInputListener.addEventListener('input', calcularPrecioFinal);
     }
+    var cantInput = nuevaLinea.querySelector('input[name="cantidad[]"]');
+    if (cantInput) cantInput.addEventListener('input', actualizarTotalesSolicitud);
+    actualizarTotalesSolicitud();
+    initDragAndDropSolicitud();
 }
 
 // Manejar input de prenda con datalist
@@ -979,6 +1170,7 @@ document.addEventListener('DOMContentLoaded', function() {
         clienteSearch.value = nombre;
         clienteSelect.value = id;
         clienteResults.style.display = 'none';
+        if (typeof syncTipoIvaFromCliente === 'function') syncTipoIvaFromCliente();
     };
     
     // Validar antes de enviar

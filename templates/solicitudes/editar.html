@@ -233,6 +233,7 @@ header {
     <h3>Productos del Presupuesto</h3>
     <!-- Cabecera con nombres de campos -->
     <div class="linea-pedido-row linea-pedido-header" style="background: #f8f9fa; font-weight: 600; color: #495057; border-bottom: 2px solid #dee2e6; margin-bottom: 8px;">
+        <div class="linea-pedido-drag-handle-header"></div>
         <div class="linea-pedido-numero" style="color: #495057;">#</div>
         <div class="linea-pedido-campos">
             <div style="flex: 0 0 350px; width: 350px; padding: 6px 8px; font-size: 0.75rem; text-align: left;">Nombre para mostrar</div>
@@ -254,7 +255,8 @@ header {
     <div id="prendas-container">
         {% if solicitud.lineas %}
             {% for linea in solicitud.lineas %}
-            <div class="linea-pedido-row">
+            <div class="linea-pedido-row" draggable="true">
+                <div class="linea-pedido-drag-handle" title="Arrastrar para reordenar">☰</div>
                 <div class="linea-pedido-numero">#{{ loop.index }}</div>
                 <div class="linea-pedido-campos">
                     <!-- Orden: nombre_mostrar, unidades, talla, modelo, color, forma, sexo, tejido, precio -->
@@ -306,7 +308,8 @@ header {
             </div>
             {% endfor %}
         {% else %}
-        <div class="linea-pedido-row">
+        <div class="linea-pedido-row" draggable="true">
+            <div class="linea-pedido-drag-handle" title="Arrastrar para reordenar">☰</div>
             <div class="linea-pedido-numero">#1</div>
                 <div class="linea-pedido-campos">
                 <!-- Orden: nombre_mostrar, unidades, talla, modelo, color, forma, sexo, tejido, precio -->
@@ -390,6 +393,37 @@ header {
     border-color: #3498db;
     background: #e3f2fd;
     transform: scale(1.05);
+}
+
+.linea-pedido-drag-handle-header {
+    flex: 0 0 30px;
+    width: 30px;
+    min-width: 30px;
+}
+
+.linea-pedido-drag-handle {
+    cursor: move;
+    color: #6c757d;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 30px;
+    width: 30px;
+    min-width: 30px;
+    user-select: none;
+    padding: 4px;
+}
+
+.linea-pedido-drag-handle:hover {
+    color: #495057;
+    background-color: #e9ecef;
+    border-radius: 4px;
+}
+
+#prendas-container .linea-pedido-row.drag-over {
+    border: 2px dashed #007bff;
+    background-color: #e7f3ff;
 }
 </style>
 
@@ -690,6 +724,7 @@ function agregarLinea() {
         return;
     }
     const nuevaLinea = primeraLinea.cloneNode(true);
+    nuevaLinea.removeAttribute('data-drag-initialized');
     
     // Limpiar valores
     nuevaLinea.querySelectorAll('input').forEach(input => {
@@ -790,14 +825,71 @@ function agregarLinea() {
     renumerarPrendas();
     
     container.appendChild(nuevaLinea);
+    initDragAndDropSolicitud();
 }
 
 function renumerarPrendas() {
-    const todasLineas = document.querySelectorAll('.linea-pedido-row');
+    const container = document.getElementById('prendas-container');
+    if (!container) return;
+    const todasLineas = container.querySelectorAll('.linea-pedido-row');
     todasLineas.forEach((linea, index) => {
         const numero = linea.querySelector('.linea-pedido-numero');
         if (numero) {
             numero.textContent = `#${index + 1}`;
+        }
+    });
+}
+
+var draggedElementSolicitud = null;
+function initDragAndDropSolicitud() {
+    var container = document.getElementById('prendas-container');
+    if (!container) return;
+    var lineas = container.querySelectorAll('.linea-pedido-row');
+    lineas.forEach(function(linea) {
+        linea.setAttribute('draggable', 'true');
+        if (!linea.querySelector('.linea-pedido-drag-handle')) {
+            var dragHandle = document.createElement('div');
+            dragHandle.className = 'linea-pedido-drag-handle';
+            dragHandle.setAttribute('title', 'Arrastrar para reordenar');
+            dragHandle.textContent = '\u2630';
+            linea.insertBefore(dragHandle, linea.firstChild);
+        }
+        if (!linea.hasAttribute('data-drag-initialized')) {
+            linea.setAttribute('data-drag-initialized', 'true');
+            linea.addEventListener('dragstart', function(e) {
+                draggedElementSolicitud = this;
+                this.style.opacity = '0.5';
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            linea.addEventListener('dragend', function() {
+                this.style.opacity = '1';
+                lineas.forEach(function(l) { l.classList.remove('drag-over'); });
+            });
+            linea.addEventListener('dragover', function(e) {
+                if (e.preventDefault) e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (this !== draggedElementSolicitud) this.classList.add('drag-over');
+                return false;
+            });
+            linea.addEventListener('dragleave', function() {
+                this.classList.remove('drag-over');
+            });
+            linea.addEventListener('drop', function(e) {
+                if (e.stopPropagation) e.stopPropagation();
+                if (draggedElementSolicitud && draggedElementSolicitud !== this) {
+                    var allLineas = Array.from(container.querySelectorAll('.linea-pedido-row'));
+                    var draggedIndex = allLineas.indexOf(draggedElementSolicitud);
+                    var targetIndex = allLineas.indexOf(this);
+                    if (draggedIndex < targetIndex) {
+                        container.insertBefore(draggedElementSolicitud, this.nextSibling);
+                    } else {
+                        container.insertBefore(draggedElementSolicitud, this);
+                    }
+                    renumerarPrendas();
+                }
+                this.classList.remove('drag-over');
+                return false;
+            });
         }
     });
 }
@@ -881,6 +973,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.precio-unitario-input, .descuento-input').forEach(input => {
         input.addEventListener('input', calcularPrecioFinal);
     });
+    initDragAndDropSolicitud();
 });
 
 function eliminarLinea(btn) {
@@ -929,6 +1022,7 @@ function togglePersonalizar(btn) {
 function duplicarLinea(btn) {
     const lineaRow = btn.closest('.linea-pedido-row');
     const nuevaLinea = lineaRow.cloneNode(true);
+    nuevaLinea.removeAttribute('data-drag-initialized');
     const container = document.getElementById('prendas-container');
     
     // Obtener valores de los selects originales antes de limpiar
@@ -1006,6 +1100,7 @@ function duplicarLinea(btn) {
     // Insertar después de la línea actual
     lineaRow.parentNode.insertBefore(nuevaLinea, lineaRow.nextSibling);
     renumerarPrendas();
+    initDragAndDropSolicitud();
 }
 
 // Buscador de clientes
