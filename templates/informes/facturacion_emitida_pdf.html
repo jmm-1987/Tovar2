@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Facturación Emitida - {{ periodo_label }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        @page { size: A4 portrait; margin: 6mm; }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 9px;
+            padding: 4mm;
+            color: #333;
+        }
+        h1 {
+            font-size: 14px;
+            margin-bottom: 6px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 4px;
+        }
+        .resumen {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 8px;
+            font-size: 8px;
+        }
+        .resumen span { font-weight: bold; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 7px;
+        }
+        th, td {
+            border: 0.5px solid #333;
+            padding: 2px 3px;
+            text-align: left;
+        }
+        th {
+            background: #366092;
+            color: white;
+            font-weight: bold;
+        }
+        td.num { text-align: right; }
+        th.num { text-align: right; }
+        .total-row {
+            font-weight: bold;
+            background: #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <h1>Facturación Emitida - {{ periodo_label }}</h1>
+    <div class="resumen">
+        <span>Total Facturación: {{ "%.2f"|format(total_facturacion) }} €</span>
+        <span>IVA Repercutido: {{ "%.2f"|format(total_iva_repercutido) }} €</span>
+        <span>Nº Facturas: {{ facturas|length }}</span>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>DNI/CIF</th>
+                <th>Cliente</th>
+                <th>Nº Factura</th>
+                <th>Fecha</th>
+                <th class="num">Base</th>
+                <th class="num">IVA</th>
+                <th class="num">Total</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for factura in facturas %}
+            {% set tipo_iva_val = factura.tipo_iva|float if factura.tipo_iva else 21.0 %}
+            {% set importe_total_val = factura.importe_total|float %}
+            {% set descuento_pronto_pago_val = factura.descuento_pronto_pago|float if factura.descuento_pronto_pago else 0.0 %}
+            {% if descuento_pronto_pago_val > 0 %}
+                {% set subtotal_sin_descuento = importe_total_val / (1 - descuento_pronto_pago_val / 100) %}
+                {% set base_imponible = subtotal_sin_descuento / (1 + tipo_iva_val / 100) %}
+                {% set importe_iva = subtotal_sin_descuento - base_imponible %}
+            {% else %}
+                {% set base_imponible = importe_total_val / (1 + tipo_iva_val / 100) %}
+                {% set importe_iva = importe_total_val - base_imponible %}
+            {% endif %}
+            {% set estado_cobro_val = factura.estado_cobro if factura.estado_cobro else 'pendiente' %}
+            {% set dni_cif = factura.nif if factura.nif else (factura.cliente.nif if factura.cliente and factura.cliente.nif else '') %}
+            <tr>
+                <td>{{ dni_cif or '-' }}</td>
+                <td>{{ factura.nombre or (factura.cliente.nombre if factura.cliente else '-') }}</td>
+                <td>{{ factura.serie }}-{{ factura.numero }}</td>
+                <td>{{ factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else '-' }}</td>
+                <td class="num">{{ "%.2f"|format(base_imponible) }}</td>
+                <td class="num">{{ "%.2f"|format(importe_iva) }}</td>
+                <td class="num">{{ "%.2f"|format(importe_total_val) }}</td>
+                <td>{{ estado_cobro_val|replace('_', ' ')|title }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        {% if facturas %}
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="4">Total</td>
+                <td class="num">{{ "%.2f"|format(total_base) }}</td>
+                <td class="num">{{ "%.2f"|format(total_iva) }}</td>
+                <td class="num">{{ "%.2f"|format(total_facturacion) }}</td>
+                <td></td>
+            </tr>
+        </tfoot>
+        {% endif %}
+    </table>
+</body>
+</html>

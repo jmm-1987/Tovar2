@@ -57,7 +57,7 @@
                 </select>
             </div>
             
-            <button type="submit" class="btn btn-primary">Filtrar</button>
+            <button type="submit" class="btn btn-primary">Buscar</button>
         </form>
     </div>
     
@@ -68,6 +68,7 @@
             <div style="display: flex; gap: 10px;">
                 <a href="{{ url_for('informes.facturacion_emitida_detalle', tipo=tipo_filtro, año=año, periodo=periodo) }}{% if cliente_id %}&cliente_id={{ cliente_id }}{% endif %}" class="btn btn-light" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">Ver Detalle</a>
                 <a href="{{ url_for('informes.facturacion_emitida_exportar_excel', tipo=tipo_filtro, año=año, periodo=periodo) }}{% if cliente_id %}&cliente_id={{ cliente_id }}{% endif %}" class="btn btn-light" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">📊 Exportar a Excel</a>
+                <a href="{{ url_for('informes.facturacion_emitida_exportar_pdf', tipo=tipo_filtro, año=año, periodo=periodo) }}{% if cliente_id %}&cliente_id={{ cliente_id }}{% endif %}" class="btn btn-light" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">📄 Exportar a PDF</a>
             </div>
         </div>
         <div class="resumen-grid">

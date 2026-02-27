@@ -1,15 +1,19 @@
 """Rutas para informes y reportes"""
-from flask import Blueprint, render_template, request, jsonify, send_file
+from flask import Blueprint, render_template, request, jsonify, send_file, make_response, redirect, url_for
 from flask_login import login_required
 from datetime import datetime
 from decimal import Decimal
 from extensions import db
-from models import Factura, FacturaProveedor, Nomina, Empleado, LineaFactura, Cliente
+from models import Factura, FacturaProveedor, Nomina, Empleado, LineaFactura, Cliente, Ticket, OtroGasto
 from sqlalchemy import func, extract, not_
 from utils.auth import not_usuario_required
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment
+from io import BytesIO
+from playwright.sync_api import sync_playwright
 import io
+import tempfile
+import os
 
 informes_bp = Blueprint('informes', __name__)
 
@@ -234,6 +238,103 @@ def facturacion_emitida_exportar_excel():
         download_name=filename
     )
 
+@informes_bp.route('/informes/facturacion-emitida/exportar-pdf')
+@login_required
+@not_usuario_required
+def facturacion_emitida_exportar_pdf():
+    """Exportar informe de facturación emitida a PDF (vertical, una hoja)"""
+    tipo_filtro = request.args.get('tipo', 'mes')
+    año = request.args.get('año', datetime.now().year, type=int)
+    periodo = request.args.get('periodo', None, type=int)
+    cliente_id = request.args.get('cliente_id', None, type=int)
+    
+    query = Factura.query.filter(
+        extract('year', Factura.fecha_expedicion) == año,
+        not_(Factura.numero.like('A%_%'))
+    )
+    if cliente_id:
+        query = query.filter(Factura.cliente_id == cliente_id)
+    
+    if tipo_filtro == 'mes' and periodo:
+        query = query.filter(extract('month', Factura.fecha_expedicion) == periodo)
+        periodo_label = f"{['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][periodo]} {año}"
+    elif tipo_filtro == 'trimestre' and periodo:
+        mes_inicio = (periodo - 1) * 3 + 1
+        mes_fin = periodo * 3
+        query = query.filter(extract('month', Factura.fecha_expedicion).between(mes_inicio, mes_fin))
+        trimestres = {1: '1T', 2: '2T', 3: '3T', 4: '4T'}
+        periodo_label = f"{trimestres.get(periodo, '')} {año}"
+    else:
+        periodo_label = f"Año {año}"
+    
+    facturas = query.order_by(Factura.fecha_expedicion.desc()).all()
+    
+    # Calcular totales
+    total_facturacion = sum(f.importe_total for f in facturas)
+    total_base = Decimal('0')
+    total_iva = Decimal('0')
+    for factura in facturas:
+        tipo_iva_val = float(factura.tipo_iva) if factura.tipo_iva else 21.0
+        importe_total_val = float(factura.importe_total) if factura.importe_total else 0.0
+        descuento_val = float(factura.descuento_pronto_pago) if factura.descuento_pronto_pago else 0.0
+        if descuento_val > 0:
+            subtotal_sin_descuento = importe_total_val / (1 - descuento_val / 100)
+            base = subtotal_sin_descuento / (1 + tipo_iva_val / 100)
+            iva = subtotal_sin_descuento - base
+        else:
+            base = importe_total_val / (1 + tipo_iva_val / 100)
+            iva = importe_total_val - base
+        total_base += Decimal(str(round(base, 2)))
+        total_iva += Decimal(str(round(iva, 2)))
+    
+    total_iva_repercutido = total_iva
+    
+    html = render_template('informes/facturacion_emitida_pdf.html',
+        facturas=facturas,
+        periodo_label=periodo_label,
+        total_facturacion=total_facturacion,
+        total_iva_repercutido=total_iva_repercutido,
+        total_base=total_base,
+        total_iva=total_iva
+    )
+    
+    pdf_buffer = BytesIO()
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+            temp_file.write(html)
+            temp_html_path = temp_file.name
+        
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(f'file://{temp_html_path}')
+            pdf_bytes = page.pdf(
+                format='A4',
+                print_background=True,
+                margin={'top': '6mm', 'right': '6mm', 'bottom': '6mm', 'left': '6mm'}
+            )
+            browser.close()
+        
+        pdf_buffer.write(pdf_bytes)
+        try:
+            os.unlink(temp_html_path)
+        except Exception:
+            pass
+    except Exception as e:
+        import traceback
+        from flask import flash
+        print(traceback.format_exc())
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        return redirect(url_for('informes.facturacion_emitida'))
+    
+    pdf_buffer.seek(0)
+    filename = f'facturacion_emitida_{periodo_label.replace(" ", "_")}.pdf'
+    
+    response = make_response(pdf_buffer.read())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'inline; filename={filename}'
+    return response
+
 @informes_bp.route('/informes/facturacion-soportada')
 @login_required
 @not_usuario_required
@@ -388,6 +489,93 @@ def iva():
                          periodo_label=periodo_label,
                          num_facturas_emitidas=len(facturas_emitidas),
                          num_facturas_proveedor=len(facturas_proveedor))
+
+@informes_bp.route('/informes/resultados')
+@login_required
+@not_usuario_required
+def resultados():
+    """Informe de resultados: ingresos - gastos categorizados por tipo, con gráficas mes a mes"""
+    año = request.args.get('año', datetime.now().year, type=int)
+    
+    MESES = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 
+             'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+    
+    datos_meses = []
+    
+    for mes in range(1, 13):
+        # Ingresos: Facturas emitidas (excl. albaranes) + Tickets tienda
+        facturas = Factura.query.filter(
+            extract('year', Factura.fecha_expedicion) == año,
+            extract('month', Factura.fecha_expedicion) == mes,
+            not_(Factura.numero.like('A%_%'))
+        ).all()
+        ingresos_facturas = sum(Decimal(str(f.importe_total)) for f in facturas)
+        
+        tickets = Ticket.query.filter(
+            extract('year', Ticket.fecha_expedicion) == año,
+            extract('month', Ticket.fecha_expedicion) == mes
+        ).all()
+        ingresos_tickets = sum(Decimal(str(t.importe_total)) for t in tickets)
+        ingresos = ingresos_facturas + ingresos_tickets
+        
+        # Gastos por categoría
+        facturas_prov = FacturaProveedor.query.filter(
+            extract('year', FacturaProveedor.fecha_factura) == año,
+            extract('month', FacturaProveedor.fecha_factura) == mes
+        ).all()
+        gasto_facturas = sum(Decimal(str(f.total)) for f in facturas_prov)
+        
+        nominas = Nomina.query.filter(Nomina.año == año, Nomina.mes == mes).all()
+        gasto_nominas = sum(Decimal(str(n.total_devengado)) for n in nominas)
+        
+        recibo_iva = OtroGasto.query.filter(
+            extract('year', OtroGasto.fecha) == año,
+            extract('month', OtroGasto.fecha) == mes,
+            OtroGasto.tipo == 'recibo_iva'
+        ).all()
+        gasto_iva = sum(Decimal(str(g.importe)) for g in recibo_iva)
+        
+        recibo_irpf = OtroGasto.query.filter(
+            extract('year', OtroGasto.fecha) == año,
+            extract('month', OtroGasto.fecha) == mes,
+            OtroGasto.tipo == 'recibo_irpf'
+        ).all()
+        gasto_irpf = sum(Decimal(str(g.importe)) for g in recibo_irpf)
+        
+        seg_social = OtroGasto.query.filter(
+            extract('year', OtroGasto.fecha) == año,
+            extract('month', OtroGasto.fecha) == mes,
+            OtroGasto.tipo == 'seguridad_social'
+        ).all()
+        gasto_seg_social = sum(Decimal(str(g.importe)) for g in seg_social)
+        
+        total_gastos = gasto_facturas + gasto_nominas + gasto_iva + gasto_irpf + gasto_seg_social
+        resultado = ingresos - total_gastos
+        
+        datos_meses.append({
+            'mes': mes,
+            'mes_nombre': MESES[mes],
+            'ingresos': float(ingresos),
+            'gasto_facturas': float(gasto_facturas),
+            'gasto_nominas': float(gasto_nominas),
+            'gasto_iva': float(gasto_iva),
+            'gasto_irpf': float(gasto_irpf),
+            'gasto_seg_social': float(gasto_seg_social),
+            'total_gastos': float(total_gastos),
+            'resultado': float(resultado)
+        })
+    
+    # Totales anuales
+    total_ingresos = sum(d['ingresos'] for d in datos_meses)
+    total_gastos_anual = sum(d['total_gastos'] for d in datos_meses)
+    resultado_anual = total_ingresos - total_gastos_anual
+    
+    return render_template('informes/resultados.html',
+                         datos_meses=datos_meses,
+                         año=año,
+                         total_ingresos=total_ingresos,
+                         total_gastos_anual=total_gastos_anual,
+                         resultado_anual=resultado_anual)
 
 @informes_bp.route('/informes/facturacion-emitida/detalle')
 @login_required

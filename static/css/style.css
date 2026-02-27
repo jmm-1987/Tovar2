@@ -301,6 +301,31 @@ nav a {
     display: none;
 }
 
+.dropdown-submenu {
+    padding: 8px 16px 4px;
+}
+
+.dropdown-submenu-label {
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: #6c757d;
+    display: block;
+    padding-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.dropdown-submenu a {
+    padding-left: 24px;
+    font-size: 0.85rem;
+}
+
+.dropdown-divider {
+    height: 1px;
+    background: #dee2e6;
+    margin: 8px 16px;
+}
+
 nav a::before {
     content: '';
     position: absolute;

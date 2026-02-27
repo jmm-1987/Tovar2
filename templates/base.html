@@ -44,26 +44,20 @@
                             </div>
                         </div>
                         {% if current_user.rol != 'comercial' %}
-                        {# Los comerciales no ven estadísticas #}
-                        <div class="dropdown">
-                            <a href="#" class="dropdown-toggle">📊 Informes <span class="dropdown-arrow">▼</span></a>
-                            <div class="dropdown-menu">
-                                <a href="{{ url_for('informes.facturacion_emitida') }}">Facturación Emitida</a>
-                                <a href="{{ url_for('informes.facturacion_soportada') }}">Facturación Soportada</a>
-                                <a href="{{ url_for('informes.nominas') }}">Nóminas</a>
-                                <a href="{{ url_for('informes.iva') }}">IVA</a>
-                            </div>
-                        </div>
                         {# Los comerciales no ven nada de la sección de Gastos #}
                         <div class="dropdown">
                             <a href="#" class="dropdown-toggle">💰 Gastos <span class="dropdown-arrow">▼</span></a>
                             <div class="dropdown-menu">
-                                <a href="{{ url_for('gastos.listado_proveedores') }}">Proveedores</a>
-                                <a href="{{ url_for('gastos.listado_facturas_proveedor') }}">Facturas Proveedor</a>
-                                <a href="{{ url_for('gastos.listado_empleados') }}">Empleados</a>
+                                <a href="{{ url_for('gastos.listado_facturas_proveedor') }}">Facturas de Proveedor</a>
                                 <a href="{{ url_for('gastos.listado_nominas') }}">Nóminas</a>
+                                <div class="dropdown-divider"></div>
+                                <a href="{{ url_for('gastos.listado_otro_gasto', tipo_gasto='recibo-iva') }}">Recibo IVA</a>
+                                <a href="{{ url_for('gastos.listado_otro_gasto', tipo_gasto='recibo-irpf') }}">Recibo IRPF</a>
+                                <a href="{{ url_for('gastos.listado_otro_gasto', tipo_gasto='seguridad-social') }}">Seguridad Social</a>
                             </div>
                         </div>
+                        {# Los comerciales no ven estadísticas - Informes como botón a la derecha de Gastos #}
+                        <a href="{{ url_for('informes.index') }}">📊 Informes</a>
                         {% endif %}
                         {% if current_user.is_supervisor() %}
                             <a href="{{ url_for('configuracion.index') }}">⚙️ Configuración</a>

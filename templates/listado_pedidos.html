@@ -60,7 +60,7 @@ h2::after {
             <div style="display: flex; gap: 8px; align-items: flex-end;">
                 <a href="{{ url_for('pedidos.nuevo_pedido') }}" class="btn btn-success" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; transition: all 0.3s ease;">➕ Nuevo</a>
                 <button type="submit" class="btn btn-primary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
-                    🔍 Filtrar
+                    🔍 Buscar
                 </button>
                 {% if estado_filtro or fecha_desde or fecha_hasta or mostrar_entregados %}
                 <a href="{{ url_for('pedidos.listado_pedidos') }}" class="btn btn-secondary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; transition: all 0.3s ease;">

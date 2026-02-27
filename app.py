@@ -129,7 +129,7 @@ def load_user(user_id):
         return Usuario.query.get(int(user_id))
 
 # Importar modelos (se crean automáticamente al importar models.py)
-from models import Comercial, Cliente, Prenda, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, Usuario, PlantillaEmail, Proveedor, FacturaProveedor, Empleado, Nomina, RegistroCambioEstado, Configuracion, CategoriaCliente, DireccionEnvio, DiaFestivo
+from models import Comercial, Cliente, Prenda, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, Usuario, PlantillaEmail, Proveedor, FacturaProveedor, Empleado, Nomina, OtroGasto, RegistroCambioEstado, Configuracion, CategoriaCliente, DireccionEnvio, DiaFestivo
 
 # Importar y registrar blueprints
 from routes.index import index_bp
@@ -1421,7 +1421,7 @@ Saludos cordiales,
                     pass
             
             # Verificar y crear tablas de gastos si no existen
-            tablas_gastos = ['proveedores', 'facturas_proveedor', 'empleados', 'nominas']
+            tablas_gastos = ['proveedores', 'facturas_proveedor', 'empleados', 'nominas', 'otros_gastos']
             for tabla in tablas_gastos:
                 if tabla not in table_names:
                     try:

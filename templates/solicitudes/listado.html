@@ -14,7 +14,7 @@ header {
     margin-bottom: 0.8rem !important;
 }
 </style>
-<h2 style="margin: 0 0 6px 0; padding-bottom: 0; font-size: 1.1rem;">Listado de Solicitudes</h2>
+<h2 style="margin: 0 0 6px 0; padding-bottom: 0; font-size: 1.2rem;">Listado de Solicitudes</h2>
 
 <div style="margin-bottom: 12px;">
     <div class="filtros-container" style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); padding: 8px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #e9ecef;">
@@ -26,10 +26,10 @@ header {
             <input type="hidden" name="sort_order" value="{{ sort_order }}">
             {% endif %}
             <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 120px;">
-                <label for="estado" style="font-size: 0.7rem; font-weight: 600; color: #495057; margin-bottom: 2px; display: flex; align-items: center; gap: 3px;">
+                <label for="estado" style="font-size: 0.8rem; font-weight: 600; color: #495057; margin-bottom: 2px; display: flex; align-items: center; gap: 3px;">
                     <span>🏷️</span> Estado
                 </label>
-                <select name="estado" id="estado" class="filtro-input" style="padding: 4px 8px; border: 2px solid #dee2e6; border-radius: 4px; font-size: 0.75rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                <select name="estado" id="estado" class="filtro-input" style="padding: 5px 8px; border: 2px solid #dee2e6; border-radius: 4px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
                     <option value="">Todos los estados</option>
                     {% for estado in estados %}
                     <option value="{{ estado }}" {% if estado_filtro == estado %}selected{% endif %}>{{ estado|title }}</option>
@@ -37,11 +37,11 @@ header {
                 </select>
             </div>
             
-            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 120px;">
-                <label for="cliente_id" style="font-size: 0.7rem; font-weight: 600; color: #495057; margin-bottom: 2px; display: flex; align-items: center; gap: 3px;">
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 0 0 140px; max-width: 140px;">
+                <label for="cliente_id" style="font-size: 0.8rem; font-weight: 600; color: #495057; margin-bottom: 2px; display: flex; align-items: center; gap: 3px;">
                     <span>👤</span> Cliente
                 </label>
-                <select name="cliente_id" id="cliente_id" class="filtro-input" style="padding: 4px 8px; border: 2px solid #dee2e6; border-radius: 4px; font-size: 0.75rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                <select name="cliente_id" id="cliente_id" class="filtro-input" style="padding: 5px 8px; border: 2px solid #dee2e6; border-radius: 4px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
                     <option value="">Todos los clientes</option>
                     {% for cliente in clientes %}
                     <option value="{{ cliente.id }}" {% if cliente_id|string == cliente.id|string %}selected{% endif %}>{{ cliente.nombre }}</option>
@@ -50,10 +50,10 @@ header {
             </div>
             
             <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 120px;">
-                <label for="comercial_id" style="font-size: 0.7rem; font-weight: 600; color: #495057; margin-bottom: 2px; display: flex; align-items: center; gap: 3px;">
+                <label for="comercial_id" style="font-size: 0.8rem; font-weight: 600; color: #495057; margin-bottom: 2px; display: flex; align-items: center; gap: 3px;">
                     <span>💼</span> Comercial
                 </label>
-                <select name="comercial_id" id="comercial_id" class="filtro-input" style="padding: 4px 8px; border: 2px solid #dee2e6; border-radius: 4px; font-size: 0.75rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                <select name="comercial_id" id="comercial_id" class="filtro-input" style="padding: 5px 8px; border: 2px solid #dee2e6; border-radius: 4px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
                     <option value="">Todos los comerciales</option>
                     {% for comercial in comerciales %}
                     <option value="{{ comercial.id }}" {% if comercial_id|string == comercial.id|string %}selected{% endif %}>{{ comercial.nombre }}</option>
@@ -62,26 +62,26 @@ header {
             </div>
             
             <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 120px;">
-                <label for="fecha_desde" style="font-size: 0.7rem; font-weight: 600; color: #495057; margin-bottom: 2px; display: flex; align-items: center; gap: 3px;">
+                <label for="fecha_desde" style="font-size: 0.8rem; font-weight: 600; color: #495057; margin-bottom: 2px; display: flex; align-items: center; gap: 3px;">
                     <span>📅</span> Fecha Desde
                 </label>
-                <input type="date" name="fecha_desde" id="fecha_desde" value="{{ fecha_desde }}" class="filtro-input" style="padding: 4px 8px; border: 2px solid #dee2e6; border-radius: 4px; font-size: 0.75rem; background: white; color: #495057; transition: all 0.3s ease;">
+                <input type="date" name="fecha_desde" id="fecha_desde" value="{{ fecha_desde }}" class="filtro-input" style="padding: 5px 8px; border: 2px solid #dee2e6; border-radius: 4px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease;">
             </div>
             
             <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 120px;">
-                <label for="fecha_hasta" style="font-size: 0.7rem; font-weight: 600; color: #495057; margin-bottom: 2px; display: flex; align-items: center; gap: 3px;">
+                <label for="fecha_hasta" style="font-size: 0.8rem; font-weight: 600; color: #495057; margin-bottom: 2px; display: flex; align-items: center; gap: 3px;">
                     <span>📅</span> Fecha Hasta
                 </label>
-                <input type="date" name="fecha_hasta" id="fecha_hasta" value="{{ fecha_hasta }}" class="filtro-input" style="padding: 4px 8px; border: 2px solid #dee2e6; border-radius: 4px; font-size: 0.75rem; background: white; color: #495057; transition: all 0.3s ease;">
+                <input type="date" name="fecha_hasta" id="fecha_hasta" value="{{ fecha_hasta }}" class="filtro-input" style="padding: 5px 8px; border: 2px solid #dee2e6; border-radius: 4px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease;">
             </div>
             
             <div style="display: flex; gap: 6px; align-items: flex-end;">
-                <a href="{{ url_for('solicitudes.nueva_solicitud') }}" class="btn btn-success" style="padding: 4px 10px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; transition: all 0.3s ease;">➕ Nueva</a>
-                <button type="submit" class="btn btn-primary" style="padding: 4px 10px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
-                    🔍 Filtrar
+                <a href="{{ url_for('solicitudes.nueva_solicitud') }}" class="btn btn-success" style="padding: 5px 12px; border-radius: 4px; font-weight: 600; font-size: 0.85rem; transition: all 0.3s ease;">➕ Nueva</a>
+                <button type="submit" class="btn btn-primary" style="padding: 5px 12px; border-radius: 4px; font-weight: 600; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
+                    🔍 Buscar
                 </button>
                 {% if estado_filtro or fecha_desde or fecha_hasta or cliente_id or comercial_id %}
-                <a href="{{ url_for('solicitudes.listado_solicitudes') }}" class="btn btn-secondary" style="padding: 4px 10px; border-radius: 4px; font-weight: 600; font-size: 0.75rem; transition: all 0.3s ease;">
+                <a href="{{ url_for('solicitudes.listado_solicitudes') }}" class="btn btn-secondary" style="padding: 5px 12px; border-radius: 4px; font-weight: 600; font-size: 0.85rem; transition: all 0.3s ease;">
                     🗑️ Limpiar
                 </a>
                 {% endif %}
@@ -95,34 +95,34 @@ header {
     <table style="width: 100%; border-collapse: collapse;">
         <thead>
             <tr style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); border-bottom: 2px solid #1a252f;">
-                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.8rem; cursor: pointer;" onclick="sortTable('numero_solicitud')">
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.9rem; cursor: pointer;" onclick="sortTable('numero_solicitud')">
                     Nº {% if sort_by == 'numero_solicitud' %}{% if sort_order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                 </th>
-                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.8rem; cursor: pointer;" onclick="sortTable('fecha_creacion')">
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.9rem; cursor: pointer;" onclick="sortTable('fecha_creacion')">
                     Fecha {% if sort_by == 'fecha_creacion' %}{% if sort_order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                 </th>
-                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.8rem; cursor: pointer;" onclick="sortTable('cliente')">
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.9rem; cursor: pointer; max-width: 140px;" onclick="sortTable('cliente')">
                     Cliente {% if sort_by == 'cliente' %}{% if sort_order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                 </th>
-                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.8rem; cursor: pointer;" onclick="sortTable('comercial')">
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.9rem; cursor: pointer;" onclick="sortTable('comercial')">
                     Comercial {% if sort_by == 'comercial' %}{% if sort_order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                 </th>
-                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.8rem; cursor: pointer;" onclick="sortTable('tipo_pedido')">
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.9rem; cursor: pointer;" onclick="sortTable('tipo_pedido')">
                     Tipo {% if sort_by == 'tipo_pedido' %}{% if sort_order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                 </th>
-                <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; font-size: 0.8rem; cursor: pointer;" onclick="sortTable('estado')">
+                <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; font-size: 0.9rem; cursor: pointer;" onclick="sortTable('estado')">
                     Estado {% if sort_by == 'estado' %}{% if sort_order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                 </th>
-                <th style="padding: 8px 10px; text-align: right; color: #ffffff; font-weight: 600; font-size: 0.8rem; cursor: pointer; min-width: 100px;" onclick="sortTable('base_imponible')">
+                <th style="padding: 8px 10px; text-align: right; color: #ffffff; font-weight: 600; font-size: 0.9rem; cursor: pointer; min-width: 100px;" onclick="sortTable('base_imponible')">
                     Base {% if sort_by == 'base_imponible' %}{% if sort_order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                 </th>
-                <th style="padding: 8px 10px; text-align: right; color: #ffffff; font-weight: 600; font-size: 0.8rem; cursor: pointer; min-width: 100px;" onclick="sortTable('iva_total')">
+                <th style="padding: 8px 10px; text-align: right; color: #ffffff; font-weight: 600; font-size: 0.9rem; cursor: pointer; min-width: 100px;" onclick="sortTable('iva_total')">
                     IVA {% if sort_by == 'iva_total' %}{% if sort_order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                 </th>
-                <th style="padding: 8px 10px; text-align: right; color: #ffffff; font-weight: 600; font-size: 0.8rem; cursor: pointer; min-width: 100px;" onclick="sortTable('total_con_iva')">
+                <th style="padding: 8px 10px; text-align: right; color: #ffffff; font-weight: 600; font-size: 0.9rem; cursor: pointer; min-width: 100px;" onclick="sortTable('total_con_iva')">
                     Total {% if sort_by == 'total_con_iva' %}{% if sort_order == 'asc' %}↑{% else %}↓{% endif %}{% endif %}
                 </th>
-                <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; font-size: 0.8rem;">Acciones</th>
+                <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; font-size: 0.9rem;">Acciones</th>
             </tr>
         </thead>
         <tbody>
@@ -132,26 +132,26 @@ header {
             {% set iva_total = item.iva_total %}
             {% set total_con_iva = item.total_con_iva %}
             <tr style="border-bottom: 1px solid #e9ecef; transition: background 0.2s;" onmouseover="this.style.background='#f8f9fa'" onmouseout="this.style.background='white'">
-                <td style="padding: 8px 10px; color: #495057; font-weight: 600; font-size: 0.8rem;">{{ solicitud.numero_solicitud or solicitud.id }}</td>
-                <td style="padding: 8px 10px; color: #495057; font-size: 0.8rem;">{{ solicitud.fecha_creacion.strftime('%d/%m/%Y') if solicitud.fecha_creacion else 'N/A' }}</td>
-                <td style="padding: 8px 10px; color: #495057; font-size: 0.8rem;">{{ solicitud.cliente.nombre if solicitud.cliente else 'N/A' }}</td>
-                <td style="padding: 8px 10px; color: #495057; font-size: 0.8rem;">{{ solicitud.comercial.nombre if solicitud.comercial else 'N/A' }}</td>
-                <td style="padding: 8px 10px; color: #495057; font-size: 0.8rem;">{{ solicitud.tipo_pedido|title }}</td>
+                <td style="padding: 8px 10px; color: #495057; font-weight: 600; font-size: 0.9rem;">{{ solicitud.numero_solicitud or solicitud.id }}</td>
+                <td style="padding: 8px 10px; color: #495057; font-size: 0.9rem;">{{ solicitud.fecha_creacion.strftime('%d/%m/%Y') if solicitud.fecha_creacion else 'N/A' }}</td>
+                <td style="padding: 8px 10px; color: #495057; font-size: 0.9rem; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ solicitud.cliente.nombre if solicitud.cliente else 'N/A' }}">{{ solicitud.cliente.nombre if solicitud.cliente else 'N/A' }}</td>
+                <td style="padding: 8px 10px; color: #495057; font-size: 0.9rem;">{{ solicitud.comercial.nombre if solicitud.comercial else 'N/A' }}</td>
+                <td style="padding: 8px 10px; color: #495057; font-size: 0.9rem;">{{ solicitud.tipo_pedido|title }}</td>
                 <td style="padding: 8px 10px; text-align: center;">
-                    <span class="badge badge-estado-{{ solicitud.estado|lower|replace(' ', '-') }}" style="padding: 3px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: 600; display: inline-block;">
+                    <span class="badge badge-estado-{{ solicitud.estado|lower|replace(' ', '-') }}" style="padding: 3px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; display: inline-block;">
                         {{ solicitud.estado|title }}
                     </span>
                 </td>
-                <td style="padding: 8px 10px; text-align: right; color: #495057; font-size: 0.8rem; font-weight: 600; min-width: 100px;">{{ "%.2f"|format(base_imponible) }} €</td>
-                <td style="padding: 8px 10px; text-align: right; color: #495057; font-size: 0.8rem; min-width: 100px;">{{ "%.2f"|format(iva_total) }} €</td>
-                <td style="padding: 8px 10px; text-align: right; color: #495057; font-size: 0.8rem; font-weight: 600; min-width: 100px;">{{ "%.2f"|format(total_con_iva) }} €</td>
+                <td style="padding: 8px 10px; text-align: right; color: #495057; font-size: 0.9rem; font-weight: 600; min-width: 100px;">{{ "%.2f"|format(base_imponible) }} €</td>
+                <td style="padding: 8px 10px; text-align: right; color: #495057; font-size: 0.9rem; min-width: 100px;">{{ "%.2f"|format(iva_total) }} €</td>
+                <td style="padding: 8px 10px; text-align: right; color: #495057; font-size: 0.9rem; font-weight: 600; min-width: 100px;">{{ "%.2f"|format(total_con_iva) }} €</td>
                 <td style="padding: 8px 10px; text-align: center;">
                     <div style="display: flex; gap: 2px; justify-content: center; align-items: center; flex-wrap: nowrap;">
-                        <a href="{{ url_for('solicitudes.ver_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-xs btn-primary" style="padding: 2px 6px; font-size: 0.65rem; white-space: nowrap;">Ver</a>
-                        <a href="{{ url_for('solicitudes.editar_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-xs btn-secondary" style="padding: 2px 6px; font-size: 0.65rem; white-space: nowrap;">Editar</a>
-                        <a href="{{ url_for('solicitudes.descargar_pdf_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-xs" style="padding: 2px 6px; font-size: 0.65rem; background: #dc3545; color: white; text-decoration: none; border-radius: 3px; white-space: nowrap;" target="_blank" title="Descargar PDF">📄</a>
-                        <a href="{{ url_for('solicitudes.descargar_pdf_detallado_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-xs" style="padding: 2px 6px; font-size: 0.65rem; background: #17a2b8; color: white; text-decoration: none; border-radius: 3px; white-space: nowrap;" target="_blank" title="Descargar PDF Detallado">📋</a>
-                        <a href="{{ url_for('solicitudes.descargar_albaran_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-xs" style="padding: 2px 6px; font-size: 0.65rem; background: #28a745; color: white; text-decoration: none; border-radius: 3px; white-space: nowrap;" target="_blank" title="Descargar Albarán">📦</a>
+                        <a href="{{ url_for('solicitudes.ver_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-xs btn-primary" style="padding: 3px 6px; font-size: 0.75rem; white-space: nowrap;">Ver</a>
+                        <a href="{{ url_for('solicitudes.editar_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-xs btn-secondary" style="padding: 3px 6px; font-size: 0.75rem; white-space: nowrap;">Editar</a>
+                        <a href="{{ url_for('solicitudes.descargar_pdf_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-xs" style="padding: 3px 6px; font-size: 0.75rem; background: #dc3545; color: white; text-decoration: none; border-radius: 3px; white-space: nowrap;" target="_blank" title="Descargar PDF">📄</a>
+                        <a href="{{ url_for('solicitudes.descargar_pdf_detallado_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-xs" style="padding: 3px 6px; font-size: 0.75rem; background: #17a2b8; color: white; text-decoration: none; border-radius: 3px; white-space: nowrap;" target="_blank" title="Descargar PDF Detallado">📋</a>
+                        <a href="{{ url_for('solicitudes.descargar_albaran_solicitud', solicitud_id=solicitud.id) }}" class="btn btn-xs" style="padding: 3px 6px; font-size: 0.75rem; background: #28a745; color: white; text-decoration: none; border-radius: 3px; white-space: nowrap;" target="_blank" title="Descargar Albarán">📦</a>
                     </div>
                 </td>
             </tr>
@@ -161,7 +161,7 @@ header {
 </div>
 {% else %}
 <div style="text-align: center; padding: 40px; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-    <p style="color: #6c757d; font-size: 1.1rem;">No se encontraron solicitudes con los filtros aplicados.</p>
+    <p style="color: #6c757d; font-size: 1rem;">No se encontraron solicitudes con los filtros aplicados.</p>
 </div>
 {% endif %}
 
@@ -238,8 +238,8 @@ h2::after {
 .badge-estado-pedido-rechazado { background: #dc3545; color: white; }
 
 .btn-xs {
-    padding: 2px 6px !important;
-    font-size: 0.65rem !important;
+    padding: 3px 6px !important;
+    font-size: 0.75rem !important;
     line-height: 1.2;
     border-radius: 3px;
 }

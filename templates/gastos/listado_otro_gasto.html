@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}{{ nombre_tipo }} - Gastos{% endblock %}
+
+{% block content %}
+<div class="clientes-container">
+    <div class="clientes-header">
+        <h2>{{ nombre_tipo }}</h2>
+        <a href="{{ url_for('gastos.nuevo_otro_gasto', tipo_gasto=tipo_gasto) }}" class="btn btn-success">➕ Nuevo</a>
+    </div>
+
+    <div style="margin-bottom: 25px;">
+        <div class="filtros-container" style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #e9ecef;">
+            <form method="GET" action="{{ url_for('gastos.listado_otro_gasto', tipo_gasto=tipo_gasto) }}" style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 180px;">
+                    <label for="fecha_desde" style="font-size: 0.875rem; font-weight: 600; color: #495057; margin-bottom: 6px;">
+                        📅 Fecha Desde
+                    </label>
+                    <input type="date" name="fecha_desde" value="{{ fecha_desde }}" class="filtro-input" style="padding: 10px 14px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem;">
+                </div>
+                <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 180px;">
+                    <label for="fecha_hasta" style="font-size: 0.875rem; font-weight: 600; color: #495057; margin-bottom: 6px;">
+                        📅 Fecha Hasta
+                    </label>
+                    <input type="date" name="fecha_hasta" value="{{ fecha_hasta }}" class="filtro-input" style="padding: 10px 14px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem;">
+                </div>
+                <div style="display: flex; gap: 10px; align-items: flex-end;">
+                    <button type="submit" class="btn btn-primary">🔍 Buscar</button>
+                    {% if fecha_desde or fecha_hasta %}
+                    <a href="{{ url_for('gastos.listado_otro_gasto', tipo_gasto=tipo_gasto) }}" class="btn btn-secondary">🗑️ Limpiar</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if gastos %}
+    <div class="table-container">
+        <table class="clientes-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Fecha</th>
+                    <th>Período</th>
+                    <th>Importe</th>
+                    <th>Observaciones</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for gasto in gastos %}
+                <tr>
+                    <td>{{ gasto.id }}</td>
+                    <td>{{ gasto.fecha.strftime('%d/%m/%Y') if gasto.fecha else '-' }}</td>
+                    <td>{{ gasto.periodo or '-' }}</td>
+                    <td><strong>{{ "%.2f"|format(gasto.importe) }} €</strong></td>
+                    <td>{{ gasto.observaciones[:50] + '...' if gasto.observaciones and gasto.observaciones|length > 50 else (gasto.observaciones or '-') }}</td>
+                    <td class="acciones-cell">
+                        <a href="{{ url_for('gastos.editar_otro_gasto', tipo_gasto=tipo_gasto, gasto_id=gasto.id) }}" class="btn btn-xs btn-primary" style="padding: 2px 6px; font-size: 0.7rem;">Editar</a>
+                        <form method="POST" action="{{ url_for('gastos.eliminar_otro_gasto', tipo_gasto=tipo_gasto, gasto_id=gasto.id) }}" style="display: inline;" onsubmit="return confirm('¿Eliminar este registro?');">
+                            <button type="submit" class="btn btn-xs btn-danger" style="padding: 2px 6px; font-size: 0.7rem;">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="font-weight: bold;">
+                    <td colspan="3">Total</td>
+                    <td>{{ "%.2f"|format(total) }} €</td>
+                    <td colspan="2"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% else %}
+    <div class="no-data">
+        <p>No hay registros de {{ nombre_tipo }}.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

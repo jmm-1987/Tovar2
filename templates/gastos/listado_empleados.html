@@ -6,7 +6,10 @@
 <div class="clientes-container">
     <div class="clientes-header">
         <h2>Gestión de Empleados</h2>
-        <a href="{{ url_for('gastos.nuevo_empleado') }}" class="btn btn-success">➕ Crear Empleado</a>
+        <div style="display: flex; gap: 10px;">
+            <a href="{{ url_for('gastos.listado_nominas') }}" class="btn btn-secondary" style="text-decoration: none;">📄 Nóminas</a>
+            <a href="{{ url_for('gastos.nuevo_empleado') }}" class="btn btn-success">➕ Crear Empleado</a>
+        </div>
     </div>
 
     {% if empleados %}

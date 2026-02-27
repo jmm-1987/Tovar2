@@ -6,7 +6,10 @@
 <div class="clientes-container">
     <div class="clientes-header">
         <h2>Nóminas</h2>
-        <a href="{{ url_for('gastos.nueva_nomina') }}" class="btn btn-success">➕ Nueva Nómina</a>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <a href="{{ url_for('gastos.listado_empleados') }}" class="btn btn-secondary" style="text-decoration: none;">📋 Empleados</a>
+            <a href="{{ url_for('gastos.nueva_nomina') }}" class="btn btn-success">➕ Nueva Nómina</a>
+        </div>
     </div>
 
     <div style="margin-bottom: 25px;">
@@ -63,7 +66,7 @@
                 
                 <div style="display: flex; gap: 10px; align-items: flex-end;">
                     <button type="submit" class="btn btn-primary" style="padding: 10px 20px; border-radius: 8px; font-weight: 600; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
-                        🔍 Filtrar
+                        🔍 Buscar
                     </button>
                     {% if año_desde or mes_desde or año_hasta or mes_hasta %}
                     <a href="{{ url_for('gastos.listado_nominas') }}" class="btn btn-secondary" style="padding: 10px 20px; border-radius: 8px; font-weight: 600; transition: all 0.3s ease;">

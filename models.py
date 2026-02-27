@@ -727,6 +727,23 @@ class Nomina(db.Model):
     def __repr__(self):
         return f'<Nomina {self.empleado.nombre if self.empleado else "Sin empleado"} - {self.mes}/{self.año}>'
 
+class OtroGasto(db.Model):
+    """Otros gastos: Recibo IVA, Recibo IRPF, Seguridad Social"""
+    __tablename__ = 'otros_gastos'
+    
+    TIPOS = ['recibo_iva', 'recibo_irpf', 'seguridad_social']
+    
+    id = db.Column(db.Integer, primary_key=True)
+    tipo = db.Column(db.String(50), nullable=False)  # recibo_iva, recibo_irpf, seguridad_social
+    fecha = db.Column(db.Date, nullable=False)
+    importe = db.Column(db.Numeric(10, 2), nullable=False)
+    periodo = db.Column(db.String(50))  # Ej: "T1 2024", "01/2024"
+    observaciones = db.Column(db.Text)
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<OtroGasto {self.tipo} {self.fecha} {self.importe}€>'
+
 class Configuracion(db.Model):
     """Configuraciones del sistema"""
     __tablename__ = 'configuracion'

@@ -80,7 +80,7 @@ h2::after {
             
             <div style="display: flex; gap: 8px; align-items: flex-end;">
                 <button type="submit" class="btn btn-primary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
-                    🔍 Filtrar
+                    🔍 Buscar
                 </button>
                 {% if tipo_vista != 'pendientes' or estado_filtro or fecha_desde or fecha_hasta %}
                 <a href="{{ url_for('facturacion.facturacion') }}" class="btn btn-secondary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; transition: all 0.3s ease;">

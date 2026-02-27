@@ -4,7 +4,7 @@ from flask_login import login_required
 from datetime import datetime
 from decimal import Decimal
 from extensions import db
-from models import Proveedor, FacturaProveedor, Empleado, Nomina
+from models import Proveedor, FacturaProveedor, Empleado, Nomina, OtroGasto
 from utils.auth import not_usuario_required
 
 gastos_bp = Blueprint('gastos', __name__)
@@ -479,4 +479,130 @@ def eliminar_nomina(nomina_id):
         flash(f'Error al eliminar nómina: {str(e)}', 'error')
     
     return redirect(url_for('gastos.listado_nominas'))
+
+# ========== OTROS GASTOS (Recibo IVA, Recibo IRPF, Seguridad Social) ==========
+
+TIPOS_OTRO_GASTO = {
+    'recibo-iva': {'model': 'recibo_iva', 'nombre': 'Recibo IVA'},
+    'recibo-irpf': {'model': 'recibo_irpf', 'nombre': 'Recibo IRPF'},
+    'seguridad-social': {'model': 'seguridad_social', 'nombre': 'Seguridad Social'},
+}
+
+@gastos_bp.route('/gastos/otros/<tipo_gasto>')
+@login_required
+@not_usuario_required
+def listado_otro_gasto(tipo_gasto):
+    """Listado de gastos por tipo (recibo-iva, recibo-irpf, seguridad-social)"""
+    if tipo_gasto not in TIPOS_OTRO_GASTO:
+        flash('Tipo de gasto no válido', 'error')
+        return redirect(url_for('gastos.listado_facturas_proveedor'))
+    
+    tipo_model = TIPOS_OTRO_GASTO[tipo_gasto]['model']
+    nombre_tipo = TIPOS_OTRO_GASTO[tipo_gasto]['nombre']
+    
+    query = OtroGasto.query.filter(OtroGasto.tipo == tipo_model)
+    
+    fecha_desde = request.args.get('fecha_desde', '')
+    fecha_hasta = request.args.get('fecha_hasta', '')
+    if fecha_desde:
+        try:
+            query = query.filter(OtroGasto.fecha >= datetime.strptime(fecha_desde, '%Y-%m-%d').date())
+        except ValueError:
+            pass
+    if fecha_hasta:
+        try:
+            query = query.filter(OtroGasto.fecha <= datetime.strptime(fecha_hasta, '%Y-%m-%d').date())
+        except ValueError:
+            pass
+    
+    gastos = query.order_by(OtroGasto.fecha.desc()).all()
+    total = sum(Decimal(str(g.importe)) for g in gastos)
+    
+    return render_template('gastos/listado_otro_gasto.html',
+                         gastos=gastos,
+                         total=total,
+                         tipo_gasto=tipo_gasto,
+                         nombre_tipo=nombre_tipo,
+                         fecha_desde=fecha_desde,
+                         fecha_hasta=fecha_hasta)
+
+@gastos_bp.route('/gastos/otros/<tipo_gasto>/nuevo', methods=['GET', 'POST'])
+@login_required
+@not_usuario_required
+def nuevo_otro_gasto(tipo_gasto):
+    """Crear nuevo gasto del tipo indicado"""
+    if tipo_gasto not in TIPOS_OTRO_GASTO:
+        flash('Tipo de gasto no válido', 'error')
+        return redirect(url_for('gastos.listado_facturas_proveedor'))
+    
+    tipo_model = TIPOS_OTRO_GASTO[tipo_gasto]['model']
+    nombre_tipo = TIPOS_OTRO_GASTO[tipo_gasto]['nombre']
+    
+    if request.method == 'POST':
+        try:
+            fecha = datetime.strptime(request.form.get('fecha'), '%Y-%m-%d').date()
+            gasto = OtroGasto(
+                tipo=tipo_model,
+                fecha=fecha,
+                importe=Decimal(str(request.form.get('importe', 0))),
+                periodo=request.form.get('periodo', '') or None,
+                observaciones=request.form.get('observaciones', '') or None
+            )
+            db.session.add(gasto)
+            db.session.commit()
+            flash(f'{nombre_tipo} registrado correctamente', 'success')
+            return redirect(url_for('gastos.listado_otro_gasto', tipo_gasto=tipo_gasto))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al crear: {str(e)}', 'error')
+    
+    return render_template('gastos/nuevo_otro_gasto.html', tipo_gasto=tipo_gasto, nombre_tipo=nombre_tipo)
+
+@gastos_bp.route('/gastos/otros/<tipo_gasto>/<int:gasto_id>/editar', methods=['GET', 'POST'])
+@login_required
+@not_usuario_required
+def editar_otro_gasto(tipo_gasto, gasto_id):
+    """Editar gasto existente"""
+    if tipo_gasto not in TIPOS_OTRO_GASTO:
+        flash('Tipo de gasto no válido', 'error')
+        return redirect(url_for('gastos.listado_facturas_proveedor'))
+    
+    gasto = OtroGasto.query.filter(OtroGasto.id == gasto_id, OtroGasto.tipo == TIPOS_OTRO_GASTO[tipo_gasto]['model']).first_or_404()
+    nombre_tipo = TIPOS_OTRO_GASTO[tipo_gasto]['nombre']
+    
+    if request.method == 'POST':
+        try:
+            gasto.fecha = datetime.strptime(request.form.get('fecha'), '%Y-%m-%d').date()
+            gasto.importe = Decimal(str(request.form.get('importe', 0)))
+            gasto.periodo = request.form.get('periodo', '') or None
+            gasto.observaciones = request.form.get('observaciones', '') or None
+            db.session.commit()
+            flash(f'{nombre_tipo} actualizado correctamente', 'success')
+            return redirect(url_for('gastos.listado_otro_gasto', tipo_gasto=tipo_gasto))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al actualizar: {str(e)}', 'error')
+    
+    return render_template('gastos/editar_otro_gasto.html', gasto=gasto, tipo_gasto=tipo_gasto, nombre_tipo=nombre_tipo)
+
+@gastos_bp.route('/gastos/otros/<tipo_gasto>/<int:gasto_id>/eliminar', methods=['POST'])
+@login_required
+@not_usuario_required
+def eliminar_otro_gasto(tipo_gasto, gasto_id):
+    """Eliminar gasto"""
+    if tipo_gasto not in TIPOS_OTRO_GASTO:
+        flash('Tipo de gasto no válido', 'error')
+        return redirect(url_for('gastos.listado_facturas_proveedor'))
+    
+    gasto = OtroGasto.query.filter(OtroGasto.id == gasto_id, OtroGasto.tipo == TIPOS_OTRO_GASTO[tipo_gasto]['model']).first_or_404()
+    nombre_tipo = TIPOS_OTRO_GASTO[tipo_gasto]['nombre']
+    try:
+        db.session.delete(gasto)
+        db.session.commit()
+        flash(f'{nombre_tipo} eliminado correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al eliminar: {str(e)}', 'error')
+    
+    return redirect(url_for('gastos.listado_otro_gasto', tipo_gasto=tipo_gasto))
 

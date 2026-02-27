@@ -6,7 +6,10 @@
 <div class="clientes-container">
     <div class="clientes-header">
         <h2>Gestión de Proveedores</h2>
-        <a href="{{ url_for('gastos.nuevo_proveedor') }}" class="btn btn-success">➕ Crear Proveedor</a>
+        <div style="display: flex; gap: 10px;">
+            <a href="{{ url_for('gastos.listado_facturas_proveedor') }}" class="btn btn-secondary" style="text-decoration: none;">📄 Facturas</a>
+            <a href="{{ url_for('gastos.nuevo_proveedor') }}" class="btn btn-success">➕ Crear Proveedor</a>
+        </div>
     </div>
 
     {% if proveedores %}

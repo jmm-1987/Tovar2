@@ -6,7 +6,10 @@
 <div class="clientes-container">
     <div class="clientes-header">
         <h2>Facturas de Proveedor</h2>
-        <a href="{{ url_for('gastos.nueva_factura_proveedor') }}" class="btn btn-success">➕ Nueva Factura</a>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <a href="{{ url_for('gastos.listado_proveedores') }}" class="btn btn-secondary" style="text-decoration: none;">📋 Proveedores</a>
+            <a href="{{ url_for('gastos.nueva_factura_proveedor') }}" class="btn btn-success">➕ Nueva Factura</a>
+        </div>
     </div>
 
     <div style="margin-bottom: 25px;">
@@ -40,7 +43,7 @@
                 
                 <div style="display: flex; gap: 10px; align-items: flex-end;">
                     <button type="submit" class="btn btn-primary" style="padding: 10px 20px; border-radius: 8px; font-weight: 600; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
-                        🔍 Filtrar
+                        🔍 Buscar
                     </button>
                     {% if estado_filtro or fecha_desde or fecha_hasta %}
                     <a href="{{ url_for('gastos.listado_facturas_proveedor') }}" class="btn btn-secondary" style="padding: 10px 20px; border-radius: 8px; font-weight: 600; transition: all 0.3s ease;">
