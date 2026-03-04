@@ -45,7 +45,7 @@
 
     {% if clientes %}
     <div class="table-container">
-        <table class="clientes-table">
+        <table class="clientes-table" id="tabla_clientes">
             <thead>
                 <tr>
                     <th>ID</th>
@@ -56,9 +56,9 @@
                     <th>Acciones</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="tabla_clientes_body">
                 {% for cliente in clientes %}
-                <tr>
+                <tr data-search="{{ (cliente.id|string ~ ' ' ~ cliente.nombre ~ ' ' ~ (cliente.alias or '') ~ ' ' ~ (cliente.nif or '') ~ ' ' ~ (cliente.poblacion or '') ~ ' ' ~ (cliente.provincia or ''))|lower }}">
                     <td>{{ cliente.id }}</td>
                     <td>{{ cliente.nombre }}</td>
                     <td>{{ cliente.alias or '-' }}</td>
@@ -79,6 +79,30 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+// Buscador de clientes en la lista (similar al de Nueva Solicitud: filtra mientras se escribe)
+document.addEventListener('DOMContentLoaded', function() {
+    const input = document.getElementById('busqueda');
+    const tbody = document.getElementById('tabla_clientes_body');
+    if (!input || !tbody) return;
+
+    const filas = Array.from(tbody.querySelectorAll('tr'));
+
+    input.addEventListener('input', function() {
+        const term = this.value.toLowerCase().trim();
+
+        filas.forEach(tr => {
+            const hayTexto = tr.dataset.search || '';
+            if (!term || hayTexto.includes(term)) {
+                tr.style.display = '';
+            } else {
+                tr.style.display = 'none';
+            }
+        });
+    });
+});
+</script>
 
 <!-- Modal para crear cliente -->
 <div id="modalCrearCliente" class="modal">

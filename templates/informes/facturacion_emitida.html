@@ -45,16 +45,20 @@
                 {% endif %}
             </div>
             
-            <div class="filtro-group filtro-cliente">
-                <label for="cliente_id">Cliente:</label>
-                <select name="cliente_id" id="cliente_id">
-                    <option value="">Todos los clientes</option>
-                    {% for cliente in clientes %}
-                    <option value="{{ cliente.id }}" {% if cliente_id == cliente.id %}selected{% endif %}>
-                        {{ cliente.nombre }}
-                    </option>
-                    {% endfor %}
-                </select>
+            <div class="filtro-group filtro-cliente" style="position: relative;">
+                <label for="cliente_search">Cliente:</label>
+                <div style="position: relative;">
+                    <input type="text" id="cliente_search" placeholder="🔍 Buscar cliente..." value="{{ cliente_seleccionado.nombre if cliente_seleccionado else '' }}"
+                           style="width: 100%; padding: 8px 32px 8px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em; box-sizing: border-box;" autocomplete="off">
+                    <span style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #6c757d; font-size: 14px;">🔍</span>
+                    <select name="cliente_id" id="cliente_id" style="position: absolute; left: -9999px; width: 1px; height: 1px;">
+                        <option value="">Todos los clientes</option>
+                        {% for cliente in clientes %}
+                        <option value="{{ cliente.id }}" data-nombre="{{ cliente.nombre|lower }}" {% if cliente_id == cliente.id %}selected{% endif %}>{{ cliente.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <div id="cliente_results" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 6px 6px; max-height: 200px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+                </div>
             </div>
             
             <button type="submit" class="btn btn-primary">Buscar</button>
@@ -90,7 +94,7 @@
     <!-- Tabla de facturas -->
     {% if facturas %}
     <div class="table-container">
-        <table class="clientes-table">
+        <table class="clientes-table" id="tabla_facturas_emitidas">
             <thead>
                 <tr>
                     <th>Número</th>
@@ -103,7 +107,7 @@
                     <th>Acciones</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="tabla_facturas_emitidas_body">
                 {% for factura in facturas %}
                 {% set tipo_iva_val = factura.tipo_iva|float if factura.tipo_iva else 21.0 %}
                 {% set importe_total_val = factura.importe_total|float %}
@@ -122,7 +126,7 @@
                     {% set importe_iva = importe_total_val - base_imponible %}
                 {% endif %}
                 {% set estado_cobro_val = factura.estado_cobro if factura.estado_cobro else 'pendiente' %}
-                <tr>
+                <tr data-search="{{ (factura.serie ~ '-' ~ factura.numero ~ ' ' ~ (factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else '-') ~ ' ' ~ factura.nombre ~ ' ' ~ estado_cobro_val)|lower }}">
                     <td>{{ factura.serie }}-{{ factura.numero }}</td>
                     <td>{{ factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else '-' }}</td>
                     <td>{{ factura.nombre }}</td>
@@ -311,6 +315,77 @@ function actualizarFiltros() {
         `;
     }
 }
+
+// Buscador de cliente (como en Nueva Solicitud): dropdown al escribir y filtro en vivo de la tabla
+document.addEventListener('DOMContentLoaded', function() {
+    const clienteSearch = document.getElementById('cliente_search');
+    const clienteSelect = document.getElementById('cliente_id');
+    const clienteResults = document.getElementById('cliente_results');
+    const tbody = document.getElementById('tabla_facturas_emitidas_body');
+
+    const clientes = Array.from(clienteSelect.options).slice(1).map(opt => ({
+        id: opt.value,
+        nombre: opt.textContent,
+        nombreLower: (opt.getAttribute('data-nombre') || opt.textContent.toLowerCase())
+    }));
+
+    function mostrarResultados(searchTerm) {
+        if (!searchTerm) {
+            clienteResults.style.display = 'none';
+            return;
+        }
+        const filtered = clientes.filter(c => c.nombreLower.includes(searchTerm.toLowerCase()));
+        if (filtered.length === 0) {
+            clienteResults.innerHTML = '<div style="padding: 10px; color: #999; text-align: center;">No se encontraron clientes</div>';
+            clienteResults.style.display = 'block';
+            return;
+        }
+        clienteResults.innerHTML = filtered.map(c =>
+            `<div class="cliente-option" data-id="${c.id}" data-nombre="${c.nombre}"
+                  style="padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.9em;"
+                  onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='white'"
+                  onclick="selectClienteFacturas(${c.id}, '${c.nombre.replace(/'/g, "\\'")}')">${c.nombre}</div>`
+        ).join('');
+        clienteResults.style.display = 'block';
+    }
+
+    clienteSearch.addEventListener('input', function() {
+        const term = this.value.trim();
+        clienteSelect.value = '';
+        mostrarResultados(term);
+
+        // Filtro en vivo de la tabla
+        if (tbody) {
+            const filas = tbody.querySelectorAll('tr');
+            const termLower = term.toLowerCase();
+            filas.forEach(tr => {
+                const texto = (tr.dataset.search || '');
+                if (!termLower || texto.includes(termLower)) {
+                    tr.style.display = '';
+                } else {
+                    tr.style.display = 'none';
+                }
+            });
+        }
+    });
+
+    clienteSearch.addEventListener('focus', function() {
+        if (this.value.trim()) mostrarResultados(this.value.trim());
+    });
+
+    document.addEventListener('click', function(e) {
+        if (clienteResults && !clienteSearch.contains(e.target) && !clienteResults.contains(e.target)) {
+            clienteResults.style.display = 'none';
+        }
+    });
+
+    window.selectClienteFacturas = function(id, nombre) {
+        clienteSearch.value = nombre;
+        clienteSelect.value = id;
+        if (clienteResults) clienteResults.style.display = 'none';
+        document.querySelector('.filtros-form').submit();
+    };
+});
 </script>
 {% endblock %}
 
