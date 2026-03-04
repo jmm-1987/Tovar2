@@ -57,7 +57,7 @@ def facturacion_emitida():
     else:
         periodo_label = f"Año {año}"
     
-    facturas = query.order_by(Factura.fecha_expedicion.desc()).all()
+    facturas = query.order_by(Factura.fecha_expedicion.desc(), Factura.numero.desc()).all()
     
     # Calcular totales
     total_facturacion = sum(f.importe_total for f in facturas)
@@ -124,7 +124,7 @@ def facturacion_emitida_exportar_excel():
     else:
         periodo_label = f"Año {año}"
     
-    facturas = query.order_by(Factura.fecha_expedicion.desc()).all()
+    facturas = query.order_by(Factura.fecha_expedicion.desc(), Factura.numero.desc()).all()
     
     # Crear libro de Excel
     wb = Workbook()
@@ -267,7 +267,7 @@ def facturacion_emitida_exportar_pdf():
     else:
         periodo_label = f"Año {año}"
     
-    facturas = query.order_by(Factura.fecha_expedicion.desc()).all()
+    facturas = query.order_by(Factura.fecha_expedicion.desc(), Factura.numero.desc()).all()
     
     # Calcular totales
     total_facturacion = sum(f.importe_total for f in facturas)
@@ -610,7 +610,7 @@ def facturacion_emitida_detalle():
     else:
         periodo_label = f"Año {año}"
     
-    facturas = query.order_by(Factura.fecha_expedicion.desc()).all()
+    facturas = query.order_by(Factura.fecha_expedicion.desc(), Factura.numero.desc()).all()
     
     # Obtener cliente seleccionado si existe
     cliente_seleccionado = Cliente.query.get(cliente_id) if cliente_id else None
@@ -714,7 +714,7 @@ def iva_detalle():
     else:
         periodo_label = f"Año {año}"
     
-    facturas_emitidas = query_facturas.order_by(Factura.fecha_expedicion.desc()).all()
+    facturas_emitidas = query_facturas.order_by(Factura.fecha_expedicion.desc(), Factura.numero.desc()).all()
     
     # Calcular IVA soportado (de facturas de proveedor)
     query_facturas_prov = FacturaProveedor.query.filter(extract('year', FacturaProveedor.fecha_factura) == año)
