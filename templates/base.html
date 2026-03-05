@@ -35,6 +35,7 @@
                                 <a href="{{ url_for('prendas.gestion_prendas') }}">Productos</a>
                             </div>
                         </div>
+                        <a href="{{ url_for('facturacion.menu_ventas') }}">💰 Ventas (nuevo)</a>
                         <div class="dropdown">
                             <a href="#" class="dropdown-toggle">🛒 Tickets Tienda <span class="dropdown-arrow">▼</span></a>
                             <div class="dropdown-menu">
@@ -60,7 +61,7 @@
                         <a href="{{ url_for('informes.index') }}">📊 Informes</a>
                         {% endif %}
                         {% if current_user.is_supervisor() %}
-                            <a href="{{ url_for('configuracion.index') }}">⚙️ Configuración</a>
+                            <a href="{{ url_for('configuracion.index') }}">⚙️</a>
                         {% endif %}
                     {% endif %}
                     <div class="user-menu">

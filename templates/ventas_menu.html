@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+
+{% block title %}Ventas - Accesos Rápidos{% endblock %}
+
+{% block content %}
+<style>
+.container {
+    padding-top: 10px !important;
+    max-width: 100% !important;
+}
+
+.ventas-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.ventas-title {
+    font-size: 1.3rem;
+    margin: 0 0 5px 0;
+}
+
+.ventas-subtitle {
+    font-size: 0.9rem;
+    color: #6c757d;
+    margin: 0 0 10px 0;
+}
+
+.ventas-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.ventas-card {
+    background: #ffffff;
+    border-radius: 10px;
+    padding: 10px 12px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    border: 1px solid #e9ecef;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 120px;
+}
+
+.ventas-card-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 2px;
+}
+
+.ventas-card-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #343a40;
+}
+
+.ventas-card-chip {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #f1f3f5;
+    color: #495057;
+}
+
+.ventas-options {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ventas-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    background: #f8f9fa;
+    color: #212529;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    min-height: 40px;
+}
+
+.ventas-btn span.descripcion {
+    font-size: 0.7rem;
+    font-weight: 400;
+    color: #6c757d;
+}
+
+.ventas-btn:hover {
+    background: #e9f5ff;
+    border-color: #0d6efd;
+    box-shadow: 0 2px 6px rgba(13,110,253,0.15);
+    text-decoration: none;
+}
+
+@media (max-width: 992px) {
+    .ventas-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .ventas-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<div class="ventas-wrapper">
+    <div>
+        <h2 class="ventas-title">Centro de Ventas</h2>
+        <p class="ventas-subtitle">Accede rápido a las principales opciones de presupuestos, albaranes y facturas.</p>
+    </div>
+
+    <div class="ventas-grid">
+        <!-- PEDIDOS -->
+        <div class="ventas-card">
+            <div class="ventas-card-header">
+                <span>📝</span>
+                <span class="ventas-card-title">Pedidos</span>
+                <span class="ventas-card-chip">Crear</span>
+            </div>
+            <div class="ventas-options">
+                <a href="{{ url_for('solicitudes.nueva_solicitud') }}" class="ventas-btn">
+                    <span>Nuevo presupuesto</span>
+                </a>
+                <a href="{{ url_for('facturacion.nuevo_albaran') }}" class="ventas-btn">
+                    <span>Nuevo albarán de retirada</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- LISTADOS -->
+        <div class="ventas-card">
+            <div class="ventas-card-header">
+                <span>📑</span>
+                <span class="ventas-card-title">Listados</span>
+                <span class="ventas-card-chip">Consultar</span>
+            </div>
+            <div class="ventas-options">
+                <a href="{{ url_for('solicitudes.listado_solicitudes') }}" class="ventas-btn">
+                    <span>Listado presupuestos</span>
+                </a>
+                <a href="{{ url_for('facturacion.facturacion', tipo_vista='formalizadas') }}" class="ventas-btn">
+                    <span>Listado facturas</span>
+                </a>
+                <a href="{{ url_for('facturacion.facturacion', tipo_vista='pendientes') }}" class="ventas-btn">
+                    <span>Listado albaranes de retirada</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- FACTURAS -->
+        <div class="ventas-card">
+            <div class="ventas-card-header">
+                <span>💳</span>
+                <span class="ventas-card-title">Facturas</span>
+                <span class="ventas-card-chip">Facturar</span>
+            </div>
+            <div class="ventas-options">
+                <a href="{{ url_for('facturacion.nueva_factura') }}" class="ventas-btn">
+                    <span>Crear factura directa</span>
+                </a>
+                <a href="{{ url_for('facturacion.crear_factura_anticipo') }}" class="ventas-btn">
+                    <span>Crear factura anticipo</span>
+                </a>
+                <a href="{{ url_for('facturacion.facturacion', tipo_vista='pendientes') }}" class="ventas-btn">
+                    <span>Facturar presupuesto</span>
+                </a>
+                <a href="{{ url_for('facturacion.facturar_albaranes') }}" class="ventas-btn">
+                    <span>Facturar albaranes de retirada</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- CLIENTES Y PRODUCTOS -->
+        <div class="ventas-card">
+            <div class="ventas-card-header">
+                <span>👥</span>
+                <span class="ventas-card-title">Clientes y productos</span>
+                <span class="ventas-card-chip">Maestros</span>
+            </div>
+            <div class="ventas-options">
+                <a href="{{ url_for('clientes.gestion_clientes') }}" class="ventas-btn">
+                    <span>Gestión de clientes</span>
+                </a>
+                <a href="{{ url_for('prendas.gestion_prendas') }}" class="ventas-btn">
+                    <span>Gestión de productos</span>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

@@ -183,6 +183,14 @@ def facturacion():
                          fecha_desde=fecha_desde,
                          fecha_hasta=fecha_hasta)
 
+
+@facturacion_bp.route('/ventas/menu')
+@login_required
+@not_usuario_required
+def menu_ventas():
+    """Pantalla de acceso rápido a las opciones de ventas"""
+    return render_template('ventas_menu.html')
+
 @facturacion_bp.route('/facturacion/solicitud/<int:presupuesto_id>')
 @login_required
 @not_usuario_required
