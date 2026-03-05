@@ -41,6 +41,17 @@
                     <input type="date" name="fecha_hasta" id="fecha_hasta" value="{{ fecha_hasta }}" class="filtro-input" style="padding: 10px 14px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; background: white; color: #495057; transition: all 0.3s ease;">
                 </div>
                 
+                <div class="filtro-group" style="display: flex; flex-direction: column; flex: 2; min-width: 220px;">
+                    <label for="busqueda_facturas_proveedor" style="font-size: 0.875rem; font-weight: 600; color: #495057; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                        <span>🔍</span> Buscar
+                    </label>
+                    <div style="position: relative;">
+                        <input type="text" id="busqueda_facturas_proveedor" name="busqueda" value="{{ busqueda or '' }}" placeholder="Filtrar por proveedor, número, estado..." 
+                               style="width: 100%; padding: 8px 32px 8px 10px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem;">
+                        <span style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #6c757d; font-size: 16px;">🔍</span>
+                    </div>
+                </div>
+                
                 <div style="display: flex; gap: 10px; align-items: flex-end;">
                     <button type="submit" class="btn btn-primary" style="padding: 10px 20px; border-radius: 8px; font-weight: 600; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
                         🔍 Buscar
@@ -90,7 +101,7 @@
 
     {% if facturas %}
     <div class="table-container">
-        <table class="clientes-table">
+        <table class="clientes-table" id="tabla_facturas_proveedor">
             <thead>
                 <tr>
                     <th>ID</th>
@@ -98,16 +109,16 @@
                     <th>Número Factura</th>
                     <th>Fecha</th>
                     <th>Vencimiento</th>
-                    <th>Base Imponible</th>
+                    <th>Base</th>
                     <th>IVA</th>
                     <th>Total</th>
                     <th>Estado</th>
                     <th>Acciones</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="tabla_facturas_proveedor_body">
                 {% for factura in facturas %}
-                <tr>
+                <tr data-search="{{ (factura.id|string ~ ' ' ~ (factura.proveedor.nombre if factura.proveedor else '') ~ ' ' ~ (factura.numero_factura or '') ~ ' ' ~ (factura.fecha_factura.strftime('%d/%m/%Y') if factura.fecha_factura else '-') ~ ' ' ~ (factura.estado or ''))|lower }}">
                     <td>{{ factura.id }}</td>
                     <td>{{ factura.proveedor.nombre if factura.proveedor else 'N/A' }}</td>
                     <td>{{ factura.numero_factura }}</td>
@@ -138,5 +149,30 @@
     </div>
     {% endif %}
 </div>
+
+<script>
+// Buscador en la lista de facturas de proveedor (como en clientes)
+document.addEventListener('DOMContentLoaded', function() {
+    const input = document.getElementById('busqueda_facturas_proveedor');
+    const tbody = document.getElementById('tabla_facturas_proveedor_body');
+    if (!input || !tbody) return;
+
+    const filas = Array.from(tbody.querySelectorAll('tr'));
+
+    input.addEventListener('input', function() {
+        const term = this.value.toLowerCase().trim();
+
+        filas.forEach(tr => {
+            const texto = tr.dataset.search || '';
+            if (!term || texto.includes(term)) {
+                tr.style.display = '';
+            } else {
+                tr.style.display = 'none';
+            }
+        });
+    });
+});
+</script>
+
 {% endblock %}
 

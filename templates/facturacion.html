@@ -78,6 +78,17 @@ h2::after {
                 <input type="date" name="fecha_hasta" id="fecha_hasta" value="{{ fecha_hasta }}" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease;">
             </div>
             
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 2; min-width: 220px;">
+                <label for="busqueda_facturas_ventas" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>🔍</span> Buscar
+                </label>
+                <div style="position: relative;">
+                    <input type="text" id="busqueda_facturas_ventas" name="busqueda" value="{{ busqueda or '' }}" placeholder="Filtrar por cliente, número, estado..." 
+                           style="width: 100%; padding: 6px 30px 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem;">
+                    <span style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: #6c757d; font-size: 14px;">🔍</span>
+                </div>
+            </div>
+            
             <div style="display: flex; gap: 8px; align-items: flex-end;">
                 <button type="submit" class="btn btn-primary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
                     🔍 Buscar
@@ -154,11 +165,12 @@ function cambiarTipoVista(tipo) {
                 <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Acciones</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="tabla_prefacturas_body">
             {% for prefactura in prefacturas %}
             {% set es_solicitud = prefactura.__class__.__name__ == 'Presupuesto' %}
             {% set es_albaran = prefactura.__class__.__name__ == 'Factura' and prefactura.numero.startswith('A') and '_' in prefactura.numero %}
-            <tr class="pedido-row" style="border-bottom: 1px solid #e9ecef; transition: all 0.3s ease;">
+            <tr class="pedido-row" style="border-bottom: 1px solid #e9ecef; transition: all 0.3s ease;"
+                data-search="{{ (prefactura.id|string ~ ' ' ~ (prefactura.cliente.nombre if prefactura.cliente else prefactura.nombre if es_albaran else '') ~ ' ' ~ (prefactura.tipo_pedido or '') ~ ' ' ~ prefactura.estado)|lower }}">
                 <td style="padding: 8px 10px; color: #212529; font-weight: 600; font-size: 0.85rem;">#{{ prefactura.id }}</td>
                 <td style="padding: 8px 10px; color: #212529; font-weight: 500; font-size: 0.85rem;">
                     {% if es_albaran %}
@@ -279,7 +291,9 @@ function cambiarTipoVista(tipo) {
             {% set importe_total_val = factura.importe_total|float %}
             {% set importe_pagado_val = factura.importe_pagado|float if factura.importe_pagado else 0.0 %}
             {% set importe_pendiente_val = importe_total_val - importe_pagado_val %}
-            <tr class="factura-row" style="border-bottom: 1px solid #e9ecef; transition: all 0.3s ease;" data-importe-total="{{ importe_total_val }}" data-importe-pagado="{{ importe_pagado_val }}" data-importe-pendiente="{{ importe_pendiente_val }}">
+            <tr class="factura-row" style="border-bottom: 1px solid #e9ecef; transition: all 0.3s ease;"
+                data-importe-total="{{ importe_total_val }}" data-importe-pagado="{{ importe_pagado_val }}" data-importe-pendiente="{{ importe_pendiente_val }}"
+                data-search="{{ (factura.serie ~ '-' ~ factura.numero ~ ' ' ~ (factura.nombre or '') ~ ' ' ~ (factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else '-') ~ ' ' ~ (factura.estado_cobro or ''))|lower }}">
                 <td style="padding: 8px 10px; text-align: center;">
                     <input type="checkbox" class="factura-checkbox" onchange="actualizarTotalesSeleccion()" value="{{ factura.id }}" style="cursor: pointer;">
                 </td>
@@ -596,9 +610,34 @@ function actualizarTotalesFiltro() {
     }
 }
 
-// Calcular totales al cargar la página
+// Calcular totales al cargar la página y preparar buscadores
 document.addEventListener('DOMContentLoaded', function() {
     actualizarTotalesFiltro();
+
+    const inputBusqueda = document.getElementById('busqueda_facturas_ventas');
+    if (inputBusqueda) {
+        const filasPref = Array.from(document.querySelectorAll('#tabla_prefacturas_body .pedido-row'));
+        const filasFact = Array.from(document.querySelectorAll('.factura-row'));
+
+        inputBusqueda.addEventListener('input', function() {
+            const term = this.value.toLowerCase().trim();
+
+            // Filtrar prefacturas (vista pendientes)
+            filasPref.forEach(tr => {
+                const texto = tr.dataset.search || '';
+                tr.style.display = !term || texto.includes(term) ? '' : 'none';
+            });
+
+            // Filtrar facturas formalizadas (vista formalizadas)
+            filasFact.forEach(tr => {
+                const texto = tr.dataset.search || '';
+                tr.style.display = !term || texto.includes(term) ? '' : 'none';
+            });
+
+            // Recalcular totales solo con las visibles
+            actualizarTotalesFiltro();
+        });
+    }
 });
 </script>
 

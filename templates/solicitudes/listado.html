@@ -37,16 +37,23 @@ header {
                 </select>
             </div>
             
-            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 0 0 140px; max-width: 140px;">
-                <label for="cliente_id" style="font-size: 0.8rem; font-weight: 600; color: #495057; margin-bottom: 2px; display: flex; align-items: center; gap: 3px;">
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 0 0 220px; max-width: 260px;">
+                <label for="cliente_search" style="font-size: 0.8rem; font-weight: 600; color: #495057; margin-bottom: 2px; display: flex; align-items: center; gap: 3px;">
                     <span>👤</span> Cliente
                 </label>
-                <select name="cliente_id" id="cliente_id" class="filtro-input" style="padding: 5px 8px; border: 2px solid #dee2e6; border-radius: 4px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
-                    <option value="">Todos los clientes</option>
-                    {% for cliente in clientes %}
-                    <option value="{{ cliente.id }}" {% if cliente_id|string == cliente.id|string %}selected{% endif %}>{{ cliente.nombre }}</option>
-                    {% endfor %}
-                </select>
+                <div style="position: relative;">
+                    <input type="text" id="cliente_search" placeholder="🔍 Buscar cliente..." value="{{ cliente_seleccionado.nombre if cliente_seleccionado else '' }}"
+                           style="width: 100%; padding: 6px 26px 6px 8px; border: 2px solid #dee2e6; border-radius: 4px; font-size: 0.85rem; box-sizing: border-box;"
+                           autocomplete="off">
+                    <span style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: #6c757d; font-size: 14px;">🔍</span>
+                    <select name="cliente_id" id="cliente_id" style="position: absolute; left: -9999px; width: 1px; height: 1px;">
+                        <option value="">Todos los clientes</option>
+                        {% for cliente in clientes %}
+                        <option value="{{ cliente.id }}" data-nombre="{{ cliente.nombre|lower }}" {% if cliente_id|string == cliente.id|string %}selected{% endif %}>{{ cliente.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <div id="cliente_results" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 6px 6px; max-height: 220px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+                </div>
             </div>
             
             <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 120px;">
@@ -205,6 +212,70 @@ document.addEventListener('DOMContentLoaded', function() {
                 hiddenSortOrder.name = 'sort_order';
                 hiddenSortOrder.value = sortOrder;
                 form.appendChild(hiddenSortOrder);
+            }
+        });
+    }
+
+    // Buscador de cliente en filtros (tipo nueva solicitud / facturación emitida)
+    const clienteSearch = document.getElementById('cliente_search');
+    const clienteSelect = document.getElementById('cliente_id');
+    const clienteResults = document.getElementById('cliente_results');
+
+    if (clienteSearch && clienteSelect && clienteResults) {
+        const clientes = Array.from(clienteSelect.options).slice(1).map(opt => ({
+            id: opt.value,
+            nombre: opt.textContent,
+            nombreLower: opt.getAttribute('data-nombre') || opt.textContent.toLowerCase()
+        }));
+
+        function mostrarResultados(term) {
+            const searchTerm = term.toLowerCase().trim();
+            if (!searchTerm) {
+                clienteResults.style.display = 'none';
+                return;
+            }
+            const filtered = clientes.filter(c => c.nombreLower.includes(searchTerm));
+            if (filtered.length === 0) {
+                clienteResults.innerHTML = '<div style="padding: 8px 10px; color: #999; font-size: 0.8rem; text-align: center;">No se encontraron clientes</div>';
+                clienteResults.style.display = 'block';
+                return;
+            }
+            clienteResults.innerHTML = filtered.map(c => `
+                <div class="cliente-option" data-id="${c.id}" data-nombre="${c.nombre}"
+                     style="padding: 6px 8px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.8rem;"
+                     onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='white'">
+                    ${c.nombre}
+                </div>
+            `).join('');
+            clienteResults.style.display = 'block';
+
+            Array.from(clienteResults.querySelectorAll('.cliente-option')).forEach(opt => {
+                opt.addEventListener('click', () => {
+                    const id = opt.getAttribute('data-id');
+                    const nombre = opt.getAttribute('data-nombre');
+                    clienteSearch.value = nombre;
+                    clienteSelect.value = id;
+                    clienteResults.style.display = 'none';
+                    form.submit();
+                });
+            });
+        }
+
+        clienteSearch.addEventListener('input', function() {
+            // Limpiar selección si se borra o cambia
+            clienteSelect.value = '';
+            mostrarResultados(this.value);
+        });
+
+        clienteSearch.addEventListener('focus', function() {
+            if (this.value.trim()) {
+                mostrarResultados(this.value);
+            }
+        });
+
+        document.addEventListener('click', function(e) {
+            if (!clienteSearch.contains(e.target) && !clienteResults.contains(e.target)) {
+                clienteResults.style.display = 'none';
             }
         });
     }

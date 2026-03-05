@@ -3,6 +3,17 @@
 {% block title %}Facturación Soportada - Informes{% endblock %}
 
 {% block content %}
+<style>
+.container {
+    padding-top: 10px !important;
+    padding-left: 5px !important;
+    padding-right: 5px !important;
+    max-width: 100% !important;
+}
+header {
+    margin-bottom: 0.8rem !important;
+}
+</style>
 <div class="informes-container">
     <h2>Facturación Soportada</h2>
     
@@ -114,7 +125,7 @@
 .informes-container {
     max-width: 100%;
     margin: 0 auto;
-    padding-top: 20px;
+    padding-top: 10px;
     padding-bottom: 20px;
     padding-left: 5px;
     padding-right: 5px;
@@ -122,15 +133,15 @@
 
 .filtros-box {
     background: white;
-    padding: 20px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
 }
 
 .filtros-form {
     display: flex;
-    gap: 15px;
+    gap: 8px;
     align-items: flex-end;
     flex-wrap: wrap;
 }
@@ -142,52 +153,52 @@
 }
 
 .filtro-group label {
-    font-weight: 500;
-    color: #555;
-    font-size: 0.9em;
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.8rem;
 }
 
 .filtro-group select,
 .filtro-group input {
-    padding: 8px 12px;
-    border: 1px solid #ddd;
+    padding: 5px 8px;
+    border: 2px solid #dee2e6;
     border-radius: 4px;
-    font-size: 0.9em;
+    font-size: 0.85rem;
 }
 
 .resumen-box {
     background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     color: white;
-    padding: 25px;
-    border-radius: 8px;
-    margin-bottom: 20px;
+    padding: 10px 12px;
+    border-radius: 5px;
+    margin-bottom: 8px;
 }
 
 .resumen-box h3 {
-    margin: 0 0 20px 0;
-    font-size: 1.5em;
+    margin: 0 0 6px 0;
+    font-size: 1rem;
 }
 
 .resumen-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
 }
 
 .resumen-item {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 2px;
 }
 
 .resumen-label {
-    font-size: 0.9em;
+    font-size: 0.75rem;
     opacity: 0.9;
 }
 
 .resumen-value {
-    font-size: 1.5em;
-    font-weight: bold;
+    font-size: 1rem;
+    font-weight: 600;
 }
 </style>
 

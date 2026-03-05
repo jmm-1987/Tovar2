@@ -198,6 +198,7 @@ def listado_solicitudes():
     
     # Obtener datos para filtros
     clientes = Cliente.query.order_by(Cliente.nombre).all()
+    cliente_seleccionado = Cliente.query.get(cliente_id) if cliente_id else None
     # Comercial.nombre es una propiedad, necesitamos ordenar por Usuario.usuario
     comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
     
@@ -205,6 +206,7 @@ def listado_solicitudes():
                          solicitudes_con_base=solicitudes_con_base,
                          estados=ESTADOS_SOLICITUD,
                          clientes=clientes,
+                         cliente_seleccionado=cliente_seleccionado,
                          comerciales=comerciales,
                          estado_filtro=estado_filtro,
                          fecha_desde=fecha_desde,
