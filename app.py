@@ -1442,6 +1442,16 @@ Saludos cordiales,
                     table_names = inspector.get_table_names()
                 except Exception as e:
                     print(f"Error al crear tablas IA de gastos: {e}")
+
+            # Asegurar tabla de estado de Telegram
+            if 'telegram_chat_state' not in table_names:
+                try:
+                    db.create_all()
+                    print("Migración: Tabla telegram_chat_state creada exitosamente")
+                    inspector = inspect(db.engine)
+                    table_names = inspector.get_table_names()
+                except Exception as e:
+                    print(f"Error al crear tabla telegram_chat_state: {e}")
             
             # Asegurar que la tabla empleados existe antes de migrar nominas
             if 'empleados' not in table_names:
