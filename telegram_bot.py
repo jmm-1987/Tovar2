@@ -20,14 +20,25 @@ def _get_env_tokens():
     return telegram_token, openai_key
 
 
-def _send_telegram_message(token: str, chat_id: int, text: str):
-    """Enviar un mensaje sencillo a Telegram."""
+def _send_telegram_message(token: str, chat_id: int, text: str, reply_markup=None):
+    """Enviar un mensaje a Telegram. Si reply_markup se pasa, se muestran botones."""
     try:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
-        requests.post(url, json={"chat_id": chat_id, "text": text}, timeout=15)
+        payload = {"chat_id": chat_id, "text": text}
+        if reply_markup is not None:
+            payload["reply_markup"] = reply_markup
+        requests.post(url, json=payload, timeout=15)
     except Exception:
         # No interrumpir el flujo por errores de notificación
         pass
+
+
+# Teclado con botones Factura y Nómina (ReplyKeyboardMarkup)
+KEYBOARD_FACTURA_NOMINA = {
+    "keyboard": [["Factura"], ["Nómina"]],
+    "resize_keyboard": True,
+    "one_time_keyboard": False,
+}
 
 
 def _download_telegram_file(token: str, file_id: str) -> bytes:
@@ -163,6 +174,7 @@ def telegram_webhook():
                 telegram_token,
                 chat_id,
                 "Hola 👋\nElige qué vas a enviar y luego mándame la foto:",
+                reply_markup=KEYBOARD_FACTURA_NOMINA,
             )
         elif text in ("factura", "facturas"):
             state = TelegramChatState.query.filter_by(chat_id=str(chat_id)).first()
@@ -192,8 +204,8 @@ def telegram_webhook():
             _send_telegram_message(
                 telegram_token,
                 chat_id,
-                "Elige primero qué vas a enviar escribiendo *Factura* o *Nómina*, "
-                "y después mándame la foto.",
+                "Elige primero qué vas a enviar (usa los botones de abajo) y después mándame la foto.",
+                reply_markup=KEYBOARD_FACTURA_NOMINA,
             )
         return jsonify(ok=True)
     
@@ -213,7 +225,8 @@ def telegram_webhook():
             _send_telegram_message(
                 telegram_token,
                 chat_id,
-                "Envía una foto o imagen de la factura o nómina.",
+                "Elige Factura o Nómina y luego envía la foto.",
+                reply_markup=KEYBOARD_FACTURA_NOMINA,
             )
         return jsonify(ok=True)
 
