@@ -4,7 +4,7 @@ from flask_login import login_required
 from datetime import datetime
 from decimal import Decimal
 from extensions import db
-from models import Proveedor, FacturaProveedor, Empleado, Nomina, OtroGasto
+from models import Proveedor, FacturaProveedor, Empleado, Nomina, OtroGasto, FacturaProveedorIA, NominaIA
 from utils.auth import not_usuario_required
 
 gastos_bp = Blueprint('gastos', __name__)
@@ -140,16 +140,31 @@ def listado_facturas_proveedor():
     
     facturas = query.order_by(FacturaProveedor.fecha_factura.desc()).all()
     
+    # Contador y siguiente factura IA pendiente (para el modal)
+    facturas_ia_pendientes = FacturaProveedorIA.query.filter_by(estado='pendiente').count()
+    factura_ia_actual = None
+    if facturas_ia_pendientes:
+        factura_ia_actual = (
+            FacturaProveedorIA.query
+            .filter_by(estado='pendiente')
+            .order_by(FacturaProveedorIA.fecha_creacion.asc())
+            .first()
+        )
+    
     # Obtener estados únicos para el filtro
     estados = db.session.query(FacturaProveedor.estado).distinct().all()
     estados_list = [estado[0] for estado in estados if estado[0]]
     
-    return render_template('gastos/listado_facturas_proveedor.html', 
-                         facturas=facturas,
-                         estados=estados_list,
-                         estado_filtro=estado_filtro,
-                         fecha_desde=fecha_desde,
-                         fecha_hasta=fecha_hasta)
+    return render_template(
+        'gastos/listado_facturas_proveedor.html',
+        facturas=facturas,
+        estados=estados_list,
+        estado_filtro=estado_filtro,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        facturas_ia_pendientes=facturas_ia_pendientes,
+        factura_ia_actual=factura_ia_actual,
+    )
 
 @gastos_bp.route('/gastos/facturas-proveedor/nueva', methods=['GET', 'POST'])
 @login_required
@@ -401,17 +416,160 @@ def listado_nominas():
     
     nominas = query.order_by(Nomina.año.desc(), Nomina.mes.desc()).all()
     
+    # Contador y siguiente nómina IA pendiente (para el modal)
+    nominas_ia_pendientes = NominaIA.query.filter_by(estado='pendiente').count()
+    nomina_ia_actual = None
+    if nominas_ia_pendientes:
+        nomina_ia_actual = (
+            NominaIA.query
+            .filter_by(estado='pendiente')
+            .order_by(NominaIA.fecha_creacion.asc())
+            .first()
+        )
+    
     # Obtener años únicos para el filtro
     años = db.session.query(Nomina.año).distinct().order_by(Nomina.año.desc()).all()
     años_list = [año[0] for año in años if año[0]]
     
-    return render_template('gastos/listado_nominas.html', 
-                         nominas=nominas,
-                         años=años_list,
-                         año_desde=año_desde,
-                         mes_desde=mes_desde,
-                         año_hasta=año_hasta,
-                         mes_hasta=mes_hasta)
+    return render_template(
+        'gastos/listado_nominas.html',
+        nominas=nominas,
+        años=años_list,
+        año_desde=año_desde,
+        mes_desde=mes_desde,
+        año_hasta=año_hasta,
+        mes_hasta=mes_hasta,
+        nominas_ia_pendientes=nominas_ia_pendientes,
+        nomina_ia_actual=nomina_ia_actual,
+    )
+
+
+@gastos_bp.route('/gastos/facturas-ia/validar', methods=['POST'])
+@login_required
+@not_usuario_required
+def validar_factura_ia():
+    """Validar una factura IA y crear la factura de proveedor definitiva"""
+    ia_id = request.form.get('ia_id')
+    if not ia_id:
+        flash('No se ha indicado factura IA a validar', 'error')
+        return redirect(url_for('gastos.listado_facturas_proveedor'))
+    
+    factura_ia = FacturaProveedorIA.query.get(ia_id)
+    if not factura_ia or factura_ia.estado != 'pendiente':
+        flash('La factura IA seleccionada ya no está disponible', 'error')
+        return redirect(url_for('gastos.listado_facturas_proveedor'))
+    
+    try:
+        proveedor_nombre = request.form.get('proveedor_nombre') or factura_ia.proveedor_nombre or ''
+        numero_factura = request.form.get('numero_factura') or factura_ia.numero_factura or ''
+        fecha_factura_str = request.form.get('fecha_factura') or ''
+        fecha_vencimiento_str = request.form.get('fecha_vencimiento') or ''
+        base_imponible_str = request.form.get('base_imponible') or ''
+        tipo_iva_str = request.form.get('tipo_iva') or ''
+        observaciones = request.form.get('observaciones', '')
+        
+        # Buscar o crear proveedor por nombre
+        proveedor = None
+        if proveedor_nombre:
+            proveedor = Proveedor.query.filter(Proveedor.nombre.ilike(proveedor_nombre)).first()
+            if not proveedor:
+                proveedor = Proveedor(nombre=proveedor_nombre)
+                db.session.add(proveedor)
+                db.session.flush()
+        
+        # Parsear fechas
+        fecha_factura = datetime.strptime(fecha_factura_str, '%Y-%m-%d').date() if fecha_factura_str else None
+        fecha_vencimiento = (
+            datetime.strptime(fecha_vencimiento_str, '%Y-%m-%d').date()
+            if fecha_vencimiento_str
+            else None
+        )
+        
+        # Importes
+        base_imponible = Decimal(str(base_imponible_str or '0').replace(',', '.'))
+        tipo_iva = Decimal(str(tipo_iva_str or '21').replace(',', '.'))
+        importe_iva = base_imponible * tipo_iva / Decimal('100')
+        total = base_imponible + importe_iva
+        
+        factura = FacturaProveedor(
+            proveedor_id=proveedor.id if proveedor else None,
+            numero_factura=numero_factura,
+            fecha_factura=fecha_factura,
+            fecha_vencimiento=fecha_vencimiento,
+            base_imponible=base_imponible,
+            tipo_iva=tipo_iva,
+            importe_iva=importe_iva,
+            total=total,
+            observaciones=observaciones,
+        )
+        db.session.add(factura)
+        
+        # Marcar IA como validada
+        factura_ia.estado = 'validado'
+        db.session.commit()
+        flash('Factura IA validada y creada como factura de proveedor', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al validar factura IA: {str(e)}', 'error')
+    
+    return redirect(url_for('gastos.listado_facturas_proveedor'))
+
+
+@gastos_bp.route('/gastos/nominas-ia/validar', methods=['POST'])
+@login_required
+@not_usuario_required
+def validar_nomina_ia():
+    """Validar una nómina IA y crear la nómina definitiva"""
+    ia_id = request.form.get('ia_id')
+    if not ia_id:
+        flash('No se ha indicado nómina IA a validar', 'error')
+        return redirect(url_for('gastos.listado_nominas'))
+    
+    nomina_ia = NominaIA.query.get(ia_id)
+    if not nomina_ia or nomina_ia.estado != 'pendiente':
+        flash('La nómina IA seleccionada ya no está disponible', 'error')
+        return redirect(url_for('gastos.listado_nominas'))
+    
+    try:
+        empleado_nombre = request.form.get('empleado_nombre') or nomina_ia.empleado_nombre or ''
+        mes_str = request.form.get('mes') or (str(nomina_ia.mes) if nomina_ia.mes else '')
+        año_str = request.form.get('año') or (str(nomina_ia.año) if nomina_ia.año else '')
+        total_devengado_str = request.form.get('total_devengado') or (
+            str(nomina_ia.total_devengado) if nomina_ia.total_devengado is not None else ''
+        )
+        observaciones = request.form.get('observaciones', '')
+        
+        # Buscar o crear empleado por nombre
+        empleado = None
+        if empleado_nombre:
+            empleado = Empleado.query.filter(Empleado.nombre.ilike(empleado_nombre)).first()
+            if not empleado:
+                empleado = Empleado(nombre=empleado_nombre)
+                db.session.add(empleado)
+                db.session.flush()
+        
+        mes = int(mes_str) if mes_str else None
+        año = int(año_str) if año_str else None
+        total_devengado = Decimal(str(total_devengado_str or '0').replace(',', '.'))
+        
+        nomina = Nomina(
+            empleado_id=empleado.id if empleado else None,
+            mes=mes or 1,
+            año=año or datetime.now().year,
+            total_devengado=total_devengado,
+            observaciones=observaciones,
+        )
+        db.session.add(nomina)
+        
+        # Marcar IA como validada
+        nomina_ia.estado = 'validado'
+        db.session.commit()
+        flash('Nómina IA validada y creada como nómina definitiva', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al validar nómina IA: {str(e)}', 'error')
+    
+    return redirect(url_for('gastos.listado_nominas'))
 
 @gastos_bp.route('/gastos/nominas/nueva', methods=['GET', 'POST'])
 @login_required

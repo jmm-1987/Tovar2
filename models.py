@@ -831,3 +831,73 @@ class RegistroEstadoSolicitud(db.Model):
     
     def __repr__(self):
         return f'<RegistroEstadoSolicitud {self.id} - {self.estado}/{self.subestado} - {self.fecha_cambio}>'
+
+
+class FacturaProveedorIA(db.Model):
+    """Facturas de proveedor detectadas por IA (pendientes de validación)"""
+    __tablename__ = 'facturas_proveedor_ia'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Datos básicos detectados por IA (texto libre)
+    proveedor_nombre = db.Column(db.String(200), nullable=True)
+    numero_factura = db.Column(db.String(100), nullable=True)
+    fecha_factura = db.Column(db.Date, nullable=True)
+    fecha_vencimiento = db.Column(db.Date, nullable=True)
+    
+    # Importes
+    base_imponible = db.Column(db.Numeric(10, 2), nullable=True)
+    tipo_iva = db.Column(db.Numeric(5, 2), nullable=True)
+    importe_iva = db.Column(db.Numeric(10, 2), nullable=True)
+    total = db.Column(db.Numeric(10, 2), nullable=True)
+    
+    # Ruta a la imagen en el sistema de ficheros
+    imagen_ruta = db.Column(db.String(255), nullable=False)
+    
+    # Estado del registro IA
+    estado = db.Column(db.String(20), nullable=False, default='pendiente')  # pendiente, validado, descartado
+    
+    # Origen (por si en el futuro hay más fuentes)
+    origen = db.Column(db.String(50), nullable=False, default='telegram')
+    
+    # Respuesta bruta de la IA (para depuración)
+    datos_ia_json = db.Column(db.Text)
+    
+    # Timestamp
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<FacturaProveedorIA {self.id} - {self.proveedor_nombre or "Sin proveedor"}>'
+
+
+class NominaIA(db.Model):
+    """Nóminas detectadas por IA (pendientes de validación)"""
+    __tablename__ = 'nominas_ia'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    
+    # Datos básicos detectados por IA
+    empleado_nombre = db.Column(db.String(200), nullable=True)
+    identificador = db.Column(db.String(100), nullable=True)  # Número de nómina o referencia
+    mes = db.Column(db.Integer, nullable=True)
+    año = db.Column(db.Integer, nullable=True)
+    
+    total_devengado = db.Column(db.Numeric(10, 2), nullable=True)
+    
+    # Ruta a la imagen en el sistema de ficheros
+    imagen_ruta = db.Column(db.String(255), nullable=False)
+    
+    # Estado del registro IA
+    estado = db.Column(db.String(20), nullable=False, default='pendiente')  # pendiente, validado, descartado
+    
+    # Origen
+    origen = db.Column(db.String(50), nullable=False, default='telegram')
+    
+    # Respuesta bruta de la IA (para depuración)
+    datos_ia_json = db.Column(db.Text)
+    
+    # Timestamp
+    fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<NominaIA {self.id} - {self.empleado_nombre or "Sin empleado"}>'

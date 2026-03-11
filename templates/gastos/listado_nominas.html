@@ -9,6 +9,15 @@
         <div style="display: flex; gap: 10px; align-items: center;">
             <a href="{{ url_for('gastos.listado_empleados') }}" class="btn btn-secondary" style="text-decoration: none;">📋 Empleados</a>
             <a href="{{ url_for('gastos.nueva_nomina') }}" class="btn btn-success">➕ Nueva Nómina</a>
+            {% if nominas_ia_pendientes %}
+            <button type="button" class="btn btn-warning" id="btnNominasIA">
+                🤖 Nóminas IA ({{ nominas_ia_pendientes }})
+            </button>
+            {% else %}
+            <button type="button" class="btn btn-outline-secondary" disabled>
+                🤖 Nóminas IA (0)
+            </button>
+            {% endif %}
         </div>
     </div>
 
@@ -154,3 +163,87 @@
 </div>
 {% endblock %}
 
+{# Modal para validar Nóminas IA #}
+{% if nomina_ia_actual %}
+<div id="modalNominaIAOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:998;"></div>
+<div id="modalNominaIA" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; border-radius:12px; max-width:900px; width:95%; max-height:90vh; overflow:hidden; box-shadow:0 10px 40px rgba(0,0,0,0.25); z-index:999;">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid #dee2e6; background:#f8f9fa;">
+        <h3 style="margin:0; font-size:1rem; font-weight:600;">Validar Nómina IA pendiente</h3>
+        <button id="modalNominaIAClose" style="border:none; background:transparent; font-size:20px; cursor:pointer;">×</button>
+    </div>
+    <div style="display:flex; gap:16px; padding:16px; max-height:calc(90vh - 60px); overflow:auto; flex-wrap:wrap;">
+        <div style="flex:1 1 55%; min-width:280px; text-align:center;">
+            <div style="border:1px solid #dee2e6; border-radius:8px; padding:8px; background:#000; max-height:70vh; overflow:auto;">
+                <img src="{{ url_for('static', filename=nomina_ia_actual.imagen_ruta.replace('static/', '')) }}"
+                     alt="Imagen nómina IA"
+                     style="max-width:100%; height:auto; cursor:zoom-in;"
+                     onclick="this.style.transform = this.style.transform ? '' : 'scale(1.5)'; this.style.transformOrigin='center top';">
+            </div>
+            <small style="display:block; margin-top:6px; color:#6c757d;">Haz clic en la imagen para hacer zoom.</small>
+        </div>
+        <div style="flex:1 1 40%; min-width:260px;">
+            <form method="POST" action="{{ url_for('gastos.validar_nomina_ia') }}">
+                <input type="hidden" name="ia_id" value="{{ nomina_ia_actual.id }}">
+                <div class="form-group">
+                    <label>Empleado (texto libre)</label>
+                    <input type="text" name="empleado_nombre" class="form-control"
+                           value="{{ nomina_ia_actual.empleado_nombre or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Mes</label>
+                    <input type="number" min="1" max="12" name="mes" class="form-control"
+                           value="{{ nomina_ia_actual.mes or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Año</label>
+                    <input type="number" name="año" class="form-control"
+                           value="{{ nomina_ia_actual.año or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Total devengado</label>
+                    <input type="number" step="0.01" name="total_devengado" class="form-control"
+                           value="{{ nomina_ia_actual.total_devengado or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Observaciones</label>
+                    <textarea name="observaciones" class="form-control" rows="3"></textarea>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('modalNominaIAClose').click();">Cerrar</button>
+                    <button type="submit" class="btn btn-primary">Validar y crear nómina</button>
+                </div>
+            </form>
+            <p style="margin-top:10px; font-size:0.85rem; color:#6c757d;">
+                Al validar, se creará una nómina normal con estos datos y esta nómina IA se marcará como procesada.
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const btnNominasIA = document.getElementById('btnNominasIA');
+    const modalNominaIA = document.getElementById('modalNominaIA');
+    const modalOverlay = document.getElementById('modalNominaIAOverlay');
+    const modalClose = document.getElementById('modalNominaIAClose');
+
+    function closeModalNominaIA() {
+        if (modalNominaIA) modalNominaIA.style.display = 'none';
+        if (modalOverlay) modalOverlay.style.display = 'none';
+    }
+
+    if (btnNominasIA && modalNominaIA && modalOverlay) {
+        btnNominasIA.addEventListener('click', function() {
+            modalNominaIA.style.display = 'block';
+            modalOverlay.style.display = 'block';
+        });
+    }
+    if (modalClose) {
+        modalClose.addEventListener('click', closeModalNominaIA);
+    }
+    if (modalOverlay) {
+        modalOverlay.addEventListener('click', closeModalNominaIA);
+    }
+});
+</script>
+{% endif %}

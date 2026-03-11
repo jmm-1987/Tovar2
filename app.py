@@ -145,6 +145,7 @@ from routes.configuracion import configuracion_bp
 from routes.cliente_web import cliente_web_bp
 from routes.gastos import gastos_bp
 from routes.informes import informes_bp
+from telegram_bot import telegram_bp
 
 # Registrar blueprints
 app.register_blueprint(index_bp)
@@ -160,6 +161,7 @@ app.register_blueprint(configuracion_bp)
 app.register_blueprint(cliente_web_bp)
 app.register_blueprint(gastos_bp)
 app.register_blueprint(informes_bp)
+app.register_blueprint(telegram_bp)
 
 def migrate_database():
     """Migrar la base de datos agregando columnas faltantes"""

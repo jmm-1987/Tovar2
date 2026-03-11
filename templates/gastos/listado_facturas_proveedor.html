@@ -9,6 +9,15 @@
         <div style="display: flex; gap: 10px; align-items: center;">
             <a href="{{ url_for('gastos.listado_proveedores') }}" class="btn btn-secondary" style="text-decoration: none;">📋 Proveedores</a>
             <a href="{{ url_for('gastos.nueva_factura_proveedor') }}" class="btn btn-success">➕ Nueva Factura</a>
+            {% if facturas_ia_pendientes %}
+            <button type="button" class="btn btn-warning" id="btnFacturasIA">
+                🤖 Facturas IA ({{ facturas_ia_pendientes }})
+            </button>
+            {% else %}
+            <button type="button" class="btn btn-outline-secondary" disabled>
+                🤖 Facturas IA (0)
+            </button>
+            {% endif %}
         </div>
     </div>
 
@@ -171,8 +180,100 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     });
+
+    // Lógica sencilla para abrir/cerrar el modal de Facturas IA
+    const btnFacturasIA = document.getElementById('btnFacturasIA');
+    const modalFacturaIA = document.getElementById('modalFacturaIA');
+    const modalOverlay = document.getElementById('modalFacturaIAOverlay');
+    const modalClose = document.getElementById('modalFacturaIAClose');
+
+    function closeModalFacturaIA() {
+        if (modalFacturaIA) modalFacturaIA.style.display = 'none';
+        if (modalOverlay) modalOverlay.style.display = 'none';
+    }
+
+    if (btnFacturasIA && modalFacturaIA && modalOverlay) {
+        btnFacturasIA.addEventListener('click', function() {
+            modalFacturaIA.style.display = 'block';
+            modalOverlay.style.display = 'block';
+        });
+    }
+    if (modalClose) {
+        modalClose.addEventListener('click', closeModalFacturaIA);
+    }
+    if (modalOverlay) {
+        modalOverlay.addEventListener('click', closeModalFacturaIA);
+    }
 });
 </script>
+
+{# Modal para validar Facturas IA #}
+{% if factura_ia_actual %}
+<div id="modalFacturaIAOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:998;"></div>
+<div id="modalFacturaIA" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; border-radius:12px; max-width:1000px; width:95%; max-height:90vh; overflow:hidden; box-shadow:0 10px 40px rgba(0,0,0,0.25); z-index:999;">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid #dee2e6; background:#f8f9fa;">
+        <h3 style="margin:0; font-size:1rem; font-weight:600;">Validar Factura IA pendiente</h3>
+        <button id="modalFacturaIAClose" style="border:none; background:transparent; font-size:20px; cursor:pointer;">×</button>
+    </div>
+    <div style="display:flex; gap:16px; padding:16px; max-height:calc(90vh - 60px); overflow:auto; flex-wrap:wrap;">
+        <div style="flex:1 1 55%; min-width:280px; text-align:center;">
+            <div style="border:1px solid #dee2e6; border-radius:8px; padding:8px; background:#000; max-height:70vh; overflow:auto;">
+                <img src="{{ url_for('static', filename=factura_ia_actual.imagen_ruta.replace('static/', '')) }}"
+                     alt="Imagen factura IA"
+                     style="max-width:100%; height:auto; cursor:zoom-in;"
+                     onclick="this.style.transform = this.style.transform ? '' : 'scale(1.5)'; this.style.transformOrigin='center top';">
+            </div>
+            <small style="display:block; margin-top:6px; color:#6c757d;">Haz clic en la imagen para hacer zoom.</small>
+        </div>
+        <div style="flex:1 1 40%; min-width:260px;">
+            <form method="POST" action="{{ url_for('gastos.validar_factura_ia') }}">
+                <input type="hidden" name="ia_id" value="{{ factura_ia_actual.id }}">
+                <div class="form-group">
+                    <label>Proveedor (texto libre)</label>
+                    <input type="text" name="proveedor_nombre" class="form-control"
+                           value="{{ factura_ia_actual.proveedor_nombre or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Número factura</label>
+                    <input type="text" name="numero_factura" class="form-control"
+                           value="{{ factura_ia_actual.numero_factura or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Fecha factura</label>
+                    <input type="date" name="fecha_factura" class="form-control"
+                           value="{{ factura_ia_actual.fecha_factura.strftime('%Y-%m-%d') if factura_ia_actual.fecha_factura else '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Fecha vencimiento</label>
+                    <input type="date" name="fecha_vencimiento" class="form-control"
+                           value="{{ factura_ia_actual.fecha_vencimiento.strftime('%Y-%m-%d') if factura_ia_actual.fecha_vencimiento else '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Base imponible</label>
+                    <input type="number" step="0.01" name="base_imponible" class="form-control"
+                           value="{{ factura_ia_actual.base_imponible or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Tipo IVA (%)</label>
+                    <input type="number" step="0.01" name="tipo_iva" class="form-control"
+                           value="{{ factura_ia_actual.tipo_iva or 21 }}">
+                </div>
+                <div class="form-group">
+                    <label>Observaciones</label>
+                    <textarea name="observaciones" class="form-control" rows="3"></textarea>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('modalFacturaIAClose').click();">Cerrar</button>
+                    <button type="submit" class="btn btn-primary">Validar y crear factura</button>
+                </div>
+            </form>
+            <p style="margin-top:10px; font-size:0.85rem; color:#6c757d;">
+                Al validar, se creará una factura de proveedor normal con estos datos y esta factura IA se marcará como procesada.
+            </p>
+        </div>
+    </div>
+</div>
+{% endif %}
 
 {% endblock %}
 
