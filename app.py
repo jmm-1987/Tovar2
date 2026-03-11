@@ -1432,6 +1432,17 @@ Saludos cordiales,
                     except Exception:
                         pass
             
+            # Asegurar tablas IA de gastos (facturas y nóminas IA)
+            if 'facturas_proveedor_ia' not in table_names or 'nominas_ia' not in table_names:
+                try:
+                    db.create_all()
+                    print("Migración: Tablas facturas_proveedor_ia y nominas_ia creadas exitosamente")
+                    # Refrescar lista de tablas
+                    inspector = inspect(db.engine)
+                    table_names = inspector.get_table_names()
+                except Exception as e:
+                    print(f"Error al crear tablas IA de gastos: {e}")
+            
             # Asegurar que la tabla empleados existe antes de migrar nominas
             if 'empleados' not in table_names:
                 try:
