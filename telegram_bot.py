@@ -7,7 +7,7 @@ import requests
 from flask import Blueprint, current_app, jsonify, request
 
 from extensions import db
-from models import FacturaProveedorIA, NominaIA
+from models import FacturaProveedorIA, NominaIA, TelegramChatState
 
 
 telegram_bp = Blueprint('telegram_bot', __name__, url_prefix='/telegram')
@@ -24,11 +24,7 @@ def _send_telegram_message(token: str, chat_id: int, text: str):
     """Enviar un mensaje sencillo a Telegram."""
     try:
         url = f"https://api.telegram.org/bot{token}/sendMessage"
-        requests.post(
-            url,
-            json={"chat_id": chat_id, "text": text},
-            timeout=15,
-        )
+        requests.post(url, json={"chat_id": chat_id, "text": text}, timeout=15)
     except Exception:
         # No interrumpir el flujo por errores de notificación
         pass
@@ -154,11 +150,55 @@ def telegram_webhook():
 
     chat = message.get("chat") or {}
     chat_id = chat.get("id")
-
+    text = (message.get("text") or "").strip().lower()
+    
+    # Si es un mensaje de texto (sin foto/documento), mostramos el menú de tipo
+    if not any(k in message for k in ("photo", "document")):
+        if not chat_id or not telegram_token:
+            return jsonify(ok=True)
+        
+        # Normalizar texto de selección
+        if text in ("/start", "inicio", "menu"):
+            _send_telegram_message(
+                telegram_token,
+                chat_id,
+                "Hola 👋\nElige qué vas a enviar y luego mándame la foto:",
+            )
+        elif text in ("factura", "facturas"):
+            state = TelegramChatState.query.filter_by(chat_id=str(chat_id)).first()
+            if not state:
+                state = TelegramChatState(chat_id=str(chat_id))
+                db.session.add(state)
+            state.tipo_documento = "factura"
+            db.session.commit()
+            _send_telegram_message(
+                telegram_token,
+                chat_id,
+                "Perfecto, envíame ahora la foto de la factura.",
+            )
+        elif text in ("nomina", "nómina", "nómina ", "nominas", "nóminas"):
+            state = TelegramChatState.query.filter_by(chat_id=str(chat_id)).first()
+            if not state:
+                state = TelegramChatState(chat_id=str(chat_id))
+                db.session.add(state)
+            state.tipo_documento = "nomina"
+            db.session.commit()
+            _send_telegram_message(
+                telegram_token,
+                chat_id,
+                "Perfecto, envíame ahora la foto de la nómina.",
+            )
+        else:
+            _send_telegram_message(
+                telegram_token,
+                chat_id,
+                "Elige primero qué vas a enviar escribiendo *Factura* o *Nómina*, "
+                "y después mándame la foto.",
+            )
+        return jsonify(ok=True)
+    
     # Determinar si viene como foto o como documento imagen
     file_id = None
-    is_nomina = False
-
     if "photo" in message and message["photo"]:
         # Tomamos la foto de mayor resolución (último elemento)
         file_id = message["photo"][-1]["file_id"]
@@ -167,18 +207,13 @@ def telegram_webhook():
         mime = doc.get("mime_type", "")
         if mime.startswith("image/"):
             file_id = doc["file_id"]
-
-    caption = (message.get("caption") or "").lower()
-    if "nomina" in caption or "nómina" in caption:
-        is_nomina = True
-
+    
     if not file_id:
         if chat_id:
             _send_telegram_message(
                 telegram_token,
                 chat_id,
-                "Envía una foto o imagen de la factura o nómina. "
-                "Opcionalmente escribe en el pie de foto la palabra 'nomina' para que lo tratemos como tal.",
+                "Envía una foto o imagen de la factura o nómina.",
             )
         return jsonify(ok=True)
 
@@ -188,11 +223,18 @@ def telegram_webhook():
 
         # Llamar a OpenAI
         ia_data = _call_openai_vision(openai_key, image_bytes)
-
-        # Decidir tipo de documento (prioriza lo que venga en el pie de foto)
-        tipo_documento = ia_data.get("tipo_documento", "factura")
-        if is_nomina:
-            tipo_documento = "nomina"
+        
+        # Decidir tipo de documento:
+        # 1) Lo que haya elegido el usuario en este chat
+        # 2) Si no, lo que detecte la IA
+        # 3) Si no, por defecto 'factura'
+        tipo_documento = "factura"
+        if chat_id:
+            state = TelegramChatState.query.filter_by(chat_id=str(chat_id)).first()
+            if state and state.tipo_documento in ("factura", "nomina"):
+                tipo_documento = state.tipo_documento
+        if not tipo_documento and ia_data.get("tipo_documento") in ("factura", "nomina"):
+            tipo_documento = ia_data.get("tipo_documento")
 
         if tipo_documento == "nomina":
             rel_path = _save_image(image_bytes, "nominas_ia", filename_hint)

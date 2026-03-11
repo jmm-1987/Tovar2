@@ -901,3 +901,16 @@ class NominaIA(db.Model):
     
     def __repr__(self):
         return f'<NominaIA {self.id} - {self.empleado_nombre or "Sin empleado"}>'
+
+
+class TelegramChatState(db.Model):
+    """Estado simple por chat de Telegram (tipo de documento elegido, etc.)."""
+    __tablename__ = 'telegram_chat_state'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    chat_id = db.Column(db.String(50), nullable=False, unique=True)
+    tipo_documento = db.Column(db.String(20), nullable=True)  # 'factura' o 'nomina'
+    fecha_actualizacion = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<TelegramChatState {self.chat_id} ({self.tipo_documento})>'
