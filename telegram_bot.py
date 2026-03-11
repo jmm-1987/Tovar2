@@ -151,9 +151,11 @@ def _call_openai_vision(openai_key: str, image_bytes: bytes) -> dict:
 def telegram_webhook():
     """Webhook de Telegram para recibir fotos de facturas/nóminas."""
     telegram_token, openai_key = _get_env_tokens()
-    if not telegram_token or not openai_key:
-        return "Faltan TELEGRAM_BOT_TOKEN u OPENAI_API_KEY", 500
-
+    # Para poder responder a /start y a mensajes de texto aunque falte OPENAI_API_KEY,
+    # solo exigimos TELEGRAM_BOT_TOKEN aquí. La clave de OpenAI se validará al procesar imágenes.
+    if not telegram_token:
+        return "Falta TELEGRAM_BOT_TOKEN", 500
+    
     update = request.get_json(silent=True) or {}
     message = update.get("message") or update.get("edited_message")
     if not message:
@@ -231,6 +233,16 @@ def telegram_webhook():
         return jsonify(ok=True)
 
     try:
+        # Si falta la clave de OpenAI, no podemos procesar imágenes
+        if not openai_key:
+            if chat_id:
+                _send_telegram_message(
+                    telegram_token,
+                    chat_id,
+                    "No se puede procesar la imagen porque falta la configuración de OpenAI en el servidor.",
+                )
+            return "Falta OPENAI_API_KEY", 500
+        
         # Descargar imagen desde Telegram
         image_bytes, filename_hint = _download_telegram_file(telegram_token, file_id)
 
