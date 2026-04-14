@@ -268,6 +268,29 @@ def eliminar_factura_proveedor(factura_id):
     
     return redirect(url_for('gastos.listado_facturas_proveedor'))
 
+@gastos_bp.route('/gastos/facturas-proveedor/<int:factura_id>/estado', methods=['POST'])
+@login_required
+@not_usuario_required
+def cambiar_estado_factura_proveedor(factura_id):
+    """Cambiar estado de factura de proveedor desde el listado"""
+    factura = FacturaProveedor.query.get_or_404(factura_id)
+    estado_nuevo = request.form.get('estado', '').strip().lower()
+    estados_validos = {'pendiente', 'pagada', 'vencida'}
+
+    if estado_nuevo not in estados_validos:
+        flash('Estado no válido', 'error')
+        return redirect(request.referrer or url_for('gastos.listado_facturas_proveedor'))
+
+    try:
+        factura.estado = estado_nuevo
+        db.session.commit()
+        flash('Estado de factura actualizado correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al actualizar estado: {str(e)}', 'error')
+
+    return redirect(request.referrer or url_for('gastos.listado_facturas_proveedor'))
+
 # ========== EMPLEADOS ==========
 
 @gastos_bp.route('/gastos/empleados')

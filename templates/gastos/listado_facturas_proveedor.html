@@ -106,6 +106,55 @@
         transform: translateY(-1px);
         box-shadow: 0 2px 4px rgba(108,117,125,0.3);
     }
+
+    .estado-form {
+        margin: 0;
+        display: inline-block;
+    }
+
+    .estado-select {
+        min-width: 132px;
+        height: 30px;
+        border-radius: 999px;
+        border: 1px solid transparent;
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.2px;
+        padding: 0 28px 0 12px;
+        cursor: pointer;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        transition: all 0.2s ease;
+        background-repeat: no-repeat;
+        background-position: right 10px center;
+        background-size: 10px 10px;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23343a40' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    }
+
+    .estado-select:focus {
+        outline: none;
+        box-shadow: 0 0 0 3px rgba(0,123,255,0.18);
+    }
+
+    .estado-select.estado-pendiente {
+        background-color: #fff3cd;
+        border-color: #f1d28b;
+        color: #8a6d1d;
+    }
+
+    .estado-select.estado-pagada {
+        background-color: #d1f3dd;
+        border-color: #8fd3a8;
+        color: #1f6c3e;
+    }
+
+    .estado-select.estado-vencida {
+        background-color: #f8d7da;
+        border-color: #e6a0a8;
+        color: #8f2a36;
+    }
     </style>
 
     {% if facturas %}
@@ -137,9 +186,13 @@
                     <td>{{ "%.2f"|format(factura.importe_iva) }} € ({{ "%.0f"|format(factura.tipo_iva) }}%)</td>
                     <td><strong>{{ "%.2f"|format(factura.total) }} €</strong></td>
                     <td>
-                        <span class="badge badge-{{ 'success' if factura.estado == 'pagada' else 'warning' if factura.estado == 'pendiente' else 'danger' }}">
-                            {{ factura.estado|title }}
-                        </span>
+                        <form method="POST" action="{{ url_for('gastos.cambiar_estado_factura_proveedor', factura_id=factura.id) }}" class="estado-form">
+                            <select name="estado" class="estado-select estado-{{ factura.estado or 'pendiente' }}" onchange="this.form.submit()" title="Cambiar estado de factura">
+                                <option value="pendiente" {% if factura.estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                                <option value="pagada" {% if factura.estado == 'pagada' %}selected{% endif %}>Pagada</option>
+                                <option value="vencida" {% if factura.estado == 'vencida' %}selected{% endif %}>Vencida</option>
+                            </select>
+                        </form>
                     </td>
                     <td class="acciones-cell">
                         <a href="{{ url_for('gastos.editar_factura_proveedor', factura_id=factura.id) }}" class="btn btn-xs btn-primary" style="padding: 2px 6px; font-size: 0.7rem;">Editar</a>
@@ -204,6 +257,15 @@ document.addEventListener('DOMContentLoaded', function() {
     if (modalOverlay) {
         modalOverlay.addEventListener('click', closeModalFacturaIA);
     }
+
+    // Pintar el selector de estado como "badge" según valor actual.
+    const estadoSelects = document.querySelectorAll('.estado-select');
+    estadoSelects.forEach(select => {
+        select.addEventListener('change', function() {
+            this.classList.remove('estado-pendiente', 'estado-pagada', 'estado-vencida');
+            this.classList.add(`estado-${this.value}`);
+        });
+    });
 });
 </script>
 
