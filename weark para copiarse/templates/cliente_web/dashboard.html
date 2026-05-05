@@ -1,0 +1,101 @@
+{% extends "cliente_web/base.html" %}
+
+{% block title %}Dashboard - Área Cliente{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>📊 Resumen</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 20px;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px;">
+            <div style="font-size: 32px; font-weight: bold;">{{ total_pedidos }}</div>
+            <div style="font-size: 14px; opacity: 0.9;">Total Pedidos</div>
+        </div>
+        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 20px; border-radius: 10px;">
+            <div style="font-size: 32px; font-weight: bold;">{{ pedidos_pendientes }}</div>
+            <div style="font-size: 14px; opacity: 0.9;">Pedidos Pendientes</div>
+        </div>
+        <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 10px;">
+            <div style="font-size: 32px; font-weight: bold;">{{ pedidos_en_preparacion }}</div>
+            <div style="font-size: 14px; opacity: 0.9;">En Preparación</div>
+        </div>
+        <div style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white; padding: 20px; border-radius: 10px;">
+            <div style="font-size: 32px; font-weight: bold;">{{ total_facturas }}</div>
+            <div style="font-size: 14px; opacity: 0.9;">Total Facturas</div>
+        </div>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+    <div class="card">
+        <h2>📦 Últimos Pedidos</h2>
+        {% if ultimos_pedidos %}
+        <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+            <thead>
+                <tr style="border-bottom: 2px solid #e0e0e0;">
+                    <th style="text-align: left; padding: 10px;">ID</th>
+                    <th style="text-align: left; padding: 10px;">Estado</th>
+                    <th style="text-align: left; padding: 10px;">Fecha</th>
+                    <th style="text-align: right; padding: 10px;">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pedido in ultimos_pedidos %}
+                <tr style="border-bottom: 1px solid #f0f0f0;">
+                    <td style="padding: 10px;">#{{ pedido.id }}</td>
+                    <td style="padding: 10px;">
+                        <span style="padding: 5px 10px; border-radius: 5px; background: #e3f2fd; color: #1976d2; font-size: 12px;">
+                            {{ pedido.estado }}
+                        </span>
+                    </td>
+                    <td style="padding: 10px; color: #666;">{{ pedido.fecha_creacion.strftime('%d/%m/%Y') if pedido.fecha_creacion else 'N/A' }}</td>
+                    <td style="padding: 10px; text-align: right;">
+                        <a href="{{ url_for('cliente_web.ver_pedido', pedido_id=pedido.id) }}" class="btn btn-info" style="padding: 5px 15px; font-size: 12px;">Ver</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color: #666; margin-top: 15px;">No tienes pedidos aún.</p>
+        {% endif %}
+        <div style="margin-top: 15px;">
+            <a href="{{ url_for('cliente_web.ver_pedidos') }}" class="btn btn-primary">Ver Todos los Pedidos</a>
+            <a href="{{ url_for('cliente_web.nuevo_pedido') }}" class="btn btn-success" style="margin-left: 10px;">Nuevo Pedido</a>
+        </div>
+    </div>
+    
+    <div class="card">
+        <h2>🧾 Últimas Facturas</h2>
+        {% if ultimas_facturas %}
+        <table style="width: 100%; border-collapse: collapse; margin-top: 15px;">
+            <thead>
+                <tr style="border-bottom: 2px solid #e0e0e0;">
+                    <th style="text-align: left; padding: 10px;">Número</th>
+                    <th style="text-align: left; padding: 10px;">Fecha</th>
+                    <th style="text-align: right; padding: 10px;">Importe</th>
+                    <th style="text-align: right; padding: 10px;">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for factura in ultimas_facturas %}
+                <tr style="border-bottom: 1px solid #f0f0f0;">
+                    <td style="padding: 10px;">{{ factura.serie }}-{{ factura.numero }}</td>
+                    <td style="padding: 10px; color: #666;">{{ factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else 'N/A' }}</td>
+                    <td style="padding: 10px; text-align: right; font-weight: 600;">{{ "%.2f"|format(factura.importe_total) }} €</td>
+                    <td style="padding: 10px; text-align: right;">
+                        <a href="{{ url_for('cliente_web.ver_factura', factura_id=factura.id) }}" class="btn btn-info" style="padding: 5px 15px; font-size: 12px;">Ver</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color: #666; margin-top: 15px;">No tienes facturas aún.</p>
+        {% endif %}
+        <div style="margin-top: 15px;">
+            <a href="{{ url_for('cliente_web.ver_facturas') }}" class="btn btn-primary">Ver Todas las Facturas</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

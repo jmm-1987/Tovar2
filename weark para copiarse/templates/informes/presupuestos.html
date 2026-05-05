@@ -1,0 +1,522 @@
+{% extends "base.html" %}
+
+{% block title %}Presupuestos — Informes{% endblock %}
+
+{% block content %}
+<style>
+.container {
+    padding-top: 10px !important;
+    padding-left: 5px !important;
+    padding-right: 5px !important;
+    max-width: 100% !important;
+}
+header { margin-bottom: 0.8rem !important; }
+</style>
+
+<div class="pres-inf-wrap">
+    <header class="pres-inf-head">
+        <h1 class="pres-inf-title">Presupuestos</h1>
+        <span class="pres-inf-head-note">Fecha por <strong>creación</strong>. Los datos se cargan al pulsar Mostrar.</span>
+    </header>
+
+    <form method="get" class="pres-inf-toolbar" id="form_pres_inf" action="{{ url_for('informes.informes_presupuestos') }}">
+        <input type="hidden" name="mostrar" value="1">
+
+        <div class="pres-inf-toolbar-inner">
+            <label class="pres-inf-cell" for="año">
+                <span class="pres-inf-lbl">Año</span>
+                <select name="año" id="año" class="pres-inf-sel pres-inf-sel--year">
+                    {% for y in años_opciones %}
+                    <option value="{{ y }}" {% if año == y %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+            <label class="pres-inf-cell" for="mes">
+                <span class="pres-inf-lbl">Mes</span>
+                <select name="mes" id="mes" class="pres-inf-sel">
+                    <option value="">Todo</option>
+                    {% for i in range(1, 13) %}
+                    <option value="{{ i }}" {% if mes == i %}selected{% endif %}>{{ meses_nombres[i][:3] }}.</option>
+                    {% endfor %}
+                </select>
+            </label>
+
+            <div class="pres-inf-cell pres-inf-cell--fd" role="group" aria-label="FacturaDirecta">
+                <span class="pres-inf-lbl">FD</span>
+                <div class="pres-inf-segment">
+                    <label class="pres-inf-seg-item">
+                        <input type="radio" name="fd" value="" {% if not fd_filtro %}checked{% endif %}>
+                        <span>Todos</span>
+                    </label>
+                    <label class="pres-inf-seg-item">
+                        <input type="radio" name="fd" value="si" {% if fd_filtro == 'si' %}checked{% endif %}>
+                        <span>Con FD</span>
+                    </label>
+                    <label class="pres-inf-seg-item">
+                        <input type="radio" name="fd" value="no" {% if fd_filtro == 'no' %}checked{% endif %}>
+                        <span>Sin FD</span>
+                    </label>
+                </div>
+            </div>
+
+            <label class="pres-inf-cell pres-inf-cell--grow" for="cliente_search">
+                <span class="pres-inf-lbl">Cliente <span class="pres-inf-lbl-opt">(opc.)</span></span>
+                <div class="pres-inf-cliente-wrap">
+                    <input type="text" id="cliente_search" class="pres-inf-inp" placeholder="Buscar…" autocomplete="off"
+                           value="{{ cliente_seleccionado.nombre if cliente_seleccionado else '' }}">
+                    <select name="cliente_id" id="cliente_id" class="pres-inf-cliente-select" aria-label="Cliente">
+                        <option value="">Todos</option>
+                        {% for cliente in clientes %}
+                        <option value="{{ cliente.id }}" data-nombre="{{ cliente.nombre|lower }}"
+                            {% if cliente_id == cliente.id %}selected{% endif %}>{{ cliente.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <div id="cliente_results" class="pres-inf-cliente-dd" hidden></div>
+                </div>
+            </label>
+
+            <div class="pres-inf-cell pres-inf-cell--btns">
+                <span class="pres-inf-lbl pres-inf-lbl--spacer">&nbsp;</span>
+                <div class="pres-inf-btns">
+                    <button type="submit" class="pres-inf-btn pres-inf-btn--primary">Mostrar</button>
+                    <a href="{{ url_for('informes.informes_presupuestos') }}" class="pres-inf-btn pres-inf-btn--ghost">Limpiar</a>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    {% if not mostrar_resultados %}
+    <div class="pres-inf-empty pres-inf-empty--idle" role="status">
+        <p class="pres-inf-empty-one">Configura filtros arriba y pulsa <strong>Mostrar</strong>.</p>
+    </div>
+    {% else %}
+
+    <section class="pres-inf-card pres-inf-card--result pres-inf-mt" aria-labelledby="lbl-res-fd">
+        <h2 id="lbl-res-fd" class="pres-inf-card-title pres-inf-card-title--sm">
+            {% if fd_filtro == 'si' %}
+            Totales enviados a FD — {{ periodo_label }}
+            {% elif fd_filtro == 'no' %}
+            Totales sin enviar a FD — {{ periodo_label }}
+            {% else %}
+            Comparativa FD — {{ periodo_label }}
+            {% endif %}
+        </h2>
+        <div class="table-container">
+            <table class="clientes-table pres-inf-table-fd">
+                <thead>
+                    <tr>
+                        {% if not fd_filtro %}<th></th>{% endif %}
+                        <th class="pres-inf-num">Presupuestos</th>
+                        <th class="pres-inf-num">Base</th>
+                        <th class="pres-inf-num">IVA</th>
+                        <th class="pres-inf-num">Total (IVA incl.)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if fd_filtro == 'si' %}
+                    <tr class="pres-inf-tr-fd-si">
+                        <td class="pres-inf-num">{{ fd_enviados.n }}</td>
+                        <td class="pres-inf-num">{{ "%.2f"|format(fd_enviados.base) }} €</td>
+                        <td class="pres-inf-num">{{ "%.2f"|format(fd_enviados.iva) }} €</td>
+                        <td class="pres-inf-num"><strong>{{ "%.2f"|format(fd_enviados.total) }} €</strong></td>
+                    </tr>
+                    {% elif fd_filtro == 'no' %}
+                    <tr class="pres-inf-tr-fd-no">
+                        <td class="pres-inf-num">{{ fd_no_enviados.n }}</td>
+                        <td class="pres-inf-num">{{ "%.2f"|format(fd_no_enviados.base) }} €</td>
+                        <td class="pres-inf-num">{{ "%.2f"|format(fd_no_enviados.iva) }} €</td>
+                        <td class="pres-inf-num"><strong>{{ "%.2f"|format(fd_no_enviados.total) }} €</strong></td>
+                    </tr>
+                    {% else %}
+                    <tr class="pres-inf-tr-fd-si">
+                        <td><span class="pres-inf-pill pres-inf-pill--ok">Enviados a FD</span></td>
+                        <td class="pres-inf-num">{{ fd_enviados.n }}</td>
+                        <td class="pres-inf-num">{{ "%.2f"|format(fd_enviados.base) }} €</td>
+                        <td class="pres-inf-num">{{ "%.2f"|format(fd_enviados.iva) }} €</td>
+                        <td class="pres-inf-num"><strong>{{ "%.2f"|format(fd_enviados.total) }} €</strong></td>
+                    </tr>
+                    <tr class="pres-inf-tr-fd-no">
+                        <td><span class="pres-inf-pill pres-inf-pill--muted">No enviados a FD</span></td>
+                        <td class="pres-inf-num">{{ fd_no_enviados.n }}</td>
+                        <td class="pres-inf-num">{{ "%.2f"|format(fd_no_enviados.base) }} €</td>
+                        <td class="pres-inf-num">{{ "%.2f"|format(fd_no_enviados.iva) }} €</td>
+                        <td class="pres-inf-num"><strong>{{ "%.2f"|format(fd_no_enviados.total) }} €</strong></td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    {% if filas %}
+    <section class="pres-inf-card pres-inf-card--result pres-inf-mt" aria-labelledby="lbl-detalle">
+        <div class="pres-inf-detalle-head">
+            <h2 id="lbl-detalle" class="pres-inf-card-title" style="margin:0;">Detalle</h2>
+            <span class="pres-inf-badge-count">{{ filas|length }} fila{% if filas|length != 1 %}s{% endif %}</span>
+        </div>
+        <div class="table-container pres-inf-table-scroll">
+            <table class="clientes-table" id="tabla_presupuestos">
+                <thead>
+                    <tr>
+                        <th>Nº</th>
+                        <th>Fecha creación</th>
+                        <th>Cliente</th>
+                        <th class="pres-inf-num">Base</th>
+                        <th class="pres-inf-num">IVA</th>
+                        <th class="pres-inf-num">Total</th>
+                        <th>FD</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in filas %}
+                    <tr>
+                        <td><a href="{{ url_for('presupuestos.ver_solicitud', solicitud_id=row.id) }}">{{ row.numero }}</a></td>
+                        <td>{{ row.fecha_creacion.strftime('%d/%m/%Y %H:%M') if row.fecha_creacion else '—' }}</td>
+                        <td>{{ row.cliente }}</td>
+                        <td class="pres-inf-num">{{ "%.2f"|format(row.base) }} €</td>
+                        <td class="pres-inf-num">{{ "%.2f"|format(row.iva) }} €</td>
+                        <td class="pres-inf-num"><strong>{{ "%.2f"|format(row.total) }} €</strong></td>
+                        <td>{% if row.fd %}<span class="pres-inf-fd-si">Sí</span>{% else %}<span class="pres-inf-fd-no">No</span>{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+    {% else %}
+    <div class="pres-inf-empty" role="status">
+        <p class="pres-inf-empty-one">Sin resultados con estos filtros.</p>
+    </div>
+    {% endif %}
+
+    {% endif %}
+</div>
+
+<style>
+.pres-inf-wrap {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 8px 12px 24px;
+    box-sizing: border-box;
+}
+.pres-inf-head {
+    margin-bottom: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 14px;
+}
+.pres-inf-title {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #1a1d21;
+    margin: 0;
+    letter-spacing: -0.02em;
+}
+.pres-inf-head-note {
+    font-size: 0.78rem;
+    color: #6c757d;
+    line-height: 1.3;
+}
+
+.pres-inf-toolbar {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.pres-inf-toolbar-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 8px 10px;
+}
+.pres-inf-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+    margin: 0;
+}
+.pres-inf-cell--grow {
+    flex: 1 1 160px;
+    min-width: 140px;
+}
+.pres-inf-cell--fd {
+    flex: 0 1 auto;
+}
+.pres-inf-cell--btns {
+    flex: 0 0 auto;
+}
+.pres-inf-lbl {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+}
+.pres-inf-lbl-opt { font-weight: 500; text-transform: none; letter-spacing: 0; color: #adb5bd; }
+.pres-inf-lbl--spacer { visibility: hidden; height: 0.65rem; margin: 0; padding: 0; line-height: 0; }
+
+.pres-inf-sel,
+.pres-inf-inp {
+    padding: 5px 8px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    background: #fff;
+    height: 30px;
+    line-height: 1.2;
+}
+.pres-inf-sel:focus,
+.pres-inf-inp:focus {
+    outline: none;
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.2);
+}
+.pres-inf-sel--year { width: 76px; min-width: 76px; }
+
+.pres-inf-segment {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    align-items: center;
+}
+.pres-inf-seg-item {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 5px 8px;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #495057;
+    margin: 0;
+    white-space: nowrap;
+    line-height: 1.2;
+    background: #f8f9fa;
+}
+.pres-inf-seg-item--on {
+    border-color: #0d6efd;
+    background: #e7f1ff;
+    color: #0a58ca;
+}
+.pres-inf-seg-item input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    margin: 0;
+}
+
+.pres-inf-cliente-wrap { position: relative; }
+.pres-inf-cliente-select {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+.pres-inf-cliente-dd {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 2px);
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 40;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+}
+.pres-inf-cliente-opt {
+    padding: 7px 10px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    border-bottom: 1px solid #f1f3f5;
+}
+.pres-inf-cliente-opt:hover { background: #f8f9fa; }
+
+.pres-inf-btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+.pres-inf-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    height: 30px;
+    box-sizing: border-box;
+}
+.pres-inf-btn--primary {
+    background: #0d6efd;
+    color: #fff;
+}
+.pres-inf-btn--primary:hover { background: #0b5ed7; color: #fff; }
+.pres-inf-btn--ghost {
+    background: #fff;
+    color: #495057;
+    border: 1px solid #ced4da;
+}
+.pres-inf-btn--ghost:hover { background: #f8f9fa; color: #212529; }
+
+.pres-inf-empty {
+    margin-top: 10px;
+    padding: 10px 12px;
+    text-align: center;
+    background: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    color: #6c757d;
+    font-size: 0.82rem;
+}
+.pres-inf-empty--idle { background: #fff; }
+.pres-inf-empty-one { margin: 0; line-height: 1.4; }
+
+.pres-inf-card {
+    background: #fff;
+    border: 1px solid #e8eaed;
+    border-radius: 8px;
+    padding: 10px 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.pres-inf-card-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #212529;
+    margin: 0 0 8px 0;
+}
+.pres-inf-card-title--sm { font-size: 0.88rem; margin-bottom: 6px; }
+.pres-inf-mt { margin-top: 12px; }
+.pres-inf-card--result { max-width: none; }
+.pres-inf-table-fd .pres-inf-num { text-align: right; }
+.pres-inf-tr-fd-si td { background: rgba(25, 135, 84, 0.06); }
+.pres-inf-tr-fd-no td { background: rgba(108, 117, 125, 0.07); }
+.pres-inf-pill {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+.pres-inf-pill--ok { background: #d1e7dd; color: #0f5132; }
+.pres-inf-pill--muted { background: #e9ecef; color: #495057; }
+.pres-inf-detalle-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+}
+.pres-inf-badge-count {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #495057;
+    background: #e9ecef;
+    padding: 4px 10px;
+    border-radius: 20px;
+}
+.pres-inf-table-scroll { overflow-x: auto; }
+.pres-inf-num { text-align: right; }
+.pres-inf-fd-si { color: #198754; font-weight: 700; font-size: 0.85rem; }
+.pres-inf-fd-no { color: #868e96; font-size: 0.85rem; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.pres-inf-seg-item input[name="fd"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            document.querySelectorAll('.pres-inf-seg-item').forEach(function(lab) {
+                var inp = lab.querySelector('input[type="radio"]');
+                lab.classList.toggle('pres-inf-seg-item--on', inp && inp.checked);
+            });
+        });
+    });
+    document.querySelectorAll('.pres-inf-seg-item').forEach(function(lab) {
+        var inp = lab.querySelector('input[type="radio"]');
+        if (inp && inp.checked) lab.classList.add('pres-inf-seg-item--on');
+    });
+
+    const search = document.getElementById('cliente_search');
+    const select = document.getElementById('cliente_id');
+    const dd = document.getElementById('cliente_results');
+    if (!search || !select || !dd) return;
+
+    const clientes = Array.from(select.options).slice(1).map(function(opt) {
+        return {
+            id: opt.value,
+            nombre: opt.textContent.trim(),
+            nombreLower: (opt.getAttribute('data-nombre') || opt.textContent.toLowerCase())
+        };
+    });
+
+    function abrirLista(term) {
+        if (!term) {
+            dd.hidden = true;
+            dd.innerHTML = '';
+            return;
+        }
+        var t = term.toLowerCase();
+        var filtrados = clientes.filter(function(c) { return c.nombreLower.indexOf(t) !== -1; });
+        if (filtrados.length === 0) {
+            dd.innerHTML = '<div class="pres-inf-cliente-opt" style="color:#868e96;cursor:default;">Ningún cliente coincide</div>';
+            dd.hidden = false;
+            return;
+        }
+        dd.innerHTML = filtrados.map(function(c) {
+            return '<div class="pres-inf-cliente-opt" data-id="' + c.id + '" role="option">' + escapeHtml(c.nombre) + '</div>';
+        }).join('');
+        dd.hidden = false;
+        dd.querySelectorAll('.pres-inf-cliente-opt[data-id]').forEach(function(el) {
+            el.addEventListener('mousedown', function(e) {
+                e.preventDefault();
+                var id = el.getAttribute('data-id');
+                var c = clientes.find(function(x) { return x.id === id; });
+                if (c) {
+                    search.value = c.nombre;
+                    select.value = id;
+                }
+                dd.hidden = true;
+            });
+        });
+    }
+
+    function escapeHtml(s) {
+        var d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    search.addEventListener('input', function() {
+        if (!this.value.trim()) select.value = '';
+        abrirLista(this.value.trim());
+    });
+    search.addEventListener('blur', function() {
+        setTimeout(function() { dd.hidden = true; }, 180);
+    });
+    search.addEventListener('focus', function() {
+        if (this.value.trim()) abrirLista(this.value.trim());
+    });
+});
+</script>
+{% endblock %}

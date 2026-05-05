@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Proveedores - Gastos{% endblock %}
+
+{% block content %}
+<div class="clientes-container">
+    <div class="clientes-header">
+        <h2>Gestión de Proveedores</h2>
+        <div style="display: flex; gap: 10px;">
+            <a href="{{ url_for('gastos.listado_facturas_proveedor') }}" class="btn btn-secondary" style="text-decoration: none;">📄 Facturas</a>
+            <a href="{{ url_for('gastos.nuevo_proveedor') }}" class="btn btn-success">➕ Crear Proveedor</a>
+        </div>
+    </div>
+
+    {% if proveedores %}
+    <div class="table-container">
+        <table class="clientes-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>CIF</th>
+                    <th>Teléfono</th>
+                    <th>Móvil</th>
+                    <th>Correo</th>
+                    <th>Persona Contacto</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for proveedor in proveedores %}
+                <tr {% if not proveedor.activo %}style="opacity: 0.6; background-color: #f8f9fa;"{% endif %}>
+                    <td>{{ proveedor.id }}</td>
+                    <td>
+                        {{ proveedor.nombre }}
+                        {% if not proveedor.activo %}
+                            <span style="color: #dc3545; font-size: 0.85rem; margin-left: 5px;">(Desactivado)</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ proveedor.cif or '-' }}</td>
+                    <td>{{ proveedor.telefono or '-' }}</td>
+                    <td>{{ proveedor.movil or '-' }}</td>
+                    <td>{{ proveedor.correo or '-' }}</td>
+                    <td>{{ proveedor.persona_contacto or '-' }}</td>
+                    <td class="acciones-cell">
+                        <a href="{{ url_for('gastos.editar_proveedor', proveedor_id=proveedor.id) }}" class="btn btn-sm btn-primary">Editar</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="no-data">
+        <p>No hay proveedores registrados.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+

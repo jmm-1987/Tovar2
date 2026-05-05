@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Gestión de Pedidos{% endblock %}</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='fav.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header>
+        <div class="container header-wrapper">
+            <a href="{{ url_for('index.index') }}" style="text-decoration: none; display: flex; align-items: center;">
+                <img src="{{ url_for('static', filename='logo_base.png') }}" alt="Logo" class="header-logo">
+            </a>
+            <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+            <nav id="mainNav">
+                {% if current_user.is_authenticated %}
+                    <a href="{{ url_for('index.index') }}">PANEL DE CONTROL</a>
+                    {% if current_user.rol == 'usuario' %}
+                        {# Usuarios con rol "usuario" solo ven Panel de Control y Presupuestos #}
+                        <a href="{{ url_for('presupuestos.listado_solicitudes') }}">PRESUPUESTOS</a>
+                    {% else %}
+                        {# Otros usuarios ven el menú completo #}
+                        <a href="{{ url_for('facturacion.menu_ventas') }}">💰 Ventas</a>
+                        <div class="dropdown">
+                            <a href="#" class="dropdown-toggle">🛒 Tickets Tienda <span class="dropdown-arrow">▼</span></a>
+                            <div class="dropdown-menu">
+                                <a href="{{ url_for('tickets.listado_tickets') }}">Tickets</a>
+                                <a href="{{ url_for('tickets.listado_clientes_tienda') }}">Clientes de Tienda</a>
+                                <a href="{{ url_for('tickets.cuadre_caja') }}">Cuadre de Caja</a>
+                            </div>
+                        </div>
+                        {% if current_user.rol != 'comercial' %}
+                        {# Los comerciales no ven nada de la sección de Gastos #}
+                        <div class="dropdown">
+                            <a href="#" class="dropdown-toggle">💰 Gastos <span class="dropdown-arrow">▼</span></a>
+                            <div class="dropdown-menu">
+                                <a href="{{ url_for('gastos.listado_facturas_proveedor') }}">Facturas de Proveedor</a>
+                                <a href="{{ url_for('gastos.listado_nominas') }}">Nóminas</a>
+                                <div class="dropdown-divider"></div>
+                                <a href="{{ url_for('gastos.listado_otro_gasto', tipo_gasto='recibo-iva') }}">Recibo IVA</a>
+                                <a href="{{ url_for('gastos.listado_otro_gasto', tipo_gasto='recibo-irpf') }}">Recibo IRPF</a>
+                                <a href="{{ url_for('gastos.listado_otro_gasto', tipo_gasto='seguridad-social') }}">Seguridad Social</a>
+                            </div>
+                        </div>
+                        {# Los comerciales no ven estadísticas - Informes como botón a la derecha de Gastos #}
+                        <a href="{{ url_for('informes.index') }}">📊 Informes</a>
+                        {% endif %}
+                        {% if current_user.is_supervisor() %}
+                            <a href="{{ url_for('configuracion.index') }}">⚙️</a>
+                        {% endif %}
+                    {% endif %}
+                    {% if respuestas_cliente_pendientes and respuestas_cliente_pendientes > 0 %}
+                        <a href="{{ url_for('presupuestos.ver_solicitud', solicitud_id=respuesta_cliente_ultimo_id) }}" style="background:#dc3545; color:#fff; padding:6px 10px; border-radius:16px;">
+                            Respuestas cliente: {{ respuestas_cliente_pendientes }}
+                        </a>
+                    {% endif %}
+                    <div class="user-menu">
+                        <span class="user-name">{{ current_user.usuario }}</span>
+                        <a href="{{ url_for('auth.logout') }}" class="logout-btn-circle" title="Cerrar Sesión">
+                            <img src="{{ url_for('static', filename='logo_jm.png') }}" alt="Cerrar Sesión" style="width: 100%; height: 100%; object-fit: contain;">
+                        </a>
+                    </div>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </div>
+    <script>
+        // Toggle del menú hamburguesa
+        document.addEventListener('DOMContentLoaded', function() {
+            const menuToggle = document.getElementById('menuToggle');
+            const mainNav = document.getElementById('mainNav');
+            const body = document.body;
+            
+            if (menuToggle && mainNav) {
+                function toggleMenu() {
+                    mainNav.classList.toggle('nav-open');
+                    menuToggle.classList.toggle('active');
+                    body.classList.toggle('nav-open');
+                }
+                
+                menuToggle.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    toggleMenu();
+                });
+                
+                // Cerrar el menú al hacer clic en el overlay
+                body.addEventListener('click', function(e) {
+                    if (body.classList.contains('nav-open')) {
+                        const isClickInsideNav = mainNav.contains(e.target);
+                        const isClickOnToggle = menuToggle.contains(e.target);
+                        
+                        if (!isClickInsideNav && !isClickOnToggle) {
+                            toggleMenu();
+                        }
+                    }
+                });
+                
+                // Manejar dropdowns en móviles (toggle al hacer clic)
+                const dropdownToggles = mainNav.querySelectorAll('.dropdown-toggle');
+                dropdownToggles.forEach(function(toggle) {
+                    toggle.addEventListener('click', function(e) {
+                        if (window.innerWidth <= 768) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const dropdown = this.closest('.dropdown');
+                            dropdown.classList.toggle('active');
+                        }
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html>

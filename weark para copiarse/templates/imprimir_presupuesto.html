@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if es_albaran is defined and es_albaran %}Albarán{% else %}Presupuesto{% endif %} {{ presupuesto.numero_solicitud or presupuesto.id }}</title>
+    <style type="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        @page {
+            size: A4;
+            margin: 5mm 10mm 20mm 10mm;
+        }
+        
+        body {
+            counter-reset: page-counter;
+        }
+        
+        .page {
+            counter-increment: page-counter;
+            position: relative;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f5f5f5;
+            padding: 10px;
+            color: #333;
+            font-size: 12px;
+        }
+        
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            background: white;
+            margin: 0 auto 10px;
+            padding: 5mm 10mm 5mm 10mm;
+            padding-bottom: 25mm;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            page-break-after: always;
+            overflow: visible;
+            box-sizing: border-box;
+            position: relative;
+        }
+        
+        .contenido-presupuesto-wrapper {
+            page-break-inside: auto;
+        }
+        
+        /* Estilos para cabecera repetida */
+        .cabecera-repetida {
+            display: none;
+        }
+        
+        .cabecera-repetida .presupuesto-header {
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .cabecera-repetida .presupuesto-header .logo-section img {
+            width: 80px;
+            height: 80px;
+        }
+        
+        .cabecera-repetida .presupuesto-header .presupuesto-title h1 {
+            font-size: 1.3em;
+            margin: 0;
+        }
+        
+        .cabecera-repetida .presupuesto-header .presupuesto-info {
+            font-size: 0.75em;
+        }
+        
+        .cabecera-repetida .presupuesto-header .presupuesto-info p {
+            margin: 1px 0;
+        }
+        
+        .page-content {
+            min-height: calc(297mm - 30mm);
+            padding-bottom: 20mm;
+        }
+        
+        .footer-datos {
+            position: absolute;
+            bottom: 5mm;
+            left: 10mm;
+            right: 10mm;
+            margin-top: 30px;
+            padding: 8px;
+            background: #f8f9fa;
+            border-top: 1px solid #dee2e6;
+            font-size: 9px;
+            color: #666;
+            line-height: 1.3;
+            text-align: justify;
+        }
+        
+        .footer-datos .iban {
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .footer-datos-presupuesto {
+            margin-top: 15px;
+            padding: 8px;
+            background: #f8f9fa;
+            font-size: 9px;
+            color: #666;
+            line-height: 1.3;
+            text-align: justify;
+            page-break-inside: avoid;
+        }
+        
+        .footer-datos-presupuesto .iban {
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .page:last-child {
+            page-break-after: auto;
+        }
+        
+        .page:only-child {
+            page-break-after: auto;
+        }
+        
+        /* Forzar salto de página en cada página excepto la última */
+        .page:not(:last-child) {
+            page-break-after: always !important;
+        }
+        
+        .no-print {
+            text-align: center;
+            margin-top: 20px;
+            padding: 20px;
+        }
+        
+        .no-print .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 0 10px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .no-print .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .no-print .btn:hover {
+            opacity: 0.9;
+        }
+        
+        /* PÁGINA 0: PORTADA */
+        .portada-page {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+        }
+        
+        .portada-image {
+            max-width: 100%;
+            max-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: block;
+            margin: auto;
+            vertical-align: middle;
+        }
+        
+        /* PÁGINA 2: IMÁGENES ADICIONALES */
+        .imagenes-page {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 0;
+            padding-bottom: 25mm;
+        }
+        
+        .imagenes-header {
+            text-align: center;
+            padding: 0 0 10mm 0;
+            margin-bottom: 10mm;
+            border-bottom: 3px solid #2c3e50;
+            flex-shrink: 0;
+        }
+        
+        .imagenes-header h2 {
+            font-size: 20px;
+            color: #2c3e50;
+            margin: 0;
+            font-weight: bold;
+        }
+        
+        .imagenes-grid {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 10mm 15mm;
+            box-sizing: border-box;
+        }
+        
+        .imagen-item {
+            width: 50%;
+            vertical-align: top;
+            padding: 0;
+            page-break-inside: avoid;
+        }
+        
+        .imagen-item-wrapper {
+            display: block;
+            text-align: center;
+            width: 100%;
+        }
+        
+        .imagen-container {
+            width: 300px !important;
+            height: 250px !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 5mm;
+            box-sizing: border-box;
+            margin: 0 auto;
+        }
+        
+        .imagen-adicional {
+            width: 300px !important;
+            height: 250px !important;
+            max-width: 300px !important;
+            max-height: 250px !important;
+            object-fit: contain;
+            display: block;
+            margin: 0;
+            padding: 0;
+        }
+        
+        .descripcion-imagen {
+            width: 100%;
+            padding: 0;
+            font-size: 9pt;
+            line-height: 1.4;
+            color: #333;
+            text-align: center;
+        }
+        
+        /* PÁGINA 3: CONDICIONADO */
+        .condicionado-page {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            padding: 0;
+            padding-top: 20mm;
+            box-sizing: border-box;
+        }
+        
+        .condicionado-header {
+            text-align: center;
+            margin-bottom: 8px;
+            margin-top: 0;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .condicionado-header h1 {
+            font-size: 18px;
+            color: #2c3e50;
+            margin-bottom: 3px;
+            margin-top: 0;
+            padding-top: 0;
+        }
+        
+        .condicionado-header h2 {
+            font-size: 14px;
+            color: #666;
+            font-weight: normal;
+            margin: 0;
+        }
+        
+        .condicionado-content {
+            flex: 1;
+            font-size: 9px;
+            line-height: 1.4;
+            text-align: justify;
+            margin-bottom: 8px;
+            margin-top: 0;
+            overflow: hidden;
+        }
+        
+        .condicionado-content h3 {
+            font-size: 10px;
+            color: #2c3e50;
+            margin-top: 8px;
+            margin-bottom: 4px;
+            font-weight: bold;
+        }
+        
+        .condicionado-content p {
+            margin-bottom: 5px;
+            margin-top: 0;
+        }
+        
+        .condicionado-content ul {
+            margin-left: 15px;
+            margin-bottom: 5px;
+            margin-top: 0;
+            padding-left: 10px;
+        }
+        
+        .condicionado-content li {
+            margin-bottom: 3px;
+        }
+        
+        .firma-section {
+            margin-top: 8px;
+            padding-top: 8px;
+            flex-shrink: 0;
+        }
+        
+        .firma-box {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        
+        .firma-cliente, .firma-empresa {
+            width: 45%;
+            text-align: center;
+        }
+        
+        .firma-line {
+            border-top: 2px solid #333;
+            margin-top: 30px;
+            padding-top: 3px;
+        }
+        
+        .firma-label {
+            font-weight: bold;
+            font-size: 9px;
+        }
+        
+        /* PÁGINA 4: CONTENIDO DEL PRESUPUESTO (si no hay portada) */
+        .presupuesto-container {
+            max-width: 210mm;
+            margin: 0 auto;
+            background: white;
+            padding: 15px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .presupuesto-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .logo-section {
+            flex: 0 0 auto;
+        }
+        
+        .logo-section img {
+            width: 120px;
+            height: 120px;
+            object-fit: contain;
+        }
+        
+        .presupuesto-title {
+            flex: 1;
+            text-align: center;
+            align-self: center;
+        }
+        
+        .presupuesto-title h1 {
+            font-size: 1.8em;
+            color: #2c3e50;
+            margin-bottom: 0;
+            font-weight: bold;
+        }
+        
+        .presupuesto-info {
+            text-align: right;
+            flex: 0 0 auto;
+            min-width: 200px;
+        }
+        
+        .presupuesto-info p {
+            margin: 3px 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .datos-section {
+            margin-bottom: 12px;
+            display: table;
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 10px;
+        }
+        
+        .datos-box {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+        
+        .diseno-box {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+        
+        .datos-box h3 {
+            color: #2c3e50;
+            border-bottom: 1px solid #2c3e50;
+            padding-bottom: 3px;
+            margin-bottom: 5px;
+            margin-top: 0;
+            font-size: 1rem;
+        }
+        
+        .datos-box h3:not(:first-child) {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .datos-box p {
+            margin: 2px 0;
+            color: #495057;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        
+        .diseno-box h3 {
+            color: #2c3e50;
+            border-bottom: 1px solid #2c3e50;
+            padding-bottom: 3px;
+            margin-bottom: 5px;
+            font-size: 1rem;
+        }
+        
+        .lineas-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .lineas-table thead {
+            background: #f8f9fa;
+            color: #000000;
+            display: table-header-group;
+        }
+        
+        .cabecera-repetida {
+            display: none;
+        }
+        
+        .cabecera-repetida .presupuesto-header {
+            margin-bottom: 10px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .cabecera-repetida .presupuesto-header .logo-section img {
+            width: 80px;
+            height: 80px;
+        }
+        
+        .cabecera-repetida .presupuesto-header .presupuesto-title h1 {
+            font-size: 1.3em;
+            margin: 0;
+        }
+        
+        .cabecera-repetida .presupuesto-header .presupuesto-info {
+            font-size: 0.75em;
+        }
+        
+        .cabecera-repetida .presupuesto-header .presupuesto-info p {
+            margin: 1px 0;
+        }
+        
+        @media print {
+            /* Mostrar cabecera repetida cuando la tabla se divide entre páginas */
+            .cabecera-repetida {
+                display: block;
+                page-break-after: avoid;
+                margin-bottom: 10px;
+            }
+            
+            /* Ocultar en la primera página del contenido */
+            .contenido-presupuesto-wrapper:first-of-type .cabecera-repetida {
+                display: none;
+            }
+        }
+        
+        .lineas-table th {
+            padding: 5px 8px;
+            text-align: left;
+            font-weight: 600;
+            border: 1px solid #dee2e6;
+            font-size: 0.9em;
+            color: #000000;
+        }
+        
+        .lineas-table td {
+            padding: 5px 8px;
+            border: 1px solid #e9ecef;
+            color: #495057;
+            font-size: 0.85em;
+        }
+        
+        .lineas-table tbody tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .totales-section {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 2px solid #2c3e50;
+            page-break-inside: avoid;
+        }
+        
+        .footer-datos-presupuesto {
+            margin-top: 15px;
+            padding-top: 10px;
+            page-break-inside: avoid;
+        }
+        
+        .contenido-presupuesto-wrapper {
+            page-break-inside: auto;
+        }
+        
+        .seccion-imagenes-wrapper {
+            page-break-before: always;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 0.95em;
+        }
+        
+        .total-row.base {
+            color: #495057;
+        }
+        
+        .total-row.iva {
+            color: #495057;
+        }
+        
+        .total-row.final {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #27ae60;
+            border-top: 2px solid #2c3e50;
+            padding-top: 8px;
+            margin-top: 5px;
+            border-bottom: none;
+        }
+        
+        .total-label {
+            font-weight: 600;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .no-print {
+                display: none;
+            }
+            
+            .page {
+                margin: 0;
+                box-shadow: none;
+                page-break-after: auto;
+                overflow: visible;
+            }
+            
+            .contenido-presupuesto-wrapper {
+                page-break-inside: auto;
+            }
+            
+            .page:last-child {
+                page-break-after: auto;
+            }
+            
+            .page:only-child {
+                page-break-after: auto;
+            }
+            
+            .page:not(:last-child) {
+                page-break-after: always !important;
+            }
+            
+            .presupuesto-container {
+                page-break-inside: avoid;
+            }
+            
+            .imagenes-page {
+                page-break-inside: avoid;
+            }
+            
+            .condicionado-page {
+                page-break-inside: avoid;
+            }
+            
+            .lineas-table thead {
+                display: table-header-group;
+            }
+            
+            .lineas-table tbody tr {
+                page-break-inside: auto;
+            }
+            
+            .totales-section {
+                page-break-inside: avoid;
+            }
+            
+            .footer-datos-presupuesto {
+                page-break-inside: avoid;
+            }
+            
+            .seccion-imagenes-wrapper {
+                page-break-before: always !important;
+            }
+            
+            /* Mostrar cabecera repetida cuando la tabla se divide entre páginas */
+            /* Para que funcione con Playwright, la cabecera debe estar visible */
+            .cabecera-repetida {
+                display: block !important;
+                page-break-after: avoid;
+                margin-bottom: 10px;
+                page-break-inside: avoid;
+            }
+            
+            /* Ocultar solo en la primera página visible (si no hay portada) */
+            body > .page.contenido-presupuesto-wrapper:first-child .cabecera-repetida {
+                display: none !important;
+            }
+            
+            /* Si hay portada, ocultar en la primera página de contenido */
+            .page.portada-page ~ .page.contenido-presupuesto-wrapper:first-of-type .cabecera-repetida {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    {% set imagenes_adicionales = [
+        presupuesto.imagen_adicional_1 if presupuesto.imagen_adicional_1 else None,
+        presupuesto.imagen_adicional_2 if presupuesto.imagen_adicional_2 else None,
+        presupuesto.imagen_adicional_3 if presupuesto.imagen_adicional_3 else None,
+        presupuesto.imagen_adicional_4 if presupuesto.imagen_adicional_4 else None,
+        presupuesto.imagen_adicional_5 if presupuesto.imagen_adicional_5 else None
+    ] %}
+    {% set descripciones_adicionales = [
+        descripciones_imagenes[0] if descripciones_imagenes is defined and descripciones_imagenes[0] else (presupuesto.descripcion_imagen_1 if presupuesto.descripcion_imagen_1 else ''),
+        descripciones_imagenes[1] if descripciones_imagenes is defined and descripciones_imagenes[1] else (presupuesto.descripcion_imagen_2 if presupuesto.descripcion_imagen_2 else ''),
+        descripciones_imagenes[2] if descripciones_imagenes is defined and descripciones_imagenes[2] else (presupuesto.descripcion_imagen_3 if presupuesto.descripcion_imagen_3 else ''),
+        descripciones_imagenes[3] if descripciones_imagenes is defined and descripciones_imagenes[3] else (presupuesto.descripcion_imagen_4 if presupuesto.descripcion_imagen_4 else ''),
+        descripciones_imagenes[4] if descripciones_imagenes is defined and descripciones_imagenes[4] else (presupuesto.descripcion_imagen_5 if presupuesto.descripcion_imagen_5 else '')
+    ] %}
+    
+    {% set tiene_imagenes_adicionales = imagenes_adicionales[0] or imagenes_adicionales[1] or imagenes_adicionales[2] or imagenes_adicionales[3] or imagenes_adicionales[4] %}
+    
+    <!-- PÁGINA 1: CONTENIDO DEL PRESUPUESTO -->
+    <div class="page contenido-presupuesto-wrapper">
+        <div class="page-content">
+        <div class="presupuesto-header">
+            <div class="logo-section">
+                {% if use_base64 is defined and use_base64 and logo_base64 %}
+                <img src="{{ logo_base64 }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
+                {% elif base_url is defined and base_url %}
+                <img src="{{ base_url }}{{ url_for('static', filename='logo1.png') }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
+                {% else %}
+                <img src="{{ url_for('static', filename='logo1.png', _external=True) }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
+                {% endif %}
+            </div>
+            <div class="presupuesto-title">
+                <h1>{% if es_albaran is defined and es_albaran %}ALBARÁN{% else %}PRESUPUESTO{% endif %}</h1>
+            </div>
+            <div class="presupuesto-info">
+                <p><strong>Weark Custom Tovar Sl</strong></p>
+                <p>B06763502</p>
+                <p>C/Marquesa de Pinares, 11</p>
+                <p>06800-Mérida (Badajoz)</p>
+            </div>
+        </div>
+
+        <div class="datos-section">
+            <div class="datos-box">
+                <h3>Datos del {% if es_albaran is defined and es_albaran %}Albarán{% else %}Presupuesto{% endif %}</h3>
+                <p><strong>Número:</strong> {{ presupuesto.numero_solicitud or presupuesto.id }}</p>
+                <p><strong>Fecha:</strong> {{ presupuesto.fecha_creacion.strftime('%d/%m/%Y') if presupuesto.fecha_creacion else 'N/A' }}</p>
+                <p><strong>Estado:</strong> {{ presupuesto.estado }}</p>
+                <p><strong>Tipo:</strong> {{ presupuesto.tipo_pedido }} | <strong>Comercial:</strong> {{ presupuesto.comercial.nombre if presupuesto.comercial else 'N/A' }}{% if presupuesto.comercial and presupuesto.comercial.usuario and presupuesto.comercial.usuario.telefono %} - {{ presupuesto.comercial.usuario.telefono }}{% endif %}</p>
+                {% if presupuesto.forma_pago %}
+                <p><strong>Forma de Pago:</strong> {{ presupuesto.forma_pago }}</p>
+                {% endif %}
+                {% if presupuesto.comentarios_cliente %}
+                <p style="margin-top: 10px; white-space: pre-wrap;"><strong>Comentarios:</strong> {{ presupuesto.comentarios_cliente }}</p>
+                {% endif %}
+
+                {% if prendas_info is defined and prendas_info|length > 0 %}
+                <h3 style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;">Productos</h3>
+                {% for prenda in prendas_info %}
+                <p style="margin-top: 4px;">
+                    <strong>P{{ prenda.numero }}:</strong> {{ prenda.tipo_producto or 'Sin tipo' }}
+                    {% if prenda.referencias_diseno %} | Ref: {{ prenda.referencias_diseno }}{% endif %}
+                    {% if prenda.comentarios %} | Coment: {{ prenda.comentarios }}{% endif %}
+                    {% if prenda.logos and prenda.logos|length > 0 %} | Logos: {{ prenda.logos|length }}{% endif %}
+                </p>
+                {% endfor %}
+                {% endif %}
+                
+                <h3 style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;">Datos del Cliente</h3>
+                <p><strong>{{ presupuesto.cliente.nombre if presupuesto.cliente else 'N/A' }}</strong></p>
+                {% if presupuesto.cliente and presupuesto.cliente.direccion %}
+                <p>{{ presupuesto.cliente.direccion }}</p>
+                {% endif %}
+                {% if presupuesto.cliente %}
+                    {% set cp = presupuesto.cliente.codigo_postal or '' %}
+                    {% set poblacion = presupuesto.cliente.poblacion or '' %}
+                    {% set provincia = presupuesto.cliente.provincia or '' %}
+                    {% if cp or poblacion or provincia %}
+                        <p>
+                            {% if cp %}{{ cp }}{% endif %}
+                            {% if cp and poblacion %}-{% endif %}
+                            {% if poblacion %}{{ poblacion }}{% endif %}
+                            {% if (cp or poblacion) and provincia %}-{% endif %}
+                            {% if provincia %}{{ provincia }}{% endif %}
+                        </p>
+                    {% endif %}
+                {% endif %}
+                {% if presupuesto.cliente and presupuesto.cliente.nif %}
+                <p><strong>NIF/CIF:</strong> {{ presupuesto.cliente.nif }}</p>
+                {% endif %}
+            </div>
+            {% if presupuesto.imagen_portada %}
+            <div class="diseno-box">
+                <h3>Portada</h3>
+                {% if use_base64 is defined and use_base64 and imagen_portada_base64 %}
+                <img src="{{ imagen_portada_base64 }}" alt="Portada" style="width: 100%; max-width: 100%; height: auto; max-height: 225px; object-fit: contain; border-radius: 4px;">
+                {% elif base_url is defined and base_url %}
+                <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + presupuesto.imagen_portada) }}" alt="Portada" style="width: 100%; max-width: 100%; height: auto; max-height: 225px; object-fit: contain; border-radius: 4px;">
+                {% else %}
+                <img src="{{ url_for('static', filename='uploads/' + presupuesto.imagen_portada, _external=True) }}" alt="Portada" style="width: 100%; max-width: 100%; height: auto; max-height: 225px; object-fit: contain; border-radius: 4px;">
+                {% endif %}
+            </div>
+            {% else %}
+            <div class="diseno-box"></div>
+            {% endif %}
+        </div>
+
+        
+        {% if presupuesto.lineas %}
+        <!-- Cabecera repetida para páginas siguientes -->
+        <div class="cabecera-repetida">
+            <div class="presupuesto-header">
+                <div class="logo-section">
+                    {% if use_base64 is defined and use_base64 and logo_base64 %}
+                    <img src="{{ logo_base64 }}" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;">
+                    {% elif base_url is defined and base_url %}
+                    <img src="{{ base_url }}{{ url_for('static', filename='logo1.png') }}" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;">
+                    {% else %}
+                    <img src="{{ url_for('static', filename='logo1.png', _external=True) }}" alt="Logo" style="width: 80px; height: 80px; object-fit: contain;">
+                    {% endif %}
+                </div>
+                <div class="presupuesto-title">
+                    <h1>{% if es_albaran is defined and es_albaran %}ALBARÁN{% else %}PRESUPUESTO{% endif %} {{ presupuesto.numero_solicitud or presupuesto.id }}</h1>
+                </div>
+                <div class="presupuesto-info">
+                    <p><strong>Weark Custom Tovar Sl</strong></p>
+                    <p>B06763502</p>
+                    <p>C/Marquesa de Pinares, 11</p>
+                    <p>06800-Mérida (Badajoz)</p>
+                </div>
+            </div>
+        </div>
+        
+        {# Verificar si hay alguna línea con descuento (solo para presupuestos, no albaranes) #}
+        {% set ns = namespace(tiene_algun_descuento=False) %}
+        {% if not (es_albaran is defined and es_albaran) %}
+            {% for linea_check in presupuesto.lineas %}
+                {% if linea_check.descuento is not none %}
+                    {% set desc_check_val = linea_check.descuento|float %}
+                    {% if desc_check_val > 0 %}
+                        {% set ns.tiene_algun_descuento = True %}
+                    {% endif %}
+                {% endif %}
+            {% endfor %}
+        {% endif %}
+        
+        <table class="lineas-table">
+            <thead>
+                <tr>
+                    {% if not (es_albaran is defined and es_albaran) and ns.tiene_algun_descuento %}
+                    <th style="width: 40%;">Nombre</th>
+                    <th style="width: 6%; text-align: center;">Cantidad</th>
+                    <th style="width: 7%; text-align: center;">Talla</th>
+                    <th style="width: 10%; text-align: right;">Precio Unit.</th>
+                    <th style="width: 8%; text-align: center;">Dto</th>
+                    <th style="width: 10%; text-align: right;">Precio Final</th>
+                    <th style="width: 19%; text-align: right;">Total</th>
+                    {% elif not (es_albaran is defined and es_albaran) %}
+                    <th style="width: 55%;">Nombre</th>
+                    <th style="width: 7%; text-align: center;">Cantidad</th>
+                    <th style="width: 8%; text-align: center;">Talla</th>
+                    <th style="width: 12%; text-align: right;">Precio Unit.</th>
+                    <th style="width: 18%; text-align: right;">Total</th>
+                    {% else %}
+                    <th style="width: 70%;">Nombre</th>
+                    <th style="width: 10%; text-align: center;">Cantidad</th>
+                    <th style="width: 10%; text-align: center;">Talla</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for linea in presupuesto.lineas %}
+                {% set precio_unitario_val = linea.precio_unitario if linea.precio_unitario else 0 %}
+                {% set cantidad_val = linea.cantidad if linea.cantidad else 0 %}
+                {% set descuento_val = linea.descuento if linea.descuento else 0 %}
+                {% set precio_final_val = linea.precio_final if linea.precio_final else None %}
+                {% set precio_unit = precio_unitario_val|float %}
+                {% set cantidad = cantidad_val|int %}
+                {% set descuento = descuento_val|float %}
+                {% set tiene_descuento = descuento > 0 %}
+                {% if tiene_descuento %}
+                    {% if precio_final_val %}
+                        {% set precio_a_usar = precio_final_val|float %}
+                    {% else %}
+                        {# Calcular precio final aplicando el descuento porcentual #}
+                        {% set precio_a_usar = precio_unit * (1 - descuento / 100) %}
+                    {% endif %}
+                {% else %}
+                    {% set precio_a_usar = precio_unit %}
+                {% endif %}
+                {% set total_linea = precio_a_usar * cantidad %}
+                {% set nombre_prenda = linea.nombre_mostrar or linea.nombre or 'N/A' %}
+                {% set nombre_personalizado = linea.nombre if (linea.nombre and linea.nombre.strip()) else '' %}
+                {% set cargo_personalizado = linea.cargo if (linea.cargo and linea.cargo.strip()) else '' %}
+                {% set texto_personalizacion = '' %}
+                {% if nombre_personalizado and cargo_personalizado %}
+                    {% set texto_personalizacion = 'Nombre: ' + nombre_personalizado + ' - Cargo: ' + cargo_personalizado %}
+                {% elif nombre_personalizado %}
+                    {% set texto_personalizacion = 'Nombre: ' + nombre_personalizado %}
+                {% elif cargo_personalizado %}
+                    {% set texto_personalizacion = 'Cargo: ' + cargo_personalizado %}
+                {% endif %}
+                <tr>
+                    <td>{{ nombre_prenda }}{% if texto_personalizacion %} - {{ texto_personalizacion }}{% endif %}</td>
+                    <td style="text-align: center;">{{ cantidad }}</td>
+                    <td style="text-align: center;">{{ linea.talla or '-' }}</td>
+                    {% if not (es_albaran is defined and es_albaran) %}
+                    <td style="text-align: right;">{{ "%.2f"|format(precio_unit) }} €</td>
+                    {% if ns.tiene_algun_descuento %}
+                    <td style="text-align: center;">
+                        {% if tiene_descuento %}
+                            {{ "%.0f"|format(descuento) }}%
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right;">
+                        {% if tiene_descuento %}
+                            {{ "%.2f"|format(precio_a_usar) }} €
+                        {% else %}
+                            {{ "%.2f"|format(precio_unit) }} €
+                        {% endif %}
+                    </td>
+                    {% endif %}
+                    <td style="text-align: right; font-weight: bold;">{{ "%.2f"|format(total_linea|float) }} €</td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if not (es_albaran is defined and es_albaran) %}
+        <div class="totales-section">
+            <div class="total-row base">
+                <span class="total-label">Base Imponible:</span>
+                <span>{{ "%.2f"|format(base_imponible) }} €</span>
+            </div>
+            <div class="total-row iva">
+                <span class="total-label">IVA ({{ tipo_iva }}%):</span>
+                <span>{{ "%.2f"|format(iva_total) }} €</span>
+            </div>
+            <div class="total-row final">
+                <span class="total-label">TOTAL:</span>
+                <span>{{ "%.2f"|format(total_con_iva) }} €</span>
+            </div>
+        </div>
+        </br>
+        </br>
+        {% endif %}
+        <div class="firma-section">
+            <div class="firma-box">
+                <div class="firma-cliente">
+                    <div class="firma-line"></div>
+                    <div class="firma-label">Firma y sello del CLIENTE</div>
+                </div>
+                <div class="firma-empresa">
+                    <div class="firma-line"></div>
+                    <div class="firma-label">Firma y sello de LA EMPRESA</div>
+                </div>
+            </div>
+            <!--<div style="margin-top: 10px; text-align: center; font-size: 8px; color: #666;">
+                <p style="margin: 2px 0;">Fecha: ___________________</p>
+                <p style="margin: 2px 0;">Lugar: ___________________</p>
+            </div>-->
+        </div>
+        {% else %}
+        <p style="padding: 30px; background: #f8f9fa; border-radius: 6px; text-align: center; color: #999;">
+            Este presupuesto no tiene líneas registradas.
+        </p>
+        {% endif %}
+
+
+        
+        <!-- Pie de página con información de protección de datos -->
+        {% if not (solo_primera_pagina is defined and solo_primera_pagina) %}
+        <div class="footer-datos">
+            <p><span class="iban">Forma de Pago: {{ forma_pago_texto if forma_pago_texto is defined else 'Transferencia' }} | IBAN: {{ numero_cuenta_iban if numero_cuenta_iban is defined else 'ES2200495247862816942248' }}</span></p>
+            </br>
+            <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> {{ texto_proteccion_datos if texto_proteccion_datos is defined else 'Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.' }}</p>
+        </div>
+        {% endif %}
+        </div>
+    </div>
+    
+    <!-- PÁGINA 2: IMÁGENES ADICIONALES (Máximo 4 imágenes con descripciones) -->
+    {% if tiene_imagenes_adicionales and not (solo_primera_pagina is defined and solo_primera_pagina) %}
+    <div class="page imagenes-page seccion-imagenes-wrapper">
+        <div class="imagenes-header">
+            <h2>DISEÑOS DEL PEDIDO</h2>
+        </div>
+        <table class="imagenes-grid" style="width: 100%;">
+            {% set img0 = imagenes_adicionales[0] if imagenes_adicionales[0] else None %}
+            {% set img1 = imagenes_adicionales[1] if imagenes_adicionales[1] else None %}
+            {% set img2 = imagenes_adicionales[2] if imagenes_adicionales[2] else None %}
+            {% set img3 = imagenes_adicionales[3] if imagenes_adicionales[3] else None %}
+            {% set img4 = imagenes_adicionales[4] if imagenes_adicionales[4] else None %}
+            
+            {% if img0 or img1 %}
+            <tr>
+                {% if img0 %}
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[0] %}
+                            <img src="{{ imagenes_adicionales_base64[0] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[0]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[0], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[0] %}
+                            {{ descripciones_adicionales[0] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                {% else %}
+                <td class="imagen-item"></td>
+                {% endif %}
+                {% if img1 %}
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[1] %}
+                            <img src="{{ imagenes_adicionales_base64[1] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[1]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[1], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[1] %}
+                            {{ descripciones_adicionales[1] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                {% else %}
+                <td class="imagen-item"></td>
+                {% endif %}
+            </tr>
+            {% endif %}
+            
+            {% if img2 or img3 %}
+            <tr>
+                {% if img2 %}
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[2] %}
+                            <img src="{{ imagenes_adicionales_base64[2] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[2]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[2], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[2] %}
+                            {{ descripciones_adicionales[2] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                {% else %}
+                <td class="imagen-item"></td>
+                {% endif %}
+                {% if img3 %}
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[3] %}
+                            <img src="{{ imagenes_adicionales_base64[3] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[3]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[3], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[3] %}
+                            {{ descripciones_adicionales[3] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                {% else %}
+                <td class="imagen-item"></td>
+                {% endif %}
+            </tr>
+            {% endif %}
+            
+            {% if img4 %}
+            <tr>
+                <td class="imagen-item">
+                    <div class="imagen-item-wrapper">
+                        <div class="imagen-container">
+                            {% if use_base64 is defined and use_base64 and imagenes_adicionales_base64 is defined and imagenes_adicionales_base64[4] %}
+                            <img src="{{ imagenes_adicionales_base64[4] }}" alt="Imagen" class="imagen-adicional">
+                            {% elif base_url is defined and base_url %}
+                            <img src="{{ base_url }}{{ url_for('static', filename='uploads/' + imagenes_adicionales[4]) }}" alt="Imagen" class="imagen-adicional">
+                            {% else %}
+                            <img src="{{ url_for('static', filename='uploads/' + imagenes_adicionales[4], _external=True) }}" alt="Imagen" class="imagen-adicional">
+                            {% endif %}
+                        </div>
+                        <div class="descripcion-imagen">
+                            {% if descripciones_adicionales[4] %}
+                            {{ descripciones_adicionales[4] }}
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td class="imagen-item"></td>
+            </tr>
+            {% endif %}
+        </table>
+        
+        <!-- Pie de página con información de protección de datos -->
+        <div class="footer-datos">
+            <p><span class="iban">Forma de Pago: {{ forma_pago_texto if forma_pago_texto is defined else 'Transferencia' }} | IBAN: {{ numero_cuenta_iban if numero_cuenta_iban is defined else 'ES2200495247862816942248' }}</span></p>
+            </br>
+            <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> {{ texto_proteccion_datos if texto_proteccion_datos is defined else 'Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.' }}</p>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if not (es_albaran is defined and es_albaran) and not (solo_primera_pagina is defined and solo_primera_pagina) %}
+    <!-- PÁGINA 3: CONDICIONADO -->
+    <div class="page condicionado-page">
+        <div class="condicionado-header">
+            <h1>CONDICIONES GENERALES</h1>
+            <h2>ACEPTACIÓN PREVIA AL PEDIDO</h2>
+        </div>
+        
+        <div class="condicionado-content">
+            <p>El presente documento establece las condiciones generales de venta que rigen la relación comercial entre <strong>{{ presupuesto.cliente.nombre if presupuesto.cliente else '_________________' }}</strong> (en adelante "EL CLIENTE") y nuestra empresa de fabricación de ropa WEARK CUSTOM TOVAR S.L. (en adelante "LA EMPRESA").</p>
+            
+            <h3>1. ACEPTACIÓN DEL PRESUPUESTO</h3>
+            <p>La aceptación del presente presupuesto implica la aceptación íntegra de todas las condiciones aquí establecidas. La firma de este documento constituye un acuerdo vinculante entre ambas partes.</p>
+            <p>Todas las ventas y suministros a efectuar por LA EMPRESA se regirán por las presentes Condiciones Generales, a excepción de cualquier acuerdo particular recogido por escrito en el contrato con EL CLIENTE.</p>
+            
+            <h3>2. CALIDAD Y ESPECIFICACIONES</h3>
+            <p>Los artículos suministrados por LA EMPRESA cumplirán con las especificaciones acordadas con EL CLIENTE.</p>
+            <p>EL CLIENTE deberá revisar y aprobar el mockup de las prendas y las muestras, si las hubiera, antes de la producción en serie. Cualquier modificación solicitada después de la aprobación de muestras, no contempladas expresamente en el presupuesto aceptado, puede conllevar costes adicionales y/o retrasos en la entrega.</p>
+            <p>Las muestras, son orientativas y pueden presentar ligeras variaciones en la producción final debido a las características propias de los procesos de fabricación textil.</p>
+            
+            <h3>2.1. COLORES Y TELAS</h3>
+            <p>Los colores de los productos pueden presentar ligeras variaciones debido a diferencias entre tipos y lotes de tela, tintas o condiciones de visualización (luz natural vs. artificial), etc. Estas variaciones son normales en la industria textil y no constituyen defecto de fabricación.</p>
+            
+            <h3>2.2. TALLAS Y MEDIDAS</h3>
+            <p>Las tallas indicadas en el presupuesto se ajustan a los estándares de la industria textil y la tabla de medidas de cada fabricante.</p>
+            <p>En la producción masiva por tallas, existe un margen de tolerancia permitido de entre 1 a 3 cm, derivados del proceso normal de corte y confección que no constituyen defecto de fabricación ni motivo de devolución.</p>
+            <p>Los diseños personalizados fabricados por LA EMPRESA se confeccionan según el estándar de tallas especificado en sus fichas técnicas, a disposición del cliente, el cual le recomendamos consultar antes de hacer su pedido para asegurar un ajuste adecuado.</p>
+            <p>LA EMPRESA dispone de un servicio de envío y recogida a domicilio de nuestro muestrario estándar, según producto, para EL CLIENTE que desee verificar su talla, por un pequeño coste adicional. Consulte disponibilidad y tarifa.</p>
+            <p>Si EL CLIENTE requiere medidas personalizadas o tallas especiales, deberá especificarlo claramente antes de la confirmación de presupuesto, pues pueden suponer costes adicionales que deben ser tenidos en cuenta en la elaboración de la oferta.</p>
+            
+            <h3>3. MODIFICACIONES Y CANCELACIONES</h3>
+            <p>Una vez aceptado el presupuesto y comenzada la producción, cualquier modificación solicitada por EL CLIENTE puede conllevar: costes adicionales, retrasos en los plazos de entrega, o pérdida de materiales ya cortados o procesados.</p>
+            <p>La EMPRESA de manera general, confecciona tallas ajustadas a un estándar. Las medidas que tomadas a los clientes en las fabricaciones personalizadas, salvo excepciones, son para proporcionarle la talla que más se ajuste a su silueta. Las modificaciones o ajustes personalizados que se soliciten en las prendas una vez confeccionadas, salvo indicación contraria expresa en el presupuesto, conllevarán costes adicionales que se regirán por la tarifa de arreglos de "LA EMPRESA".</p>
+            <p>La cancelación del pedido después de la aceptación del presupuesto conllevará:</p>
+            <ul>
+                <li>El pago por EL CLIENTE del importe correspondiente a los artículos y/o materiales ya entregados.</li>
+                <li>La obligación de adquirir los artículos pendientes de entrega y que sean de fabricación exclusiva para EL CLIENTE, abonando su importe a la entrega.</li>
+                <li>El pago de los materiales comprados o servicios contratados por la EMPRESA, para el pedido del CLIENTE, cuando no sea posible la cancelación de estos.</li>
+                <li>El pago del coste de cancelación (si lo tiene) de los pedidos a proveedores y/o subcontratistas emitidos por LA EMPRESA, para el pedido del CLIENTE, cuando dicha cancelación sea posible.</li>
+            </ul>
+            
+            <h3>4. PLAZOS DE ENTREGA</h3>
+            <p>Los plazos de entrega indicados en el presupuesto o pedido son estimados y pueden verse afectados por diversos factores fuera del control de LA EMPRESA, tales como:</p>
+            <ul>
+                <li>Disponibilidad de materias primas y tejidos en el momento de aceptación.</li>
+                <li>Retrasos en la recepción de materiales por parte de proveedores.</li>
+                <li>Circunstancias de fuerza mayor (huelgas, catástrofes naturales, pandemias, etc.).</li>
+                <li>Volumen de pedidos y carga de trabajo del taller.</li>
+                <li>Procesos de bordado, serigrafía o personalización adicional.</li>
+                <li>Disponibilidad de transporte para la entrega.</li>
+            </ul>
+            <p>El plazo de entrega también puede verse afectado por causas derivadas del CLIENTE, tales como:</p>
+            <ul>
+                <li>Que no entregue en plazo la documentación que sea necesaria para la ejecución de la producción y/o suministro.</li>
+                <li>Que requiera modificaciones en el pedido, posteriores a la confirmación de este, que precisen una extensión del plazo de fabricación y entrega.</li>
+                <li>Que El CLIENTE haya incumplido alguna de las obligaciones contractuales del pedido, en especial la que se refiere a pagos.</li>
+                <li>Que el CLIENTE haya pausado unilateralmente y sin acuerdo, el suministro objeto de pedido.</li>
+            </ul>
+            <p>Los aplazamientos en el plazo de entrega por los anteriores motivos no modificarán la programación de pagos de los productos.</p>
+            
+            <h3>5. RECEPCIÓN Y REVISIÓN</h3>
+            <p>EL CLIENTE deberá revisar los productos recibidos en un plazo máximo de 48 horas desde la entrega. Cualquier reclamación por eventuales defectos y/o faltas imputables a LA EMPRESA, deberá comunicarse por escrito dentro de este plazo, adjuntando fotografías y descripción detallada de los mismos.</p>
+            <p>Pasado este plazo sin comunicación, se entenderá que los productos han sido aceptados conforme.</p>
+            <p>De confirmarse defectos imputables a LA EMPRESA, ésta procederá a la reparación necesaria, siendo obligación del CLIENTE preparar el embalaje necesario y facilitar la recogida por parte de LA EMPRESA.</p>
+            <p>Si las reclamaciones son errores imputables al CLIENTE en elección de talla, modelo, etc., LA EMPRESA solo aceptará devoluciones, en artículos estándar y de continuidad, nunca en prendas personalizadas, y siempre que se devuelvan en perfectas condiciones, siendo a cuenta del CLIENTE los gastos devolución.</p>
+            <p>En ningún caso LA EMPRESA admitirá devoluciones de materiales sin previa notificación por escrito y acuerdo al respecto en el modo y forma de realizar la devolución.</p>
+            
+            <h3>6. FORMA DE PAGO Y FACTURACIÓN</h3>
+            <p>Las condiciones de pago serán las establecidas por escrito y según lo acordado en el presupuesto.</p>
+            <p>De forma general el pago será del 50 % del importe a la aceptación del pedido, y 50% restante a la entrega. Si la entrega se realiza por lotes, el segundo pago será del 50% equivalente a los artículos entregados en cada uno de los lotes hasta completar el pedido.</p>
+            <p>El pago se realizará en la cuenta bancaria de LA EMPRESA o mediante procedimiento acordado. No se aplicará ninguna deducción, retención, descuentos, gastos, o impuestos no acordados.</p>
+            <p>En caso de retraso en los pagos por parte de EL CLIENTE, éste tendrá que pagar a la EMPRESA, sin requerimiento alguno, y a partir de la fecha de vencimiento del pago, los intereses de demora del pago retrasado, que se calcularán conforme a lo previsto en la legislación aplicable del país del CLIENTE. El pago de estos intereses no liberará al CLIENTE de la obligación de realizar el resto de los pagos en las condiciones acordadas.</p>
+            <p>En caso de que el CLIENTE incurra en retrasos, LA EMPRESA podrá suspender de forma provisional o definitiva, el envío del suministro, sin perjuicio de requerirle al CLIENTE la realización de los pagos atrasados y de reclamarle, en su caso, compensaciones adicionales por esta suspensión de los servicios acordados.</p>
+            <p>La formulación de una reclamación por parte del CLIENTE no da derecho al mismo a la suspensión o deducción alguna en los pagos comprometidos.</p>
+            
+            <h3>9. GARANTÍA</h3>
+            <p>LA EMPRESA garantiza la calidad de los productos fabricados durante un período de 6 meses desde la fecha de entrega, siempre que se hayan seguido las instrucciones de cuidado y mantenimiento indicadas en la etiqueta.</p>
+            <p>La garantía no cubre:</p>
+            <ul>
+                <li>Desgaste normal por uso</li>
+                <li>Daños causados por uso inadecuado o negligencia</li>
+                <li>Modificaciones realizadas por terceros</li>
+                <li>Lavados o tratamientos no recomendados</li>
+            </ul>
+            <p>La garantía expresada consiste en la reparación de los elementos que se hayan reconocido como defectuosos, bien por defectos del material o por defectos de fabricación.</p>
+            <p>En ningún caso el LA EMPRESA se hará cargo de las reparaciones efectuadas por personal ajeno a su organización y perderán su garantía las prendas modificadas por personal ajeno.</p>
+            
+            <h3>10. PROPIEDAD INTELECTUAL</h3>
+            <p>Los diseños, logos y elementos gráficos proporcionados por EL CLIENTE para su aplicación, deben ser de su propiedad o contar con las licencias necesarias. LA EMPRESA no se responsabiliza de cualquier reclamación relacionada con derechos de propiedad intelectual de terceros.</p>
+            <p>La propiedad intelectual y/o industrial de la oferta en todos sus términos, y la información adjunta proporcionada o elaborada por LA EMPRESA, tales como planos, dibujos, diseños, mockup, patrones, etc., relativos a la producción del pedido, pertenece a LA EMPRESA o proveedores. Queda expresamente prohibida su utilización por EL CLIENTE para otros fines que no sean los vinculados al pedido, así como su copia total o parcial o cesión de uso a favor de terceros, salvo consentimiento por escrito de LA EMPRESA.</p>
+            
+            <h3>11. LEGISLACIÓN APLICABLE</h3>
+            <p>El presente acuerdo se rige por la legislación española. Para cualquier controversia, las partes se someten a los juzgados y tribunales del domicilio de LA EMPRESA.</p>
+            
+            <p style="margin-top: 8px; margin-bottom: 0; font-weight: bold; text-align: center; font-size: 9px;">EL CLIENTE DECLARA HABER LEÍDO Y ACEPTADO TODAS LAS CONDICIONES ESTABLECIDAS EN EL PRESENTE DOCUMENTO</p>
+        </div>
+        
+        <div class="firma-section">
+            <div class="firma-box">
+                <div class="firma-cliente">
+                    <div class="firma-line"></div>
+                    <div class="firma-label">Firma y sello del CLIENTE</div>
+                </div>
+                <div class="firma-empresa">
+                    <div class="firma-line"></div>
+                    <div class="firma-label">Firma y sello de LA EMPRESA</div>
+                </div>
+            </div>
+            <!--<div style="margin-top: 10px; text-align: center; font-size: 8px; color: #666;">
+                <p style="margin: 2px 0;">Fecha: ___________________</p>
+                <p style="margin: 2px 0;">Lugar: ___________________</p>
+            </div>-->
+        </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="no-print">
+        <button onclick="window.print()" class="btn btn-primary">Imprimir</button>
+        <a href="{{ url_for('presupuestos.ver_solicitud', solicitud_id=presupuesto.id) }}" class="btn btn-secondary">Volver</a>
+    </div>
+    
+    <script>
+        // Mostrar cabecera repetida cuando la tabla se divide entre páginas
+        document.addEventListener('DOMContentLoaded', function() {
+            // La cabecera repetida se mostrará automáticamente cuando sea necesario
+            // Para PDFs generados con Playwright, el CSS se encargará de mostrarla
+            const cabeceraRepetida = document.querySelector('.cabecera-repetida');
+            if (cabeceraRepetida) {
+                // En modo impresión/PDF, la cabecera se mostrará automáticamente
+                // gracias al CSS @media print
+            }
+        });
+    </script>
+    </body>
+</html>

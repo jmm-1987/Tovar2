@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Crear Factura Anticipo{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 1000px; margin-top: 20px;">
+    <h2>Crear Factura Anticipo</h2>
+    <p style="color: #666; margin-bottom: 20px;">Seleccione una solicitud para crear una factura anticipo</p>
+    
+    {% if solicitudes %}
+    <div class="table-container" style="background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; margin-bottom: 20px;">
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); border-bottom: 2px solid #1a252f;">
+                    <th style="padding: 12px; text-align: left; color: #ffffff; font-weight: 600;">ID</th>
+                    <th style="padding: 12px; text-align: left; color: #ffffff; font-weight: 600;">Nº Solicitud</th>
+                    <th style="padding: 12px; text-align: left; color: #ffffff; font-weight: 600;">Cliente</th>
+                    <th style="padding: 12px; text-align: left; color: #ffffff; font-weight: 600;">Tipo</th>
+                    <th style="padding: 12px; text-align: center; color: #ffffff; font-weight: 600;">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for solicitud in solicitudes %}
+                <tr style="border-bottom: 1px solid #e9ecef;">
+                    <td style="padding: 12px; color: #212529; font-weight: 600;">#{{ solicitud.id }}</td>
+                    <td style="padding: 12px; color: #212529;">{{ solicitud.numero_solicitud or '-' }}</td>
+                    <td style="padding: 12px; color: #212529;">{{ solicitud.cliente.nombre if solicitud.cliente else 'N/A' }}</td>
+                    <td style="padding: 12px; color: #212529;">{{ solicitud.tipo_pedido if solicitud.tipo_pedido else 'N/A' }}</td>
+                    <td style="padding: 12px; text-align: center;">
+                        <a href="{{ url_for('facturacion.crear_factura_anticipo_seleccionar', presupuesto_id=solicitud.id) }}" 
+                           class="btn btn-primary" 
+                           style="padding: 6px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.85rem;">
+                            Seleccionar
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="padding: 30px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef; text-align: center;">
+        <p style="color: #999; font-style: italic; margin: 0; font-size: 1.1rem;">No hay solicitudes pendientes de facturar.</p>
+    </div>
+    {% endif %}
+    
+    <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+        <a href="{{ url_for('facturacion.facturacion') }}" class="btn btn-secondary" style="padding: 10px 20px; background: #6c757d; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">
+            Cancelar
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+

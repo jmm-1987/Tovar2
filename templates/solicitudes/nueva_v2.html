@@ -1,0 +1,1969 @@
+{% extends "base.html" %}
+
+{% block title %}Nuevo Presupuesto (2) - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<style>
+.container {
+    padding-top: 10px !important;
+    padding-left: 15px !important;
+    padding-right: 15px !important;
+    max-width: 100% !important;
+}
+header {
+    margin-bottom: 0.8rem !important;
+}
+@media (max-width: 1100px) {
+    #prendas-fabricacion-container {
+        grid-template-columns: 1fr !important;
+    }
+}
+</style>
+<h2>Nuevo Presupuesto (2)</h2>
+
+<form method="POST" enctype="multipart/form-data">
+    <div style="display: grid; grid-template-columns: 1fr; gap: 20px; margin-bottom: 20px;">
+        <!-- Columna izquierda (2/3) -->
+        <div>
+            <div class="form-row-compact">
+                <div class="form-group-compact">
+                    <label for="comercial_id">Comercial *</label>
+                    <select name="comercial_id" id="comercial_id" required>
+                        <option value="">Seleccione un comercial</option>
+                        {% for comercial in comerciales %}
+                        <option value="{{ comercial.id }}" {% if form_data and form_data.comercial_id == comercial.id|string %}selected{% endif %}>{{ comercial.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group-compact">
+                    <label for="cliente_id">Cliente (ojo! - crear carpeta con el nombre del cliente)</label>
+                    <div style="display: flex; gap: 5px;">
+                        <div style="position: relative; flex: 1;">
+                            <input type="text" id="cliente_search" placeholder="🔍 Buscar cliente..." 
+                                   style="width: 100%; padding: 10px 35px 10px 10px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; box-sizing: border-box;"
+                                   autocomplete="off">
+                            <select name="cliente_id" id="cliente_id" required style="display: none;">
+                                <option value="">Seleccione un cliente</option>
+                                {% for cliente in clientes %}
+                                <option value="{{ cliente.id }}" data-nombre="{{ cliente.nombre|lower }}" data-tipo-iva="{% if cliente.tipo_iva is not none %}{{ (cliente.tipo_iva|float)|int }}{% else %}21{% endif %}">{{ cliente.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                            <div id="cliente_results" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px; max-height: 200px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+                        </div>
+                        <button type="button" onclick="abrirModalCrearCliente()" 
+                                style="padding: 10px 15px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; white-space: nowrap;"
+                                title="Crear nuevo cliente">
+                            ➕
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-row-compact">
+                <div class="form-group-compact">
+                    <label for="tipo_pedido">Tipo *</label>
+                    <select name="tipo_pedido" id="tipo_pedido" required>
+                        <option value="fabricacion" {% if form_data and form_data.tipo_pedido == 'fabricacion' %}selected{% endif %}>Fabricación</option>
+                        <option value="bordado" {% if form_data and form_data.tipo_pedido == 'bordado' %}selected{% endif %}>Bordado/Serig.</option>
+                        <option value="pedido proveedor" {% if form_data and form_data.tipo_pedido == 'pedido proveedor' %}selected{% endif %}>Pedido proveedor</option>
+                    </select>
+                </div>
+
+                <div class="form-group-compact">
+                    <label for="forma_pago">Forma de Pago</label>
+                    <input type="text" name="forma_pago" id="forma_pago" value="{% if form_data %}{{ form_data.forma_pago or '' }}{% endif %}" placeholder="Ej: Transferencia, Efectivo, etc.">
+                </div>
+
+                <div class="form-group-compact">
+                    <label for="fecha_objetivo">Fecha Objetivo</label>
+                    <input type="date" name="fecha_objetivo" id="fecha_objetivo" value="{% if form_data %}{{ form_data.fecha_objetivo or '' }}{% endif %}" placeholder="Fecha objetivo de entrega">
+                    <small style="font-size: 0.8em; color: #666; display: block; margin-top: 4px;">Fecha objetivo de entrega (opcional)</small>
+                </div>
+            </div>
+
+            <div class="form-row-compact">
+                <div class="form-group-compact" style="flex: 1;">
+                    <label for="imagen_portada">Imagen de portada (1ª página PDF)</label>
+                    <input type="file" name="imagen_portada" id="imagen_portada" accept="image/*">
+                    <small style="font-size: 0.8em; color: #666; display: block; margin-top: 4px;">Esta imagen se usará como portada del presupuesto en PDF.</small>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="productos-section">
+    <h3 style="margin-top: 30px; margin-bottom: 15px; color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 8px;">Productos</h3>
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dee2e6;">
+        <!-- Tarjetas por producto -->
+        <div id="prendas-fabricacion-container" style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;">
+            <div class="prenda-group" data-prenda-num="1" style="padding: 10px; background: #ffffff; border: 1px solid #dee2e6; border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h4 style="margin: 0; color: #2c3e50; font-size: 0.92rem;">Producto 1</h4>
+                    <button type="button" class="btn-eliminar-prenda" onclick="eliminarPrenda(this)" style="display: none; background: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Eliminar</button>
+                </div>
+                
+                <div class="form-row-compact">
+                    <div class="form-group-compact" style="flex: 1;">
+                        <label for="prenda1_tipo">Tipo de producto *</label>
+                        <select name="prenda1_tipo" id="prenda1_tipo" onchange="toggleTipoProducto(this)">
+                            <option value="">Seleccione</option>
+                            <option value="LONA">LONA</option>
+                            <option value="TELA POR METROS">TELA POR METROS</option>
+                            <option value="GRABACION">GRABACION</option>
+                            <option value="ROPA">ROPA</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="tipo-fields" style="display:none;">
+                    <div class="tipo-field lona">
+                        <label for="prenda1_costuras">Costuras</label>
+                        <select name="prenda1_costuras" id="prenda1_costuras">
+                            <option value="ojal">ojal</option><option value="barra">barra</option><option value="mástil">mástil</option>
+                            <option value="cuadro">cuadro</option><option value="cuerdas colgadas">cuerdas colgadas</option>
+                            <option value="photocall">photocall</option><option value="otros">otros</option>
+                        </select>
+                    </div>
+                    <div class="tipo-field lona tela-metros">
+                        <label for="prenda1_tipo_tela">Tipo de tela</label>
+                        <input type="text" name="prenda1_tipo_tela" id="prenda1_tipo_tela">
+                    </div>
+                    <div class="tipo-field lona tela-metros">
+                        <label for="prenda1_medidas">Medidas</label>
+                        <input type="text" name="prenda1_medidas" id="prenda1_medidas">
+                    </div>
+                    <div class="tipo-field lona">
+                        <label for="prenda1_grabacion">Grabación</label>
+                        <select name="prenda1_grabacion" id="prenda1_grabacion">
+                            <option value="1 cara">1 cara</option>
+                            <option value="2 caras">2 caras</option>
+                        </select>
+                    </div>
+                    <div class="tipo-field grabacion">
+                        <label for="prenda1_tipo_grabacion">Tipo grabación</label>
+                        <select name="prenda1_tipo_grabacion" id="prenda1_tipo_grabacion">
+                            <option value="bordado">bordado</option><option value="serigrafia">serigrafia</option>
+                            <option value="dtf">dtf</option><option value="sublimacion">sublimacion</option>
+                        </select>
+                    </div>
+                    <div class="tipo-field grabacion ropa">
+                        <label for="prenda1_tipo_prenda">Tipo prenda</label>
+                        <input type="text" name="prenda1_tipo_prenda" id="prenda1_tipo_prenda">
+                    </div>
+                    <div class="tipo-field ropa"><label for="prenda1_color1">Color1</label><input type="text" name="prenda1_color1" id="prenda1_color1"></div>
+                    <div class="tipo-field ropa"><label for="prenda1_color2">Color2</label><input type="text" name="prenda1_color2" id="prenda1_color2"></div>
+                    <div class="tipo-field ropa"><label for="prenda1_color3">Color3</label><input type="text" name="prenda1_color3" id="prenda1_color3"></div>
+                    <div class="tipo-field ropa"><label for="prenda1_tipo_tejido">Tipo tejido</label><input type="text" name="prenda1_tipo_tejido" id="prenda1_tipo_tejido"></div>
+                    <div class="tipo-field ropa">
+                        <label for="prenda1_marcada">Marcada</label>
+                        <select name="prenda1_marcada" id="prenda1_marcada">
+                            <option value="137">137</option><option value="147">147</option><option value="157">157</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row-compact">
+                    <div class="form-group-compact" style="flex: 1;">
+                        <label for="prenda1_referencias_diseno">Referencias diseño</label>
+                        <input type="text" name="prenda1_referencias_diseno" id="prenda1_referencias_diseno"
+                               value="{% if form_data %}{{ form_data.prenda1_referencias_diseno or '' }}{% endif %}"
+                               placeholder="Referencias de diseño..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                    <div class="form-group-compact" style="flex: 1;">
+                        <label for="prenda1_comentarios">Comentarios</label>
+                        <input type="text" name="prenda1_comentarios" id="prenda1_comentarios"
+                               value="{% if form_data %}{{ form_data.prenda1_comentarios or '' }}{% endif %}"
+                               placeholder="Comentarios del producto..." style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+                    </div>
+                </div>
+
+                <div>
+                    <div style="display:flex; justify-content: space-between; align-items:center; margin-top:8px;">
+                        <label style="font-weight: 600; font-size: 0.85rem;">Logos</label>
+                        <button type="button" onclick="addLogoProducto(this)" style="background:#28a745; color:#fff; border:none; border-radius:4px; padding:4px 8px; cursor:pointer;">+</button>
+                    </div>
+                    <input type="hidden" name="prenda1_logos_json" id="prenda1_logos_json" value="">
+                    <div class="logos-container" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;"></div>
+                </div>
+                
+                <div>
+                    <label style="display:block; font-weight: 600; font-size: 0.85rem; margin-bottom: 8px;">Fotos del producto</label>
+                    <input type="file" name="prenda1_fotos[]" id="prenda1_fotos" accept="image/*" multiple onchange="previewProductoFotos(this)">
+                    <small style="color: #666; font-size: 0.8rem; display:block; margin-top: 6px;">Puedes adjuntar una o varias fotos.</small>
+                    <div class="producto-fotos-preview" style="display:flex; flex-wrap:wrap; gap: 8px; margin-top: 10px;"></div>
+                </div>
+            </div>
+        </div>
+        
+        <button type="button" onclick="agregarPrenda()" style="margin-top: 15px; background: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
+            <span>+</span> Añadir Producto
+        </button>
+    </div>
+
+    <div class="form-row-compact" style="display:flex; gap:12px; align-items:flex-start;">
+        <div class="form-group-compact" style="flex: 1;">
+            <label for="comentarios_cliente">Comentarios visibles al cliente</label>
+            <textarea name="comentarios_cliente" id="comentarios_cliente" rows="3" placeholder="Comentarios que el cliente verá...">{% if form_data %}{{ form_data.comentarios_cliente or '' }}{% endif %}</textarea>
+        </div>
+        <div class="form-group-compact" style="flex: 1;">
+            <label for="seguimiento">Seguimiento interno</label>
+            <textarea name="seguimiento" id="seguimiento" rows="3" placeholder="Actualizaciones y seguimiento...">{% if form_data %}{{ form_data.seguimiento or '' }}{% endif %}</textarea>
+        </div>
+    </div>
+    </div>
+
+    <details id="lineas-section" open style="margin-top: 18px; margin-bottom: 20px; border: 1px solid #dee2e6; border-radius: 8px; background:#fff;">
+    <summary style="cursor:pointer; padding: 12px 14px; font-weight: 700; color:#2c3e50; border-bottom: 1px solid #e9ecef;">Líneas del Presupuesto</summary>
+    <div style="padding: 14px;">
+    <!-- Cabecera con nombres de campos -->
+    <div class="linea-pedido-row linea-pedido-header" style="background: #f8f9fa; font-weight: 600; color: #495057; border-bottom: 2px solid #dee2e6; margin-bottom: 8px;">
+        <div class="linea-pedido-drag-handle-header"></div>
+        <div class="linea-pedido-numero" style="color: #495057;">#</div>
+        <div class="linea-pedido-campos">
+            <div style="flex: 0 0 350px; width: 350px; padding: 6px 8px; font-size: 0.75rem; text-align: left;">Nombre para mostrar</div>
+            <div style="flex: 0 0 53px; width: 53px; padding: 6px 8px; font-size: 0.75rem; text-align: center;">Unid.</div>
+            <div style="flex: 0 0 80px; width: 80px; padding: 6px 8px; font-size: 0.75rem; text-align: left;">Talla</div>
+            <div style="flex: 0 0 150px; width: 150px; padding: 6px 8px; font-size: 0.75rem; text-align: left;">Modelo</div>
+            <div style="flex: 0 0 100px; width: 100px; padding: 6px 8px; font-size: 0.75rem; text-align: left;">Color</div>
+            <div style="flex: 0 0 100px; width: 100px; padding: 6px 8px; font-size: 0.75rem; text-align: left;">Forma</div>
+            <div style="flex: 0 0 80px; width: 80px; padding: 6px 8px; font-size: 0.75rem; text-align: left;">Sexo</div>
+            <div style="flex: 0 0 120px; width: 120px; padding: 6px 8px; font-size: 0.75rem; text-align: left;">Tejido</div>
+            <div style="flex: 0 0 65px; width: 65px; padding: 6px 15px 6px -12px; font-size: 0.75rem; text-align: left;">Precio</div>
+            <div style="flex: 0 0 40px; width: 40px; padding: 6px 10px 6px -10px; font-size: 0.75rem; text-align: left;">Desc.</div>
+            <div style="flex: 0 0 65px; width: 65px; padding: 6px 15px 6px -12px; font-size: 0.75rem; text-align: left;">P. Final</div>
+        </div>
+        <!--<div class="linea-acciones" style="min-width: 100px;">
+            <div style="font-size: 0.75rem; color: #495057;">Acciones</div>
+        </div>-->
+    </div>
+    <div id="prendas-container">
+        <div class="linea-pedido-row" draggable="true">
+            <div class="linea-pedido-drag-handle" title="Arrastrar para reordenar">☰</div>
+            <div class="linea-pedido-numero">#1</div>
+            <div class="linea-pedido-campos">
+                <!-- Orden: nombre_mostrar, unidades, talla, modelo, color, forma, sexo, tejido, precio -->
+                <input type="text" name="nombre_mostrar[]" class="linea-campo-compact nombre-mostrar-campo" placeholder="Nombre para mostrar *" required title="Nombre para mostrar al cliente" style="flex: 0 0 350px !important; width: 350px !important; max-width: none !important; min-width: 350px !important;">
+                <input type="number" name="cantidad[]" class="linea-campo-compact cantidad" value="1" min="1" required placeholder="Unidades *" title="Unidades" style="flex: 0 0 53px; width: 53px;">
+                <input type="text" name="talla[]" class="linea-campo-compact" placeholder="Talla" title="Talla" style="flex: 0 0 80px; width: 80px;">
+                <input type="text" name="prenda_nombre[]" class="linea-campo-compact prenda-input" placeholder="Modelo (seleccione o escriba texto libre)" title="Modelo" list="prendas-list" autocomplete="off" style="flex: 0 0 150px; width: 150px;">
+                <input type="hidden" name="prenda_id[]" class="prenda-id-hidden">
+                <datalist id="prendas-list">
+                    {% for prenda in prendas %}
+                    <option value="{{ prenda.nombre }}" data-id="{{ prenda.id }}">{{ prenda.nombre }}</option>
+                    {% endfor %}
+                </datalist>
+                <input type="text" name="color[]" class="linea-campo-compact" placeholder="Color" title="Color" style="flex: 0 0 100px; width: 100px;">
+                <input type="text" name="forma[]" class="linea-campo-compact" placeholder="Forma" title="Forma" list="formas-list" style="flex: 0 0 100px; width: 100px;">
+                <select name="sexo[]" class="linea-campo-compact" title="Sexo" style="flex: 0 0 80px; width: 80px;">
+                    <option value="">Sexo</option>
+                    <option value="cro">Cro</option>
+                    <option value="sra">Sra</option>
+                    <option value="unisex">Unisex</option>
+                </select>
+                <select name="tejido[]" class="linea-campo-compact" title="Tejido" style="flex: 0 0 120px; width: 120px;">
+                    <option value="">Tejido</option>
+                    <option value="SARGA">SARGA</option>
+                    <option value="MICRO">MICRO</option>
+                    <option value="NUEVO T.POLO">NUEVO T.POLO</option>
+                    <option value="T.CAMISETA">T.CAMISETA</option>
+                    <option value="T.SHOFT">T.SHOFT</option>
+                    <option value="T.SHOFT">DAMA</option>
+                </select>
+                <input type="number" name="precio_unitario[]" class="linea-campo-compact precio-unitario-input" step="0.01" min="0" placeholder="Precio €" title="Precio" style="flex: 0 0 65px; width: 65px;">
+                <input type="number" name="descuento[]" class="linea-campo-compact descuento-input" step="0.01" min="0" max="100" value="0" placeholder="Desc. %" title="Descuento (%)" style="flex: 0 0 40px; width: 40px;">
+                <input type="number" name="precio_final[]" class="linea-campo-compact precio-final-input" step="0.01" min="0" placeholder="P. Final €" title="Precio Final" readonly style="flex: 0 0 65px; width: 65px; background: #f0f0f0;">
+                
+                <!-- Campos personalizados (nombre y cargo) - se muestran al final si tienen valor o si se activa personalización -->
+                <input type="text" name="nombre[]" class="linea-campo-compact campo-personalizado" placeholder="Nombre personalizado" title="Nombre personalizado" style="display: none; flex: 2.5;">
+                <input type="text" name="cargo[]" class="linea-campo-compact campo-personalizado" placeholder="Cargo" title="Cargo" style="display: none;">
+            </div>
+            <div class="linea-acciones">
+                <button type="button" class="btn-duplicar" onclick="duplicarLinea(this)" title="Duplicar línea (mantiene todo excepto talla y unidades)">
+                    📋
+                </button>
+                <button type="button" class="btn-personalizar" onclick="togglePersonalizar(this)" title="Personalizar nombre y cargo">
+                    ✏️
+                </button>
+                <button type="button" class="btn-remove-linea-inline" onclick="eliminarLinea(this)">×</button>
+            </div>
+        </div>
+    </div>
+
+    <button type="button" class="btn btn-primary" onclick="agregarLinea()">Agregar Línea</button>
+
+    <div style="margin-top: 30px; padding: 15px; background: #f8f9fa; border-radius: 6px; max-width: 400px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <strong>Base Imponible:</strong>
+            <span id="solicitud-base-imponible">0.00</span> €
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center;">
+            <label for="tipo_iva_solicitud" style="margin: 0; font-weight: 500;">Tipo de IVA (%):</label>
+            <select id="tipo_iva_solicitud" class="form-control" style="width: 100px; padding: 4px 8px; border: 1px solid #dee2e6; border-radius: 4px;">
+                <option value="21" selected>21%</option>
+                <option value="10">10%</option>
+                <option value="4">4%</option>
+                <option value="0">0%</option>
+            </select>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+            <strong id="solicitud-iva-label">IVA (21%):</strong>
+            <span id="solicitud-iva-total">0.00</span> €
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding-top: 10px; border-top: 1px solid #dee2e6;">
+            <strong>Subtotal:</strong>
+            <span id="solicitud-subtotal">0.00</span> €
+        </div>
+        <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #dee2e6;">
+            <strong style="font-size: 1.2rem;">Total:</strong>
+            <strong style="font-size: 1.2rem;"><span id="solicitud-importe-total">0.00</span> €</strong>
+        </div>
+    </div>
+
+    <!-- Datalist para formas (disponible para todos los inputs de forma) -->
+    <datalist id="formas-list">
+        <option value="Abt Cremallera">
+        <option value="Abt Botones">
+        <option value="Cerrada">
+        <option value="Serigrafia">
+        <option value="Bordado">
+        <option value="Seri + bordado">
+    </datalist>
+    </div>
+    </details>
+
+    <div class="actions">
+        <button type="submit" class="btn btn-success">Guardar Presupuesto</button>
+        <a href="{{ url_for('solicitudes.listado_solicitudes') }}" class="btn btn-danger">Cancelar</a>
+    </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const lineasSection = document.getElementById('lineas-section');
+    const productosSection = document.getElementById('productos-section');
+    if (lineasSection && productosSection && lineasSection.nextElementSibling !== productosSection) {
+        productosSection.parentNode.insertBefore(lineasSection, productosSection);
+    }
+});
+</script>
+
+<style>
+.imagen-miniatura-container:hover {
+    border-color: #3498db;
+    background: #f0f8ff;
+}
+
+.imagen-miniatura-container.drag-over {
+    border-color: #3498db;
+    background: #e3f2fd;
+    transform: scale(1.05);
+}
+
+.linea-pedido-drag-handle-header {
+    flex: 0 0 30px;
+    width: 30px;
+    min-width: 30px;
+}
+
+.linea-pedido-drag-handle {
+    cursor: move;
+    color: #6c757d;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 30px;
+    width: 30px;
+    min-width: 30px;
+    user-select: none;
+    padding: 4px;
+}
+
+.linea-pedido-drag-handle:hover {
+    color: #495057;
+    background-color: #e9ecef;
+    border-radius: 4px;
+}
+
+#prendas-container .linea-pedido-row.drag-over {
+    border: 2px dashed #007bff;
+    background-color: #e7f3ff;
+}
+</style>
+
+<script>
+// Restaurar datos del formulario si hay errores
+document.addEventListener('DOMContentLoaded', function() {
+    {% if form_data %}
+    // Restaurar cliente en el buscador
+    const clienteId = '{{ form_data.cliente_id or "" }}';
+    if (clienteId) {
+        const clienteSelect = document.getElementById('cliente_id');
+        const clienteSearch = document.getElementById('cliente_search');
+        if (clienteSelect && clienteSearch) {
+            clienteSelect.value = clienteId;
+            const selectedOption = clienteSelect.options[clienteSelect.selectedIndex];
+            if (selectedOption) {
+                clienteSearch.value = selectedOption.textContent;
+            }
+        }
+    }
+    
+    // Restaurar líneas del presupuesto desde form_data
+    {% set nombres_mostrar = form_data.getlist('nombre_mostrar[]') if form_data else [] %}
+    {% if nombres_mostrar|length > 0 %}
+    const container = document.getElementById('prendas-container');
+    if (container) {
+        // Obtener arrays de datos del formulario
+        const nombresMostrar = {{ form_data.getlist('nombre_mostrar[]')|tojson|safe }};
+        const cantidades = {{ form_data.getlist('cantidad[]')|tojson|safe }};
+        const tallas = {{ form_data.getlist('talla[]')|tojson|safe }};
+        const prendaNombres = {{ form_data.getlist('prenda_nombre[]')|tojson|safe }};
+        const prendaIds = {{ form_data.getlist('prenda_id[]')|tojson|safe }};
+        const colores = {{ form_data.getlist('color[]')|tojson|safe }};
+        const formas = {{ form_data.getlist('forma[]')|tojson|safe }};
+        const sexos = {{ form_data.getlist('sexo[]')|tojson|safe }};
+        const tejidos = {{ form_data.getlist('tejido[]')|tojson|safe }};
+        const preciosUnitarios = {{ form_data.getlist('precio_unitario[]')|tojson|safe }};
+        const descuentos = {{ form_data.getlist('descuento[]')|tojson|safe }};
+        const preciosFinales = {{ form_data.getlist('precio_final[]')|tojson|safe }};
+        
+        // Restaurar primera línea
+        const primeraLinea = container.querySelector('.linea-pedido-row');
+        if (primeraLinea && nombresMostrar.length > 0) {
+            if (nombresMostrar[0]) primeraLinea.querySelector('input[name="nombre_mostrar[]"]').value = nombresMostrar[0];
+            if (cantidades.length > 0 && cantidades[0]) primeraLinea.querySelector('input[name="cantidad[]"]').value = cantidades[0];
+            if (tallas.length > 0 && tallas[0]) primeraLinea.querySelector('input[name="talla[]"]').value = tallas[0];
+            if (prendaNombres.length > 0 && prendaNombres[0]) primeraLinea.querySelector('input[name="prenda_nombre[]"]').value = prendaNombres[0];
+            if (prendaIds.length > 0 && prendaIds[0]) primeraLinea.querySelector('input[name="prenda_id[]"]').value = prendaIds[0];
+            if (colores.length > 0 && colores[0]) primeraLinea.querySelector('input[name="color[]"]').value = colores[0];
+            if (formas.length > 0 && formas[0]) primeraLinea.querySelector('input[name="forma[]"]').value = formas[0];
+            if (sexos.length > 0 && sexos[0]) primeraLinea.querySelector('select[name="sexo[]"]').value = sexos[0];
+            if (tejidos.length > 0 && tejidos[0]) primeraLinea.querySelector('select[name="tejido[]"]').value = tejidos[0];
+            if (preciosUnitarios.length > 0 && preciosUnitarios[0]) primeraLinea.querySelector('input[name="precio_unitario[]"]').value = preciosUnitarios[0];
+            if (descuentos.length > 0 && descuentos[0]) primeraLinea.querySelector('input[name="descuento[]"]').value = descuentos[0];
+            if (preciosFinales.length > 0 && preciosFinales[0]) primeraLinea.querySelector('input[name="precio_final[]"]').value = preciosFinales[0];
+        }
+        
+        // Agregar líneas adicionales
+        for (let i = 1; i < nombresMostrar.length; i++) {
+            agregarLinea();
+            const todasLineas = container.querySelectorAll('.linea-pedido-row');
+            const nuevaLinea = todasLineas[todasLineas.length - 1];
+            if (nuevaLinea) {
+                if (nombresMostrar[i]) nuevaLinea.querySelector('input[name="nombre_mostrar[]"]').value = nombresMostrar[i];
+                if (cantidades.length > i && cantidades[i]) nuevaLinea.querySelector('input[name="cantidad[]"]').value = cantidades[i];
+                if (tallas.length > i && tallas[i]) nuevaLinea.querySelector('input[name="talla[]"]').value = tallas[i];
+                if (prendaNombres.length > i && prendaNombres[i]) nuevaLinea.querySelector('input[name="prenda_nombre[]"]').value = prendaNombres[i];
+                if (prendaIds.length > i && prendaIds[i]) nuevaLinea.querySelector('input[name="prenda_id[]"]').value = prendaIds[i];
+                if (colores.length > i && colores[i]) nuevaLinea.querySelector('input[name="color[]"]').value = colores[i];
+                if (formas.length > i && formas[i]) nuevaLinea.querySelector('input[name="forma[]"]').value = formas[i];
+                if (sexos.length > i && sexos[i]) nuevaLinea.querySelector('select[name="sexo[]"]').value = sexos[i];
+                if (tejidos.length > i && tejidos[i]) nuevaLinea.querySelector('select[name="tejido[]"]').value = tejidos[i];
+                if (preciosUnitarios.length > i && preciosUnitarios[i]) nuevaLinea.querySelector('input[name="precio_unitario[]"]').value = preciosUnitarios[i];
+                if (descuentos.length > i && descuentos[i]) nuevaLinea.querySelector('input[name="descuento[]"]').value = descuentos[i];
+                if (preciosFinales.length > i && preciosFinales[i]) nuevaLinea.querySelector('input[name="precio_final[]"]').value = preciosFinales[i];
+            }
+        }
+    }
+    {% endif %}
+    {% endif %}
+});
+
+// Funciones para gestionar prendas de fabricación
+let contadorPrendasFabricacion = 1;
+
+function agregarPrenda() {
+    contadorPrendasFabricacion++;
+    const container = document.getElementById('prendas-fabricacion-container');
+    const primeraPrenda = container.querySelector('.prenda-group');
+    
+    if (!primeraPrenda) {
+        console.error('No se encontró la primera prenda para clonar');
+        return;
+    }
+    
+    const nuevaPrenda = primeraPrenda.cloneNode(true);
+    nuevaPrenda.setAttribute('data-prenda-num', contadorPrendasFabricacion);
+    
+    // Actualizar IDs y nombres de los campos
+    nuevaPrenda.querySelector('h4').textContent = `Producto ${contadorPrendasFabricacion}`;
+    
+    nuevaPrenda.querySelectorAll('input, textarea, select').forEach(input => {
+        const oldId = input.id;
+        const oldName = input.name;
+        
+        if (oldId && oldName) {
+            const newId = oldId.replace(/prenda\d+/, `prenda${contadorPrendasFabricacion}`);
+            const newName = oldName.replace(/prenda\d+/, `prenda${contadorPrendasFabricacion}`);
+            input.id = newId;
+            input.name = newName;
+            input.value = '';
+            // No forzar required en inputs de tipo file (fotos por producto)
+            if (input.tagName && input.tagName.toLowerCase() === 'input') {
+                if (input.type === 'file') {
+                    input.required = false;
+                }
+            } else if (input.tagName && input.tagName.toLowerCase() === 'select') {
+                input.selectedIndex = 0;
+            }
+        }
+    });
+
+    // Limpiar previews de fotos clonadas para que cada producto tenga sus propias imágenes
+    const fotosPreview = nuevaPrenda.querySelector('.producto-fotos-preview');
+    if (fotosPreview) fotosPreview.innerHTML = '';
+
+    // Limpiar cualquier dataset/base64 residual en inputs de archivo (logos/fotos)
+    nuevaPrenda.querySelectorAll('input[type="file"]').forEach(fileInput => {
+        fileInput.value = '';
+        if (fileInput.dataset) {
+            delete fileInput.dataset.base64;
+        }
+    });
+
+    const logosContainer = nuevaPrenda.querySelector('.logos-container');
+    if (logosContainer) logosContainer.innerHTML = '';
+    
+    nuevaPrenda.querySelectorAll('label').forEach(label => {
+        const oldFor = label.getAttribute('for');
+        if (oldFor) {
+            label.setAttribute('for', oldFor.replace(/prenda\d+/, `prenda${contadorPrendasFabricacion}`));
+        }
+    });
+    
+    // Mostrar botón eliminar
+    const btnEliminar = nuevaPrenda.querySelector('.btn-eliminar-prenda');
+    if (btnEliminar) {
+        btnEliminar.style.display = 'block';
+    }
+    
+    container.appendChild(nuevaPrenda);
+}
+
+function eliminarPrenda(btn) {
+    const prendaGroup = btn.closest('.prenda-group');
+    const container = document.getElementById('prendas-fabricacion-container');
+    const todasPrendas = container.querySelectorAll('.prenda-group');
+    
+    if (todasPrendas.length > 1) {
+        prendaGroup.remove();
+        // Renumerar las prendas restantes
+        renumerarPrendas();
+    } else {
+        alert('Debe haber al menos un producto');
+    }
+}
+
+function renumerarPrendas() {
+    const container = document.getElementById('prendas-fabricacion-container');
+    const todasPrendas = container.querySelectorAll('.prenda-group');
+    
+    todasPrendas.forEach((prenda, index) => {
+        const numero = index + 1;
+        prenda.setAttribute('data-prenda-num', numero);
+        prenda.querySelector('h4').textContent = `Producto ${numero}`;
+        
+        // Ocultar botón eliminar en la primera prenda
+        const btnEliminar = prenda.querySelector('.btn-eliminar-prenda');
+        if (numero === 1 && btnEliminar) {
+            btnEliminar.style.display = 'none';
+        } else if (btnEliminar) {
+            btnEliminar.style.display = 'block';
+        }
+        
+        // Actualizar IDs y nombres
+        prenda.querySelectorAll('input, textarea, select').forEach(input => {
+            const oldId = input.id;
+            const oldName = input.name;
+            
+            if (oldId && oldName) {
+                const newId = oldId.replace(/prenda\d+/, `prenda${numero}`);
+                const newName = oldName.replace(/prenda\d+/, `prenda${numero}`);
+                input.id = newId;
+                input.name = newName;
+            }
+        });
+        
+        prenda.querySelectorAll('label').forEach(label => {
+            const oldFor = label.getAttribute('for');
+            if (oldFor) {
+                label.setAttribute('for', oldFor.replace(/prenda\d+/, `prenda${numero}`));
+            }
+        });
+    });
+}
+
+// Función para mostrar/ocultar sección de imágenes
+function toggleSeccionImagenes() {
+    const seccion = document.getElementById('seccion-imagenes');
+    const icono = document.getElementById('icono-imagenes');
+    
+    if (seccion.style.display === 'none') {
+        seccion.style.display = 'block';
+        icono.textContent = '▼';
+    } else {
+        seccion.style.display = 'none';
+        icono.textContent = '▶';
+    }
+}
+
+// Funciones para drag & drop
+function allowDrop(ev) {
+    ev.preventDefault();
+    ev.currentTarget.classList.add('drag-over');
+}
+
+function dragLeave(ev) {
+    ev.currentTarget.classList.remove('drag-over');
+}
+
+function dropHandler(ev, numero) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove('drag-over');
+    
+    const files = ev.dataTransfer.files;
+    if (files.length > 0 && files[0].type.startsWith('image/')) {
+        const input = document.getElementById('imagen_adicional_' + numero);
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(files[0]);
+        input.files = dataTransfer.files;
+        handleImageSelect(numero, input);
+    }
+}
+
+// Funciones para imagen de diseño
+function dropHandlerDiseno(ev) {
+    ev.preventDefault();
+    ev.currentTarget.classList.remove('drag-over');
+    
+    const files = ev.dataTransfer.files;
+    if (files.length > 0 && files[0].type.startsWith('image/')) {
+        const input = document.getElementById('imagen_diseno');
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(files[0]);
+        input.files = dataTransfer.files;
+        handleImageSelectDiseno(input);
+    }
+}
+
+function handleImageSelectDiseno(input) {
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            const preview = document.getElementById('preview_container_diseno');
+            const placeholder = document.getElementById('placeholder_diseno');
+            const img = document.getElementById('preview_img_diseno');
+            
+            img.src = e.target.result;
+            preview.style.display = 'flex';
+            placeholder.style.display = 'none';
+        };
+        
+        reader.readAsDataURL(file);
+    }
+}
+
+function eliminarImagenDiseno() {
+    const input = document.getElementById('imagen_diseno');
+    input.value = '';
+    
+    const preview = document.getElementById('preview_container_diseno');
+    const placeholder = document.getElementById('placeholder_diseno');
+    
+    preview.style.display = 'none';
+    placeholder.style.display = 'flex';
+    
+    const img = document.getElementById('preview_img_diseno');
+    img.src = '';
+}
+
+// Manejar selección de imagen (click o drop)
+function handleImageSelect(numero, input) {
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            const preview = document.getElementById('preview_container_' + numero);
+            const placeholder = document.getElementById('placeholder_' + numero);
+            const img = document.getElementById('preview_img_' + numero);
+            
+            img.src = e.target.result;
+            preview.style.display = 'flex';
+            placeholder.style.display = 'none';
+        };
+        
+        reader.readAsDataURL(file);
+        actualizarContador();
+    }
+}
+
+// Preview de fotos por producto (se usa dentro de las tarjetas del bloque "Productos")
+function previewProductoFotos(input) {
+    const group = input.closest('.prenda-group');
+    if (!group) return;
+
+    const preview = group.querySelector('.producto-fotos-preview');
+    if (!preview) return;
+
+    preview.innerHTML = '';
+
+    const files = Array.from(input.files || []);
+    if (!files.length) return;
+
+    files.forEach((file, idx) => {
+        if (!file.type || !file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+            const wrap = document.createElement('div');
+            wrap.style.position = 'relative';
+            wrap.style.width = '130px';
+            wrap.style.height = '130px';
+
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.style.width = '130px';
+            img.style.height = '130px';
+            img.style.border = '1px solid #ddd';
+            img.style.borderRadius = '4px';
+            img.style.objectFit = 'cover';
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.textContent = '×';
+            btn.title = 'Eliminar imagen';
+            btn.style.position = 'absolute';
+            btn.style.top = '-6px';
+            btn.style.right = '-6px';
+            btn.style.width = '18px';
+            btn.style.height = '18px';
+            btn.style.border = 'none';
+            btn.style.borderRadius = '50%';
+            btn.style.cursor = 'pointer';
+            btn.style.background = '#dc3545';
+            btn.style.color = '#fff';
+            btn.style.fontSize = '12px';
+            btn.style.lineHeight = '18px';
+            btn.style.padding = '0';
+            btn.onclick = () => removeProductoFoto(input, idx);
+
+            wrap.appendChild(img);
+            wrap.appendChild(btn);
+            preview.appendChild(wrap);
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function removeProductoFoto(input, indexToRemove) {
+    const dt = new DataTransfer();
+    const files = Array.from(input.files || []);
+    files.forEach((f, i) => {
+        if (i !== indexToRemove) dt.items.add(f);
+    });
+    input.files = dt.files;
+    previewProductoFotos(input);
+}
+
+function addLogoProducto(buttonEl) {
+    const group = buttonEl.closest('.prenda-group');
+    if (!group) return;
+    const numero = group.getAttribute('data-prenda-num');
+    const container = group.querySelector('.logos-container');
+    if (!container) return;
+
+    const row = document.createElement('div');
+    row.className = 'logo-item';
+    row.style.display = 'grid';
+    row.style.gridTemplateColumns = 'minmax(160px,1.2fr) minmax(80px,1fr) minmax(80px,1fr) minmax(120px,1fr) minmax(80px,1fr) auto';
+    row.style.gap = '6px';
+    row.style.width = '100%';
+    row.style.alignItems = 'center';
+    row.innerHTML = `
+        <div style="display:flex; align-items:center; gap:6px;">
+            <input type="file" name="prenda${numero}_logo_imagen[]" accept="image/*" style="width:100%; box-sizing:border-box;">
+            <img class="logo-img-preview" style="width:34px; height:34px; object-fit:cover; border:1px solid #ddd; border-radius:4px; display:none;">
+        </div>
+        <input type="text" name="prenda${numero}_logo_posicion[]" placeholder="Posición" style="width:100%; box-sizing:border-box;">
+        <input type="text" name="prenda${numero}_logo_medidas[]" placeholder="Medidas">
+        <select name="prenda${numero}_logo_grabacion[]">
+            <option value="bordado">bordado</option>
+            <option value="serigrafia">serigrafia</option>
+            <option value="dtf">dtf</option>
+            <option value="sublimacion">sublimacion</option>
+        </select>
+        <input type="text" name="prenda${numero}_logo_nota[]" placeholder="Nota" style="width:100%; box-sizing:border-box;">
+        <button type="button" title="Eliminar logo" style="background:#dc3545;color:#fff;border:none;border-radius:4px;cursor:pointer;">×</button>
+    `;
+    const logoFileInput = row.querySelector(`input[name="prenda${numero}_logo_imagen[]"]`);
+    const logoPreview = row.querySelector('.logo-img-preview');
+    if (logoFileInput && logoPreview) {
+        logoFileInput.addEventListener('change', () => {
+            const file = logoFileInput.files && logoFileInput.files[0];
+            if (!file) {
+                logoFileInput.dataset.base64 = '';
+                logoPreview.src = '';
+                logoPreview.style.display = 'none';
+                syncLogosProducto(group);
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const b64 = e.target && e.target.result ? e.target.result : '';
+                logoFileInput.dataset.base64 = b64;
+                logoPreview.src = b64;
+                logoPreview.style.display = 'block';
+                syncLogosProducto(group);
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+    row.querySelector('button').onclick = () => {
+        row.remove();
+        syncLogosProducto(group);
+    };
+    row.querySelectorAll('input,select').forEach(el => {
+        el.addEventListener('input', () => syncLogosProducto(group));
+        el.addEventListener('change', () => syncLogosProducto(group));
+    });
+    container.appendChild(row);
+    syncLogosProducto(group);
+}
+
+function syncLogosProducto(group) {
+    const numero = group.getAttribute('data-prenda-num');
+    const hidden = group.querySelector(`#prenda${numero}_logos_json`);
+    if (!hidden) return;
+    const logos = [];
+    group.querySelectorAll('.logo-item').forEach(item => {
+        const posicion = item.querySelector(`input[name="prenda${numero}_logo_posicion[]"]`)?.value || '';
+        const medidas = item.querySelector(`input[name="prenda${numero}_logo_medidas[]"]`)?.value || '';
+        const grabacion = item.querySelector(`select[name="prenda${numero}_logo_grabacion[]"]`)?.value || '';
+        const nota = item.querySelector(`input[name="prenda${numero}_logo_nota[]"]`)?.value || '';
+        const imagen = item.querySelector(`input[name="prenda${numero}_logo_imagen[]"]`)?.dataset?.base64 || '';
+        logos.push({ imagen, posicion, medidas, grabacion, nota });
+    });
+    hidden.value = JSON.stringify(logos);
+}
+
+function toggleTipoProducto(selectEl) {
+    const group = selectEl.closest('.prenda-group');
+    if (!group) return;
+    const tipo = (selectEl.value || '').toUpperCase();
+    const container = group.querySelector('.tipo-fields');
+    if (!container) return;
+
+    container.style.display = tipo ? 'grid' : 'none';
+    container.style.gridTemplateColumns = '1fr 1fr';
+    container.style.gap = '10px';
+
+    container.querySelectorAll('.tipo-field').forEach(el => {
+        el.style.display = 'none';
+    });
+
+    const showByClass = (cls) => {
+        container.querySelectorAll('.' + cls).forEach(el => el.style.display = 'block');
+    };
+
+    if (tipo === 'LONA') showByClass('lona');
+    if (tipo === 'TELA POR METROS') showByClass('tela-metros');
+    if (tipo === 'GRABACION') showByClass('grabacion');
+    if (tipo === 'ROPA') showByClass('ropa');
+}
+
+// Eliminar imagen
+function eliminarImagen(numero) {
+    const input = document.getElementById('imagen_adicional_' + numero);
+    input.value = '';
+    
+    const preview = document.getElementById('preview_container_' + numero);
+    const placeholder = document.getElementById('placeholder_' + numero);
+    
+    preview.style.display = 'none';
+    placeholder.style.display = 'flex';
+    
+    actualizarContador();
+}
+
+// Actualizar contador
+function actualizarContador() {
+    let contador = 0;
+    for (let i = 1; i <= 5; i++) {
+        const input = document.getElementById('imagen_adicional_' + i);
+        if (input && input.files.length > 0) {
+            contador++;
+        }
+    }
+    const contadorElement = document.getElementById('contador-imagenes');
+    if (contadorElement) {
+        contadorElement.textContent = contador + '/5 imágenes seleccionadas';
+    }
+}
+
+let contadorPrendas = 1;
+function agregarLinea() {
+    contadorPrendas++;
+    const container = document.getElementById('prendas-container');
+    const primeraLinea = container.querySelector('.linea-pedido-row');
+    const nuevaLinea = primeraLinea.cloneNode(true);
+    nuevaLinea.removeAttribute('data-drag-initialized');
+    
+    // Limpiar valores
+    nuevaLinea.querySelectorAll('input').forEach(input => {
+        if (input.type !== 'button' && input.type !== 'submit') {
+            if (input.type === 'number') {
+                input.value = '1';
+            } else {
+                input.value = '';
+            }
+        }
+    });
+    nuevaLinea.querySelectorAll('select').forEach(select => {
+        select.selectedIndex = 0;
+    });
+    
+    // Limpiar campos de prenda
+    const prendaInputNuevo = nuevaLinea.querySelector('input[name="prenda_nombre[]"]');
+    const prendaIdHiddenNuevo = nuevaLinea.querySelector('input[name="prenda_id[]"].prenda-id-hidden');
+    if (prendaInputNuevo) prendaInputNuevo.value = '';
+    if (prendaIdHiddenNuevo) prendaIdHiddenNuevo.value = '';
+    
+    // Resetear descuento y precio final
+    const descuentoInput = nuevaLinea.querySelector('.descuento-input');
+    const precioFinalInput = nuevaLinea.querySelector('.precio-final-input');
+    if (descuentoInput) descuentoInput.value = '0';
+    if (precioFinalInput) precioFinalInput.value = '';
+    
+    // Ocultar campos personalizados por defecto
+    nuevaLinea.querySelectorAll('.campo-personalizado').forEach(campo => {
+        campo.style.display = 'none';
+    });
+    
+    // Añadir event listeners para calcular precio final
+    const precioUnitarioInput = nuevaLinea.querySelector('.precio-unitario-input');
+    if (precioUnitarioInput && descuentoInput && precioFinalInput) {
+        precioUnitarioInput.addEventListener('input', calcularPrecioFinal);
+        descuentoInput.addEventListener('input', calcularPrecioFinal);
+    }
+    
+    // Resetear botón de personalizar
+    const btnPersonalizar = nuevaLinea.querySelector('.btn-personalizar');
+    if (btnPersonalizar) {
+        btnPersonalizar.style.background = '#95a5a6';
+        btnPersonalizar.style.opacity = '0.7';
+    }
+    
+    // Actualizar número
+    renumerarPrendas();
+    
+    container.appendChild(nuevaLinea);
+    var cantInput = nuevaLinea.querySelector('input[name="cantidad[]"]');
+    if (cantInput) cantInput.addEventListener('input', actualizarTotalesSolicitud);
+    actualizarTotalesSolicitud();
+    initDragAndDropSolicitud();
+}
+
+function renumerarPrendas() {
+    const container = document.getElementById('prendas-container');
+    if (!container) return;
+    const todasLineas = container.querySelectorAll('.linea-pedido-row');
+    todasLineas.forEach((linea, index) => {
+        const numero = linea.querySelector('.linea-pedido-numero');
+        if (numero) {
+            numero.textContent = `#${index + 1}`;
+        }
+    });
+}
+
+// Función para calcular el precio final con descuento
+function calcularPrecioFinal(event) {
+    const lineaRow = event.target.closest('.linea-pedido-row');
+    if (!lineaRow) return;
+    
+    const precioUnitarioInput = lineaRow.querySelector('.precio-unitario-input');
+    const descuentoInput = lineaRow.querySelector('.descuento-input');
+    const precioFinalInput = lineaRow.querySelector('.precio-final-input');
+    
+    if (!precioUnitarioInput || !descuentoInput || !precioFinalInput) return;
+    
+    const precioUnitario = parseFloat(precioUnitarioInput.value) || 0;
+    const descuento = parseFloat(descuentoInput.value) || 0;
+    
+    if (precioUnitario > 0 && descuento > 0) {
+        const precioFinal = precioUnitario * (1 - descuento / 100);
+        precioFinalInput.value = precioFinal.toFixed(2);
+    } else {
+        precioFinalInput.value = '';
+    }
+    actualizarTotalesSolicitud();
+}
+
+function actualizarTotalesSolicitud() {
+    let baseImponible = 0;
+    const filas = document.querySelectorAll('#prendas-container .linea-pedido-row');
+    filas.forEach(function(row) {
+        if (row.classList.contains('linea-pedido-header')) return;
+        const cantidad = parseFloat(row.querySelector('input[name="cantidad[]"]')?.value) || 0;
+        const precioFinalVal = row.querySelector('.precio-final-input')?.value;
+        const precioUnitVal = row.querySelector('.precio-unitario-input')?.value;
+        const precio = (precioFinalVal !== '' && !isNaN(parseFloat(precioFinalVal))) ? parseFloat(precioFinalVal) : (parseFloat(precioUnitVal) || 0);
+        baseImponible += cantidad * precio;
+    });
+    const tipoIvaEl = document.getElementById('tipo_iva_solicitud');
+    let tipoIva = 21;
+    if (tipoIvaEl) {
+        const v = parseFloat(tipoIvaEl.value);
+        if (!isNaN(v)) tipoIva = v;
+    }
+    const iva = baseImponible * (tipoIva / 100);
+    const subtotal = baseImponible + iva;
+    const total = subtotal;
+    function fmt(n) { return (typeof n === 'number' && !isNaN(n)) ? n.toFixed(2) : '0.00'; }
+    const baseEl = document.getElementById('solicitud-base-imponible');
+    const ivaEl = document.getElementById('solicitud-iva-total');
+    const subEl = document.getElementById('solicitud-subtotal');
+    const totalEl = document.getElementById('solicitud-importe-total');
+    const labelIva = document.getElementById('solicitud-iva-label');
+    if (baseEl) baseEl.textContent = fmt(baseImponible);
+    if (ivaEl) ivaEl.textContent = fmt(iva);
+    if (subEl) subEl.textContent = fmt(subtotal);
+    if (totalEl) totalEl.textContent = fmt(total);
+    if (labelIva) labelIva.textContent = 'IVA (' + tipoIva + '%):';
+}
+
+function syncTipoIvaFromCliente() {
+    var sel = document.getElementById('cliente_id');
+    var tipoIvaSel = document.getElementById('tipo_iva_solicitud');
+    if (!sel || !tipoIvaSel) return;
+    var opt = sel.options[sel.selectedIndex];
+    if (!opt || !opt.value) return;
+    var tipoIva = opt.getAttribute('data-tipo-iva');
+    if (tipoIva !== null && tipoIva !== '' && ['0','4','10','21'].indexOf(String(tipoIva)) !== -1) {
+        tipoIvaSel.value = tipoIva;
+        actualizarTotalesSolicitud();
+    }
+}
+
+var draggedElementSolicitud = null;
+function initDragAndDropSolicitud() {
+    var container = document.getElementById('prendas-container');
+    if (!container) return;
+    var lineas = container.querySelectorAll('.linea-pedido-row');
+    lineas.forEach(function(linea) {
+        linea.setAttribute('draggable', 'true');
+        if (!linea.querySelector('.linea-pedido-drag-handle')) {
+            var dragHandle = document.createElement('div');
+            dragHandle.className = 'linea-pedido-drag-handle';
+            dragHandle.setAttribute('title', 'Arrastrar para reordenar');
+            dragHandle.textContent = '\u2630';
+            linea.insertBefore(dragHandle, linea.firstChild);
+        }
+        if (!linea.hasAttribute('data-drag-initialized')) {
+            linea.setAttribute('data-drag-initialized', 'true');
+            linea.addEventListener('dragstart', function(e) {
+                draggedElementSolicitud = this;
+                this.style.opacity = '0.5';
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            linea.addEventListener('dragend', function() {
+                this.style.opacity = '1';
+                lineas.forEach(function(l) { l.classList.remove('drag-over'); });
+            });
+            linea.addEventListener('dragover', function(e) {
+                if (e.preventDefault) e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                if (this !== draggedElementSolicitud) this.classList.add('drag-over');
+                return false;
+            });
+            linea.addEventListener('dragleave', function() {
+                this.classList.remove('drag-over');
+            });
+            linea.addEventListener('drop', function(e) {
+                if (e.stopPropagation) e.stopPropagation();
+                if (draggedElementSolicitud && draggedElementSolicitud !== this) {
+                    var allLineas = Array.from(container.querySelectorAll('.linea-pedido-row'));
+                    var draggedIndex = allLineas.indexOf(draggedElementSolicitud);
+                    var targetIndex = allLineas.indexOf(this);
+                    if (draggedIndex < targetIndex) {
+                        container.insertBefore(draggedElementSolicitud, this.nextSibling);
+                    } else {
+                        container.insertBefore(draggedElementSolicitud, this);
+                    }
+                    renumerarPrendas();
+                    actualizarTotalesSolicitud();
+                }
+                this.classList.remove('drag-over');
+                return false;
+            });
+        }
+    });
+}
+
+// Añadir event listeners a todas las líneas existentes al cargar la página
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.precio-unitario-input, .descuento-input').forEach(input => {
+        input.addEventListener('input', calcularPrecioFinal);
+    });
+    document.querySelectorAll('#prendas-container input[name="cantidad[]"]').forEach(input => {
+        input.addEventListener('input', actualizarTotalesSolicitud);
+    });
+    const tipoIvaSelect = document.getElementById('tipo_iva_solicitud');
+    if (tipoIvaSelect) {
+        tipoIvaSelect.addEventListener('change', actualizarTotalesSolicitud);
+        tipoIvaSelect.addEventListener('input', actualizarTotalesSolicitud);
+    }
+    var clienteSelect = document.getElementById('cliente_id');
+    if (clienteSelect) {
+        clienteSelect.addEventListener('change', syncTipoIvaFromCliente);
+    }
+    actualizarTotalesSolicitud();
+    syncTipoIvaFromCliente();
+    initDragAndDropSolicitud();
+});
+
+function eliminarLinea(btn) {
+    const lineas = document.querySelectorAll('.linea-pedido-row');
+    if (lineas.length > 1) {
+        btn.closest('.linea-pedido-row').remove();
+        renumerarPrendas();
+        actualizarTotalesSolicitud();
+    } else {
+        alert('Debe haber al menos una línea en el presupuesto');
+    }
+}
+
+function togglePersonalizar(btn) {
+    const lineaRow = btn.closest('.linea-pedido-row');
+    const camposPersonalizados = lineaRow.querySelectorAll('.campo-personalizado');
+    
+    if (camposPersonalizados.length === 0) {
+        return;
+    }
+    
+    // Verificar si los campos están visibles
+    const primerCampo = camposPersonalizados[0];
+    const estaActivo = primerCampo.style.display !== 'none' && 
+                       window.getComputedStyle(primerCampo).display !== 'none';
+    
+    camposPersonalizados.forEach(campo => {
+        if (estaActivo) {
+            campo.style.display = 'none';
+        } else {
+            campo.style.display = 'block';
+        }
+    });
+    
+    // Actualizar estado visual del botón
+    if (estaActivo) {
+        btn.style.background = '#95a5a6';
+        btn.style.opacity = '0.7';
+        btn.classList.remove('active');
+    } else {
+        btn.style.background = '#3498db';
+        btn.style.opacity = '1';
+        btn.classList.add('active');
+    }
+}
+
+function duplicarLinea(btn) {
+    const lineaRow = btn.closest('.linea-pedido-row');
+    const nuevaLinea = lineaRow.cloneNode(true);
+    nuevaLinea.removeAttribute('data-drag-initialized');
+    const container = document.getElementById('prendas-container');
+    
+    // Obtener valores de los selects originales antes de limpiar
+    const prendaSelectOriginal = lineaRow.querySelector('select[name="prenda_id[]"]');
+    const sexoSelectOriginal = lineaRow.querySelector('select[name="sexo[]"]');
+    const tejidoSelectOriginal = lineaRow.querySelector('select[name="tejido[]"]');
+    
+    const prendaValue = prendaSelectOriginal ? prendaSelectOriginal.value : '';
+    const sexoValue = sexoSelectOriginal ? sexoSelectOriginal.value : '';
+    const tejidoValue = tejidoSelectOriginal ? tejidoSelectOriginal.value : '';
+    
+    // Limpiar talla y unidades
+    const tallaInput = nuevaLinea.querySelector('input[name="talla[]"]');
+    const unidadesInput = nuevaLinea.querySelector('input[name="cantidad[]"]');
+    
+    if (tallaInput) {
+        tallaInput.value = '';
+    }
+    if (unidadesInput) {
+        unidadesInput.value = '1';
+    }
+    
+    // Establecer valores de los selects en la línea duplicada
+    const prendaSelectNuevo = nuevaLinea.querySelector('select[name="prenda_id[]"]');
+    const sexoSelectNuevo = nuevaLinea.querySelector('select[name="sexo[]"]');
+    const tejidoSelectNuevo = nuevaLinea.querySelector('select[name="tejido[]"]');
+    
+    if (prendaSelectNuevo && prendaValue) {
+        prendaSelectNuevo.value = prendaValue;
+    }
+    if (sexoSelectNuevo && sexoValue) {
+        sexoSelectNuevo.value = sexoValue;
+    }
+    if (tejidoSelectNuevo && tejidoValue) {
+        tejidoSelectNuevo.value = tejidoValue;
+    }
+    
+    // Limpiar descuento y precio final
+    const descuentoInputNuevo = nuevaLinea.querySelector('.descuento-input');
+    const precioFinalInputNuevo = nuevaLinea.querySelector('.precio-final-input');
+    if (descuentoInputNuevo) descuentoInputNuevo.value = '0';
+    if (precioFinalInputNuevo) precioFinalInputNuevo.value = '';
+    
+    // Mantener el estado de los campos personalizados
+    const camposPersonalizados = nuevaLinea.querySelectorAll('.campo-personalizado');
+    const btnPersonalizar = nuevaLinea.querySelector('.btn-personalizar');
+    const estaActivo = camposPersonalizados[0] && camposPersonalizados[0].style.display !== 'none';
+    
+    if (estaActivo && camposPersonalizados.length > 0) {
+        camposPersonalizados.forEach(campo => {
+            campo.style.display = 'block';
+        });
+        if (btnPersonalizar) {
+            btnPersonalizar.style.background = '#3498db';
+            btnPersonalizar.style.opacity = '1';
+            btnPersonalizar.classList.add('active');
+        }
+    } else {
+        camposPersonalizados.forEach(campo => {
+            campo.style.display = 'none';
+        });
+        if (btnPersonalizar) {
+            btnPersonalizar.style.background = '#95a5a6';
+            btnPersonalizar.style.opacity = '0.7';
+            btnPersonalizar.classList.remove('active');
+        }
+    }
+    
+    // Insertar después de la línea actual
+    if (container && lineaRow.parentNode) {
+        lineaRow.parentNode.insertBefore(nuevaLinea, lineaRow.nextSibling);
+    } else if (container) {
+        container.appendChild(nuevaLinea);
+    }
+    
+    // Actualizar número
+    renumerarPrendas();
+    
+    // Añadir event listeners a los nuevos campos
+    const cantidadInputNuevo = nuevaLinea.querySelector('.cantidad');
+    const precioUnitarioInputNuevo = nuevaLinea.querySelector('.precio-unitario-input');
+    const descuentoInputListener = nuevaLinea.querySelector('.descuento-input');
+    const precioFinalInputListener = nuevaLinea.querySelector('.precio-final-input');
+    
+    // Añadir listeners para calcular precio final
+    if (precioUnitarioInputNuevo) {
+        precioUnitarioInputNuevo.addEventListener('input', calcularPrecioFinal);
+    }
+    
+    if (descuentoInputListener) {
+        descuentoInputListener.addEventListener('input', calcularPrecioFinal);
+    }
+    var cantInput = nuevaLinea.querySelector('input[name="cantidad[]"]');
+    if (cantInput) cantInput.addEventListener('input', actualizarTotalesSolicitud);
+    actualizarTotalesSolicitud();
+    initDragAndDropSolicitud();
+}
+
+// Manejar input de prenda con datalist
+document.addEventListener('DOMContentLoaded', function() {
+    // Función para sincronizar prenda_id desde prenda_nombre
+    function sincronizarPrendaId(input) {
+        const prendaNombre = input.value.trim();
+        const prendaIdHidden = input.closest('.linea-pedido-campos')?.querySelector('input[name="prenda_id[]"].prenda-id-hidden');
+        if (!prendaIdHidden) return;
+        
+        if (prendaNombre === '') {
+            prendaIdHidden.value = '';
+            return;
+        }
+        
+        // Buscar en el datalist si el nombre coincide con alguna opción
+        const datalist = document.getElementById('prendas-list');
+        if (datalist) {
+            const options = datalist.querySelectorAll('option');
+            for (const option of options) {
+                if (option.value === prendaNombre) {
+                    const prendaId = option.getAttribute('data-id');
+                    if (prendaId) {
+                        prendaIdHidden.value = prendaId;
+                        return;
+                    }
+                }
+            }
+        }
+        
+        // Si no coincide, es texto libre, dejar prenda_id vacío
+        prendaIdHidden.value = '';
+    }
+    
+    // Añadir listeners a todos los inputs de prenda existentes
+    document.querySelectorAll('input[name="prenda_nombre[]"]').forEach(input => {
+        input.addEventListener('input', function() {
+            sincronizarPrendaId(this);
+        });
+        input.addEventListener('change', function() {
+            sincronizarPrendaId(this);
+        });
+        // Inicializar
+        sincronizarPrendaId(input);
+    });
+    
+    // Añadir listeners cuando se añaden nuevas líneas (mediante delegación de eventos)
+    document.addEventListener('input', function(e) {
+        if (e.target && e.target.name === 'prenda_nombre[]') {
+            sincronizarPrendaId(e.target);
+        }
+    });
+});
+
+// Buscador de clientes
+document.addEventListener('DOMContentLoaded', function() {
+    const clienteSearch = document.getElementById('cliente_search');
+    const clienteSelect = document.getElementById('cliente_id');
+    const clienteResults = document.getElementById('cliente_results');
+    const clientes = Array.from(clienteSelect.options).slice(1).map(opt => ({
+        id: opt.value,
+        nombre: opt.textContent,
+        nombreLower: opt.getAttribute('data-nombre') || opt.textContent.toLowerCase()
+    }));
+    
+    let selectedClienteId = null;
+    let selectedClienteNombre = '';
+    
+    clienteSearch.addEventListener('input', function() {
+        const searchTerm = this.value.toLowerCase().trim();
+        
+        if (searchTerm === '') {
+            clienteResults.style.display = 'none';
+            clienteSelect.value = '';
+            selectedClienteId = null;
+            selectedClienteNombre = '';
+            return;
+        }
+        
+        // Filtrar clientes
+        const filtered = clientes.filter(cliente => 
+            cliente.nombreLower.includes(searchTerm)
+        );
+        
+        if (filtered.length === 0) {
+            clienteResults.innerHTML = '<div style="padding: 10px; color: #999; text-align: center;">No se encontraron clientes</div>';
+            clienteResults.style.display = 'block';
+            return;
+        }
+        
+        // Mostrar resultados
+        clienteResults.innerHTML = filtered.map(cliente => 
+            `<div class="cliente-option" data-id="${cliente.id}" data-nombre="${cliente.nombre}" 
+                  style="padding: 10px; cursor: pointer; border-bottom: 1px solid #eee; transition: background 0.2s;"
+                  onmouseover="this.style.background='#f0f0f0'" 
+                  onmouseout="this.style.background='white'"
+                  onclick="selectCliente(${cliente.id}, '${cliente.nombre.replace(/'/g, "\\'")}')">
+                ${cliente.nombre}
+            </div>`
+        ).join('');
+        
+        clienteResults.style.display = 'block';
+    });
+    
+    // Ocultar resultados al hacer clic fuera
+    document.addEventListener('click', function(e) {
+        if (!clienteSearch.contains(e.target) && !clienteResults.contains(e.target)) {
+            clienteResults.style.display = 'none';
+        }
+    });
+    
+    // Función para seleccionar cliente
+    window.selectCliente = function(id, nombre) {
+        selectedClienteId = id;
+        selectedClienteNombre = nombre;
+        clienteSearch.value = nombre;
+        clienteSelect.value = id;
+        clienteResults.style.display = 'none';
+        if (typeof syncTipoIvaFromCliente === 'function') syncTipoIvaFromCliente();
+    };
+    
+    // Validar antes de enviar
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            if (!selectedClienteId && !clienteSelect.value) {
+                e.preventDefault();
+                alert('Por favor, seleccione un cliente');
+                clienteSearch.focus();
+                return false;
+            }
+            // Asegurar que el select tenga el valor correcto
+            if (selectedClienteId) {
+                clienteSelect.value = selectedClienteId;
+            }
+        });
+    }
+});
+
+// Funciones para el modal de crear cliente
+const STORAGE_KEY_CLIENTE_PRESUPUESTO = 'cliente_presupuesto_draft';
+let contadorDireccionesClienteModal = 0;
+let contadorPersonasContactoClienteModal = 0;
+
+function abrirModalCrearCliente() {
+    const modal = document.getElementById('modalCrearClientePresupuesto');
+    const form = document.getElementById('formCrearClientePresupuesto');
+    modal.style.display = 'block';
+    
+    // Restaurar datos guardados
+    const datosGuardados = localStorage.getItem(STORAGE_KEY_CLIENTE_PRESUPUESTO);
+    if (datosGuardados) {
+        try {
+            const datos = JSON.parse(datosGuardados);
+            Object.keys(datos).forEach(key => {
+                const input = form.querySelector(`[name="${key}"]`);
+                if (input) {
+                    if (input.type === 'checkbox' || input.type === 'radio') {
+                        input.checked = datos[key] === input.value;
+                    } else {
+                        input.value = datos[key] || '';
+                    }
+                }
+            });
+        } catch (e) {
+            console.error('Error al restaurar datos:', e);
+        }
+    }
+}
+
+function cerrarModalCrearClientePresupuesto() {
+    const modal = document.getElementById('modalCrearClientePresupuesto');
+    const form = document.getElementById('formCrearClientePresupuesto');
+    
+    // Guardar datos antes de cerrar
+    guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+    
+    modal.style.display = 'none';
+    // NO hacer reset aquí, solo ocultar
+}
+
+function guardarDatosFormulario(form, storageKey) {
+    const datos = {};
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        if (input.name && input.name !== 'csrf_token') {
+            if (input.type === 'checkbox' || input.type === 'radio') {
+                if (input.checked) {
+                    datos[input.name] = input.value;
+                }
+            } else {
+                datos[input.name] = input.value || '';
+            }
+        }
+    });
+    localStorage.setItem(storageKey, JSON.stringify(datos));
+}
+
+function limpiarDatosGuardados(storageKey) {
+    localStorage.removeItem(storageKey);
+}
+
+// Guardar datos automáticamente mientras el usuario escribe y manejar el envío del formulario
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('formCrearClientePresupuesto');
+    if (form) {
+        // Guardar datos en cada cambio
+        form.addEventListener('input', function() {
+            guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+        });
+        form.addEventListener('change', function() {
+            guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+        });
+        
+        // Manejar el envío del formulario de crear cliente
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creando...';
+            
+            fetch('{{ url_for("solicitudes.crear_cliente_ajax") }}', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Agregar el nuevo cliente al select
+                    const clienteSelect = document.getElementById('cliente_id');
+                    const newOption = document.createElement('option');
+                    newOption.value = data.cliente.id;
+                    newOption.textContent = data.cliente.nombre;
+                    newOption.setAttribute('data-nombre', data.cliente.nombre.toLowerCase());
+                    clienteSelect.appendChild(newOption);
+                    
+                    // Seleccionar el nuevo cliente
+                    selectCliente(data.cliente.id, data.cliente.nombre);
+                    
+                    // Limpiar datos guardados
+                    limpiarDatosGuardados(STORAGE_KEY_CLIENTE_PRESUPUESTO);
+                    
+                    // Cerrar modal y limpiar formulario
+                    document.getElementById('modalCrearClientePresupuesto').style.display = 'none';
+                    document.getElementById('formCrearClientePresupuesto').reset();
+                    
+                    alert('Cliente creado correctamente');
+                } else {
+                    alert('Error al crear cliente: ' + data.error);
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = originalText;
+                }
+            })
+            .catch(error => {
+                alert('Error al crear cliente: ' + error);
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
+            });
+        });
+    }
+});
+
+// Cerrar modal al hacer clic fuera
+window.onclick = function(event) {
+    const modal = document.getElementById('modalCrearClientePresupuesto');
+    if (event.target == modal) {
+        cerrarModalCrearClientePresupuesto();
+    }
+}
+
+function añadirPersonaContactoClienteModal() {
+    const container = document.getElementById('personas-contacto-container-cliente-modal');
+    const index = contadorPersonasContactoClienteModal++;
+    
+    const personaDiv = document.createElement('div');
+    personaDiv.className = 'persona-contacto-item';
+    personaDiv.style.cssText = 'border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 5px; background: #f9f9f9;';
+    personaDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h5 style="margin: 0; font-size: 14px; color: #555;">Persona de Contacto ${index + 1}</h5>
+            <button type="button" class="btn btn-sm btn-danger" onclick="eliminarPersonaContactoClienteModal(this)" style="padding: 4px 8px; font-size: 12px;">✕ Eliminar</button>
+        </div>
+        <input type="hidden" name="personas_contacto[]" value="1">
+        <div class="form-group" style="margin-bottom: 10px;">
+            <label>Nombre *</label>
+            <input type="text" name="personas_contacto_nombre_${index}" required placeholder="Nombre completo" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div class="form-group">
+                <label>Cargo</label>
+                <input type="text" name="personas_contacto_cargo_${index}" placeholder="Cargo o puesto" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div class="form-group">
+                <label>Móvil</label>
+                <input type="text" name="personas_contacto_movil_${index}" placeholder="Teléfono móvil" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" name="personas_contacto_email_${index}" placeholder="email@ejemplo.com" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+    `;
+    
+    container.appendChild(personaDiv);
+    
+    // Agregar event listeners para guardar automáticamente
+    personaDiv.querySelectorAll('input').forEach(input => {
+        input.addEventListener('input', function() {
+            const form = document.getElementById('formCrearClientePresupuesto');
+            if (form) guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+        });
+        input.addEventListener('change', function() {
+            const form = document.getElementById('formCrearClientePresupuesto');
+            if (form) guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+        });
+    });
+}
+
+function eliminarPersonaContactoClienteModal(button) {
+    button.closest('.persona-contacto-item').remove();
+    // Guardar después de eliminar
+    const form = document.getElementById('formCrearClientePresupuesto');
+    if (form) guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+}
+
+function añadirDireccionEnvioClienteModal() {
+    const container = document.getElementById('direcciones-envio-container-cliente-modal');
+    const index = contadorDireccionesClienteModal++;
+    
+    const direccionDiv = document.createElement('div');
+    direccionDiv.className = 'direccion-envio-item';
+    direccionDiv.style.cssText = 'border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 5px; background: #f9f9f9;';
+    direccionDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h5 style="margin: 0; font-size: 14px; color: #555;">Dirección Envío ${index + 2}</h5>
+            <button type="button" class="btn btn-sm btn-danger" onclick="eliminarDireccionEnvioClienteModal(this)" style="padding: 4px 8px; font-size: 12px;">✕ Eliminar</button>
+        </div>
+        <input type="hidden" name="direcciones_envio[]" value="1">
+        <input type="hidden" name="direcciones_envio_nombre_${index}" value="Dirección envío ${index + 2}">
+        <div class="form-group" style="margin-bottom: 10px;">
+            <label>Dirección</label>
+            <textarea name="direcciones_envio_direccion_${index}" rows="2" placeholder="Dirección completa" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div class="form-group">
+                <label>Población</label>
+                <input type="text" name="direcciones_envio_poblacion_${index}" placeholder="Ciudad" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div class="form-group">
+                <label>Provincia</label>
+                <input type="text" name="direcciones_envio_provincia_${index}" placeholder="Provincia" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+                <label>Código Postal</label>
+                <input type="text" name="direcciones_envio_codigo_postal_${index}" placeholder="28001" maxlength="10" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div class="form-group">
+                <label>País</label>
+                <input type="text" name="direcciones_envio_pais_${index}" placeholder="España" value="España" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(direccionDiv);
+    
+    // Agregar event listeners para guardar automáticamente
+    direccionDiv.querySelectorAll('input, textarea').forEach(input => {
+        input.addEventListener('input', function() {
+            const form = document.getElementById('formCrearClientePresupuesto');
+            if (form) guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+        });
+        input.addEventListener('change', function() {
+            const form = document.getElementById('formCrearClientePresupuesto');
+            if (form) guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+        });
+    });
+}
+
+function eliminarDireccionEnvioClienteModal(button) {
+    button.closest('.direccion-envio-item').remove();
+    // Guardar después de eliminar
+    const form = document.getElementById('formCrearClientePresupuesto');
+    if (form) guardarDatosFormulario(form, STORAGE_KEY_CLIENTE_PRESUPUESTO);
+}
+</script>
+
+<!-- Modal para crear cliente desde presupuesto -->
+<div id="modalCrearClientePresupuesto" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Crear Nuevo Cliente</h3>
+            <span class="close" onclick="cerrarModalCrearClientePresupuesto()">&times;</span>
+        </div>
+        <form id="formCrearClientePresupuesto" class="modal-form" oninput="guardarDatosFormulario(this, STORAGE_KEY_CLIENTE_PRESUPUESTO)">
+            <div class="form-section">
+                <h4>Información Principal</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nombre_cliente_modal">Nombre Fiscal *</label>
+                        <input type="text" name="nombre" id="nombre_cliente_modal" required placeholder="Razón social o nombre fiscal">
+                    </div>
+                    <div class="form-group">
+                        <label for="alias_cliente_modal">Nombre Comercial</label>
+                        <input type="text" name="alias" id="alias_cliente_modal" placeholder="Nombre comercial">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nif_cliente_modal">NIF/CIF</label>
+                        <input type="text" name="nif" id="nif_cliente_modal" placeholder="A15022510" maxlength="20">
+                    </div>
+                    <div class="form-group">
+                        <label for="fecha_alta_cliente_modal">Fecha de Alta</label>
+                        <input type="date" name="fecha_alta" id="fecha_alta_cliente_modal">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Dirección Fiscal</h4>
+                <div class="form-group">
+                    <label for="direccion_cliente_modal">Dirección</label>
+                    <input type="text" name="direccion" id="direccion_cliente_modal" placeholder="Calle y número">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="poblacion_cliente_modal">Población</label>
+                        <input type="text" name="poblacion" id="poblacion_cliente_modal" placeholder="Ciudad">
+                    </div>
+                    <div class="form-group">
+                        <label for="provincia_cliente_modal">Provincia</label>
+                        <input type="text" name="provincia" id="provincia_cliente_modal" placeholder="Provincia">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="codigo_postal_cliente_modal">Código Postal</label>
+                        <input type="text" name="codigo_postal" id="codigo_postal_cliente_modal" placeholder="28001" maxlength="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="pais_cliente_modal">País</label>
+                        <input type="text" name="pais" id="pais_cliente_modal" placeholder="España" value="España">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Información Adicional</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="categoria_id_cliente_modal">Categoría</label>
+                        <select name="categoria_id" id="categoria_id_cliente_modal">
+                            <option value="">Sin categoría</option>
+                            {% for categoria in categorias %}
+                            <option value="{{ categoria.id }}">{{ categoria.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="comercial_id_cliente_modal">Comercial Asignado</label>
+                        <select name="comercial_id" id="comercial_id_cliente_modal">
+                            <option value="">Sin comercial asignado</option>
+                            {% for comercial in comerciales %}
+                            <option value="{{ comercial.id }}">{{ comercial.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="numero_cuenta_cliente_modal">Número de Cuenta</label>
+                        <input type="text" name="numero_cuenta" id="numero_cuenta_cliente_modal" placeholder="ES24-3456-3456-3456-3456-3456" maxlength="29">
+                        <small style="color: #666; font-size: 11px;">Formato: ES seguido de 22 dígitos (ESXX-XXXX-XXXX-XXXX-XXXX-XXXX). Opcional.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="tipo_iva_cliente_modal">Tipo de IVA (%) *</label>
+                        <select name="tipo_iva" id="tipo_iva_cliente_modal" required>
+                            <option value="21" selected>21%</option>
+                            <option value="10">10%</option>
+                            <option value="4">4%</option>
+                            <option value="0">0%</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Contacto</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="telefono_cliente_modal">Teléfono</label>
+                        <input type="text" name="telefono" id="telefono_cliente_modal" placeholder="Teléfono fijo">
+                    </div>
+                    <div class="form-group">
+                        <label for="movil_cliente_modal">Móvil</label>
+                        <input type="text" name="movil" id="movil_cliente_modal" placeholder="Teléfono móvil">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="email_general_cliente_modal">Email General</label>
+                        <input type="email" name="email_general" id="email_general_cliente_modal" placeholder="email@ejemplo.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="email_comunicaciones_cliente_modal">Email Comunicaciones</label>
+                        <input type="email" name="email_comunicaciones" id="email_comunicaciones_cliente_modal" placeholder="email@ejemplo.com">
+                        <small style="color: #666; font-size: 11px;">Para avisos de estados</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Direcciones de Envío Alternativas</h4>
+                <div id="direcciones-envio-container-cliente-modal">
+                    <!-- Las direcciones se añadirán dinámicamente aquí -->
+                </div>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="añadirDireccionEnvioClienteModal()" style="margin-top: 10px;">
+                    ➕ Añadir Dirección de Envío
+                </button>
+            </div>
+
+            <div class="form-section">
+                <h4>Personas de Contacto</h4>
+                <div id="personas-contacto-container-cliente-modal">
+                    <!-- Las personas de contacto se añadirán dinámicamente aquí -->
+                </div>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="añadirPersonaContactoClienteModal()" style="margin-top: 10px;">
+                    ➕ Añadir Persona de Contacto
+                </button>
+            </div>
+
+            <div class="form-section">
+                <h4>Anotaciones</h4>
+                <div class="form-group">
+                    <label for="anotaciones_cliente_modal">Anotaciones</label>
+                    <textarea name="anotaciones" id="anotaciones_cliente_modal" rows="2" placeholder="Notas adicionales"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Crear Cliente</button>
+                <button type="button" class="btn btn-secondary" onclick="cerrarModalCrearClientePresupuesto()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    overflow-y: auto;
+}
+
+.modal-content {
+    background-color: white;
+    margin: 3% auto;
+    padding: 0;
+    border-radius: 10px;
+    max-width: 700px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 2px solid #e0e0e0;
+    background: #f8f9fa;
+    border-radius: 10px 10px 0 0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.close {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 20px;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.modal-form {
+    padding: 20px;
+}
+
+.form-section {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.form-section:last-child {
+    border-bottom: none;
+}
+
+.form-section h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #2c3e50;
+    font-size: 16px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #555;
+    font-size: 14px;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 2px solid #e0e0e0;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+</style>
+{% endblock %}
+

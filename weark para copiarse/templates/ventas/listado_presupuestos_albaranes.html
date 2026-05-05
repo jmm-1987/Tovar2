@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo }} — Ventas{% endblock %}
+
+{% block content %}
+<style>
+.container {
+    padding-top: 10px !important;
+    padding-left: 5px !important;
+    padding-right: 5px !important;
+    max-width: 100% !important;
+}
+header { margin-bottom: 0.6rem !important; }
+</style>
+
+<div style="max-width: 1200px; margin: 0 auto;">
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px;">
+        <div>
+            <h2 style="margin: 0 0 4px 0; font-size: 1.15rem;">{{ titulo }}</h2>
+            <p style="margin: 0; font-size: 0.8rem; color: #6c757d; max-width: 640px; line-height: 1.4;">{{ descripcion }}</p>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+            <a href="{{ url_for('facturacion.menu_ventas') }}" class="btn btn-secondary" style="padding: 5px 10px; font-size: 0.78rem;">← Ventas</a>
+            <a href="{{ url_for('facturacion.listado_ventas_fd_enviados') }}" class="btn btn-sm {% if modo == 'enviados_fd' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="font-size: 0.75rem;">FD enviados</a>
+            <a href="{{ url_for('facturacion.listado_ventas_fd_pendientes') }}" class="btn btn-sm {% if modo == 'pendientes_fd' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="font-size: 0.75rem;">FD pendientes</a>
+            <a href="{{ url_for('facturacion.listado_ventas_cancelados') }}" class="btn btn-sm {% if modo == 'cancelados' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="font-size: 0.75rem;">Cancelados</a>
+        </div>
+    </div>
+
+    {% if modo == 'cancelados' %}
+    <p style="font-size: 0.72rem; color: #868e96; margin: 0 0 10px 0;">
+        Solo registros con estado <strong>cancelado</strong> (presupuestos y albaranes de retirada). Los <strong>rechazados</strong> no entran aquí.
+        Presupuestos cancelados: IVA 0 y total = base. Tabla sin columna IVA.
+    </p>
+    {% endif %}
+
+    {% if filas %}
+    <div class="ventas-listado-totales-bar" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 16px 28px; padding: 10px 14px; margin-bottom: 10px; border-radius: 8px; background: linear-gradient(135deg, #e8f0fe 0%, #f0e7ff 100%); border: 1px solid #d0d7de;">
+        <span style="font-size: 0.72rem; font-weight: 700; color: #495057; text-transform: uppercase; letter-spacing: 0.04em; width: 100%; margin: 0;">Totales del listado</span>
+        <div style="display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: baseline;">
+            <div>
+                <span style="font-size: 0.7rem; color: #6c757d; display: block;">Base</span>
+                <span style="font-size: 0.95rem; font-weight: 700; color: #212529;">{{ "%.2f"|format(totales.base) }} €</span>
+            </div>
+            {% if modo != 'cancelados' %}
+            <div>
+                <span style="font-size: 0.7rem; color: #6c757d; display: block;">IVA</span>
+                <span style="font-size: 0.95rem; font-weight: 700; color: #212529;">{{ "%.2f"|format(totales.iva) }} €</span>
+            </div>
+            {% endif %}
+            <div>
+                <span style="font-size: 0.7rem; color: #6c757d; display: block;">Total</span>
+                <span style="font-size: 1.05rem; font-weight: 800; color: #0d6efd;">{{ "%.2f"|format(totales.total) }} €</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-container" style="background: #fff; border-radius: 8px; border: 1px solid #e9ecef; overflow-x: auto;">
+        <table class="clientes-table" style="width: 100%; border-collapse: collapse; font-size: 0.82rem; min-width: 880px;">
+            <thead>
+                <tr style="background: #f1f3f5;">
+                    <th style="padding: 8px 10px; text-align: left;">Tipo</th>
+                    <th style="padding: 8px 10px; text-align: left;">Referencia</th>
+                    <th style="padding: 8px 10px; text-align: left;">Cliente</th>
+                    <th style="padding: 8px 10px; text-align: left;">Fecha</th>
+                    <th style="padding: 8px 10px; text-align: left;">Estado</th>
+                    <th style="padding: 8px 10px; text-align: right;">Base</th>
+                    {% if modo != 'cancelados' %}
+                    <th style="padding: 8px 10px; text-align: right;">IVA</th>
+                    {% endif %}
+                    <th style="padding: 8px 10px; text-align: right;">Total</th>
+                    <th style="padding: 8px 10px; text-align: center;" title="FacturaDirecta">FD</th>
+                    <th style="padding: 8px 10px; text-align: center;">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in filas %}
+                <tr style="border-top: 1px solid #eee;">
+                    <td style="padding: 7px 10px;">
+                        {% if row.tipo == 'presupuesto' %}
+                        <span style="background: #e7f1ff; color: #0a58ca; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">Presupuesto</span>
+                        {% else %}
+                        <span style="background: #fff3cd; color: #856404; padding: 2px 6px; border-radius: 4px; font-size: 0.72rem; font-weight: 600;">Alb. retirada</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 7px 10px; font-weight: 600;">{{ row.ref }}</td>
+                    <td style="padding: 7px 10px;">{{ row.cliente }}</td>
+                    <td style="padding: 7px 10px; white-space: nowrap;">{{ row.fecha.strftime('%d/%m/%Y %H:%M') if row.fecha else '—' }}</td>
+                    <td style="padding: 7px 10px;">{{ row.estado }}</td>
+                    <td style="padding: 7px 10px; text-align: right; white-space: nowrap;">{{ "%.2f"|format(row.base) }} €</td>
+                    {% if modo != 'cancelados' %}
+                    <td style="padding: 7px 10px; text-align: right; white-space: nowrap;">{{ "%.2f"|format(row.iva) }} €</td>
+                    {% endif %}
+                    <td style="padding: 7px 10px; text-align: right; white-space: nowrap;"><strong>{{ "%.2f"|format(row.total) }} €</strong></td>
+                    <td style="padding: 7px 10px; text-align: center;">
+                        {% if row.fd %}
+                        <span style="color: #198754; font-weight: 700; font-size: 0.72rem;" title="{{ row.fd_doc or row.fd }}">Sí</span>
+                        {% else %}
+                        <span style="color: #adb5bd; font-size: 0.72rem;">No</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 7px 10px; text-align: center;">
+                        <a href="{{ row.url }}" style="font-size: 0.78rem; font-weight: 600;">Abrir</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p style="font-size: 0.75rem; color: #868e96; margin-top: 8px;">{{ filas|length }} registro{% if filas|length != 1 %}s{% endif %}.</p>
+    {% else %}
+    <div style="padding: 24px; text-align: center; background: #f8f9fa; border-radius: 8px; border: 1px dashed #ced4da; color: #6c757d; font-size: 0.88rem;">
+        No hay registros en este listado.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

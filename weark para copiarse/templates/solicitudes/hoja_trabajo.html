@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hoja de Trabajo - Presupuesto {{ solicitud.numero_solicitud or solicitud.id }}</title>
+    <style type="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        @page {
+            size: A4;
+            margin: 5mm 10mm 10mm 10mm;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f5f5f5;
+            padding: 10px;
+            color: #333;
+            font-size: 11px;
+            line-height: 1.4;
+        }
+        
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            height: 297mm;
+            background: white;
+            margin: 0 auto 10px;
+            padding: 5mm 10mm 5mm 10mm;
+            padding-bottom: 25mm;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            page-break-after: always;
+            page-break-inside: avoid;
+            overflow: hidden;
+            box-sizing: border-box;
+            position: relative;
+        }
+        
+        .page-content {
+            min-height: calc(297mm - 20mm);
+            padding-bottom: 10mm;
+        }
+        
+        .page:last-child {
+            page-break-after: auto;
+        }
+        
+        .page:only-child {
+            page-break-after: auto;
+        }
+        
+        .page:not(:last-child) {
+            page-break-after: always !important;
+        }
+        
+        .presupuesto-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .logo-section {
+            flex: 0 0 auto;
+        }
+        
+        .logo-section img {
+            width: 60px;
+            height: 60px;
+            object-fit: contain;
+        }
+        
+        .presupuesto-title {
+            flex: 1;
+            text-align: center;
+            align-self: center;
+        }
+        
+        .presupuesto-title h1 {
+            font-size: 1.8em;
+            color: #2c3e50;
+            margin-bottom: 0;
+            font-weight: bold;
+        }
+        
+        .presupuesto-info {
+            text-align: right;
+            flex: 0 0 auto;
+            min-width: 200px;
+        }
+        
+        .presupuesto-info p {
+            margin: 3px 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .datos-section {
+            margin-bottom: 12px;
+            display: table;
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 10px;
+        }
+        
+        .datos-box {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+        
+        .datos-box h3 {
+            color: #2c3e50;
+            border-bottom: 1px solid #2c3e50;
+            padding-bottom: 3px;
+            margin-bottom: 5px;
+            margin-top: 0;
+            font-size: 1rem;
+        }
+        
+        .datos-box h3:not(:first-child) {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .datos-box p {
+            margin: 2px 0;
+            color: #495057;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        
+        .lineas-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            margin-bottom: 10px;
+            font-size: 8px;
+        }
+        
+        .lineas-table thead {
+            background: #f8f9fa;
+            color: #000000;
+        }
+        
+        .lineas-table th {
+            padding: 4px 5px;
+            text-align: left;
+            font-weight: 600;
+            border: 1px solid #dee2e6;
+            font-size: 8px;
+            color: #000000;
+        }
+        
+        .lineas-table td {
+            padding: 4px 5px;
+            border: 1px solid #e9ecef;
+            color: #495057;
+            font-size: 8px;
+        }
+        
+        .lineas-table tbody tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .totales-section {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 2px solid #2c3e50;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 0.95em;
+        }
+        
+        .total-row.base {
+            color: #495057;
+        }
+        
+        .total-row.iva {
+            color: #495057;
+        }
+        
+        .total-row.final {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #27ae60;
+            border-top: 2px solid #2c3e50;
+            padding-top: 8px;
+            margin-top: 5px;
+        }
+        
+        .total-label {
+            font-weight: 600;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+            page-break-inside: avoid;
+        }
+        
+        .section-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .fabricacion-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 10px;
+        }
+        
+        .fabricacion-item {
+            margin-bottom: 10px;
+        }
+        
+        .fabricacion-item strong {
+            display: block;
+            color: #495057;
+            margin-bottom: 3px;
+        }
+        
+        .fabricacion-item div {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            color: #212529;
+            min-height: 30px;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .page {
+                margin: 0;
+                box-shadow: none;
+                page-break-after: auto;
+                page-break-inside: avoid;
+                overflow: hidden;
+            }
+            
+            .page:last-child {
+                page-break-after: auto;
+            }
+            
+            .page:only-child {
+                page-break-after: auto;
+            }
+            
+            .page:not(:last-child) {
+                page-break-after: always !important;
+            }
+            
+            .lineas-table tbody tr {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="page-content">
+        <!-- Encabezado -->
+        <div class="presupuesto-header">
+            <div class="logo-section">
+                {% if use_base64 is defined and use_base64 and logo_base64 %}
+                <img src="{{ logo_base64 }}" alt="Logo" style="width: 60px; height: 60px; object-fit: contain;">
+                {% elif base_url is defined and base_url %}
+                <img src="{{ base_url }}{{ url_for('static', filename='logo1.png') }}" alt="Logo" style="width: 60px; height: 60px; object-fit: contain;">
+                {% else %}
+                <img src="{{ url_for('static', filename='logo1.png', _external=True) }}" alt="Logo" style="width: 60px; height: 60px; object-fit: contain;">
+                {% endif %}
+            </div>
+            <div class="presupuesto-title">
+                <h1>HOJA DE TRABAJO</h1>
+            </div>
+            <div class="presupuesto-info">
+                <p><strong>Weark Custom Tovar Sl</strong></p>
+                <p>B06763502</p>
+                <p>C/Marquesa de Pinares, 11</p>
+                <p>06800-Mérida (Badajoz)</p>
+            </div>
+        </div>
+
+        <div class="datos-section">
+            <div class="datos-box">
+                <h3>Datos del Presupuesto</h3>
+                <p><strong>Número:</strong> {{ solicitud.numero_solicitud or solicitud.id }}</p>
+                <p><strong>Fecha:</strong> {{ solicitud.fecha_creacion.strftime('%d/%m/%Y') if solicitud.fecha_creacion else 'N/A' }}</p>
+                <p><strong>Estado:</strong> {{ solicitud.estado }}</p>
+                <p><strong>Tipo:</strong> {{ solicitud.tipo_pedido }} | <strong>Comercial:</strong> {{ solicitud.comercial.nombre if solicitud.comercial else 'N/A' }}{% if solicitud.comercial and solicitud.comercial.usuario and solicitud.comercial.usuario.telefono %} - {{ solicitud.comercial.usuario.telefono }}{% endif %}</p>
+                {% if solicitud.forma_pago %}
+                <p><strong>Forma de Pago:</strong> {{ solicitud.forma_pago }}</p>
+                {% endif %}
+                
+                <h3 style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;">Datos del Cliente</h3>
+                <p><strong>{{ solicitud.cliente.nombre if solicitud.cliente else 'N/A' }}</strong></p>
+                {% if solicitud.cliente and solicitud.cliente.direccion %}
+                <p>{{ solicitud.cliente.direccion }}</p>
+                {% endif %}
+                {% if solicitud.cliente %}
+                    {% set cp = solicitud.cliente.codigo_postal or '' %}
+                    {% set poblacion = solicitud.cliente.poblacion or '' %}
+                    {% set provincia = solicitud.cliente.provincia or '' %}
+                    {% if cp or poblacion or provincia %}
+                        <p>
+                            {% if cp %}{{ cp }}{% endif %}
+                            {% if cp and poblacion %}-{% endif %}
+                            {% if poblacion %}{{ poblacion }}{% endif %}
+                            {% if (cp or poblacion) and provincia %}-{% endif %}
+                            {% if provincia %}{{ provincia }}{% endif %}
+                        </p>
+                    {% endif %}
+                {% endif %}
+                {% if solicitud.cliente and solicitud.cliente.nif %}
+                <p><strong>NIF/CIF:</strong> {{ solicitud.cliente.nif }}</p>
+                {% endif %}
+            </div>
+            <div class="datos-box">
+                <h3>Productos</h3>
+                
+                {% if prendas_info is defined and prendas_info|length > 0 %}
+                    {% for prenda in prendas_info %}
+                    <div style="margin-top: {% if loop.index > 1 %}15px{% else %}10px{% endif %}; padding-top: {% if loop.index > 1 %}10px{% else %}0{% endif %}; border-top: {% if loop.index > 1 %}1px solid #dee2e6{% else %}none{% endif %};">
+                        <h4 style="color: #2c3e50; font-size: 0.95em; margin-bottom: 5px; margin-top: 0; font-weight: bold;">Producto {{ prenda.numero }}</h4>
+                        {% if prenda.tipo_producto %}
+                        <p><strong>Tipo:</strong> {{ prenda.tipo_producto }}</p>
+                        {% endif %}
+                        {% if prenda.referencias_diseno %}
+                        <p><strong>Referencias diseño:</strong> {{ prenda.referencias_diseno }}</p>
+                        {% endif %}
+                        {% if prenda.comentarios %}
+                        <p><strong>Comentarios:</strong> {{ prenda.comentarios }}</p>
+                        {% endif %}
+                        {% if prenda.tipo_tela %}<p><strong>Tipo tela:</strong> {{ prenda.tipo_tela }}</p>{% endif %}
+                        {% if prenda.medidas %}<p><strong>Medidas:</strong> {{ prenda.medidas }}</p>{% endif %}
+                        {% if prenda.grabacion %}<p><strong>Grabación:</strong> {{ prenda.grabacion }}</p>{% endif %}
+                        {% if prenda.costuras %}<p><strong>Costuras:</strong> {{ prenda.costuras }}</p>{% endif %}
+                        {% if prenda.tipo_grabacion %}<p><strong>Tipo grabación:</strong> {{ prenda.tipo_grabacion }}</p>{% endif %}
+                        {% if prenda.tipo_prenda %}<p><strong>Tipo prenda:</strong> {{ prenda.tipo_prenda }}</p>{% endif %}
+                        {% if prenda.color1 %}<p><strong>Color1:</strong> {{ prenda.color1 }}</p>{% endif %}
+                        {% if prenda.color2 %}<p><strong>Color2:</strong> {{ prenda.color2 }}</p>{% endif %}
+                        {% if prenda.color3 %}<p><strong>Color3:</strong> {{ prenda.color3 }}</p>{% endif %}
+                        {% if prenda.tipo_tejido %}<p><strong>Tipo tejido:</strong> {{ prenda.tipo_tejido }}</p>{% endif %}
+                        {% if prenda.marcada %}<p><strong>Marcada:</strong> {{ prenda.marcada }}</p>{% endif %}
+                        {% if prenda.logos and prenda.logos|length > 0 %}
+                        <p><strong>Logos:</strong> {{ prenda.logos|length }}</p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    {# Fallback: mostrar información tradicional si no hay prendas_info #}
+                    {% if solicitud.tipo_producto %}
+                    <p><strong>Tipo Producto:</strong> {{ solicitud.tipo_producto }}</p>
+                    {% endif %}
+                    {% if solicitud.colores_principales %}
+                    <p><strong>Colores Principales:</strong> {{ solicitud.colores_principales }}</p>
+                    {% endif %}
+                    {% if solicitud.colores_secundarios %}
+                    <p><strong>Colores Secundarios:</strong> {{ solicitud.colores_secundarios }}</p>
+                    {% endif %}
+                    {% if solicitud.ubicacion_logo %}
+                    <p><strong>Ubicación del Logo:</strong> {{ solicitud.ubicacion_logo }}</p>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+
+        <h3 style="color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 5px; margin-bottom: 10px; font-size: 1rem;">Líneas del Presupuesto (Detallado)</h3>
+        
+        {% if solicitud.lineas %}
+        <table class="lineas-table">
+            <thead>
+                <tr>
+                    <th style="width: 12%;">Nombre</th>
+                    <th style="width: 8%;">Modelo</th>
+                    <th style="width: 6%; text-align: center;">Cant.</th>
+                    <th style="width: 5%; text-align: center;">Talla</th>
+                    <th style="width: 6%;">Color</th>
+                    <th style="width: 7%;">Forma</th>
+                    <th style="width: 5%;">Sexo</th>
+                    <th style="width: 7%;">Tejido</th>
+                    <th style="width: 8%;">Nombre Pers.</th>
+                    <th style="width: 6%;">Cargo</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for linea in solicitud.lineas %}
+                {% set precio_unitario_val = linea.precio_unitario if linea.precio_unitario else 0 %}
+                {% set cantidad_val = linea.cantidad if linea.cantidad else 0 %}
+                {% set descuento_val = linea.descuento if linea.descuento else 0 %}
+                {% set precio_final_val = linea.precio_final if linea.precio_final else None %}
+                {% set precio_unit = precio_unitario_val|float %}
+                {% set cantidad = cantidad_val|int %}
+                {% set descuento = descuento_val|float %}
+                {% set tiene_descuento = descuento > 0 %}
+                {% if tiene_descuento and precio_final_val %}
+                    {% set precio_a_usar = precio_final_val|float %}
+                {% else %}
+                    {% set precio_a_usar = precio_unit %}
+                {% endif %}
+                {% set total_linea = precio_a_usar * cantidad %}
+                {% set nombre_prenda = linea.nombre_mostrar or linea.nombre or 'N/A' %}
+                {% set modelo_prenda = linea.prenda.nombre if linea.prenda else (linea.prenda_nombre_texto if linea.prenda_nombre_texto else '-') %}
+                {% set nombre_personalizado = linea.nombre if (linea.nombre and linea.nombre.strip()) else '-' %}
+                {% set cargo_personalizado = linea.cargo if (linea.cargo and linea.cargo.strip()) else '-' %}
+                <tr>
+                    <td>{{ nombre_prenda }}</td>
+                    <td>{{ modelo_prenda }}</td>
+                    <td style="text-align: center;">{{ cantidad }}</td>
+                    <td style="text-align: center;">{{ linea.talla or '-' }}</td>
+                    <td>{{ linea.color or '-' }}</td>
+                    <td>{{ linea.forma or '-' }}</td>
+                    <td>{{ linea.sexo|title if linea.sexo else '-' }}</td>
+                    <td>{{ linea.tejido or '-' }}</td>
+                    <td>{{ nombre_personalizado }}</td>
+                    <td>{{ cargo_personalizado }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="padding: 30px; background: #f8f9fa; border-radius: 6px; text-align: center; color: #999;">
+            Este presupuesto no tiene líneas registradas.
+        </p>
+        {% endif %}
+        
+        {% if solicitud.seguimiento %}
+        <div class="section" style="margin-top: 20px;">
+            <div class="section-title">SEGUIMIENTO</div>
+            <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; white-space: pre-wrap; font-size: 10px;">{{ solicitud.seguimiento }}</div>
+        </div>
+        {% endif %}
+        </div>
+    </div>
+
+    {% set tiene_imagenes = (imagen_diseno_base64 or imagen_portada_base64 or imagenes_adicionales_base64) %}
+    {% if tiene_imagenes %}
+    <!-- Páginas separadas para cada imagen con su descripción -->
+    
+    {% if imagen_diseno_base64 %}
+    <div class="page">
+        <div class="page-content">
+            <div class="section-title" style="margin-top: 0; margin-bottom: 20px;">IMÁGENES Y REFERENCIAS</div>
+            <div class="imagen-container" style="display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: calc(100% - 80px);">
+                <img src="{{ imagen_diseno_base64 }}" alt="Imagen de Diseño" style="max-width: 100%; max-height: 70vh; height: auto; margin-bottom: 15px; border: 1px solid #dee2e6; border-radius: 4px; object-fit: contain;">
+                <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 10px; color: #495057; text-align: center; width: 100%;">
+                    <strong>Diseño:</strong> {% if solicitud.imagen_diseno %}{{ solicitud.imagen_diseno }}{% else %}Imagen de diseño del presupuesto{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if imagen_portada_base64 %}
+    <div class="page">
+        <div class="page-content">
+            <div class="section-title" style="margin-top: 0; margin-bottom: 20px;">IMÁGENES Y REFERENCIAS</div>
+            <div class="imagen-container" style="display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: calc(100% - 80px);">
+                <img src="{{ imagen_portada_base64 }}" alt="Imagen de Portada" style="max-width: 100%; max-height: 70vh; height: auto; margin-bottom: 15px; border: 1px solid #dee2e6; border-radius: 4px; object-fit: contain;">
+                <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 10px; color: #495057; text-align: center; width: 100%;">
+                    <strong>Portada:</strong> {% if solicitud.imagen_portada %}{{ solicitud.imagen_portada }}{% else %}Imagen de portada{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% for i in range(5) %}
+        {% set imagen_base64 = imagenes_adicionales_base64[i] if imagenes_adicionales_base64 and i < imagenes_adicionales_base64|length else None %}
+        {% set descripcion = descripciones_imagenes[i] if descripciones_imagenes and i < descripciones_imagenes|length else '' %}
+        {% if imagen_base64 %}
+        <div class="page">
+            <div class="page-content">
+                <div class="section-title" style="margin-top: 0; margin-bottom: 20px;">IMÁGENES Y REFERENCIAS</div>
+                <div class="imagen-container" style="display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: calc(100% - 80px);">
+                    <img src="{{ imagen_base64 }}" alt="Imagen Adicional {{ i + 1 }}" style="max-width: 100%; max-height: 70vh; height: auto; margin-bottom: 15px; border: 1px solid #dee2e6; border-radius: 4px; object-fit: contain;">
+                    <div style="background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 10px; color: #495057; text-align: center; width: 100%;">
+                        <strong>Imagen {{ i + 1 }}:</strong> {% if descripcion %}{{ descripcion }}{% else %}Referencia adicional{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    {% endfor %}
+    {% endif %}
+</body>
+</html>

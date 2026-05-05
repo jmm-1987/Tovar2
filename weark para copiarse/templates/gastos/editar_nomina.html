@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Nómina - Gastos{% endblock %}
+
+{% block content %}
+<h2>Editar Nómina</h2>
+
+<form method="POST">
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="empleado_id">Empleado *</label>
+            <select name="empleado_id" id="empleado_id" required>
+                <option value="">Seleccione un empleado</option>
+                {% for empleado in empleados %}
+                <option value="{{ empleado.id }}" {% if nomina.empleado_id == empleado.id %}selected{% endif %}>{{ empleado.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="mes">Mes *</label>
+            <select name="mes" id="mes" required>
+                <option value="">Seleccione un mes</option>
+                <option value="1" {% if nomina.mes == 1 %}selected{% endif %}>Enero</option>
+                <option value="2" {% if nomina.mes == 2 %}selected{% endif %}>Febrero</option>
+                <option value="3" {% if nomina.mes == 3 %}selected{% endif %}>Marzo</option>
+                <option value="4" {% if nomina.mes == 4 %}selected{% endif %}>Abril</option>
+                <option value="5" {% if nomina.mes == 5 %}selected{% endif %}>Mayo</option>
+                <option value="6" {% if nomina.mes == 6 %}selected{% endif %}>Junio</option>
+                <option value="7" {% if nomina.mes == 7 %}selected{% endif %}>Julio</option>
+                <option value="8" {% if nomina.mes == 8 %}selected{% endif %}>Agosto</option>
+                <option value="9" {% if nomina.mes == 9 %}selected{% endif %}>Septiembre</option>
+                <option value="10" {% if nomina.mes == 10 %}selected{% endif %}>Octubre</option>
+                <option value="11" {% if nomina.mes == 11 %}selected{% endif %}>Noviembre</option>
+                <option value="12" {% if nomina.mes == 12 %}selected{% endif %}>Diciembre</option>
+            </select>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="año">Año *</label>
+            <input type="number" name="año" id="año" min="2000" max="2100" value="{{ nomina.año }}" required>
+        </div>
+    </div>
+
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="total_devengado">Total Devengado *</label>
+            <input type="number" name="total_devengado" id="total_devengado" step="0.01" min="0" value="{{ "%.2f"|format(nomina.total_devengado) }}" required>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="observaciones">Observaciones</label>
+        <textarea name="observaciones" id="observaciones" rows="3" placeholder="Observaciones adicionales...">{{ nomina.observaciones or '' }}</textarea>
+    </div>
+
+    <div class="actions">
+        <button type="submit" class="btn btn-success">Actualizar Nómina</button>
+        <a href="{{ url_for('gastos.listado_nominas') }}" class="btn btn-danger">Cancelar</a>
+    </div>
+</form>
+{% endblock %}
+

@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+
+{% block title %}Resultados Nuevo - Informes{% endblock %}
+
+{% block content %}
+<div class="informes-container">
+    <h2>📈 Informe de Resultados Nuevo</h2>
+
+    <div class="filtros-box">
+        <form method="GET" class="filtros-form">
+            <div class="filtro-group">
+                <label for="año">Año:</label>
+                <input type="number" name="año" id="año" value="{{ año }}" min="2000" max="2100" required>
+            </div>
+            <div class="filtro-group">
+                <label for="mes">Mes:</label>
+                <select name="mes" id="mes">
+                    <option value="">Todos</option>
+                    {% for i in range(1, 13) %}
+                    <option value="{{ i }}" {% if mes_filtro == i %}selected{% endif %}>
+                        {{ ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][i] }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Buscar</button>
+        </form>
+    </div>
+
+    <div class="resumen-anual-box">
+        <h3>
+            Resumen {{ año }}
+            {% if mes_filtro_nombre %}- {{ mes_filtro_nombre }}{% endif %}
+        </h3>
+        <div class="resumen-grid">
+            <div class="resumen-item ingresos">
+                <span class="resumen-label">Presupuestos enviados FD</span>
+                <span class="resumen-value">{{ "%.2f"|format(total_presupuestos_fd) }} €</span>
+            </div>
+            <div class="resumen-item ingresos-secundario">
+                <span class="resumen-label">Ingresos considerados (estado cancelado)</span>
+                <span class="resumen-value">{{ "%.2f"|format(total_presupuestos_cancelado) }} €</span>
+            </div>
+            <div class="resumen-item gastos">
+                <span class="resumen-label">Total Gastos</span>
+                <span class="resumen-value">{{ "%.2f"|format(total_gastos_anual) }} €</span>
+            </div>
+            <div class="resumen-item {% if resultado_anual >= 0 %}positivo{% else %}negativo{% endif %}">
+                <span class="resumen-label">Resultado (FD - Gastos)</span>
+                <span class="resumen-value">{{ "%.2f"|format(resultado_anual) }} €</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="charts-section">
+        <h3>Evolución mensual</h3>
+        <div class="chart-wrapper">
+            <canvas id="chartEvolucionNuevo"></canvas>
+        </div>
+        <h3 style="margin-top: 30px;">Composición de gastos por mes</h3>
+        <div class="chart-wrapper">
+            <canvas id="chartGastosNuevo"></canvas>
+        </div>
+    </div>
+
+    <div class="tabla-resultados-box">
+        <h3>Detalle por mes</h3>
+        <div class="table-responsive">
+            <table class="tabla-resultados">
+                <thead>
+                    <tr>
+                        <th>Mes</th>
+                        <th>Presup. FD</th>
+                        <th>Ingresos considerados</th>
+                        <th>Facturas Prov.</th>
+                        <th>Nóminas</th>
+                        <th>Recibo IVA</th>
+                        <th>Recibo IRPF</th>
+                        <th>Seg. Social</th>
+                        <th>Total Gastos</th>
+                        <th>Resultado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in datos_meses %}
+                    <tr>
+                        <td><strong>{{ d.mes_nombre }}</strong></td>
+                        <td>{{ "%.2f"|format(d.ingresos_presupuestos_fd) }} €</td>
+                        <td>{{ "%.2f"|format(d.ingresos) }} €</td>
+                        <td>{{ "%.2f"|format(d.gasto_facturas) }} €</td>
+                        <td>{{ "%.2f"|format(d.gasto_nominas) }} €</td>
+                        <td>{{ "%.2f"|format(d.gasto_iva) }} €</td>
+                        <td>{{ "%.2f"|format(d.gasto_irpf) }} €</td>
+                        <td>{{ "%.2f"|format(d.gasto_seg_social) }} €</td>
+                        <td>{{ "%.2f"|format(d.total_gastos) }} €</td>
+                        <td class="{% if d.resultado >= 0 %}positivo{% else %}negativo{% endif %}">{{ "%.2f"|format(d.resultado) }} €</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="total-row">
+                        <td><strong>Total {{ año }}</strong></td>
+                        <td>{{ "%.2f"|format(total_presupuestos_fd) }} €</td>
+                        <td>{{ "%.2f"|format(total_ingresos) }} €</td>
+                        <td>{{ "%.2f"|format(datos_meses|sum(attribute='gasto_facturas')) }} €</td>
+                        <td>{{ "%.2f"|format(datos_meses|sum(attribute='gasto_nominas')) }} €</td>
+                        <td>{{ "%.2f"|format(datos_meses|sum(attribute='gasto_iva')) }} €</td>
+                        <td>{{ "%.2f"|format(datos_meses|sum(attribute='gasto_irpf')) }} €</td>
+                        <td>{{ "%.2f"|format(datos_meses|sum(attribute='gasto_seg_social')) }} €</td>
+                        <td>{{ "%.2f"|format(total_gastos_anual) }} €</td>
+                        <td class="{% if resultado_anual >= 0 %}positivo{% else %}negativo{% endif %}">{{ "%.2f"|format(resultado_anual) }} €</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const datos = {{ datos_meses | tojson }};
+    const labels = datos.map(d => d.mes_nombre);
+
+    const colorIngresos = 'rgba(17, 153, 142, 0.8)';
+    const colorGastos = 'rgba(238, 9, 121, 0.8)';
+    const colorResultado = 'rgba(102, 126, 234, 0.8)';
+    const colorFD = 'rgba(46, 204, 113, 0.9)';
+    const coloresGastos = [
+        'rgba(255, 99, 132, 0.8)',
+        'rgba(54, 162, 235, 0.8)',
+        'rgba(255, 206, 86, 0.8)',
+        'rgba(75, 192, 192, 0.8)',
+        'rgba(153, 102, 255, 0.8)'
+    ];
+
+    const chartEvolucionNuevo = new Chart(document.getElementById('chartEvolucionNuevo'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Ingresos considerados (cancelado)',
+                    data: datos.map(d => d.ingresos),
+                    backgroundColor: colorIngresos,
+                    borderRadius: 4
+                },
+                {
+                    label: 'Presupuestos enviados FD',
+                    data: datos.map(d => d.ingresos_presupuestos_fd),
+                    backgroundColor: colorFD,
+                    borderRadius: 4
+                },
+                {
+                    label: 'Gastos',
+                    data: datos.map(d => d.total_gastos),
+                    backgroundColor: colorGastos,
+                    borderRadius: 4
+                },
+                {
+                    label: 'Resultado',
+                    data: datos.map(d => d.resultado),
+                    backgroundColor: colorResultado,
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.8,
+            onClick: function(evt, elements) {
+                if (!elements || !elements.length) return;
+                const point = elements[0];
+                const mes = point.index + 1;
+                const datasetLabel = this.data.datasets[point.datasetIndex].label;
+                const categoriaPorDataset = {
+                    'Ingresos considerados (cancelado)': 'ingresos_totales',
+                    'Presupuestos enviados FD': 'ingresos_fd',
+                    'Gastos': 'gastos_totales',
+                    'Resultado': 'resultado'
+                };
+                const categoria = categoriaPorDataset[datasetLabel] || 'ingresos_totales';
+                window.location.href = `{{ url_for('informes.resultados_nuevo_detalle') }}?año={{ año }}&mes=${mes}&categoria=${encodeURIComponent(categoria)}`;
+            },
+            plugins: {
+                legend: { position: 'top' },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return ctx.dataset.label + ': ' + ctx.raw.toFixed(2) + ' €';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) { return value.toFixed(0) + ' €'; }
+                    }
+                }
+            }
+        }
+    });
+
+    const chartGastosNuevo = new Chart(document.getElementById('chartGastosNuevo'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'Facturas Proveedor', data: datos.map(d => d.gasto_facturas), backgroundColor: coloresGastos[0], stack: 'gastos', borderRadius: 2 },
+                { label: 'Nóminas', data: datos.map(d => d.gasto_nominas), backgroundColor: coloresGastos[1], stack: 'gastos', borderRadius: 2 },
+                { label: 'Recibo IVA', data: datos.map(d => d.gasto_iva), backgroundColor: coloresGastos[2], stack: 'gastos', borderRadius: 2 },
+                { label: 'Recibo IRPF', data: datos.map(d => d.gasto_irpf), backgroundColor: coloresGastos[3], stack: 'gastos', borderRadius: 2 },
+                { label: 'Seguridad Social', data: datos.map(d => d.gasto_seg_social), backgroundColor: coloresGastos[4], stack: 'gastos', borderRadius: 2 }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.8,
+            onClick: function(evt, elements) {
+                if (!elements || !elements.length) return;
+                const point = elements[0];
+                const mes = point.index + 1;
+                const datasetLabel = this.data.datasets[point.datasetIndex].label;
+                const categoriaPorDataset = {
+                    'Facturas Proveedor': 'gasto_facturas',
+                    'Nóminas': 'gasto_nominas',
+                    'Recibo IVA': 'gasto_iva',
+                    'Recibo IRPF': 'gasto_irpf',
+                    'Seguridad Social': 'gasto_seg_social'
+                };
+                const categoria = categoriaPorDataset[datasetLabel] || 'gastos_totales';
+                window.location.href = `{{ url_for('informes.resultados_nuevo_detalle') }}?año={{ año }}&mes=${mes}&categoria=${encodeURIComponent(categoria)}`;
+            },
+            plugins: {
+                legend: { position: 'top' },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return ctx.dataset.label + ': ' + ctx.raw.toFixed(2) + ' €';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { stacked: true },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) { return value.toFixed(0) + ' €'; }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+
+<style>
+.informes-container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+.filtros-box { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.filtros-form { display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; }
+.filtro-group label { font-weight: 500; color: #555; font-size: 0.9em; }
+.filtro-group input[type="number"] { padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em; }
+.filtro-group select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em; }
+.checkbox-group { display: flex; align-items: center; padding-bottom: 6px; }
+.resumen-anual-box { background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%); color: white; padding: 25px; border-radius: 8px; margin-bottom: 25px; }
+.resumen-anual-box h3 { margin: 0 0 20px 0; font-size: 1.3em; }
+.resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
+.resumen-item { display: flex; flex-direction: column; gap: 5px; }
+.resumen-item.ingresos .resumen-value { color: #38ef7d; }
+.resumen-item.ingresos-secundario .resumen-value { color: #f9d66b; }
+.resumen-item.gastos .resumen-value { color: #ff9a9e; }
+.resumen-item.positivo .resumen-value { color: #38ef7d; font-weight: bold; }
+.resumen-item.negativo .resumen-value { color: #ff6a00; font-weight: bold; }
+.resumen-label { font-size: 0.9em; opacity: 0.9; }
+.resumen-value { font-size: 1.4em; }
+.charts-section { background: white; padding: 25px; border-radius: 8px; margin-bottom: 25px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; flex-direction: column; align-items: center; }
+.charts-section h3 { margin: 0 0 15px 0; color: #2c3e50; width: 100%; text-align: center; }
+.chart-wrapper { position: relative; width: 100%; max-width: 1100px; height: 350px; margin: 0 auto 25px auto; }
+.tabla-resultados-box { background: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); overflow-x: auto; }
+.tabla-resultados-box h3 { margin: 0 0 15px 0; color: #2c3e50; }
+.tabla-resultados { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+.tabla-resultados th, .tabla-resultados td { padding: 10px 12px; text-align: right; border-bottom: 1px solid #eee; }
+.tabla-resultados th { background: #f8f9fa; font-weight: 600; color: #555; }
+.tabla-resultados td:first-child, .tabla-resultados th:first-child { text-align: left; }
+.tabla-resultados tbody tr:hover { background: #f8f9fa; }
+.tabla-resultados .positivo { color: #11998e; font-weight: 600; }
+.tabla-resultados .negativo { color: #ee0979; font-weight: 600; }
+.tabla-resultados .total-row { background: #f0f4f8; font-weight: 600; }
+.tabla-resultados .total-row td { border-top: 2px solid #3498db; padding-top: 15px; }
+</style>
+{% endblock %}

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Presupuestos Enviados FD - {{ periodo_label }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        @page { size: A4 portrait; margin: 6mm; }
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 9px;
+            padding: 4mm;
+            color: #333;
+        }
+        h1 {
+            font-size: 14px;
+            margin-bottom: 6px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 4px;
+        }
+        .resumen {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 8px;
+            font-size: 8px;
+        }
+        .resumen span { font-weight: bold; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 7px;
+        }
+        th, td {
+            border: 0.5px solid #333;
+            padding: 2px 3px;
+            text-align: left;
+        }
+        th {
+            background: #366092;
+            color: white;
+            font-weight: bold;
+        }
+        td.num { text-align: right; }
+        th.num { text-align: right; }
+        .total-row {
+            font-weight: bold;
+            background: #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <h1>Presupuestos Enviados FD - {{ periodo_label }}</h1>
+    <div class="resumen">
+        <span>Total Emisión: {{ "%.2f"|format(total_facturacion) }} €</span>
+        <span>IVA Repercutido: {{ "%.2f"|format(total_iva_repercutido) }} €</span>
+        <span>Nº Presupuestos: {{ facturas|length }}</span>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>DNI/CIF</th>
+                <th>Cliente</th>
+                <th>Nº Presupuesto</th>
+                <th>Fecha</th>
+                <th class="num">Base</th>
+                <th class="num">IVA</th>
+                <th class="num">Total</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for factura in facturas %}
+            <tr>
+                <td>{{ factura.nif or '-' }}</td>
+                <td>{{ factura.nombre or '-' }}</td>
+                <td>{{ factura.numero }}</td>
+                <td>{{ factura.fecha.strftime('%d/%m/%Y') if factura.fecha else '-' }}</td>
+                <td class="num">{{ "%.2f"|format(factura.base) }}</td>
+                <td class="num">{{ "%.2f"|format(factura.iva) }}</td>
+                <td class="num">{{ "%.2f"|format(factura.total) }}</td>
+                <td>Enviado FD</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        {% if facturas %}
+        <tfoot>
+            <tr class="total-row">
+                <td colspan="4">Total</td>
+                <td class="num">{{ "%.2f"|format(total_base) }}</td>
+                <td class="num">{{ "%.2f"|format(total_iva) }}</td>
+                <td class="num">{{ "%.2f"|format(total_facturacion) }}</td>
+                <td></td>
+            </tr>
+        </tfoot>
+        {% endif %}
+    </table>
+</body>
+</html>

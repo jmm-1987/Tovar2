@@ -1,0 +1,419 @@
+{% extends "base.html" %}
+
+{% block title %}Resultados - Informes{% endblock %}
+
+{% block content %}
+<div class="informes-container">
+    <h2>📈 Informe de Resultados</h2>
+    
+    <!-- Filtros -->
+    <div class="filtros-box">
+        <form method="GET" class="filtros-form">
+            <div class="filtro-group">
+                <label for="año">Año:</label>
+                <input type="number" name="año" id="año" value="{{ año }}" min="2000" max="2100" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Buscar</button>
+        </form>
+    </div>
+    
+    <!-- Resumen anual -->
+    <div class="resumen-anual-box">
+        <h3>Resumen anual {{ año }}</h3>
+        <div class="resumen-grid">
+            <div class="resumen-item ingresos">
+                <span class="resumen-label">Ingresos</span>
+                <span class="resumen-value">{{ "%.2f"|format(total_ingresos) }} €</span>
+            </div>
+            <div class="resumen-item gastos">
+                <span class="resumen-label">Total Gastos</span>
+                <span class="resumen-value">{{ "%.2f"|format(total_gastos_anual) }} €</span>
+            </div>
+            <div class="resumen-item {% if resultado_anual >= 0 %}positivo{% else %}negativo{% endif %}">
+                <span class="resumen-label">Resultado</span>
+                <span class="resumen-value">{{ "%.2f"|format(resultado_anual) }} €</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Gráficas -->
+    <div class="charts-section">
+        <h3>Evolución mensual</h3>
+        <div class="chart-wrapper">
+            <canvas id="chartEvolucion"></canvas>
+        </div>
+        <h3 style="margin-top: 30px;">Composición de gastos por mes</h3>
+        <div class="chart-wrapper">
+            <canvas id="chartGastos"></canvas>
+        </div>
+    </div>
+    
+    <!-- Tabla detallada -->
+    <div class="tabla-resultados-box">
+        <h3>Detalle por mes</h3>
+        <div class="table-responsive">
+            <table class="tabla-resultados">
+                <thead>
+                    <tr>
+                        <th>Mes</th>
+                        <th>Ingresos</th>
+                        <th>Facturas Prov.</th>
+                        <th>Nóminas</th>
+                        <th>Recibo IVA</th>
+                        <th>Recibo IRPF</th>
+                        <th>Seg. Social</th>
+                        <th>Total Gastos</th>
+                        <th>Resultado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for d in datos_meses %}
+                    <tr>
+                        <td><strong>{{ d.mes_nombre }}</strong></td>
+                        <td>{{ "%.2f"|format(d.ingresos) }} €</td>
+                        <td>{{ "%.2f"|format(d.gasto_facturas) }} €</td>
+                        <td>{{ "%.2f"|format(d.gasto_nominas) }} €</td>
+                        <td>{{ "%.2f"|format(d.gasto_iva) }} €</td>
+                        <td>{{ "%.2f"|format(d.gasto_irpf) }} €</td>
+                        <td>{{ "%.2f"|format(d.gasto_seg_social) }} €</td>
+                        <td>{{ "%.2f"|format(d.total_gastos) }} €</td>
+                        <td class="{% if d.resultado >= 0 %}positivo{% else %}negativo{% endif %}">
+                            {{ "%.2f"|format(d.resultado) }} €
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="total-row">
+                        <td><strong>Total {{ año }}</strong></td>
+                        <td>{{ "%.2f"|format(total_ingresos) }} €</td>
+                        <td>{{ "%.2f"|format(datos_meses|sum(attribute='gasto_facturas')) }} €</td>
+                        <td>{{ "%.2f"|format(datos_meses|sum(attribute='gasto_nominas')) }} €</td>
+                        <td>{{ "%.2f"|format(datos_meses|sum(attribute='gasto_iva')) }} €</td>
+                        <td>{{ "%.2f"|format(datos_meses|sum(attribute='gasto_irpf')) }} €</td>
+                        <td>{{ "%.2f"|format(datos_meses|sum(attribute='gasto_seg_social')) }} €</td>
+                        <td>{{ "%.2f"|format(total_gastos_anual) }} €</td>
+                        <td class="{% if resultado_anual >= 0 %}positivo{% else %}negativo{% endif %}">
+                            {{ "%.2f"|format(resultado_anual) }} €
+                        </td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const datos = {{ datos_meses | tojson }};
+    const labels = datos.map(d => d.mes_nombre);
+    
+    // Colores
+    const colorIngresos = 'rgba(17, 153, 142, 0.8)';
+    const colorGastos = 'rgba(238, 9, 121, 0.8)';
+    const colorResultado = 'rgba(102, 126, 234, 0.8)';
+    const coloresGastos = [
+        'rgba(255, 99, 132, 0.8)',   // Facturas
+        'rgba(54, 162, 235, 0.8)',   // Nóminas
+        'rgba(255, 206, 86, 0.8)',   // IVA
+        'rgba(75, 192, 192, 0.8)',   // IRPF
+        'rgba(153, 102, 255, 0.8)'   // Seg. Social
+    ];
+    
+    // Gráfica de evolución (Ingresos, Gastos, Resultado)
+    new Chart(document.getElementById('chartEvolucion'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Ingresos',
+                    data: datos.map(d => d.ingresos),
+                    backgroundColor: colorIngresos,
+                    borderRadius: 4
+                },
+                {
+                    label: 'Gastos',
+                    data: datos.map(d => d.total_gastos),
+                    backgroundColor: colorGastos,
+                    borderRadius: 4
+                },
+                {
+                    label: 'Resultado',
+                    data: datos.map(d => d.resultado),
+                    backgroundColor: colorResultado,
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.8,
+            plugins: {
+                legend: {
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return ctx.dataset.label + ': ' + ctx.raw.toFixed(2) + ' €';
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toFixed(0) + ' €';
+                        }
+                    }
+                }
+            }
+        }
+    });
+    
+    // Gráfica de composición de gastos (stacked bar)
+    new Chart(document.getElementById('chartGastos'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Facturas Proveedor',
+                    data: datos.map(d => d.gasto_facturas),
+                    backgroundColor: coloresGastos[0],
+                    stack: 'gastos',
+                    borderRadius: 2
+                },
+                {
+                    label: 'Nóminas',
+                    data: datos.map(d => d.gasto_nominas),
+                    backgroundColor: coloresGastos[1],
+                    stack: 'gastos',
+                    borderRadius: 2
+                },
+                {
+                    label: 'Recibo IVA',
+                    data: datos.map(d => d.gasto_iva),
+                    backgroundColor: coloresGastos[2],
+                    stack: 'gastos',
+                    borderRadius: 2
+                },
+                {
+                    label: 'Recibo IRPF',
+                    data: datos.map(d => d.gasto_irpf),
+                    backgroundColor: coloresGastos[3],
+                    stack: 'gastos',
+                    borderRadius: 2
+                },
+                {
+                    label: 'Seguridad Social',
+                    data: datos.map(d => d.gasto_seg_social),
+                    backgroundColor: coloresGastos[4],
+                    stack: 'gastos',
+                    borderRadius: 2
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            aspectRatio: 2.8,
+            plugins: {
+                legend: {
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                            const pct = total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : 0;
+                            return ctx.dataset.label + ': ' + ctx.raw.toFixed(2) + ' €';
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return value.toFixed(0) + ' €';
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+
+<style>
+.informes-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.filtros-box {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.filtros-form {
+    display: flex;
+    gap: 15px;
+    align-items: flex-end;
+}
+
+.filtro-group label {
+    font-weight: 500;
+    color: #555;
+    font-size: 0.9em;
+}
+
+.filtro-group input {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.resumen-anual-box {
+    background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+    color: white;
+    padding: 25px;
+    border-radius: 8px;
+    margin-bottom: 25px;
+}
+
+.resumen-anual-box h3 {
+    margin: 0 0 20px 0;
+    font-size: 1.3em;
+}
+
+.resumen-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 20px;
+}
+
+.resumen-item {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.resumen-item.ingresos .resumen-value { color: #38ef7d; }
+.resumen-item.gastos .resumen-value { color: #ff9a9e; }
+.resumen-item.positivo .resumen-value { color: #38ef7d; font-weight: bold; }
+.resumen-item.negativo .resumen-value { color: #ff6a00; font-weight: bold; }
+
+.resumen-label {
+    font-size: 0.9em;
+    opacity: 0.9;
+}
+
+.resumen-value {
+    font-size: 1.6em;
+}
+
+.charts-section {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    margin-bottom: 25px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.charts-section h3 {
+    margin: 0 0 15px 0;
+    color: #2c3e50;
+    width: 100%;
+    text-align: center;
+}
+
+.chart-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 1100px;
+    height: 350px;
+    margin: 0 auto 25px auto;
+}
+
+.tabla-resultados-box {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow-x: auto;
+}
+
+.tabla-resultados-box h3 {
+    margin: 0 0 15px 0;
+    color: #2c3e50;
+}
+
+.tabla-resultados {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9em;
+}
+
+.tabla-resultados th,
+.tabla-resultados td {
+    padding: 10px 12px;
+    text-align: right;
+    border-bottom: 1px solid #eee;
+}
+
+.tabla-resultados th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #555;
+}
+
+.tabla-resultados td:first-child,
+.tabla-resultados th:first-child {
+    text-align: left;
+}
+
+.tabla-resultados tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.tabla-resultados .positivo {
+    color: #11998e;
+    font-weight: 600;
+}
+
+.tabla-resultados .negativo {
+    color: #ee0979;
+    font-weight: 600;
+}
+
+.tabla-resultados .total-row {
+    background: #f0f4f8;
+    font-weight: 600;
+}
+
+.tabla-resultados .total-row td {
+    border-top: 2px solid #3498db;
+    padding-top: 15px;
+}
+</style>
+{% endblock %}

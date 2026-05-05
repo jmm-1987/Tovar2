@@ -1,0 +1,673 @@
+{% extends "base.html" %}
+
+{% block title %}Factura Solicitud {{ solicitud.numero_solicitud or solicitud.id }} - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<div class="factura-card" style="background: white; border-radius: 8px; padding: 30px; margin-bottom: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); animation: slideUp 0.5s ease-out;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; border-bottom: 2px solid #e0e0e0; padding-bottom: 20px;">
+        <div>
+            <h2 style="margin: 0 0 10px 0; color: #2c3e50;">Factura Solicitud {{ solicitud.numero_solicitud or solicitud.id }}</h2>
+            <p style="margin: 5px 0; color: #666;"><strong>Estado:</strong> 
+                <span class="badge badge-estado-{{ solicitud.estado.lower()|replace(' ', '-') }}">{{ solicitud.estado }}</span>
+            </p>
+            <p style="margin: 5px 0; color: #666;"><strong>Tipo:</strong> {{ solicitud.tipo_pedido if solicitud.tipo_pedido else 'N/A' }}</p>
+        </div>
+        <div>
+            <a href="{{ url_for('facturacion.facturacion') }}" class="btn btn-primary" style="padding: 10px 20px; text-decoration: none; display: inline-block;">
+                ← Volver al Listado
+            </a>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 30px;">
+        <!-- Datos del Cliente -->
+        <div class="datos-cliente" style="background: #f8f9fa; padding: 20px; border-radius: 6px; border: 1px solid #e9ecef;">
+            <h3 style="margin: 0 0 15px 0; color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; font-size: 1.2rem;">Datos del Cliente</h3>
+            <p style="margin: 8px 0;"><strong>Nombre:</strong> {{ solicitud.cliente.nombre if solicitud.cliente else 'N/A' }}</p>
+            {% if solicitud.cliente.direccion %}
+            <p style="margin: 8px 0;"><strong>Dirección:</strong> {{ solicitud.cliente.direccion }}</p>
+            {% endif %}
+            {% if solicitud.cliente.telefono %}
+            <p style="margin: 8px 0;"><strong>Teléfono:</strong> {{ solicitud.cliente.telefono }}</p>
+            {% endif %}
+            {% if solicitud.cliente.email %}
+            <p style="margin: 8px 0;"><strong>Email:</strong> {{ solicitud.cliente.email }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Información adicional de la solicitud -->
+        <div class="info-pedido" style="background: #f8f9fa; padding: 20px; border-radius: 6px; border: 1px solid #e9ecef;">
+            <h3 style="margin: 0 0 15px 0; color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; font-size: 1.2rem;">Información de la Solicitud</h3>
+            {% if solicitud.fecha_aceptado %}
+            <p style="margin: 8px 0;"><strong>Fecha Aceptación:</strong> {{ solicitud.fecha_aceptado.strftime('%d/%m/%Y') }}</p>
+            {% endif %}
+            {% if solicitud.forma_pago %}
+            <p style="margin: 8px 0;"><strong>Forma de Pago:</strong> {{ solicitud.forma_pago }}</p>
+            {% endif %}
+            {% if solicitud.comercial %}
+            <p style="margin: 8px 0;"><strong>Comercial:</strong> {{ solicitud.comercial.nombre }}</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Líneas de la factura -->
+    <div class="lineas-factura" style="margin-top: 30px;">
+        <h3 style="margin: 0 0 20px 0; color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 12px; font-size: 1.3rem;">Líneas de Factura</h3>
+        
+        {% if solicitud.lineas %}
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; background: white;">
+                <thead>
+                    <tr style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); border-bottom: 2px solid #1a252f;">
+                        <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Nombre</th>
+                        <th style="padding: 15px; text-align: center; color: #ffffff; font-weight: 600;">Cantidad</th>
+                        <th style="padding: 15px; text-align: center; color: #ffffff; font-weight: 600;">Talla</th>
+                        <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Precio Unit. (€)</th>
+                        <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Descuento (%)</th>
+                        <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Precio Final (€)</th>
+                        <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Total (€)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linea in solicitud.lineas %}
+                    <tr class="linea-factura" style="border-bottom: 1px solid #e9ecef; transition: background 0.2s;">
+                        <td style="padding: 15px; color: #495057;" class="descripcion-linea">{{ linea.nombre_mostrar or linea.nombre or 'N/A' }}</td>
+                        <td style="padding: 15px; text-align: center; color: #495057; font-weight: 500;">{{ linea.cantidad }}</td>
+                        <td style="padding: 15px; text-align: center; color: #495057;">{{ linea.talla or '-' }}</td>
+                        <td style="padding: 15px; text-align: right;">
+                            {% if factura_existente %}
+                            <span style="color: #495057; font-weight: 500;">{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '0.00' }} €</span>
+                            {% else %}
+                            <input type="number" 
+                                   step="0.01" 
+                                   min="0" 
+                                   class="importe-unitario" 
+                                   data-linea-id="{{ linea.id }}"
+                                   data-cantidad="{{ linea.cantidad }}"
+                                   data-descuento="{{ linea.descuento if linea.descuento else 0 }}"
+                                   data-solicitud-id="{{ solicitud.id }}"
+                                   value="{{ "%.2f"|format(linea.precio_unitario) if linea.precio_unitario else '' }}"
+                                   style="width: 120px; padding: 10px; border: 2px solid #ddd; border-radius: 6px; text-align: right; font-size: 1rem; transition: all 0.3s ease;"
+                                   placeholder="0.00">
+                            {% endif %}
+                        </td>
+                        <td style="padding: 15px; text-align: right;">
+                            {% if factura_existente %}
+                            <span style="color: #495057; font-weight: 500;">{{ "%.0f"|format(linea.descuento) if linea.descuento and linea.descuento > 0 else '0' }}%</span>
+                            {% else %}
+                            <input type="number" 
+                                   step="0.01" 
+                                   min="0" 
+                                   max="100"
+                                   class="descuento-linea" 
+                                   data-linea-id="{{ linea.id }}"
+                                   data-solicitud-id="{{ solicitud.id }}"
+                                   value="{{ "%.0f"|format(linea.descuento) if linea.descuento and linea.descuento > 0 else '0' }}"
+                                   style="width: 80px; padding: 8px; border: 2px solid #856404; border-radius: 4px; text-align: right; font-size: 1rem; font-weight: bold; color: #856404; transition: all 0.3s ease;"
+                                   placeholder="0">
+                            {% endif %}
+                        </td>
+                        <td style="padding: 15px; text-align: right; color: #495057; font-weight: 500;">
+                            <span class="precio-final-linea" data-linea-id="{{ linea.id }}" style="color: #d32f2f; font-weight: bold;">0.00 €</span>
+                        </td>
+                        <td style="padding: 15px; text-align: right;">
+                            <span class="total-linea" data-linea-id="{{ linea.id }}" style="font-weight: bold; color: #2c3e50; font-size: 1.1rem;">0.00</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr style="border-top: 2px solid #2c3e50; background: #f8f9fa;">
+                        <td colspan="5" style="padding: 15px; text-align: right; font-weight: bold; color: #2c3e50;">Base Imponible (€):</td>
+                        <td colspan="2" style="padding: 15px; text-align: right;">
+                            <span class="base-imponible" data-solicitud-id="{{ solicitud.id }}" style="font-weight: bold; color: #2c3e50;">0.00</span>
+                        </td>
+                    </tr>
+                    <tr style="background: #f8f9fa;">
+                        <td colspan="4" style="padding: 15px; text-align: right; font-weight: bold; color: #2c3e50;">Tipo de IVA:</td>
+                        <td style="padding: 15px; text-align: center;">
+                            <select id="tipo-iva" data-initial="{{ tipo_iva_default|int }}" style="width: 90px; padding: 6px 8px; border: 2px solid #2c3e50; border-radius: 4px; font-size: 1rem; font-weight: 600; color: #2c3e50;">
+                                <option value="21" {% if (tipo_iva_default|int) == 21 %}selected{% endif %}>21%</option>
+                                <option value="10" {% if (tipo_iva_default|int) == 10 %}selected{% endif %}>10%</option>
+                                <option value="4" {% if (tipo_iva_default|int) == 4 %}selected{% endif %}>4%</option>
+                                <option value="0" {% if (tipo_iva_default|int) == 0 %}selected{% endif %}>0%</option>
+                            </select>
+                        </td>
+                        <td colspan="2" style="padding: 15px; text-align: right;">
+                            <span id="iva-label-text" style="font-weight: bold; color: #2c3e50;">IVA ({{ tipo_iva_default|int }}%)</span>
+                            <span class="iva-total" data-solicitud-id="{{ solicitud.id }}" style="font-weight: bold; color: #2c3e50; margin-left: 8px;">0.00 €</span>
+                        </td>
+                    </tr>
+                    <tr style="background: #f8f9fa;">
+                        <td colspan="5" style="padding: 15px; text-align: right; font-weight: bold; color: #2c3e50;">Subtotal (€):</td>
+                        <td colspan="2" style="padding: 15px; text-align: right;">
+                            <span class="subtotal" data-solicitud-id="{{ solicitud.id }}" style="font-weight: bold; color: #2c3e50;">0.00</span>
+                        </td>
+                    </tr>
+                    <tr style="background: #fff3cd;">
+                        <td colspan="4" style="padding: 15px; text-align: right; font-weight: bold; color: #856404;">Descuento Pronto Pago:</td>
+                        <td style="padding: 15px; text-align: center;">
+                            <input type="number" 
+                                   id="descuento-pronto-pago" 
+                                   step="0.01" 
+                                   min="0" 
+                                   max="100"
+                                   value="0"
+                                   data-solicitud-id="{{ solicitud.id }}"
+                                   style="width: 80px; padding: 8px; border: 2px solid #856404; border-radius: 4px; text-align: right; font-size: 1rem; font-weight: bold; color: #856404;"
+                                   placeholder="0">
+                            <span style="margin-left: 5px; color: #856404; font-weight: bold;">%</span>
+                        </td>
+                        <td colspan="2" style="padding: 15px; text-align: right;">
+                            <span class="descuento-pronto-pago" data-solicitud-id="{{ solicitud.id }}" style="font-weight: bold; color: #856404;">0.00 €</span>
+                        </td>
+                    </tr>
+                    {% if anticipo_facturado and anticipo_facturado > 0 %}
+                    <tr style="background: #e7f3ff; border-top: 2px solid #b3d9ff;">
+                        <td colspan="5" style="padding: 15px; text-align: right; font-weight: bold; color: #0066cc;">
+                            Anticipo ya facturado:
+                            {% if factura_anticipo %}
+                            <span style="font-size: 0.9rem; color: #666; margin-left: 10px;">(Factura {{ factura_anticipo.serie }}-{{ factura_anticipo.numero }})</span>
+                            {% endif %}
+                        </td>
+                        <td colspan="2" style="padding: 15px; text-align: right;">
+                            <span class="anticipo-facturado" data-solicitud-id="{{ solicitud.id }}" style="font-weight: bold; color: #0066cc;">{{ "%.2f"|format(anticipo_facturado|float) }} €</span>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    <tr style="border-top: 3px solid #2c3e50; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+                        <td colspan="5" style="padding: 20px 15px; text-align: right; font-weight: bold; color: #2c3e50; font-size: 1.1rem;">Total Factura (€):</td>
+                        <td colspan="2" style="padding: 20px 15px; text-align: right;">
+                            <span class="total-factura" data-solicitud-id="{{ solicitud.id }}" style="font-weight: bold; font-size: 1.5em; color: #27ae60;">0.00</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div style="padding: 30px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef; text-align: center;">
+            <p style="color: #999; font-style: italic; margin: 0; font-size: 1.1rem;">Esta solicitud no tiene líneas.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Botón para formalizar factura -->
+    {% if solicitud.lineas %}
+    {% if not factura_existente %}
+    <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;">
+        <h3 style="margin: 0 0 15px 0; color: #2c3e50; font-size: 1.2rem;">Datos de la Factura</h3>
+        <div style="margin-bottom: 20px; padding: 15px; background: #e7f3ff; border-radius: 6px; border: 1px solid #b3d9ff;">
+            <p style="margin: 0; color: #2c3e50; font-weight: 600;">ℹ️ El número de factura se generará automáticamente con el formato: <strong>F + año + contador</strong> (ejemplo: F251, F252...)</p>
+        </div>
+        <div style="margin-bottom: 20px;">
+            <label for="fecha-expedicion" style="display: block; margin-bottom: 5px; font-weight: 600; color: #2c3e50;">Fecha Expedición *</label>
+            <input type="date" id="fecha-expedicion" required style="width: 100%; max-width: 300px; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+        <div style="margin-bottom: 20px;">
+            <label for="descripcion-factura" style="display: block; margin-bottom: 5px; font-weight: 600; color: #2c3e50;">Descripción</label>
+            <input type="text" id="descripcion-factura" placeholder="Descripcion de la operacion" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+        <div style="text-align: right; padding-top: 15px; border-top: 2px solid #e0e0e0;">
+            <button type="button" 
+                    class="btn btn-success formalizar-factura" 
+                    data-solicitud-id="{{ solicitud.id }}"
+                    style="padding: 15px 40px; font-size: 1.1rem; font-weight: 600;">
+                Formalizar Factura
+            </button>
+        </div>
+    </div>
+    {% else %}
+    <div style="margin-top: 30px; padding: 20px; background: #d4edda; border-radius: 6px; border: 1px solid #c3e6cb;">
+        <p style="margin: 0; color: #155724; font-weight: 600;">✓ Esta solicitud ya tiene una factura formalizada ({{ factura_existente.serie }}-{{ factura_existente.numero }})</p>
+    </div>
+    {% endif %}
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Establecer fecha de hoy por defecto
+    const today = new Date().toISOString().split('T')[0];
+    const fechaExpedicionInput = document.getElementById('fecha-expedicion');
+    if (fechaExpedicionInput && !fechaExpedicionInput.value) {
+        fechaExpedicionInput.value = today;
+    }
+    
+    // Forzar valor del Tipo de IVA desde el servidor (ficha del cliente)
+    const selectTipoIva = document.getElementById('tipo-iva');
+    if (selectTipoIva && selectTipoIva.dataset.initial !== undefined) {
+        const initial = String(selectTipoIva.dataset.initial);
+        if (selectTipoIva.querySelector('option[value="' + initial + '"]')) {
+            selectTipoIva.value = initial;
+        }
+    }
+    
+    // Función para calcular el total de una línea
+    function calcularTotalLinea(input) {
+        const lineaId = input.dataset.lineaId;
+        const solicitudId = input.dataset.solicitudId;
+        const cantidad = parseFloat(input.dataset.cantidad) || 0;
+        const importe = parseFloat(input.value) || 0;
+        
+        // Obtener descuento del input de descuento
+        const descuentoInput = document.querySelector(`.descuento-linea[data-linea-id="${lineaId}"]`);
+        const descuento = parseFloat(descuentoInput ? descuentoInput.value : 0) || 0;
+        
+        // Calcular precio final con descuento
+        let precioFinal = importe;
+        if (descuento > 0) {
+            precioFinal = importe * (1 - descuento / 100);
+        }
+        
+        const total = cantidad * precioFinal;
+        
+        // Actualizar precio final
+        const precioFinalSpan = document.querySelector(`.precio-final-linea[data-linea-id="${lineaId}"]`);
+        if (precioFinalSpan) {
+            precioFinalSpan.textContent = precioFinal.toFixed(2) + ' €';
+        }
+        
+        // Actualizar total de línea
+        const totalLineaSpan = document.querySelector(`.total-linea[data-linea-id="${lineaId}"]`);
+        if (totalLineaSpan) {
+            totalLineaSpan.textContent = total.toFixed(2);
+        }
+        
+        // Recalcular total de la factura (con IVA y descuento por pronto pago)
+        calcularTotalFactura(solicitudId);
+    }
+    
+    // Calcular totales iniciales si hay precios predefinidos
+    const solicitudId = document.querySelector('.importe-unitario')?.dataset.solicitudId;
+    if (solicitudId) {
+        // Calcular total de cada línea individualmente
+        document.querySelectorAll(`.importe-unitario[data-solicitud-id="${solicitudId}"]`).forEach(input => {
+            calcularTotalLinea(input);
+        });
+    }
+    
+    // Función para calcular el total de una factura con IVA y descuento por pronto pago
+    function calcularTotalFactura(solicitudId) {
+        const inputs = document.querySelectorAll(`.importe-unitario[data-solicitud-id="${solicitudId}"]`);
+        let baseImponible = 0;
+        const tipoIvaInput = document.getElementById('tipo-iva');
+        let tipoIva = 21;
+        if (tipoIvaInput) {
+            const v = parseFloat(tipoIvaInput.value);
+            if (!isNaN(v)) tipoIva = v;
+        }
+        
+        // Actualizar etiqueta IVA
+        const ivaLabel = document.getElementById('iva-label-text');
+        if (ivaLabel) ivaLabel.textContent = 'IVA (' + tipoIva + '%)';
+        
+        inputs.forEach(input => {
+            const lineaId = input.dataset.lineaId;
+            const cantidad = parseFloat(input.dataset.cantidad) || 0;
+            const importe = parseFloat(input.value) || 0;
+            
+            // Obtener descuento del input de descuento
+            const descuentoInput = document.querySelector(`.descuento-linea[data-linea-id="${lineaId}"]`);
+            const descuento = parseFloat(descuentoInput ? descuentoInput.value : 0) || 0;
+            
+            // Calcular precio final con descuento
+            let precioFinal = importe;
+            if (descuento > 0) {
+                precioFinal = importe * (1 - descuento / 100);
+            }
+            
+            baseImponible += cantidad * precioFinal;
+        });
+        
+        // Calcular IVA
+        const ivaTotal = baseImponible * (tipoIva / 100);
+        const subtotal = baseImponible + ivaTotal;
+        
+        // Obtener descuento por pronto pago
+        const descuentoProntoPagoInput = document.getElementById('descuento-pronto-pago');
+        const descuentoProntoPago = parseFloat(descuentoProntoPagoInput ? descuentoProntoPagoInput.value : 0) || 0;
+        
+        // Calcular descuento por pronto pago sobre el subtotal
+        const descuentoProntoPagoAplicado = subtotal * (descuentoProntoPago / 100);
+        let totalFactura = subtotal - descuentoProntoPagoAplicado;
+        
+        // Restar anticipo ya facturado si existe
+        const anticipoFacturadoSpan = document.querySelector(`.anticipo-facturado[data-solicitud-id="${solicitudId}"]`);
+        if (anticipoFacturadoSpan) {
+            const anticipoFacturado = parseFloat(anticipoFacturadoSpan.textContent.replace(' €', '').replace(',', '.')) || 0;
+            totalFactura = totalFactura - anticipoFacturado;
+            if (totalFactura < 0) {
+                totalFactura = 0;
+            }
+        }
+        
+        // Actualizar base imponible
+        const baseImponibleSpan = document.querySelector(`.base-imponible[data-solicitud-id="${solicitudId}"]`);
+        if (baseImponibleSpan) {
+            baseImponibleSpan.textContent = baseImponible.toFixed(2);
+        }
+        
+        // Actualizar IVA
+        const ivaTotalSpan = document.querySelector(`.iva-total[data-solicitud-id="${solicitudId}"]`);
+        if (ivaTotalSpan) {
+            ivaTotalSpan.textContent = ivaTotal.toFixed(2);
+        }
+        
+        // Actualizar subtotal
+        const subtotalSpan = document.querySelector(`.subtotal[data-solicitud-id="${solicitudId}"]`);
+        if (subtotalSpan) {
+            subtotalSpan.textContent = subtotal.toFixed(2);
+        }
+        
+        // Actualizar descuento por pronto pago
+        const descuentoProntoPagoSpan = document.querySelector(`.descuento-pronto-pago[data-solicitud-id="${solicitudId}"]`);
+        if (descuentoProntoPagoSpan) {
+            descuentoProntoPagoSpan.textContent = descuentoProntoPagoAplicado.toFixed(2);
+        }
+        
+        const descuentoProntoPagoPorcentajeSpan = document.querySelector(`.descuento-pronto-pago-porcentaje[data-solicitud-id="${solicitudId}"]`);
+        if (descuentoProntoPagoPorcentajeSpan) {
+            descuentoProntoPagoPorcentajeSpan.textContent = descuentoProntoPago.toFixed(2);
+        }
+        
+        // Actualizar total
+        const totalFacturaSpan = document.querySelector(`.total-factura[data-solicitud-id="${solicitudId}"]`);
+        if (totalFacturaSpan) {
+            totalFacturaSpan.textContent = totalFactura.toFixed(2);
+        }
+    }
+    
+    // Event listeners para inputs de importe unitario
+    document.querySelectorAll('.importe-unitario').forEach(input => {
+        input.addEventListener('input', function() {
+            calcularTotalLinea(this);
+        });
+        
+        input.addEventListener('focus', function() {
+            this.style.borderColor = '#3498db';
+            this.style.boxShadow = '0 0 0 3px rgba(52, 152, 219, 0.1)';
+        });
+        
+        input.addEventListener('blur', function() {
+            if (this.value && parseFloat(this.value) >= 0) {
+                this.value = parseFloat(this.value).toFixed(2);
+            }
+            this.style.borderColor = '#ddd';
+            this.style.boxShadow = 'none';
+        });
+    });
+    
+    // Event listeners para inputs de descuento de línea
+    document.querySelectorAll('.descuento-linea').forEach(input => {
+        input.addEventListener('input', function() {
+            const lineaId = this.dataset.lineaId;
+            const solicitudId = this.dataset.solicitudId;
+            const precioInput = document.querySelector(`.importe-unitario[data-linea-id="${lineaId}"]`);
+            if (precioInput) {
+                calcularTotalLinea(precioInput);
+            }
+        });
+        
+        input.addEventListener('focus', function() {
+            this.style.borderColor = '#3498db';
+            this.style.boxShadow = '0 0 0 3px rgba(52, 152, 219, 0.1)';
+        });
+        
+        input.addEventListener('blur', function() {
+            if (this.value && parseFloat(this.value) >= 0) {
+                this.value = parseFloat(this.value).toFixed(2);
+            }
+            this.style.borderColor = '#ddd';
+            this.style.boxShadow = 'none';
+        });
+    });
+    
+    // Event listener para descuento por pronto pago
+    const descuentoProntoPagoInput = document.getElementById('descuento-pronto-pago');
+    if (descuentoProntoPagoInput) {
+        descuentoProntoPagoInput.addEventListener('input', function() {
+            const solicitudId = this.dataset.solicitudId;
+            calcularTotalFactura(solicitudId);
+        });
+    }
+    
+    const tipoIvaSelect = document.getElementById('tipo-iva');
+    if (tipoIvaSelect) {
+        tipoIvaSelect.addEventListener('change', function() {
+            const solicitudId = document.querySelector('.importe-unitario')?.dataset.solicitudId;
+            if (solicitudId) calcularTotalFactura(solicitudId);
+        });
+    }
+    
+    // Event listeners para botones de formalizar factura
+    document.querySelectorAll('.formalizar-factura').forEach(button => {
+        button.addEventListener('click', function() {
+            const solicitudId = this.dataset.solicitudId;
+            const totalFacturaSpan = document.querySelector(`.total-factura[data-solicitud-id="${solicitudId}"]`);
+            const totalFactura = parseFloat(totalFacturaSpan.textContent) || 0;
+            
+            // Verificar que haya al menos un importe introducido
+            const inputs = document.querySelectorAll(`.importe-unitario[data-solicitud-id="${solicitudId}"]`);
+            let hayImportes = false;
+            inputs.forEach(input => {
+                if (input.value && parseFloat(input.value) > 0) {
+                    hayImportes = true;
+                }
+            });
+            
+            if (!hayImportes) {
+                alert('Por favor, introduzca al menos un importe unitario antes de formalizar la factura.');
+                return;
+            }
+            
+            if (totalFactura === 0) {
+                alert('El total de la factura es 0.00€. Por favor, verifique los importes.');
+                return;
+            }
+            
+            // Obtener datos de la factura
+            const fechaExpedicion = document.getElementById('fecha-expedicion').value;
+            const descripcion = document.getElementById('descripcion-factura').value;
+            
+            if (!fechaExpedicion) {
+                alert('Por favor, complete la fecha de expedición.');
+                return;
+            }
+            
+            // Obtener base imponible, IVA, subtotal y descuento por pronto pago
+            const baseImponibleSpan = document.querySelector(`.base-imponible[data-solicitud-id="${solicitudId}"]`);
+            const ivaTotalSpan = document.querySelector(`.iva-total[data-solicitud-id="${solicitudId}"]`);
+            const subtotalSpan = document.querySelector(`.subtotal[data-solicitud-id="${solicitudId}"]`);
+            const descuentoProntoPagoSpan = document.querySelector(`.descuento-pronto-pago[data-solicitud-id="${solicitudId}"]`);
+            const baseImponible = parseFloat(baseImponibleSpan.textContent) || 0;
+            const ivaTotal = parseFloat(ivaTotalSpan.textContent) || 0;
+            const subtotal = parseFloat(subtotalSpan.textContent) || 0;
+            const descuentoProntoPago = parseFloat(descuentoProntoPagoSpan.textContent) || 0;
+            
+            // Obtener descuento por pronto pago porcentaje
+            const descuentoProntoPagoInput = document.getElementById('descuento-pronto-pago');
+            const descuentoProntoPagoPorcentaje = parseFloat(descuentoProntoPagoInput ? descuentoProntoPagoInput.value : 0) || 0;
+            
+            // Obtener anticipo facturado si existe
+            const anticipoFacturadoSpan = document.querySelector(`.anticipo-facturado[data-solicitud-id="${solicitudId}"]`);
+            let anticipoFacturado = 0;
+            if (anticipoFacturadoSpan) {
+                anticipoFacturado = parseFloat(anticipoFacturadoSpan.textContent.replace(' €', '').replace(',', '.')) || 0;
+            }
+            
+            // Calcular total final restando anticipo
+            let totalFinal = totalFactura;
+            if (anticipoFacturado > 0) {
+                totalFinal = totalFactura - anticipoFacturado;
+                if (totalFinal < 0) {
+                    totalFinal = 0;
+                }
+            }
+            
+            const tipoIvaEl = document.getElementById('tipo-iva');
+            let tipoIvaPorcentaje = 21;
+            if (tipoIvaEl) {
+                const v = parseFloat(tipoIvaEl.value);
+                if (!isNaN(v)) tipoIvaPorcentaje = v;
+            }
+            // Confirmar formalización
+            let mensajeConfirmacion = `¿Está seguro de que desea formalizar la factura de la solicitud #${solicitudId}?\n\nBase Imponible: ${baseImponible.toFixed(2)}€\nIVA (${tipoIvaPorcentaje}%): ${ivaTotal.toFixed(2)}€\nSubtotal: ${subtotal.toFixed(2)}€`;
+            if (descuentoProntoPagoPorcentaje > 0) {
+                mensajeConfirmacion += `\nDescuento Pronto Pago (${descuentoProntoPagoPorcentaje.toFixed(2)}%): -${descuentoProntoPago.toFixed(2)}€`;
+            }
+            if (anticipoFacturado > 0) {
+                mensajeConfirmacion += `\nAnticipo ya facturado: -${anticipoFacturado.toFixed(2)}€`;
+            }
+            mensajeConfirmacion += `\nTotal: ${totalFinal.toFixed(2)}€\n\nEl número de factura se generará automáticamente.`;
+            
+            if (confirm(mensajeConfirmacion)) {
+                // Preparar datos de las líneas (el importe incluye IVA)
+                const lineas = [];
+                inputs.forEach(input => {
+                    const lineaId = input.dataset.lineaId;
+                    const cantidad = parseFloat(input.dataset.cantidad) || 0;
+                    const precioUnitario = parseFloat(input.value) || 0;
+                    
+                    // Obtener descuento del input de descuento
+                    const descuentoInput = document.querySelector(`.descuento-linea[data-linea-id="${lineaId}"]`);
+                    const descuento = parseFloat(descuentoInput ? descuentoInput.value : 0) || 0;
+                    
+                    // Calcular precio final con descuento
+                    let precioFinal = precioUnitario;
+                    if (descuento > 0) {
+                        precioFinal = precioUnitario * (1 - descuento / 100);
+                    }
+                    
+                    // El importe total de la línea (usando precio final con descuento)
+                    const importe = cantidad * precioFinal;
+                    
+                    if (importe > 0) {
+                        const lineaRow = input.closest('tr');
+                        const descripcionTd = lineaRow.querySelector('.descripcion-linea');
+                        const descripcionLinea = descripcionTd ? descripcionTd.textContent.trim() : 'Producto';
+                        
+                        lineas.push({
+                            linea_presupuesto_id: lineaId,
+                            descripcion: descripcionLinea,
+                            cantidad: cantidad,
+                            precio_unitario: precioUnitario,
+                            descuento: descuento,
+                            importe: importe  // Este importe usa precio final con descuento aplicado
+                        });
+                    }
+                });
+                
+                // Deshabilitar botón durante el proceso
+                const button = document.querySelector('.formalizar-factura');
+                button.disabled = true;
+                button.textContent = 'Procesando...';
+                
+                // Obtener descuento por pronto pago y tipo de IVA
+                const descuentoProntoPago = parseFloat(descuentoProntoPagoInput ? descuentoProntoPagoInput.value : 0) || 0;
+                const tipoIva = document.getElementById('tipo-iva') ? document.getElementById('tipo-iva').value : '21';
+                
+                // Enviar datos al servidor
+                fetch(`/facturacion/solicitud/${solicitudId}/formalizar`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        fecha_expedicion: fechaExpedicion,
+                        descripcion: descripcion,
+                        descuento_pronto_pago: descuentoProntoPago,
+                        tipo_iva: tipoIva,
+                        lineas: lineas
+                    })
+                })
+                .then(response => {
+                    if (response.redirected) {
+                        // Si hay redirección, seguirla
+                        window.location.href = response.url;
+                    } else {
+                        return response.json().then(data => {
+                            if (data.success) {
+                                // Redirigir al listado
+                                window.location.href = '/facturacion';
+                            } else {
+                                alert('Error: ' + data.error);
+                                button.disabled = false;
+                                button.textContent = 'Formalizar Factura';
+                            }
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error al formalizar la factura: ' + error.message);
+                    button.disabled = false;
+                    button.textContent = 'Formalizar Factura';
+                });
+            }
+        });
+    });
+    
+    // Recalcular totales una vez más con el IVA de la ficha del cliente (select ya forzado al inicio)
+    const sid = document.querySelector('.importe-unitario')?.dataset?.solicitudId;
+    if (sid && typeof calcularTotalFactura === 'function') {
+        calcularTotalFactura(sid);
+    }
+    
+    // Efecto hover en las filas de la tabla
+    document.querySelectorAll('.linea-factura').forEach(row => {
+        row.addEventListener('mouseenter', function() {
+            this.style.background = '#f8f9fa';
+        });
+        row.addEventListener('mouseleave', function() {
+            this.style.background = '';
+        });
+    });
+});
+</script>
+
+<style>
+.btn-primary {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+    font-weight: 500;
+}
+
+.btn-primary:hover {
+    background: linear-gradient(135deg, #2980b9 0%, #21618c 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+    color: white;
+    text-decoration: none;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3);
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #229954 0%, #1e8449 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(39, 174, 96, 0.4);
+}
+
+.btn-success:active {
+    transform: translateY(0);
+}
+
+input.importe-unitario:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+</style>
+{% endblock %}
+

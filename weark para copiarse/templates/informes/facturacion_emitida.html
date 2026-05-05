@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+
+{% block title %}Presupuestos Enviados FD - Informes{% endblock %}
+
+{% block content %}
+<style>
+.container {
+    padding-top: 10px !important;
+    padding-left: 5px !important;
+    padding-right: 5px !important;
+    max-width: 100% !important;
+}
+header {
+    margin-bottom: 0.8rem !important;
+}
+</style>
+<div class="informes-container">
+    <h2>Presupuestos Enviados a FD</h2>
+    
+    <!-- Filtros -->
+    <div class="filtros-box">
+        <form method="GET" class="filtros-form">
+            <div class="filtro-group">
+                <label for="tipo">Tipo de Filtro:</label>
+                <select name="tipo" id="tipo" onchange="actualizarFiltros()">
+                    <option value="mes" {% if tipo_filtro == 'mes' %}selected{% endif %}>Por Mes</option>
+                    <option value="trimestre" {% if tipo_filtro == 'trimestre' %}selected{% endif %}>Por Trimestre</option>
+                </select>
+            </div>
+            
+            <div class="filtro-group">
+                <label for="año">Año:</label>
+                <input type="number" name="año" id="año" value="{{ año }}" min="2000" max="2100" required>
+            </div>
+            
+            <div class="filtro-group" id="periodo-group">
+                {% if tipo_filtro == 'mes' %}
+                <label for="periodo">Mes:</label>
+                <select name="periodo" id="periodo">
+                    <option value="">Todos los meses</option>
+                    {% for i in range(1, 13) %}
+                    <option value="{{ i }}" {% if periodo == i %}selected{% endif %}>
+                        {{ ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'][i] }}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% else %}
+                <label for="periodo">Trimestre:</label>
+                <select name="periodo" id="periodo">
+                    <option value="">Todos los trimestres</option>
+                    <option value="1" {% if periodo == 1 %}selected{% endif %}>Primer Trimestre</option>
+                    <option value="2" {% if periodo == 2 %}selected{% endif %}>Segundo Trimestre</option>
+                    <option value="3" {% if periodo == 3 %}selected{% endif %}>Tercer Trimestre</option>
+                    <option value="4" {% if periodo == 4 %}selected{% endif %}>Cuarto Trimestre</option>
+                </select>
+                {% endif %}
+            </div>
+            
+            <div class="filtro-group filtro-cliente" style="position: relative;">
+                <label for="cliente_search">Cliente:</label>
+                <div style="position: relative;">
+                    <input type="text" id="cliente_search" placeholder="🔍 Buscar cliente..." value="{{ cliente_seleccionado.nombre if cliente_seleccionado else '' }}"
+                           style="width: 100%; padding: 8px 32px 8px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 0.9em; box-sizing: border-box;" autocomplete="off">
+                    <span style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #6c757d; font-size: 14px;">🔍</span>
+                    <select name="cliente_id" id="cliente_id" style="position: absolute; left: -9999px; width: 1px; height: 1px;">
+                        <option value="">Todos los clientes</option>
+                        {% for cliente in clientes %}
+                        <option value="{{ cliente.id }}" data-nombre="{{ cliente.nombre|lower }}" {% if cliente_id == cliente.id %}selected{% endif %}>{{ cliente.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                    <div id="cliente_results" style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 6px 6px; max-height: 200px; overflow-y: auto; z-index: 1000; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1);"></div>
+                </div>
+            </div>
+            
+            <button type="submit" class="btn btn-primary">Buscar</button>
+        </form>
+    </div>
+    
+    <!-- Resumen -->
+    <div class="resumen-box">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="margin: 0;">Resumen - {{ periodo_label }}</h3>
+            <div style="display: flex; gap: 10px;">
+                <a href="{{ url_for('informes.facturacion_emitida_detalle', tipo=tipo_filtro, año=año, periodo=periodo) }}{% if cliente_id %}&cliente_id={{ cliente_id }}{% endif %}" class="btn btn-light" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">Ver Detalle</a>
+                <a href="{{ url_for('informes.facturacion_emitida_exportar_excel', tipo=tipo_filtro, año=año, periodo=periodo) }}{% if cliente_id %}&cliente_id={{ cliente_id }}{% endif %}" class="btn btn-light" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">📊 Exportar a Excel</a>
+                <a href="{{ url_for('informes.facturacion_emitida_exportar_pdf', tipo=tipo_filtro, año=año, periodo=periodo) }}{% if cliente_id %}&cliente_id={{ cliente_id }}{% endif %}" class="btn btn-light" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3);">📄 Exportar a PDF</a>
+            </div>
+        </div>
+        <div class="resumen-grid">
+            <div class="resumen-item">
+                <span class="resumen-label">Total Emisión:</span>
+                <span class="resumen-value">{{ "%.2f"|format(total_facturacion) }} €</span>
+            </div>
+            <div class="resumen-item">
+                <span class="resumen-label">IVA Repercutido:</span>
+                <span class="resumen-value">{{ "%.2f"|format(total_iva_repercutido) }} €</span>
+            </div>
+            <div class="resumen-item">
+                <span class="resumen-label">Número de Presupuestos:</span>
+                <span class="resumen-value">{{ facturas|length }}</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tabla de presupuestos -->
+    {% if facturas %}
+    <div class="table-container">
+        <table class="clientes-table" id="tabla_facturas_emitidas">
+            <thead>
+                <tr>
+                    <th>Número Presupuesto</th>
+                    <th>Fecha</th>
+                    <th>Cliente</th>
+                    <th>Base</th>
+                    <th>IVA</th>
+                    <th>Total</th>
+                    <th>FD</th>
+                </tr>
+            </thead>
+            <tbody id="tabla_facturas_emitidas_body">
+                {% for factura in facturas %}
+                <tr data-search="{{ (factura.numero ~ ' ' ~ (factura.fecha.strftime('%d/%m/%Y') if factura.fecha else '-') ~ ' ' ~ factura.nombre)|lower }}">
+                    <td>{{ factura.numero }}</td>
+                    <td>{{ factura.fecha.strftime('%d/%m/%Y') if factura.fecha else '-' }}</td>
+                    <td>{{ factura.nombre }}</td>
+                    <td style="text-align: right;">{{ "%.2f"|format(factura.base) }} €</td>
+                    <td style="text-align: right;">{{ "%.2f"|format(factura.iva) }} € ({{ "%.0f"|format(factura.tipo_iva) }}%)</td>
+                    <td style="text-align: right;"><strong>{{ "%.2f"|format(factura.total) }} €</strong></td>
+                    <td>
+                        {% if factura.fd_deliverynote_uuid %}
+                        <span title="Enviado a FacturaDirecta{% if factura.fd_deliverynote_doc_number %} ({{ factura.fd_deliverynote_doc_number }}){% endif %}" style="display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; background: #198754; color: #fff; white-space: nowrap;">FD ✓</span>
+                        {% else %}
+                        —
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="no-data">
+        <p>No hay presupuestos enviados a FD para el período seleccionado.</p>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.informes-container {
+    max-width: 100%;
+    margin: 0 auto;
+    padding-top: 10px;
+    padding-bottom: 20px;
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.filtros-box {
+    background: white;
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+}
+
+.filtros-form {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.filtro-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex: 0 0 auto;
+    min-width: 0;
+}
+
+.filtro-group label {
+    font-weight: 600;
+    color: #495057;
+    font-size: 0.8rem;
+}
+
+.filtro-group select,
+.filtro-group input {
+    padding: 5px 8px;
+    border: 2px solid #dee2e6;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.filtro-group:first-child {
+    flex: 0 0 140px;
+}
+
+.filtro-group:nth-child(2) {
+    flex: 0 0 100px;
+}
+
+.filtro-group#periodo-group {
+    flex: 0 0 160px;
+}
+
+.filtro-group.filtro-cliente {
+    flex: 1 1 200px;
+    min-width: 180px;
+    max-width: 300px;
+}
+
+.filtros-form button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.resumen-box {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 10px 12px;
+    border-radius: 5px;
+    margin-bottom: 8px;
+}
+
+.resumen-box h3 {
+    margin: 0 0 6px 0;
+    font-size: 1rem;
+}
+
+.resumen-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 8px;
+}
+
+.resumen-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.resumen-label {
+    font-size: 0.75rem;
+    opacity: 0.9;
+}
+
+.resumen-value {
+    font-size: 1rem;
+    font-weight: 600;
+}
+</style>
+
+<script>
+function actualizarFiltros() {
+    const tipo = document.getElementById('tipo').value;
+    const periodoGroup = document.getElementById('periodo-group');
+    
+    if (tipo === 'mes') {
+        periodoGroup.innerHTML = `
+            <label for="periodo">Mes:</label>
+            <select name="periodo" id="periodo">
+                <option value="">Todos los meses</option>
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3">Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+            </select>
+        `;
+    } else {
+        periodoGroup.innerHTML = `
+            <label for="periodo">Trimestre:</label>
+            <select name="periodo" id="periodo">
+                <option value="">Todos los trimestres</option>
+                <option value="1">Primer Trimestre</option>
+                <option value="2">Segundo Trimestre</option>
+                <option value="3">Tercer Trimestre</option>
+                <option value="4">Cuarto Trimestre</option>
+            </select>
+        `;
+    }
+}
+
+// Buscador de cliente (como en Nueva Solicitud): dropdown al escribir y filtro en vivo de la tabla
+document.addEventListener('DOMContentLoaded', function() {
+    const clienteSearch = document.getElementById('cliente_search');
+    const clienteSelect = document.getElementById('cliente_id');
+    const clienteResults = document.getElementById('cliente_results');
+    const tbody = document.getElementById('tabla_facturas_emitidas_body');
+
+    const clientes = Array.from(clienteSelect.options).slice(1).map(opt => ({
+        id: opt.value,
+        nombre: opt.textContent,
+        nombreLower: (opt.getAttribute('data-nombre') || opt.textContent.toLowerCase())
+    }));
+
+    function mostrarResultados(searchTerm) {
+        if (!searchTerm) {
+            clienteResults.style.display = 'none';
+            return;
+        }
+        const filtered = clientes.filter(c => c.nombreLower.includes(searchTerm.toLowerCase()));
+        if (filtered.length === 0) {
+            clienteResults.innerHTML = '<div style="padding: 10px; color: #999; text-align: center;">No se encontraron clientes</div>';
+            clienteResults.style.display = 'block';
+            return;
+        }
+        clienteResults.innerHTML = filtered.map(c =>
+            `<div class="cliente-option" data-id="${c.id}" data-nombre="${c.nombre}"
+                  style="padding: 8px 10px; cursor: pointer; border-bottom: 1px solid #eee; font-size: 0.9em;"
+                  onmouseover="this.style.background='#f0f0f0'" onmouseout="this.style.background='white'"
+                  onclick="selectClienteFacturas(${c.id}, '${c.nombre.replace(/'/g, "\\'")}')">${c.nombre}</div>`
+        ).join('');
+        clienteResults.style.display = 'block';
+    }
+
+    clienteSearch.addEventListener('input', function() {
+        const term = this.value.trim();
+        clienteSelect.value = '';
+        mostrarResultados(term);
+
+        // Filtro en vivo de la tabla
+        if (tbody) {
+            const filas = tbody.querySelectorAll('tr');
+            const termLower = term.toLowerCase();
+            filas.forEach(tr => {
+                const texto = (tr.dataset.search || '');
+                if (!termLower || texto.includes(termLower)) {
+                    tr.style.display = '';
+                } else {
+                    tr.style.display = 'none';
+                }
+            });
+        }
+    });
+
+    clienteSearch.addEventListener('focus', function() {
+        if (this.value.trim()) mostrarResultados(this.value.trim());
+    });
+
+    document.addEventListener('click', function(e) {
+        if (clienteResults && !clienteSearch.contains(e.target) && !clienteResults.contains(e.target)) {
+            clienteResults.style.display = 'none';
+        }
+    });
+
+    window.selectClienteFacturas = function(id, nombre) {
+        clienteSearch.value = nombre;
+        clienteSelect.value = id;
+        if (clienteResults) clienteResults.style.display = 'none';
+        document.querySelector('.filtros-form').submit();
+    };
+});
+</script>
+{% endblock %}
+

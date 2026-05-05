@@ -1,0 +1,3483 @@
+"""Rutas para facturación"""
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, make_response
+from flask_login import login_required
+from datetime import datetime
+from decimal import Decimal
+from functools import wraps
+import os
+import requests
+import json
+import tempfile
+import base64
+from io import BytesIO
+from sqlalchemy import not_, or_, and_, text
+from sqlalchemy.orm import joinedload
+from extensions import db
+from models import Factura, LineaFactura, Cliente, Presupuesto, LineaPresupuesto, Pedido
+from utils.numeracion import obtener_siguiente_numero_factura, obtener_siguiente_numero_albaran
+from playwright.sync_api import sync_playwright
+from utils.auth import not_usuario_required
+from utils.facturadirecta import (
+    FacturaDirectaError,
+    build_delivery_note_payload,
+    create_delivery_note,
+    net_unit_price_for_fd_line,
+)
+
+facturacion_bp = Blueprint('facturacion', __name__)
+
+
+def emision_facturas_desactivada(view_func):
+    """Bloquea la emisión/gestión de facturas formales; responde JSON si la petición es API."""
+    @wraps(view_func)
+    def wrapped(*args, **kwargs):
+        msg = 'La emisión de facturas desde la aplicación está desactivada. Use el listado de presupuestos y albaranes de retirada.'
+        if request.is_json or (request.content_type or '').lower().startswith('application/json'):
+            return jsonify({'success': False, 'error': msg}), 403
+        flash(msg, 'warning')
+        return redirect(url_for('facturacion.menu_ventas'))
+
+    return wrapped
+
+
+@facturacion_bp.route('/facturacion')
+@login_required
+@not_usuario_required
+def facturacion():
+    """Antigua pantalla de facturación: redirige al listado de presupuestos."""
+    return redirect(url_for('presupuestos.listado_solicitudes'))
+
+
+@facturacion_bp.route('/facturacion/albaranes-retirada')
+@login_required
+@not_usuario_required
+def listado_albaranes_retirada():
+    """Listado de albaranes de retirada (registros tipo AYYMM_XXX sin pedido ni presupuesto)."""
+    estado_filtro = request.args.get('estado', '')
+    fecha_desde = request.args.get('fecha_desde', '')
+    fecha_hasta = request.args.get('fecha_hasta', '')
+    busqueda = (request.args.get('busqueda', '') or '').strip()
+
+    query = Factura.query.options(
+        joinedload(Factura.lineas),
+        joinedload(Factura.cliente),
+    ).filter(
+        Factura.presupuesto_id.is_(None),
+        Factura.pedido_id.is_(None),
+        Factura.numero.like('A%_%'),
+    )
+
+    if estado_filtro:
+        query = query.filter(Factura.estado == estado_filtro)
+
+    if fecha_desde:
+        try:
+            fd = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+            query = query.filter(Factura.fecha_expedicion >= fd)
+        except ValueError:
+            pass
+    if fecha_hasta:
+        try:
+            fh = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+            query = query.filter(Factura.fecha_expedicion <= fh)
+        except ValueError:
+            pass
+
+    if busqueda:
+        term = f'%{busqueda}%'
+        query = query.filter(
+            or_(
+                Factura.nombre.ilike(term),
+                Factura.numero.ilike(term),
+                Factura.nif.ilike(term),
+            )
+        )
+
+    albaranes = query.order_by(Factura.fecha_creacion.desc()).all()
+
+    estados_raw = db.session.query(Factura.estado).filter(
+        Factura.presupuesto_id.is_(None),
+        Factura.pedido_id.is_(None),
+        Factura.numero.like('A%_%'),
+    ).distinct().all()
+    estados_list = sorted({e[0] for e in estados_raw if e[0]})
+    for e in ('pendiente', 'enviado', 'confirmado', 'error'):
+        if e not in estados_list:
+            estados_list.append(e)
+    estados_list.sort()
+
+    return render_template(
+        'facturacion/listado_albaranes_retirada.html',
+        albaranes=albaranes,
+        estados=estados_list,
+        estado_filtro=estado_filtro,
+        fecha_desde=fecha_desde,
+        fecha_hasta=fecha_hasta,
+        busqueda=busqueda,
+    )
+
+
+@facturacion_bp.route('/facturacion/albaranes-retirada/<int:factura_id>/enviar-fd', methods=['POST'])
+@login_required
+@not_usuario_required
+def enviar_albaran_retirada_a_facturadirecta(factura_id: int):
+    """Envía un albarán de retirada (Factura con número AYYMM_XXX) a FacturaDirecta como delivery note."""
+    albaran = Factura.query.options(joinedload(Factura.lineas)).get_or_404(factura_id)
+
+    if not (albaran.numero and albaran.numero.startswith('A') and '_' in albaran.numero and albaran.presupuesto_id is None and albaran.pedido_id is None):
+        flash('Este registro no es un albarán de retirada válido.', 'error')
+        return redirect(url_for('facturacion.listado_albaranes_retirada'))
+
+    if albaran.fd_deliverynote_uuid and not current_app.config.get('FACTURADIRECTA_ALLOW_RESEND'):
+        flash(f'Ya existe un albarán en FacturaDirecta para este albarán ({albaran.fd_deliverynote_doc_number or albaran.fd_deliverynote_uuid}).', 'info')
+        return redirect(url_for('facturacion.listado_albaranes_retirada'))
+
+    # Intentar resolver cliente interno para crear/buscar contacto en FD
+    cliente = None
+    if albaran.cliente_id:
+        cliente = Cliente.query.get(albaran.cliente_id)
+    if not cliente:
+        # Buscar por NIF si existe
+        if albaran.nif:
+            cliente = Cliente.query.filter(Cliente.nif == albaran.nif).first()
+    if not cliente:
+        flash('No se pudo resolver el cliente (necesario para crear el contacto en FacturaDirecta). Asigna el cliente o NIF en el albarán.', 'error')
+        return redirect(url_for('facturacion.editar_albaran', factura_id=factura_id))
+
+    try:
+        _enviar_factura_a_facturadirecta_desde_lineas(
+            albaran,
+            doc_reference=albaran.numero,
+            notes=f'Albarán WEARK: {albaran.numero}',
+            empty_line_fallback=f'Albarán {albaran.numero}',
+        )
+        db.session.commit()
+
+        flash('Enviado a FacturaDirecta correctamente.', 'success')
+        return redirect(url_for('facturacion.listado_albaranes_retirada'))
+    except Exception as e:
+        db.session.rollback()
+        albaran.fd_deliverynote_last_error = str(e)
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        flash(f'Error al enviar a FacturaDirecta: {e}', 'error')
+        return redirect(url_for('facturacion.listado_albaranes_retirada'))
+
+
+def _enviar_factura_a_facturadirecta_desde_lineas(
+    factura: Factura,
+    *,
+    doc_reference: str | None = None,
+    notes: str | None = None,
+    empty_line_fallback: str | None = None,
+) -> None:
+    """Construye payload FD desde líneas de factura (mismo criterio que presupuesto/albarán). Lanza FacturaDirectaError."""
+    cliente = None
+    if factura.cliente_id:
+        cliente = Cliente.query.get(factura.cliente_id)
+    if not cliente and factura.nif:
+        cliente = Cliente.query.filter(Cliente.nif == factura.nif).first()
+    if not cliente:
+        raise FacturaDirectaError(
+            'No se pudo resolver el cliente (necesario para crear el contacto en FacturaDirecta).'
+        )
+
+    tipo_iva = Decimal(str(cliente.tipo_iva)) if cliente.tipo_iva is not None else Decimal(str(factura.tipo_iva or 21))
+
+    doc_ref = doc_reference or (
+        f'{factura.serie}-{factura.numero}' if getattr(factura, 'serie', None) else str(factura.numero)
+    )
+    line_default = empty_line_fallback or f'Factura {doc_ref}'
+
+    lines = []
+    for lf in (factura.lineas or []):
+        qty = Decimal(str(lf.cantidad or 0))
+        # Permitir líneas de abono (cantidad negativa). Solo ignorar líneas neutras.
+        if qty == 0:
+            continue
+        text = (lf.descripcion or '').strip()
+        if lf.talla:
+            text = f"{text} (Talla: {lf.talla})"
+        unit_price = net_unit_price_for_fd_line(lf.precio_unitario, lf.precio_final, lf.descuento)
+        lines.append({
+            'quantity': qty,
+            'text': text or line_default,
+            'unitPrice': unit_price,
+        })
+
+    if not lines:
+        raise FacturaDirectaError('No hay líneas válidas para enviar.')
+
+    payload = build_delivery_note_payload(
+        doc_reference=doc_ref,
+        cliente=cliente,
+        lines=lines,
+        tipo_iva_percent=tipo_iva,
+        notes=notes or f'Factura WEARK: {doc_ref}',
+    )
+    resp = create_delivery_note(payload)
+    content = resp.get('content') or {}
+    main = content.get('main') or {}
+    doc_number = main.get('docNumber') or {}
+
+    factura.fd_deliverynote_uuid = content.get('uuid')
+    factura.fd_deliverynote_doc_number = doc_number.get('formatted') or doc_number.get('series')
+    factura.fd_deliverynote_sent_at = datetime.utcnow()
+    factura.fd_deliverynote_last_error = None
+
+
+@facturacion_bp.route('/facturacion/facturas/<int:factura_id>/enviar-fd', methods=['POST'])
+@login_required
+@not_usuario_required
+def enviar_factura_emitida_a_facturadirecta(factura_id: int):
+    """Envía una factura emitida (no albarán de retirada A%_%) a FacturaDirecta como albarán, mismo flujo que presupuestos."""
+    factura = Factura.query.options(joinedload(Factura.lineas)).get_or_404(factura_id)
+
+    # Albaranes de retirada: listado propio
+    if factura.numero and factura.numero.startswith('A') and '_' in factura.numero and factura.presupuesto_id is None and factura.pedido_id is None:
+        flash('Los albaranes de retirada se envían desde el listado de albaranes de retirada.', 'info')
+        return redirect(request.referrer or url_for('facturacion.listado_albaranes_retirada'))
+
+    if factura.fd_deliverynote_uuid and not current_app.config.get('FACTURADIRECTA_ALLOW_RESEND'):
+        flash(
+            f'Ya existe un albarán en FacturaDirecta para esta factura ({factura.fd_deliverynote_doc_number or factura.fd_deliverynote_uuid}).',
+            'info',
+        )
+        return redirect(request.referrer or url_for('informes.facturacion_emitida'))
+
+    try:
+        _enviar_factura_a_facturadirecta_desde_lineas(factura)
+        db.session.commit()
+        flash('Enviado a FacturaDirecta correctamente.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        factura.fd_deliverynote_last_error = str(e)
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        flash(f'Error al enviar a FacturaDirecta: {e}', 'error')
+
+    return redirect(request.referrer or url_for('informes.facturacion_emitida'))
+
+
+@facturacion_bp.route('/ventas/menu')
+@login_required
+@not_usuario_required
+def menu_ventas():
+    """Pantalla de acceso rápido a las opciones de ventas"""
+    return render_template('ventas_menu.html')
+
+
+def _query_albaranes_retirada_base():
+    """Facturas que son albaranes de retirada (A…_…, sin pedido ni presupuesto)."""
+    return Factura.query.options(joinedload(Factura.cliente), joinedload(Factura.lineas)).filter(
+        Factura.presupuesto_id.is_(None),
+        Factura.pedido_id.is_(None),
+        Factura.numero.like('A%_%'),
+    )
+
+
+def _ventas_totales_presupuesto(presupuesto):
+    """Misma lógica que el informe de presupuestos: base, IVA y total con IVA."""
+    base_imponible = Decimal('0.00')
+    for linea in presupuesto.lineas or []:
+        cantidad = Decimal(str(linea.cantidad)) if linea.cantidad else Decimal('0')
+        precio_unit = Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0.00')
+        descuento = Decimal(str(linea.descuento)) if linea.descuento else Decimal('0')
+        precio_final = precio_unit
+        if descuento > 0:
+            if linea.precio_final:
+                precio_final = Decimal(str(linea.precio_final))
+            else:
+                precio_final = precio_unit * (Decimal('1') - descuento / Decimal('100'))
+        elif linea.precio_final:
+            precio_final = Decimal(str(linea.precio_final))
+        base_imponible += cantidad * precio_final
+    tipo_iva = Decimal('21')
+    if presupuesto.cliente and getattr(presupuesto.cliente, 'tipo_iva', None) is not None:
+        try:
+            tipo_iva = Decimal(str(presupuesto.cliente.tipo_iva))
+        except (ValueError, TypeError):
+            pass
+    base_q = base_imponible.quantize(Decimal('0.01'))
+    if (presupuesto.estado or '') == 'cancelado':
+        return base_q, Decimal('0.00'), base_q
+    iva_total = (base_imponible * tipo_iva / Decimal('100')).quantize(Decimal('0.01'))
+    total = (base_imponible + iva_total).quantize(Decimal('0.01'))
+    return base_q, iva_total, total
+
+
+def _ventas_totales_albaran_retirada(factura):
+    """Total del albarán (con IVA) desde cabecera; desglose con tipo_iva del documento."""
+    total = Decimal(str(factura.importe_total or 0)).quantize(Decimal('0.01'))
+    try:
+        tipo_iva = Decimal(str(factura.tipo_iva if factura.tipo_iva is not None else 21))
+    except (ValueError, TypeError):
+        tipo_iva = Decimal('21')
+    if tipo_iva <= 0:
+        return total, Decimal('0.00'), total
+    divisor = Decimal('1') + tipo_iva / Decimal('100')
+    base = (total / divisor).quantize(Decimal('0.01'))
+    iva = (total - base).quantize(Decimal('0.01'))
+    return base, iva, total
+
+
+def _listado_ventas_presupuestos_y_retirada(modo: str):
+    """
+    modo: 'enviados_fd' | 'pendientes_fd' | 'cancelados'
+    Mezcla presupuestos y albaranes de retirada, ordenados por fecha de creación descendente.
+    cancelados: solo estado 'cancelado' (no 'rechazado').
+    """
+    modo = (modo or '').strip()
+    if modo not in ('enviados_fd', 'pendientes_fd', 'cancelados'):
+        modo = 'enviados_fd'
+
+    pres_q = Presupuesto.query.options(
+        joinedload(Presupuesto.cliente),
+        joinedload(Presupuesto.lineas),
+    )
+    alb_q = _query_albaranes_retirada_base()
+
+    if modo == 'enviados_fd':
+        pres_q = pres_q.filter(
+            Presupuesto.fd_deliverynote_uuid.isnot(None),
+            Presupuesto.estado != 'rechazado',
+        )
+        alb_q = alb_q.filter(Factura.fd_deliverynote_uuid.isnot(None))
+        titulo = 'Enviados a FacturaDirecta'
+        descripcion = 'Presupuestos y albaranes de retirada con albarán generado en FD.'
+    elif modo == 'pendientes_fd':
+        pres_q = pres_q.filter(
+            Presupuesto.fd_deliverynote_uuid.is_(None),
+            Presupuesto.estado != 'rechazado',
+        )
+        alb_q = alb_q.filter(Factura.fd_deliverynote_uuid.is_(None))
+        titulo = 'Pendientes de enviar a FD'
+        descripcion = 'Presupuestos (no rechazados) y albaranes de retirada aún sin enviar a FacturaDirecta.'
+    else:
+        pres_q = pres_q.filter(Presupuesto.estado == 'cancelado')
+        alb_q = alb_q.filter(Factura.estado == 'cancelado')
+        titulo = 'Cancelados'
+        descripcion = (
+            'Presupuestos y albaranes de retirada solo en estado cancelado (no incluye rechazados).'
+        )
+
+    presupuestos = pres_q.order_by(Presupuesto.fecha_creacion.desc()).all()
+    albaranes = alb_q.order_by(Factura.fecha_creacion.desc()).all()
+
+    filas = []
+    for p in presupuestos:
+        fc = p.fecha_creacion
+        base, iva, total = _ventas_totales_presupuesto(p)
+        filas.append(
+            {
+                'tipo': 'presupuesto',
+                'tipo_label': 'Presupuesto',
+                'ref': p.numero_solicitud or f'#{p.id}',
+                'cliente': p.cliente.nombre if p.cliente else '—',
+                'fecha': fc,
+                'estado': p.estado or '—',
+                'fd': bool(p.fd_deliverynote_uuid),
+                'fd_doc': p.fd_deliverynote_doc_number,
+                'url': url_for('presupuestos.ver_solicitud', solicitud_id=p.id),
+                'base': base,
+                'iva': iva,
+                'total': total,
+            }
+        )
+    for a in albaranes:
+        fc = a.fecha_creacion
+        base, iva, total = _ventas_totales_albaran_retirada(a)
+        filas.append(
+            {
+                'tipo': 'albaran_retirada',
+                'tipo_label': 'Albarán retirada',
+                'ref': a.numero or f'#{a.id}',
+                'cliente': (a.nombre or (a.cliente.nombre if a.cliente else '') or '—'),
+                'fecha': fc,
+                'estado': a.estado or '—',
+                'fd': bool(a.fd_deliverynote_uuid),
+                'fd_doc': a.fd_deliverynote_doc_number,
+                'url': url_for('facturacion.editar_albaran', factura_id=a.id),
+                'base': base,
+                'iva': iva,
+                'total': total,
+            }
+        )
+
+    filas.sort(key=lambda r: r['fecha'] or datetime.min, reverse=True)
+
+    sum_base = sum((r['base'] for r in filas), Decimal('0')).quantize(Decimal('0.01'))
+    sum_iva = sum((r['iva'] for r in filas), Decimal('0')).quantize(Decimal('0.01'))
+    sum_total = sum((r['total'] for r in filas), Decimal('0')).quantize(Decimal('0.01'))
+    totales = {'base': sum_base, 'iva': sum_iva, 'total': sum_total}
+
+    return titulo, descripcion, filas, modo, totales
+
+
+@facturacion_bp.route('/ventas/listado-fd-enviados')
+@login_required
+@not_usuario_required
+def listado_ventas_fd_enviados():
+    titulo, descripcion, filas, modo, totales = _listado_ventas_presupuestos_y_retirada('enviados_fd')
+    return render_template(
+        'ventas/listado_presupuestos_albaranes.html',
+        titulo=titulo,
+        descripcion=descripcion,
+        filas=filas,
+        modo=modo,
+        totales=totales,
+    )
+
+
+@facturacion_bp.route('/ventas/listado-fd-pendientes')
+@login_required
+@not_usuario_required
+def listado_ventas_fd_pendientes():
+    titulo, descripcion, filas, modo, totales = _listado_ventas_presupuestos_y_retirada('pendientes_fd')
+    return render_template(
+        'ventas/listado_presupuestos_albaranes.html',
+        titulo=titulo,
+        descripcion=descripcion,
+        filas=filas,
+        modo=modo,
+        totales=totales,
+    )
+
+
+@facturacion_bp.route('/ventas/listado-cancelados')
+@login_required
+@not_usuario_required
+def listado_ventas_cancelados():
+    titulo, descripcion, filas, modo, totales = _listado_ventas_presupuestos_y_retirada('cancelados')
+    return render_template(
+        'ventas/listado_presupuestos_albaranes.html',
+        titulo=titulo,
+        descripcion=descripcion,
+        filas=filas,
+        modo=modo,
+        totales=totales,
+    )
+
+
+@facturacion_bp.route('/facturacion/solicitud/<int:presupuesto_id>')
+@login_required
+@not_usuario_required
+@emision_facturas_desactivada
+def ver_factura_solicitud(presupuesto_id):
+    """Vista detallada de una factura para introducir importes desde una solicitud"""
+    presupuesto = Presupuesto.query.options(joinedload(Presupuesto.cliente)).get_or_404(presupuesto_id)
+    
+    # Verificar si ya existe una factura formal (no anticipo) para este presupuesto
+    factura_existente = Factura.query.filter(
+        and_(Factura.presupuesto_id == presupuesto_id, 
+             or_(Factura.es_anticipo == False, Factura.es_anticipo.is_(None)))
+    ).first()
+    
+    # Obtener factura de anticipo si existe
+    factura_anticipo = Factura.query.filter(
+        and_(Factura.presupuesto_id == presupuesto_id, Factura.es_anticipo == True)
+    ).first()
+    
+    # Calcular anticipo total facturado
+    anticipo_facturado = Decimal('0')
+    if factura_anticipo:
+        anticipo_facturado = factura_anticipo.importe_total if factura_anticipo.importe_total else Decimal('0')
+    elif presupuesto.anticipo:
+        anticipo_facturado = Decimal(str(presupuesto.anticipo))
+    
+    # IVA por defecto: leer directamente de la tabla clientes para asegurar el valor de la ficha
+    tipo_iva_default = 21
+    if presupuesto.cliente_id:
+        try:
+            raw = db.session.execute(
+                text('SELECT tipo_iva FROM clientes WHERE id = :id'),
+                {'id': presupuesto.cliente_id}
+            ).scalar()
+            # Aceptar 0 explícitamente (en BD es 0 o 0.0; no usar "if raw" porque 0 es falsy)
+            if raw is not None:
+                v = int(round(float(str(raw))))
+                if v in (0, 4, 10, 21):
+                    tipo_iva_default = v
+        except (ValueError, TypeError, AttributeError) as e:
+            current_app.logger.warning('ver_factura_solicitud: no se pudo leer tipo_iva del cliente %s: %s',
+                                      presupuesto.cliente_id, e)
+    
+    # Forzar entero para la plantilla (evitar Decimal/float que Jinja pueda comparar mal)
+    tipo_iva_default = int(tipo_iva_default)
+    
+    return render_template('ver_factura_solicitud.html', 
+                         solicitud=presupuesto, 
+                         factura_existente=factura_existente,
+                         factura_anticipo=factura_anticipo,
+                         anticipo_facturado=anticipo_facturado,
+                         tipo_iva_default=tipo_iva_default)
+
+@facturacion_bp.route('/facturacion/solicitud/<int:presupuesto_id>/formalizar', methods=['POST'])
+@login_required
+@not_usuario_required
+@emision_facturas_desactivada
+def formalizar_factura_solicitud(presupuesto_id):
+    """Formalizar una factura desde una solicitud y enviarla a Verifactu"""
+    try:
+        presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+        
+        # Verificar si ya existe una factura final (no anticipo) para este presupuesto
+        factura_existente = Factura.query.filter(
+            and_(Factura.presupuesto_id == presupuesto_id, Factura.es_anticipo == False)
+        ).first()
+        if factura_existente:
+            return jsonify({'success': False, 'error': 'Esta solicitud ya tiene una factura formalizada.'}), 400
+        
+        # Obtener datos del formulario
+        data = request.get_json()
+        
+        fecha_expedicion_str = data.get('fecha_expedicion', '')
+        descripcion = data.get('descripcion', '')
+        descuento_pronto_pago = data.get('descuento_pronto_pago', 0)
+        tipo_iva_form = data.get('tipo_iva')
+        lineas_data = data.get('lineas', [])
+        
+        if not fecha_expedicion_str:
+            return jsonify({'success': False, 'error': 'La fecha de expedición es obligatoria'}), 400
+        
+        if not lineas_data:
+            return jsonify({'success': False, 'error': 'Debe haber al menos una línea con importe'}), 400
+        
+        # Procesar fecha
+        fecha_expedicion = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d').date()
+        
+        # Generar número de factura automáticamente
+        serie = 'A'  # Serie fija
+        numero = obtener_siguiente_numero_factura(fecha_expedicion)
+        
+        # Calcular base imponible (suma de importes de líneas sin IVA)
+        base_imponible = Decimal('0.00')
+        for linea_data in lineas_data:
+            importe = Decimal(str(linea_data.get('importe', 0)))
+            base_imponible += importe
+        
+        # Tipo de IVA: el indicado en el formulario o el de la ficha del cliente (por defecto 21%)
+        cliente = presupuesto.cliente
+        if tipo_iva_form not in (None, ''):
+            try:
+                tipo_iva = Decimal(str(tipo_iva_form))
+            except (ValueError, TypeError):
+                tipo_iva_valor = float(cliente.tipo_iva) if cliente and cliente.tipo_iva else 21.0
+                tipo_iva = Decimal(str(tipo_iva_valor))
+        else:
+            tipo_iva_valor = float(cliente.tipo_iva) if cliente and cliente.tipo_iva else 21.0
+            tipo_iva = Decimal(str(tipo_iva_valor))
+        iva_total = base_imponible * (tipo_iva / Decimal('100'))
+        subtotal = base_imponible + iva_total
+        
+        # Procesar descuento por pronto pago
+        descuento_pronto_pago_decimal = Decimal('0')
+        try:
+            descuento_pronto_pago_decimal = Decimal(str(descuento_pronto_pago))
+        except:
+            descuento_pronto_pago_decimal = Decimal('0')
+        
+        # Aplicar descuento por pronto pago al subtotal (base + IVA)
+        if descuento_pronto_pago_decimal > 0:
+            descuento_aplicado = subtotal * (descuento_pronto_pago_decimal / Decimal('100'))
+            importe_total = subtotal - descuento_aplicado
+        else:
+            importe_total = subtotal
+        
+        # Restar el anticipo si existe
+        anticipo_presupuesto = Decimal(str(presupuesto.anticipo)) if presupuesto.anticipo else Decimal('0')
+        if anticipo_presupuesto > 0:
+            importe_total = importe_total - anticipo_presupuesto
+            if importe_total < 0:
+                importe_total = Decimal('0')
+        
+        # Crear factura
+        cliente = presupuesto.cliente if presupuesto.cliente else None
+        factura = Factura(
+            presupuesto_id=presupuesto_id,
+            pedido_id=None,
+            serie=serie,
+            numero=numero,
+            fecha_expedicion=fecha_expedicion,
+            tipo_factura='F1',  # Factura completa
+            descripcion=descripcion,
+            nif=cliente.nif if cliente and cliente.nif else '',
+            nombre=cliente.nombre if cliente else 'Sin cliente',
+            importe_total=importe_total,
+            descuento_pronto_pago=descuento_pronto_pago_decimal,
+            tipo_iva=tipo_iva,  # IVA del cliente
+            estado='pendiente'
+        )
+        
+        db.session.add(factura)
+        db.session.flush()  # Para obtener el ID de la factura
+        
+        # Crear líneas de factura (usando lineas de presupuesto)
+        for linea_data in lineas_data:
+            linea_presupuesto_id = linea_data.get('linea_presupuesto_id')
+            descripcion_linea = linea_data.get('descripcion', '')
+            cantidad = Decimal(str(linea_data.get('cantidad', 1)))
+            precio_unitario = Decimal(str(linea_data.get('precio_unitario', 0)))
+            importe = Decimal(str(linea_data.get('importe', 0)))
+            
+            # Obtener descuento del formulario o de la línea de presupuesto
+            descuento = Decimal('0')
+            if 'descuento' in linea_data:
+                descuento = Decimal(str(linea_data.get('descuento', 0)))
+            elif linea_presupuesto_id:
+                linea_presupuesto = LineaPresupuesto.query.get(linea_presupuesto_id)
+                if linea_presupuesto:
+                    descuento = Decimal(str(linea_presupuesto.descuento)) if linea_presupuesto.descuento else Decimal('0')
+            
+            # Calcular precio final con descuento
+            precio_final = None
+            if descuento > 0:
+                precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+            else:
+                precio_final = precio_unitario
+            
+            # Obtener talla de la línea de presupuesto si existe
+            talla = None
+            if linea_presupuesto_id:
+                linea_presupuesto = LineaPresupuesto.query.get(linea_presupuesto_id)
+                if linea_presupuesto and linea_presupuesto.talla:
+                    talla = linea_presupuesto.talla
+            
+            linea_factura = LineaFactura(
+                factura_id=factura.id,
+                linea_pedido_id=None,  # No hay línea de pedido, es de presupuesto
+                descripcion=descripcion_linea,
+                cantidad=cantidad,
+                talla=talla,
+                precio_unitario=precio_unitario,
+                descuento=descuento,
+                precio_final=precio_final,
+                importe=importe
+            )
+            db.session.add(linea_factura)
+        
+        # ============================================
+        # CÓDIGO VERIFACTU COMENTADO - Se puede restaurar más adelante
+        # ============================================
+        # # Verificar si el envío a Verifactu está activado
+        # from models import Configuracion
+        # config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+        # verifactu_enviar_activo = True  # Por defecto activado
+        # if config:
+        #     verifactu_enviar_activo = config.valor.lower() == 'true'
+        # 
+        # # Enviar a Verifactu solo si está activado y hay token
+        # verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
+        # verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
+        # 
+        # if verifactu_token and verifactu_enviar_activo:
+        #     # Preparar datos para la API
+        #     tipo_impositivo = 21  # IVA estándar en España
+        #     lineas_payload = []
+        #     total_base_imponible = Decimal('0.00')
+        #     total_cuota_repercutida = Decimal('0.00')
+        #     
+        #     for linea in factura.lineas:
+        #         importe_con_iva = Decimal(str(linea.importe))
+        #         base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
+        #         cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
+        #         
+        #         base_imponible = base_imponible.quantize(Decimal('0.01'))
+        #         cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
+        #         
+        #         total_base_imponible += base_imponible
+        #         total_cuota_repercutida += cuota_repercutida
+        #         
+        #         lineas_payload.append({
+        #             'base_imponible': str(base_imponible),
+        #             'tipo_impositivo': str(tipo_impositivo),
+        #             'cuota_repercutida': str(cuota_repercutida)
+        #         })
+        #     
+        #     payload = {
+        #         'serie': factura.serie,
+        #         'numero': factura.numero,
+        #         'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
+        #         'tipo_factura': factura.tipo_factura,
+        #         'descripcion': factura.descripcion or 'Descripcion de la operacion',
+        #         'nif': factura.nif or '',
+        #         'nombre': factura.nombre,
+        #         'lineas': lineas_payload,
+        #         'importe_total': str(factura.importe_total)
+        #     }
+        #     
+        #     headers = {
+        #         'Content-Type': 'application/json',
+        #         'Authorization': f'Bearer {verifactu_token}'
+        #     }
+        #     
+        #     try:
+        #         response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
+        #         
+        #         if response.status_code == 200 or response.status_code == 201:
+        #             response_data = response.json()
+        #             factura.huella_verifactu = json.dumps(response_data)
+        #             factura.estado = 'confirmado'
+        #             factura.fecha_confirmacion = datetime.utcnow()
+        #             db.session.commit()
+        #             flash('Factura formalizada y enviada a Verifactu correctamente.', 'success')
+        #             return redirect(url_for('presupuestos.listado_solicitudes'))
+        #         else:
+        #             factura.estado = 'error'
+        #             factura.huella_verifactu = json.dumps({
+        #                 'error': response.text,
+        #                 'status_code': response.status_code
+        #             })
+        #             db.session.commit()
+        #             return jsonify({
+        #                 'success': False,
+        #                 'error': f'Error al enviar a Verifactu: {response.status_code} - {response.text}'
+        #             }), 400
+        #     except requests.exceptions.RequestException as e:
+        #         factura.estado = 'error'
+        #         factura.huella_verifactu = json.dumps({'error': str(e)})
+        #         db.session.commit()
+        #         return jsonify({
+        #             'success': False,
+        #             'error': f'Error de conexión con Verifactu: {str(e)}'
+        #         }), 400
+        # elif not verifactu_enviar_activo:
+        #     factura.estado = 'pendiente'
+        #     db.session.commit()
+        #     flash('Factura creada. El envío automático a Verifactu está desactivado.', 'success')
+        #     return redirect(url_for('presupuestos.listado_solicitudes'))
+        # else:
+        #     factura.estado = 'pendiente'
+        #     db.session.commit()
+        #     flash('Factura creada. Configure VERIFACTU_TOKEN para enviar automáticamente.', 'success')
+        #     return redirect(url_for('presupuestos.listado_solicitudes'))
+        
+        # Estado por defecto sin Verifactu
+        factura.estado = 'pendiente'
+        db.session.commit()
+        flash('Factura formalizada correctamente.', 'success')
+        return redirect(url_for('presupuestos.listado_solicitudes'))
+            
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': f'Error al formalizar la factura: {str(e)}'
+        }), 500
+
+@facturacion_bp.route('/facturacion/crear_factura_anticipo', methods=['GET', 'POST'])
+@login_required
+@not_usuario_required
+@emision_facturas_desactivada
+def crear_factura_anticipo():
+    """Seleccionar solicitud y crear factura anticipo"""
+    if request.method == 'POST':
+        # Obtener solicitud seleccionada
+        presupuesto_id = request.form.get('presupuesto_id', '')
+        if not presupuesto_id:
+            flash('Debe seleccionar una solicitud', 'error')
+            return redirect(url_for('facturacion.crear_factura_anticipo'))
+        
+        presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+        
+        # Obtener importe anticipado
+        importe_anticipo_str = request.form.get('importe_anticipo', '')
+        if not importe_anticipo_str:
+            flash('Debe introducir un importe anticipado', 'error')
+            return redirect(url_for('facturacion.crear_factura_anticipo_seleccionar', presupuesto_id=presupuesto_id))
+        
+        try:
+            importe_anticipo = Decimal(importe_anticipo_str)
+            if importe_anticipo <= 0:
+                flash('El importe anticipado debe ser mayor que 0', 'error')
+                return redirect(url_for('facturacion.crear_factura_anticipo_seleccionar', presupuesto_id=presupuesto_id))
+        except:
+            flash('El importe anticipado no es válido', 'error')
+            return redirect(url_for('facturacion.crear_factura_anticipo_seleccionar', presupuesto_id=presupuesto_id))
+        
+        # Obtener fecha de expedición
+        fecha_expedicion_str = request.form.get('fecha_expedicion', '')
+        if not fecha_expedicion_str:
+            flash('La fecha de expedición es obligatoria', 'error')
+            return redirect(url_for('facturacion.crear_factura_anticipo_seleccionar', presupuesto_id=presupuesto_id))
+        
+        fecha_expedicion = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d').date()
+        
+        # Calcular base imponible e IVA del anticipo
+        cliente = presupuesto.cliente
+        tipo_iva_valor = float(cliente.tipo_iva) if cliente and cliente.tipo_iva else 21.0
+        tipo_iva = Decimal(str(tipo_iva_valor))
+        
+        # El importe_anticipo viene con IVA incluido, calcular base imponible
+        base_imponible = importe_anticipo / (Decimal('1') + tipo_iva / Decimal('100'))
+        base_imponible = base_imponible.quantize(Decimal('0.01'))
+        iva_total = importe_anticipo - base_imponible
+        iva_total = iva_total.quantize(Decimal('0.01'))
+        
+        # Generar número de factura automáticamente
+        serie = 'A'  # Serie fija
+        numero = obtener_siguiente_numero_factura(fecha_expedicion)
+        
+        # Crear factura anticipo
+        factura = Factura(
+            presupuesto_id=presupuesto_id,
+            pedido_id=None,
+            serie=serie,
+            numero=numero,
+            fecha_expedicion=fecha_expedicion,
+            tipo_factura='F1',
+            descripcion=f'Anticipo del pedido {presupuesto.numero_solicitud or presupuesto.id}',
+            nif=cliente.nif if cliente and cliente.nif else '',
+            nombre=cliente.nombre if cliente else 'Sin cliente',
+            importe_total=importe_anticipo,
+            descuento_pronto_pago=Decimal('0'),
+            tipo_iva=tipo_iva,
+            estado='pendiente',
+            anticipo=importe_anticipo,
+            es_anticipo=True
+        )
+        
+        db.session.add(factura)
+        db.session.flush()
+        
+        # Crear una línea de factura para el anticipo (sin desglose)
+        linea_factura = LineaFactura(
+            factura_id=factura.id,
+            linea_pedido_id=None,
+            descripcion=f'Anticipo de la solicitud {presupuesto.numero_solicitud or presupuesto.id}',
+            cantidad=Decimal('1'),
+            talla=None,
+            precio_unitario=base_imponible,
+            descuento=Decimal('0'),
+            precio_final=base_imponible,
+            importe=base_imponible
+        )
+        db.session.add(linea_factura)
+        
+        # Actualizar el anticipo en el presupuesto
+        presupuesto.anticipo = importe_anticipo
+        
+        # ============================================
+        # CÓDIGO VERIFACTU COMENTADO - Se puede restaurar más adelante
+        # ============================================
+        # # Verificar si el envío a Verifactu está activado
+        # from models import Configuracion
+        # config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+        # verifactu_enviar_activo = True
+        # if config:
+        #     verifactu_enviar_activo = config.valor.lower() == 'true'
+        # 
+        # # Enviar a Verifactu si está activado
+        # verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
+        # verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
+        # 
+        # if verifactu_token and verifactu_enviar_activo:
+        #     # Preparar payload para Verifactu
+        #     payload = {
+        #         'serie': factura.serie,
+        #         'numero': factura.numero,
+        #         'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
+        #         'tipo_factura': factura.tipo_factura,
+        #         'descripcion': factura.descripcion,
+        #         'lineas': [{
+        #             'base_imponible': str(base_imponible),
+        #             'tipo_impositivo': str(int(tipo_iva)),
+        #             'cuota_repercutida': str(iva_total)
+        #         }],
+        #         'importe_total': str(importe_anticipo),
+        #         'nombre': factura.nombre,
+        #         'nif': factura.nif if factura.nif else None
+        #     }
+        #     
+        #     headers = {
+        #         'Content-Type': 'application/json',
+        #         'Authorization': f'Bearer {verifactu_token}'
+        #     }
+        #     
+        #     try:
+        #         response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
+        #         
+        #         if response.status_code == 200 or response.status_code == 201:
+        #             response_data = response.json()
+        #             factura.huella_verifactu = json.dumps(response_data)
+        #             factura.estado = 'confirmado'
+        #             factura.fecha_confirmacion = datetime.utcnow()
+        #             flash('Factura anticipo creada y enviada a Verifactu correctamente.', 'success')
+        #         else:
+        #             factura.estado = 'error'
+        #             factura.huella_verifactu = json.dumps({
+        #                 'error': response.text,
+        #                 'status_code': response.status_code
+        #             })
+        #             flash(f'Error al enviar a Verifactu: {response.status_code} - {response.text}', 'error')
+        #     except requests.exceptions.RequestException as e:
+        #         factura.estado = 'error'
+        #         factura.huella_verifactu = json.dumps({'error': str(e)})
+        #         flash(f'Error de conexión con Verifactu: {str(e)}', 'error')
+        # elif not verifactu_enviar_activo:
+        #     factura.estado = 'pendiente'
+        #     flash('Factura anticipo creada. El envío automático a Verifactu está desactivado.', 'info')
+        # else:
+        #     factura.estado = 'pendiente'
+        #     flash('Factura anticipo creada. Configure VERIFACTU_TOKEN para enviar automáticamente.', 'warning')
+        
+        # Estado por defecto sin Verifactu
+        factura.estado = 'pendiente'
+        flash('Factura anticipo creada correctamente.', 'success')
+        
+        db.session.commit()
+        return redirect(url_for('presupuestos.listado_solicitudes'))
+    
+    # GET: mostrar solicitudes pendientes de facturar
+    # Obtener solicitudes que aún no tienen factura formalizada (o solo tienen factura anticipo)
+    # Permitir cualquier estado posterior a 'presupuesto' (rechazado, aceptado, mockup, en preparacion, etc.)
+    # No se requiere que hayan pasado por estado 'aceptado' para poder facturar
+    presupuestos_con_factura_ids = [f.presupuesto_id for f in Factura.query.with_entities(Factura.presupuesto_id).filter(
+        and_(Factura.presupuesto_id.isnot(None), Factura.es_anticipo == False)
+    ).all()]
+    
+    query_solicitudes = Presupuesto.query.filter(Presupuesto.estado != 'presupuesto')
+    if presupuestos_con_factura_ids:
+        query_solicitudes = query_solicitudes.filter(not_(Presupuesto.id.in_(presupuestos_con_factura_ids)))
+    
+    solicitudes = query_solicitudes.order_by(Presupuesto.id.desc()).all()
+    
+    return render_template('facturacion/seleccionar_solicitud_anticipo.html', solicitudes=solicitudes)
+
+@facturacion_bp.route('/facturacion/crear_factura_anticipo/<int:presupuesto_id>', methods=['GET', 'POST'])
+@login_required
+@not_usuario_required
+@emision_facturas_desactivada
+def crear_factura_anticipo_seleccionar(presupuesto_id):
+    """Mostrar formulario para introducir importe anticipado"""
+    presupuesto = Presupuesto.query.get_or_404(presupuesto_id)
+    
+    # Calcular total de la solicitud
+    cliente = presupuesto.cliente
+    tipo_iva_valor = float(cliente.tipo_iva) if cliente and cliente.tipo_iva else 21.0
+    tipo_iva = Decimal(str(tipo_iva_valor))
+    
+    base_imponible = Decimal('0.00')
+    for linea in presupuesto.lineas:
+        precio_unit = Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0.00')
+        cantidad = Decimal(str(linea.cantidad))
+        descuento = Decimal(str(linea.descuento)) if linea.descuento else Decimal('0')
+        
+        precio_final = precio_unit
+        if descuento > 0:
+            if linea.precio_final:
+                precio_final = Decimal(str(linea.precio_final))
+            else:
+                precio_final = precio_unit * (Decimal('1') - descuento / Decimal('100'))
+        
+        total_linea = cantidad * precio_final
+        base_imponible += total_linea
+    
+    iva_total = base_imponible * tipo_iva / Decimal('100')
+    total_con_iva = base_imponible + iva_total
+    
+    fecha_hoy = datetime.now().strftime('%Y-%m-%d')
+    
+    return render_template('facturacion/formulario_anticipo.html', 
+                         presupuesto=presupuesto,
+                         total_con_iva=total_con_iva,
+                         fecha_hoy=fecha_hoy)
+
+@facturacion_bp.route('/facturacion/<int:pedido_id>')
+@login_required
+@not_usuario_required
+@emision_facturas_desactivada
+def ver_factura(pedido_id):
+    """Vista detallada de una factura para introducir importes"""
+    pedido = Pedido.query.get_or_404(pedido_id)
+    
+    # Verificar si ya existe una factura para este pedido
+    factura_existente = Factura.query.filter_by(pedido_id=pedido_id).first()
+    
+    return render_template('ver_factura.html', pedido=pedido, factura_existente=factura_existente)
+
+@facturacion_bp.route('/facturacion/<int:pedido_id>/formalizar', methods=['POST'])
+@login_required
+@not_usuario_required
+@emision_facturas_desactivada
+def formalizar_factura(pedido_id):
+    """Formalizar una factura y enviarla a Verifactu"""
+    try:
+        pedido = Pedido.query.get_or_404(pedido_id)
+        
+        # Verificar si ya existe una factura para este pedido
+        factura_existente = Factura.query.filter_by(pedido_id=pedido_id).first()
+        if factura_existente:
+            flash('Este pedido ya tiene una factura formalizada.', 'warning')
+            return redirect(url_for('facturacion.ver_factura', pedido_id=pedido_id))
+        
+        # Obtener datos del formulario
+        data = request.get_json()
+        
+        fecha_expedicion_str = data.get('fecha_expedicion', '')
+        descripcion = data.get('descripcion', '')
+        lineas_data = data.get('lineas', [])
+        
+        if not fecha_expedicion_str:
+            return jsonify({'success': False, 'error': 'La fecha de expedición es obligatoria'}), 400
+        
+        if not lineas_data:
+            return jsonify({'success': False, 'error': 'Debe haber al menos una línea con importe'}), 400
+        
+        # Procesar fecha
+        fecha_expedicion = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d').date()
+        
+        # Generar número de factura automáticamente
+        serie = 'A'  # Serie fija
+        numero = obtener_siguiente_numero_factura(fecha_expedicion)
+        
+        # Calcular importe total
+        importe_total = Decimal('0.00')
+        for linea_data in lineas_data:
+            importe = Decimal(str(linea_data.get('importe', 0)))
+            importe_total += importe
+        
+        # Crear factura
+        cliente = pedido.cliente if pedido.cliente else None
+        factura = Factura(
+            pedido_id=pedido_id,
+            serie=serie,
+            numero=numero,
+            fecha_expedicion=fecha_expedicion,
+            tipo_factura='F1',  # Factura completa
+            descripcion=descripcion,
+            nif=cliente.nif if cliente and cliente.nif else '',
+            nombre=cliente.nombre if cliente else 'Sin cliente',
+            importe_total=importe_total,
+            tipo_iva=Decimal('21.00'),  # IVA por defecto 21%
+            estado='pendiente'
+        )
+        
+        db.session.add(factura)
+        db.session.flush()  # Para obtener el ID de la factura
+        
+        # Crear líneas de factura
+        for linea_data in lineas_data:
+            linea_pedido_id = linea_data.get('linea_pedido_id')
+            descripcion_linea = linea_data.get('descripcion', '')
+            cantidad = Decimal(str(linea_data.get('cantidad', 1)))
+            precio_unitario = Decimal(str(linea_data.get('precio_unitario', 0)))
+            importe = Decimal(str(linea_data.get('importe', 0)))
+            
+            # Obtener talla de la línea de pedido si existe
+            talla = None
+            if linea_pedido_id:
+                from models import LineaPedido
+                linea_pedido = LineaPedido.query.get(linea_pedido_id)
+                if linea_pedido and linea_pedido.talla:
+                    talla = linea_pedido.talla
+            
+            linea_factura = LineaFactura(
+                factura_id=factura.id,
+                linea_pedido_id=linea_pedido_id,
+                descripcion=descripcion_linea,
+                cantidad=cantidad,
+                talla=talla,
+                precio_unitario=precio_unitario,
+                importe=importe
+            )
+            db.session.add(linea_factura)
+        
+        # ============================================
+        # CÓDIGO VERIFACTU COMENTADO - Se puede restaurar más adelante
+        # ============================================
+        # # Verificar si el envío a Verifactu está activado
+        # from models import Configuracion
+        # config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+        # verifactu_enviar_activo = True  # Por defecto activado
+        # if config:
+        #     verifactu_enviar_activo = config.valor.lower() == 'true'
+        # 
+        # # Enviar a Verifactu solo si está activado y hay token
+        # verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
+        # verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
+        # 
+        # if verifactu_token and verifactu_enviar_activo:
+        #     # Preparar datos para la API
+        #     # Calcular base imponible e IVA para cada línea
+        #     # Asumimos que el importe incluye IVA al 21%
+        #     tipo_impositivo = 21  # IVA estándar en España
+        #     lineas_payload = []
+        #     total_base_imponible = Decimal('0.00')
+        #     total_cuota_repercutida = Decimal('0.00')
+        #     
+        #     for linea in factura.lineas:
+        #         # Si el importe incluye IVA, calcular base imponible
+        #         importe_con_iva = Decimal(str(linea.importe))
+        #         # Calcular base imponible: importe / (1 + tipo_impositivo/100)
+        #         base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
+        #         # Calcular cuota repercutida: base_imponible * (tipo_impositivo/100)
+        #         cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
+        #         
+        #         # Redondear a 2 decimales
+        #         base_imponible = base_imponible.quantize(Decimal('0.01'))
+        #         cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
+        #         
+        #         total_base_imponible += base_imponible
+        #         total_cuota_repercutida += cuota_repercutida
+        #         
+        #         lineas_payload.append({
+        #             'base_imponible': str(base_imponible),
+        #             'tipo_impositivo': str(tipo_impositivo),
+        #             'cuota_repercutida': str(cuota_repercutida)
+        #         })
+        #     
+        #     payload = {
+        #         'serie': factura.serie,
+        #         'numero': factura.numero,
+        #         'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
+        #         'tipo_factura': factura.tipo_factura,
+        #         'descripcion': factura.descripcion or 'Descripcion de la operacion',
+        #         'nif': factura.nif or '',
+        #         'nombre': factura.nombre,
+        #         'lineas': lineas_payload,
+        #         'importe_total': str(factura.importe_total)
+        #     }
+        #     
+        #     headers = {
+        #         'Content-Type': 'application/json',
+        #         'Authorization': f'Bearer {verifactu_token}'
+        #     }
+        #     
+        #     try:
+        #         response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
+        #         
+        #         if response.status_code == 200 or response.status_code == 201:
+        #             # Éxito: guardar la huella
+        #             response_data = response.json()
+        #             factura.huella_verifactu = json.dumps(response_data)
+        #             factura.estado = 'confirmado'
+        #             factura.fecha_confirmacion = datetime.utcnow()
+        #             db.session.commit()
+        #             return jsonify({
+        #                 'success': True,
+        #                 'message': 'Factura formalizada y enviada a Verifactu correctamente.',
+        #                 'factura_id': factura.id
+        #             })
+        #         else:
+        #             # Error en la API
+        #             factura.estado = 'error'
+        #             factura.huella_verifactu = json.dumps({
+        #                 'error': response.text,
+        #                 'status_code': response.status_code
+        #             })
+        #             db.session.commit()
+        #             return jsonify({
+        #                 'success': False,
+        #                 'error': f'Error al enviar a Verifactu: {response.status_code} - {response.text}'
+        #             }), 400
+        #     except requests.exceptions.RequestException as e:
+        #         # Error de conexión
+        #         factura.estado = 'error'
+        #         factura.huella_verifactu = json.dumps({'error': str(e)})
+        #         db.session.commit()
+        #         return jsonify({
+        #             'success': False,
+        #             'error': f'Error de conexión con Verifactu: {str(e)}'
+        #         }), 400
+        # elif not verifactu_enviar_activo:
+        #     # Envío desactivado, solo guardar como pendiente
+        #     factura.estado = 'pendiente'
+        #     db.session.commit()
+        #     return jsonify({
+        #         'success': True,
+        #         'message': 'Factura creada. El envío automático a Verifactu está desactivado.',
+        #         'factura_id': factura.id
+        #     })
+        # else:
+        #     # Sin token, solo guardar como pendiente
+        #     factura.estado = 'pendiente'
+        #     db.session.commit()
+        #     return jsonify({
+        #         'success': True,
+        #         'message': 'Factura creada. Configure VERIFACTU_TOKEN para enviar automáticamente.',
+        #         'factura_id': factura.id
+        #     })
+        
+        # Estado por defecto sin Verifactu
+        factura.estado = 'pendiente'
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': 'Factura formalizada correctamente.',
+            'factura_id': factura.id
+        })
+            
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': f'Error al formalizar la factura: {str(e)}'
+        }), 500
+
+@facturacion_bp.route('/facturacion/nueva', methods=['GET', 'POST'])
+@login_required
+@not_usuario_required
+@emision_facturas_desactivada
+def nueva_factura():
+    """Crear una factura directamente sin pedido"""
+    if request.method == 'POST':
+        try:
+            # Obtener datos del formulario
+            fecha_expedicion_str = request.form.get('fecha_expedicion', '')
+            tipo_factura = request.form.get('tipo_factura', 'F1')
+            descripcion = request.form.get('descripcion', '')
+            nombre_cliente = request.form.get('nombre_cliente', '')
+            nif_cliente = request.form.get('nif_cliente', '')
+            direccion_cliente = request.form.get('direccion_cliente', '')
+            poblacion_cliente = request.form.get('poblacion_cliente', '')
+            provincia_cliente = request.form.get('provincia_cliente', '')
+            codigo_postal_cliente = request.form.get('codigo_postal_cliente', '')
+            telefono_cliente = request.form.get('telefono_cliente', '')
+            email_cliente = request.form.get('email_cliente', '')
+            cliente_id = request.form.get('cliente_id', '')
+            descuento_pronto_pago = request.form.get('descuento_pronto_pago', '0') or '0'
+            tipo_iva = request.form.get('tipo_iva', '21') or '21'
+            
+            # Obtener líneas de factura
+            descripciones = request.form.getlist('descripcion_linea[]')
+            cantidades = request.form.getlist('cantidad[]')
+            tallas = request.form.getlist('talla[]')
+            precios_unitarios = request.form.getlist('precio_unitario[]')
+            descuentos = request.form.getlist('descuento[]')
+            precios_finales = request.form.getlist('precio_final[]')
+            
+            if not fecha_expedicion_str:
+                flash('La fecha de expedición es obligatoria', 'error')
+                return redirect(url_for('facturacion.nueva_factura'))
+            
+            if not nombre_cliente:
+                flash('El nombre del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.nueva_factura'))
+            
+            if not nif_cliente:
+                flash('El NIF/CIF del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.nueva_factura'))
+            
+            if not direccion_cliente:
+                flash('La dirección del cliente es obligatoria', 'error')
+                return redirect(url_for('facturacion.nueva_factura'))
+            
+            if not poblacion_cliente:
+                flash('La población del cliente es obligatoria', 'error')
+                return redirect(url_for('facturacion.nueva_factura'))
+            
+            if not provincia_cliente:
+                flash('La provincia del cliente es obligatoria', 'error')
+                return redirect(url_for('facturacion.nueva_factura'))
+            
+            if not codigo_postal_cliente:
+                flash('El código postal del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.nueva_factura'))
+            
+            if not descripciones or not any(descripciones):
+                flash('Debe haber al menos una línea en la factura', 'error')
+                return redirect(url_for('facturacion.nueva_factura'))
+            
+            # Procesar fecha
+            fecha_expedicion = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d').date()
+            
+            # Si hay cliente_id, obtener datos del cliente (pero permitir sobrescribir con los del formulario)
+            cliente_obj = None
+            if cliente_id:
+                cliente_obj = Cliente.query.get(cliente_id)
+                if cliente_obj:
+                    if not nombre_cliente:
+                        nombre_cliente = cliente_obj.nombre
+                    if not nif_cliente and cliente_obj.nif:
+                        nif_cliente = cliente_obj.nif
+                    if not direccion_cliente and cliente_obj.direccion:
+                        direccion_cliente = cliente_obj.direccion
+                    if not poblacion_cliente and cliente_obj.poblacion:
+                        poblacion_cliente = cliente_obj.poblacion
+                    if not provincia_cliente and cliente_obj.provincia:
+                        provincia_cliente = cliente_obj.provincia
+                    if not codigo_postal_cliente and cliente_obj.codigo_postal:
+                        codigo_postal_cliente = cliente_obj.codigo_postal
+                    if not telefono_cliente and cliente_obj.telefono:
+                        telefono_cliente = cliente_obj.telefono
+                    if not email_cliente and cliente_obj.email:
+                        email_cliente = cliente_obj.email
+                    # Usar tipo_iva del cliente si no se especificó en el formulario
+                    if tipo_iva == '21' and cliente_obj.tipo_iva:
+                        tipo_iva = str(cliente_obj.tipo_iva)
+            
+            # Generar número de factura automáticamente
+            serie = 'A'
+            numero = obtener_siguiente_numero_factura(fecha_expedicion)
+            
+            # Calcular importe total
+            importe_total = Decimal('0.00')
+            lineas_data = []
+            for i in range(len(descripciones)):
+                if descripciones[i]:
+                    cantidad = Decimal(str(cantidades[i])) if i < len(cantidades) and cantidades[i] else Decimal('1')
+                    precio_unitario = Decimal(str(precios_unitarios[i])) if i < len(precios_unitarios) and precios_unitarios[i] else Decimal('0')
+                    
+                    # Procesar descuento
+                    descuento = Decimal('0')
+                    if i < len(descuentos) and descuentos[i]:
+                        try:
+                            descuento = Decimal(str(descuentos[i]))
+                        except:
+                            descuento = Decimal('0')
+                    
+                    # Procesar precio final (si existe, usar ese; sino calcular con descuento)
+                    precio_final = None
+                    if i < len(precios_finales) and precios_finales[i]:
+                        try:
+                            precio_final = Decimal(str(precios_finales[i]))
+                        except:
+                            precio_final = None
+                    
+                    # Si no hay precio_final pero hay descuento, calcularlo
+                    if precio_final is None and descuento > 0:
+                        precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+                    elif precio_final is None:
+                        precio_final = precio_unitario
+                    
+                    # Calcular importe usando precio_final si existe
+                    importe = cantidad * precio_final
+                    importe_total += importe
+                    
+                    talla = tallas[i] if i < len(tallas) and tallas[i] else None
+                    lineas_data.append({
+                        'descripcion': descripciones[i],
+                        'cantidad': cantidad,
+                        'talla': talla,
+                        'precio_unitario': precio_unitario,
+                        'descuento': descuento,
+                        'precio_final': precio_final,
+                        'importe': importe
+                    })
+            
+            # Calcular IVA según el tipo seleccionado
+            # Los precios unitarios son sin IVA, así que importe_total es la base imponible
+            base_imponible = importe_total
+            tipo_iva_decimal = Decimal(str(tipo_iva))
+            iva = base_imponible * (tipo_iva_decimal / Decimal('100'))
+            subtotal = base_imponible + iva
+            
+            # Procesar descuento por pronto pago
+            descuento_pronto_pago_decimal = Decimal('0')
+            try:
+                descuento_pronto_pago_decimal = Decimal(str(descuento_pronto_pago))
+            except:
+                descuento_pronto_pago_decimal = Decimal('0')
+            
+            # Aplicar descuento por pronto pago al subtotal (base + IVA)
+            if descuento_pronto_pago_decimal > 0:
+                descuento_aplicado = subtotal * (descuento_pronto_pago_decimal / Decimal('100'))
+                importe_total = subtotal - descuento_aplicado
+            else:
+                importe_total = subtotal
+            
+            # Obtener cliente_id si se proporcionó
+            cliente_id_int = None
+            if cliente_id:
+                try:
+                    cliente_id_int = int(cliente_id)
+                except:
+                    cliente_id_int = None
+            
+            # Crear factura sin pedido
+            factura = Factura(
+                pedido_id=None,  # Factura directa sin pedido
+                cliente_id=cliente_id_int,  # Cliente asociado si se seleccionó uno
+                serie=serie,
+                numero=numero,
+                fecha_expedicion=fecha_expedicion,
+                tipo_factura=tipo_factura,
+                descripcion=descripcion,
+                nif=nif_cliente,
+                nombre=nombre_cliente,
+                importe_total=importe_total,
+                descuento_pronto_pago=descuento_pronto_pago_decimal,
+                tipo_iva=tipo_iva_decimal,
+                estado='pendiente'
+            )
+            
+            db.session.add(factura)
+            db.session.flush()  # Para obtener el ID de la factura
+            
+            # Crear líneas de factura
+            for linea_data in lineas_data:
+                linea_factura = LineaFactura(
+                    factura_id=factura.id,
+                    linea_pedido_id=None,  # Sin línea de pedido asociada
+                    descripcion=linea_data['descripcion'],
+                    cantidad=linea_data['cantidad'],
+                    talla=linea_data.get('talla'),
+                    precio_unitario=linea_data['precio_unitario'],
+                    descuento=linea_data['descuento'],
+                    precio_final=linea_data['precio_final'],
+                    importe=linea_data['importe']
+                )
+                db.session.add(linea_factura)
+            
+            # ============================================
+            # CÓDIGO VERIFACTU COMENTADO - Se puede restaurar más adelante
+            # ============================================
+            # # Verificar si el envío a Verifactu está activado
+            # from models import Configuracion
+            # config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+            # verifactu_enviar_activo = True  # Por defecto activado
+            # if config:
+            #     verifactu_enviar_activo = config.valor.lower() == 'true'
+            # 
+            # # Enviar a Verifactu solo si está activado y hay token
+            # verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
+            # verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
+            # 
+            # if verifactu_token and verifactu_enviar_activo:
+            #     # Preparar datos para la API
+            #     tipo_impositivo = 21  # IVA estándar en España
+            #     lineas_payload = []
+            #     total_base_imponible = Decimal('0.00')
+            #     total_cuota_repercutida = Decimal('0.00')
+            #     
+            #     for linea_data in lineas_data:
+            #         importe_con_iva = linea_data['importe']
+            #         base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
+            #         cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
+            #         
+            #         base_imponible = base_imponible.quantize(Decimal('0.01'))
+            #         cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
+            #         
+            #         total_base_imponible += base_imponible
+            #         total_cuota_repercutida += cuota_repercutida
+            #         
+            #         lineas_payload.append({
+            #             'base_imponible': str(base_imponible),
+            #             'tipo_impositivo': str(tipo_impositivo),
+            #             'cuota_repercutida': str(cuota_repercutida)
+            #         })
+            #     
+            #     payload = {
+            #         'serie': factura.serie,
+            #         'numero': factura.numero,
+            #         'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
+            #         'tipo_factura': factura.tipo_factura,
+            #         'descripcion': factura.descripcion or 'Descripcion de la operacion',
+            #         'nif': factura.nif or '',
+            #         'nombre': factura.nombre,
+            #         'lineas': lineas_payload,
+            #         'importe_total': str(factura.importe_total)
+            #     }
+            #     
+            #     headers = {
+            #         'Content-Type': 'application/json',
+            #         'Authorization': f'Bearer {verifactu_token}'
+            #     }
+            #     
+            #     try:
+            #         response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
+            #         
+            #         if response.status_code == 200 or response.status_code == 201:
+            #             response_data = response.json()
+            #             factura.huella_verifactu = json.dumps(response_data)
+            #             factura.estado = 'confirmado'
+            #             db.session.commit()
+            #             flash('Factura creada y enviada a Verifactu correctamente.', 'success')
+            #         else:
+            #             factura.estado = 'error'
+            #             factura.huella_verifactu = json.dumps({
+            #                 'error': response.text,
+            #                 'status_code': response.status_code
+            #             })
+            #             db.session.commit()
+            #             flash(f'Error al enviar a Verifactu: {response.status_code} - {response.text}', 'error')
+            #     except requests.exceptions.RequestException as e:
+            #         factura.estado = 'error'
+            #         factura.huella_verifactu = json.dumps({'error': str(e)})
+            #         db.session.commit()
+            #         flash(f'Error de conexión con Verifactu: {str(e)}', 'error')
+            # elif not verifactu_enviar_activo:
+            #     factura.estado = 'pendiente'
+            #     db.session.commit()
+            #     flash('Factura creada. El envío automático a Verifactu está desactivado.', 'info')
+            # else:
+            #     factura.estado = 'pendiente'
+            #     db.session.commit()
+            #     flash('Factura creada. Configure VERIFACTU_TOKEN para enviar automáticamente.', 'warning')
+            
+            # Estado por defecto sin Verifactu
+            factura.estado = 'pendiente'
+            db.session.commit()
+            flash('Factura creada correctamente.', 'success')
+            
+            return redirect(url_for('facturacion.menu_ventas'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al crear la factura: {str(e)}', 'error')
+            import traceback
+            traceback.print_exc()
+    
+    # GET: mostrar formulario
+    from models import Comercial
+    clientes = Cliente.query.order_by(Cliente.nombre).all()
+    comerciales = Comercial.query.all()
+    # Establecer fecha de hoy por defecto
+    fecha_hoy = datetime.now().strftime('%Y-%m-%d')
+    return render_template('facturacion/nueva_factura.html', clientes=clientes, comerciales=comerciales, fecha_hoy=fecha_hoy)
+
+@facturacion_bp.route('/facturacion/factura/<int:factura_id>/rectificativa', methods=['GET', 'POST'])
+@login_required
+@not_usuario_required
+@emision_facturas_desactivada
+def crear_factura_rectificativa(factura_id):
+    """Crear una factura rectificativa desde una factura"""
+    factura_original = Factura.query.get_or_404(factura_id)
+    
+    if request.method == 'POST':
+        try:
+            # Obtener datos del formulario
+            fecha_expedicion_str = request.form.get('fecha_expedicion', '')
+            tipo_factura = request.form.get('tipo_factura', 'R1')  # R1 = Rectificativa completa, R2 = Rectificativa simplificada
+            descripcion = request.form.get('descripcion', '')
+            nombre_cliente = request.form.get('nombre_cliente', '')
+            nif_cliente = request.form.get('nif_cliente', '')
+            direccion_cliente = request.form.get('direccion_cliente', '')
+            poblacion_cliente = request.form.get('poblacion_cliente', '')
+            provincia_cliente = request.form.get('provincia_cliente', '')
+            codigo_postal_cliente = request.form.get('codigo_postal_cliente', '')
+            telefono_cliente = request.form.get('telefono_cliente', '')
+            email_cliente = request.form.get('email_cliente', '')
+            cliente_id = request.form.get('cliente_id', '')
+            descuento_pronto_pago = request.form.get('descuento_pronto_pago', '0') or '0'
+            tipo_iva = request.form.get('tipo_iva', '21') or '21'
+            
+            # Obtener líneas de factura
+            descripciones = request.form.getlist('descripcion_linea[]')
+            cantidades = request.form.getlist('cantidad[]')
+            tallas = request.form.getlist('talla[]')
+            precios_unitarios = request.form.getlist('precio_unitario[]')
+            descuentos = request.form.getlist('descuento[]')
+            precios_finales = request.form.getlist('precio_final[]')
+            
+            if not fecha_expedicion_str:
+                flash('La fecha de expedición es obligatoria', 'error')
+                return redirect(url_for('facturacion.crear_factura_rectificativa', factura_id=factura_id))
+            
+            if not nombre_cliente:
+                flash('El nombre del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.crear_factura_rectificativa', factura_id=factura_id))
+            
+            # Procesar fecha
+            fecha_expedicion = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d').date()
+            
+            # Procesar tipo de IVA
+            tipo_iva_decimal = Decimal(str(tipo_iva))
+            
+            # Procesar descuento por pronto pago
+            descuento_pronto_pago_decimal = Decimal('0')
+            try:
+                descuento_pronto_pago_decimal = Decimal(str(descuento_pronto_pago))
+            except:
+                descuento_pronto_pago_decimal = Decimal('0')
+            
+            # Procesar líneas de factura (con valores negativos para rectificativa)
+            lineas_data = []
+            base_imponible = Decimal('0')
+            
+            for i in range(len(descripciones)):
+                if not descripciones[i]:
+                    continue
+                
+                cantidad = Decimal(str(cantidades[i])) if cantidades[i] else Decimal('0')
+                precio_unitario = Decimal(str(precios_unitarios[i])) if precios_unitarios[i] else Decimal('0')
+                descuento = Decimal(str(descuentos[i])) if descuentos[i] else Decimal('0')
+                precio_final = Decimal(str(precios_finales[i])) if precios_finales[i] else Decimal('0')
+                
+                # Para factura rectificativa, los valores deben ser negativos
+                cantidad = -abs(cantidad)
+                precio_unitario = -abs(precio_unitario)
+                precio_final = -abs(precio_final)
+                
+                # Calcular importe (negativo)
+                importe = precio_final * abs(cantidad)
+                base_imponible += importe
+                
+                lineas_data.append({
+                    'descripcion': descripciones[i],
+                    'cantidad': cantidad,
+                    'talla': tallas[i] if i < len(tallas) else '',
+                    'precio_unitario': precio_unitario,
+                    'descuento': descuento,
+                    'precio_final': precio_final,
+                    'importe': importe
+                })
+            
+            if not lineas_data:
+                flash('Debe añadir al menos una línea a la factura', 'error')
+                return redirect(url_for('facturacion.crear_factura_rectificativa', factura_id=factura_id))
+            
+            # Calcular IVA y total (valores negativos)
+            base_imponible = abs(base_imponible)  # Tomar valor absoluto para cálculos
+            iva = base_imponible * (tipo_iva_decimal / Decimal('100'))
+            subtotal = base_imponible + iva
+            
+            # Aplicar descuento por pronto pago
+            if descuento_pronto_pago_decimal > 0:
+                descuento_aplicado = subtotal * (descuento_pronto_pago_decimal / Decimal('100'))
+                importe_total = subtotal - descuento_aplicado
+            else:
+                importe_total = subtotal
+            
+            # El importe total debe ser negativo para la rectificativa
+            importe_total = -importe_total
+            
+            # Obtener siguiente número de factura rectificativa
+            serie = factura_original.serie
+            numero = obtener_siguiente_numero_factura(fecha_expedicion)
+            
+            # Procesar cliente_id
+            cliente_id_int = None
+            if cliente_id:
+                try:
+                    cliente_id_int = int(cliente_id)
+                except:
+                    cliente_id_int = None
+            
+            # Crear factura rectificativa
+            factura_rectificativa = Factura(
+                pedido_id=None,
+                cliente_id=cliente_id_int,
+                serie=serie,
+                numero=numero,
+                fecha_expedicion=fecha_expedicion,
+                tipo_factura=tipo_factura,  # R1 o R2
+                descripcion=descripcion or f'Rectificativa de factura {factura_original.serie}-{factura_original.numero}',
+                nif=nif_cliente,
+                nombre=nombre_cliente,
+                importe_total=importe_total,
+                descuento_pronto_pago=descuento_pronto_pago_decimal,
+                tipo_iva=tipo_iva_decimal,
+                estado='pendiente',
+                es_rectificativa=True,
+                factura_rectificada_id=factura_id
+            )
+            
+            db.session.add(factura_rectificativa)
+            db.session.flush()
+            
+            # Crear líneas de factura rectificativa (con valores negativos)
+            for linea_data in lineas_data:
+                linea_factura = LineaFactura(
+                    factura_id=factura_rectificativa.id,
+                    linea_pedido_id=None,
+                    descripcion=linea_data['descripcion'],
+                    cantidad=linea_data['cantidad'],
+                    talla=linea_data.get('talla'),
+                    precio_unitario=linea_data['precio_unitario'],
+                    descuento=linea_data['descuento'],
+                    precio_final=linea_data['precio_final'],
+                    importe=linea_data['importe']
+                )
+                db.session.add(linea_factura)
+            
+            factura_rectificativa.estado = 'pendiente'
+            db.session.commit()
+            flash(f'Factura rectificativa {factura_rectificativa.serie}-{factura_rectificativa.numero} creada correctamente', 'success')
+            return redirect(url_for('facturacion.editar_factura', factura_id=factura_rectificativa.id))
+        
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al crear la factura rectificativa: {str(e)}', 'error')
+            return redirect(url_for('facturacion.crear_factura_rectificativa', factura_id=factura_id))
+    
+    # GET: mostrar formulario de factura rectificativa prellenado con datos de la factura original
+    clientes = Cliente.query.order_by(Cliente.nombre).all()
+    comerciales = []  # No necesario para rectificativas
+    
+    # Obtener cliente completo de la factura original
+    cliente_original = None
+    if factura_original.cliente_id:
+        cliente_original = Cliente.query.get(factura_original.cliente_id)
+    
+    # Calcular la base imponible total de la factura original
+    base_imponible_total = Decimal('0')
+    for linea in factura_original.lineas:
+        importe_linea = Decimal(str(linea.importe)) if linea.importe else Decimal('0')
+        base_imponible_total += abs(importe_linea)
+    
+    fecha_hoy = datetime.now().strftime('%Y-%m-%d')
+    
+    # Preparar datos para usar el mismo template que nueva_factura.html
+    # Crear solo una línea con el concepto "Abono" y el total de la base imponible en negativo
+    # Usar cantidad positiva (1) y precio negativo para que el importe sea negativo
+    lineas_prellenadas = [{
+        'descripcion': 'Abono',
+        'cantidad': Decimal('1'),
+        'talla': '',
+        'precio_unitario': -base_imponible_total,
+        'descuento': Decimal('0'),
+        'precio_final': -base_imponible_total,
+        'importe': -base_imponible_total
+    }]
+    
+    # Formatear fecha_expedicion como string para evitar problemas en el template
+    fecha_expedicion_str = None
+    if factura_original.fecha_expedicion:
+        try:
+            if isinstance(factura_original.fecha_expedicion, str):
+                fecha_expedicion_str = factura_original.fecha_expedicion
+            elif hasattr(factura_original.fecha_expedicion, 'strftime'):
+                fecha_expedicion_str = factura_original.fecha_expedicion.strftime('%d/%m/%Y')
+            else:
+                fecha_expedicion_str = str(factura_original.fecha_expedicion)
+        except Exception:
+            fecha_expedicion_str = str(factura_original.fecha_expedicion) if factura_original.fecha_expedicion else 'N/A'
+    
+    return render_template('facturacion/nueva_factura.html', 
+                         factura_original=factura_original,
+                         fecha_expedicion_str=fecha_expedicion_str,
+                         cliente_original=cliente_original,
+                         clientes=clientes,
+                         comerciales=comerciales,
+                         fecha_hoy=fecha_hoy,
+                         es_rectificativa=True,
+                         lineas_prellenadas=lineas_prellenadas)
+
+@facturacion_bp.route('/facturacion/factura/<int:factura_id>/editar', methods=['GET', 'POST'])
+@login_required
+@not_usuario_required
+@emision_facturas_desactivada
+def editar_factura(factura_id):
+    """Editar una factura existente (directa, desde solicitud o anticipo)"""
+    factura = Factura.query.get_or_404(factura_id)
+    
+    # No permitir editar facturas que vienen de pedidos (solo directas o desde solicitudes)
+    if factura.pedido_id is not None:
+        flash('Las facturas que vienen de pedidos no se pueden editar desde aquí', 'error')
+        return redirect(url_for('facturacion.menu_ventas'))
+    
+    if request.method == 'POST':
+        try:
+            # Obtener datos del formulario
+            fecha_expedicion_str = request.form.get('fecha_expedicion', '')
+            tipo_factura = request.form.get('tipo_factura', 'F1')
+            descripcion = request.form.get('descripcion', '')
+            nombre_cliente = request.form.get('nombre_cliente', '')
+            nif_cliente = request.form.get('nif_cliente', '')
+            direccion_cliente = request.form.get('direccion_cliente', '')
+            poblacion_cliente = request.form.get('poblacion_cliente', '')
+            provincia_cliente = request.form.get('provincia_cliente', '')
+            codigo_postal_cliente = request.form.get('codigo_postal_cliente', '')
+            telefono_cliente = request.form.get('telefono_cliente', '')
+            email_cliente = request.form.get('email_cliente', '')
+            cliente_id = request.form.get('cliente_id', '')
+            descuento_pronto_pago = request.form.get('descuento_pronto_pago', '0') or '0'
+            tipo_iva = request.form.get('tipo_iva', '21') or '21'
+            
+            # Obtener líneas de factura
+            descripciones = request.form.getlist('descripcion_linea[]')
+            cantidades = request.form.getlist('cantidad[]')
+            tallas = request.form.getlist('talla[]')
+            precios_unitarios = request.form.getlist('precio_unitario[]')
+            descuentos = request.form.getlist('descuento[]')
+            precios_finales = request.form.getlist('precio_final[]')
+            
+            if not fecha_expedicion_str:
+                flash('La fecha de expedición es obligatoria', 'error')
+                return redirect(url_for('facturacion.editar_factura', factura_id=factura_id))
+            
+            if not nombre_cliente:
+                flash('El nombre del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.editar_factura', factura_id=factura_id))
+            
+            if not nif_cliente:
+                flash('El NIF/CIF del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.editar_factura', factura_id=factura_id))
+            
+            if not descripciones or not any(descripciones):
+                flash('Debe haber al menos una línea en la factura', 'error')
+                return redirect(url_for('facturacion.editar_factura', factura_id=factura_id))
+            
+            # Procesar fecha
+            fecha_expedicion = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d').date()
+            
+            # Obtener cliente_id si se proporcionó
+            cliente_id_int = None
+            if cliente_id:
+                try:
+                    cliente_id_int = int(cliente_id)
+                except:
+                    cliente_id_int = None
+            
+            # Actualizar datos de la factura
+            factura.fecha_expedicion = fecha_expedicion
+            factura.tipo_factura = tipo_factura
+            factura.descripcion = descripcion
+            factura.nombre = nombre_cliente
+            factura.nif = nif_cliente
+            factura.cliente_id = cliente_id_int
+            factura.tipo_iva = Decimal(str(tipo_iva))
+            factura.descuento_pronto_pago = Decimal(str(descuento_pronto_pago))
+            
+            # Eliminar líneas existentes
+            for linea in factura.lineas:
+                db.session.delete(linea)
+            db.session.flush()
+            
+            # Calcular importe total
+            importe_total = Decimal('0.00')
+            lineas_data = []
+            for i in range(len(descripciones)):
+                if descripciones[i]:
+                    cantidad = Decimal(str(cantidades[i])) if i < len(cantidades) and cantidades[i] else Decimal('1')
+                    precio_unitario = Decimal(str(precios_unitarios[i])) if i < len(precios_unitarios) and precios_unitarios[i] else Decimal('0')
+                    
+                    # Procesar descuento
+                    descuento = Decimal('0')
+                    if i < len(descuentos) and descuentos[i]:
+                        try:
+                            descuento = Decimal(str(descuentos[i]))
+                        except:
+                            descuento = Decimal('0')
+                    
+                    # Procesar precio final (si existe, usar ese; sino calcular con descuento)
+                    precio_final = None
+                    if i < len(precios_finales) and precios_finales[i]:
+                        try:
+                            precio_final = Decimal(str(precios_finales[i]))
+                        except:
+                            precio_final = None
+                    
+                    # Si no hay precio_final pero hay descuento, calcularlo
+                    if precio_final is None and descuento > 0:
+                        precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+                    elif precio_final is None:
+                        precio_final = precio_unitario
+                    
+                    # Calcular importe usando precio_final si existe
+                    importe = cantidad * precio_final
+                    importe_total += importe
+                    
+                    talla = tallas[i] if i < len(tallas) and tallas[i] else None
+                    
+                    # Crear nueva línea
+                    linea_factura = LineaFactura(
+                        factura_id=factura.id,
+                        linea_pedido_id=None,
+                        descripcion=descripciones[i],
+                        cantidad=cantidad,
+                        talla=talla,
+                        precio_unitario=precio_unitario,
+                        descuento=descuento,
+                        precio_final=precio_final,
+                        importe=importe
+                    )
+                    db.session.add(linea_factura)
+            
+            # Calcular IVA según el tipo seleccionado
+            base_imponible = importe_total
+            tipo_iva_decimal = Decimal(str(tipo_iva))
+            iva = base_imponible * (tipo_iva_decimal / Decimal('100'))
+            subtotal = base_imponible + iva
+            
+            # Aplicar descuento por pronto pago
+            descuento_pronto_pago_decimal = Decimal(str(descuento_pronto_pago))
+            if descuento_pronto_pago_decimal > 0:
+                descuento_aplicado = subtotal * (descuento_pronto_pago_decimal / Decimal('100'))
+                importe_total = subtotal - descuento_aplicado
+            else:
+                importe_total = subtotal
+            
+            factura.importe_total = importe_total
+            
+            db.session.commit()
+            flash('Factura actualizada correctamente', 'success')
+            return redirect(url_for('facturacion.menu_ventas'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al actualizar la factura: {str(e)}', 'error')
+            import traceback
+            traceback.print_exc()
+    
+    # GET: mostrar formulario con datos existentes
+    clientes = Cliente.query.order_by(Cliente.nombre).all()
+    
+    # Obtener cliente: primero desde factura.cliente, luego desde presupuesto si existe
+    cliente_directo = None
+    if factura.cliente_id:
+        cliente_directo = factura.cliente
+    elif factura.presupuesto_id and factura.presupuesto and factura.presupuesto.cliente:
+        cliente_directo = factura.presupuesto.cliente
+        # Si no hay cliente_id en la factura pero hay cliente en el presupuesto, asignarlo
+        if not factura.cliente_id:
+            factura.cliente_id = cliente_directo.id
+            db.session.commit()
+    
+    # Calcular anticipo facturado si la factura viene de un presupuesto
+    anticipo_facturado = Decimal('0')
+    if factura.presupuesto_id:
+        # Buscar factura de anticipo para este presupuesto
+        factura_anticipo = Factura.query.filter(
+            and_(Factura.presupuesto_id == factura.presupuesto_id, Factura.es_anticipo == True)
+        ).first()
+        if factura_anticipo:
+            anticipo_facturado = factura_anticipo.importe_total if factura_anticipo.importe_total else Decimal('0')
+        elif factura.presupuesto and factura.presupuesto.anticipo:
+            anticipo_facturado = Decimal(str(factura.presupuesto.anticipo))
+    
+    return render_template('facturacion/editar_factura.html', 
+                         factura=factura,
+                         clientes=clientes,
+                         cliente_directo=cliente_directo,
+                         anticipo_facturado=anticipo_facturado)
+
+@facturacion_bp.route('/facturacion/nuevo_albaran', methods=['GET', 'POST'])
+@login_required
+@not_usuario_required
+def nuevo_albaran():
+    """Crear un albarán directamente sin pedido (factura pendiente de formalizar)"""
+    if request.method == 'POST':
+        try:
+            # Obtener datos del formulario
+            fecha_expedicion_str = request.form.get('fecha_expedicion', '')
+            descripcion = request.form.get('descripcion', '')
+            nombre_cliente = request.form.get('nombre_cliente', '')
+            nif_cliente = request.form.get('nif_cliente', '')
+            direccion_cliente = request.form.get('direccion_cliente', '')
+            poblacion_cliente = request.form.get('poblacion_cliente', '')
+            provincia_cliente = request.form.get('provincia_cliente', '')
+            codigo_postal_cliente = request.form.get('codigo_postal_cliente', '')
+            telefono_cliente = request.form.get('telefono_cliente', '')
+            email_cliente = request.form.get('email_cliente', '')
+            cliente_id = request.form.get('cliente_id', '')
+            # Los albaranes no tienen descuento por pronto pago
+            descuento_pronto_pago = '0'
+            
+            # Obtener líneas de albarán
+            descripciones = request.form.getlist('descripcion_linea[]')
+            cantidades = request.form.getlist('cantidad[]')
+            tallas = request.form.getlist('talla[]')
+            precios_unitarios = request.form.getlist('precio_unitario[]')
+            descuentos = request.form.getlist('descuento[]')
+            precios_finales = request.form.getlist('precio_final[]')
+            es_linea_texto = request.form.getlist('es_linea_texto[]')
+            
+            if not fecha_expedicion_str:
+                flash('La fecha de expedición es obligatoria', 'error')
+                return redirect(url_for('facturacion.nuevo_albaran'))
+            
+            if not nombre_cliente:
+                flash('El nombre del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.nuevo_albaran'))
+            
+            if not nif_cliente:
+                flash('El NIF/CIF del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.nuevo_albaran'))
+            
+            if not direccion_cliente:
+                flash('La dirección del cliente es obligatoria', 'error')
+                return redirect(url_for('facturacion.nuevo_albaran'))
+            
+            if not poblacion_cliente:
+                flash('La población del cliente es obligatoria', 'error')
+                return redirect(url_for('facturacion.nuevo_albaran'))
+            
+            if not provincia_cliente:
+                flash('La provincia del cliente es obligatoria', 'error')
+                return redirect(url_for('facturacion.nuevo_albaran'))
+            
+            if not codigo_postal_cliente:
+                flash('El código postal del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.nuevo_albaran'))
+            
+            if not descripciones or not any(descripciones):
+                flash('Debe haber al menos una línea en el albarán', 'error')
+                return redirect(url_for('facturacion.nuevo_albaran'))
+            
+            # Procesar fecha
+            fecha_expedicion = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d').date()
+            
+            # Si hay cliente_id, obtener datos del cliente (pero permitir sobrescribir con los del formulario)
+            if cliente_id:
+                cliente = Cliente.query.get(cliente_id)
+                if cliente:
+                    if not nombre_cliente:
+                        nombre_cliente = cliente.nombre
+                    if not nif_cliente and cliente.nif:
+                        nif_cliente = cliente.nif
+                    if not direccion_cliente and cliente.direccion:
+                        direccion_cliente = cliente.direccion
+                    if not poblacion_cliente and cliente.poblacion:
+                        poblacion_cliente = cliente.poblacion
+                    if not provincia_cliente and cliente.provincia:
+                        provincia_cliente = cliente.provincia
+                    if not codigo_postal_cliente and cliente.codigo_postal:
+                        codigo_postal_cliente = cliente.codigo_postal
+                    if not telefono_cliente and cliente.telefono:
+                        telefono_cliente = cliente.telefono
+                    if not email_cliente and cliente.email:
+                        email_cliente = cliente.email
+            
+            # Generar número de albarán automáticamente
+            serie = 'A'
+            numero = obtener_siguiente_numero_albaran(fecha_expedicion)
+            
+            # Calcular importe total
+            importe_total = Decimal('0.00')
+            lineas_data = []
+            for i in range(len(descripciones)):
+                if descripciones[i]:
+                    # Verificar si es línea de texto
+                    es_texto = i < len(es_linea_texto) and es_linea_texto[i] == '1'
+                    
+                    if es_texto:
+                        # Línea de texto: cantidad 0, sin precios
+                        cantidad = Decimal('0')
+                        precio_unitario = Decimal('0')
+                        descuento = Decimal('0')
+                        precio_final = Decimal('0')
+                        importe = Decimal('0')
+                        talla = None
+                    else:
+                        cantidad = Decimal(str(cantidades[i])) if i < len(cantidades) and cantidades[i] else Decimal('1')
+                        # Permitir precio vacío (None) para albaranes sin precio
+                        precio_unitario = None
+                        if i < len(precios_unitarios) and precios_unitarios[i] and precios_unitarios[i].strip():
+                            try:
+                                precio_unitario = Decimal(str(precios_unitarios[i]))
+                            except:
+                                precio_unitario = None
+                    
+                    # Procesar descuento
+                    descuento = Decimal('0')
+                    if i < len(descuentos) and descuentos[i]:
+                        try:
+                            descuento = Decimal(str(descuentos[i]))
+                        except:
+                            descuento = Decimal('0')
+                    
+                    # Procesar precio final (si existe, usar ese; sino calcular con descuento)
+                    precio_final = None
+                    if i < len(precios_finales) and precios_finales[i] and precios_finales[i].strip():
+                        try:
+                            precio_final = Decimal(str(precios_finales[i]))
+                        except:
+                            precio_final = None
+                    
+                    # Si no hay precio_unitario, precio_final e importe serán 0
+                    if precio_unitario is None:
+                        precio_unitario = Decimal('0')
+                        precio_final = Decimal('0')
+                        importe = Decimal('0')
+                    else:
+                        # Si no hay precio_final pero hay descuento, calcularlo
+                        if precio_final is None and descuento > 0:
+                            precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+                        elif precio_final is None:
+                            precio_final = precio_unitario
+                        
+                        # Calcular importe usando precio_final si existe
+                        importe = cantidad * precio_final
+                    
+                    talla = tallas[i] if i < len(tallas) and tallas[i] else None
+                    
+                    importe_total += importe
+                    
+                    lineas_data.append({
+                        'descripcion': descripciones[i],
+                        'cantidad': cantidad,
+                        'talla': talla,
+                        'precio_unitario': precio_unitario,
+                        'descuento': descuento,
+                        'precio_final': precio_final,
+                        'importe': importe
+                    })
+            
+            # Calcular IVA (21% sobre la base imponible)
+            # Los precios unitarios son sin IVA, así que importe_total es la base imponible
+            base_imponible = importe_total
+            iva = base_imponible * Decimal('0.21')
+            # Los albaranes no tienen descuento por pronto pago, el total es base + IVA
+            importe_total = base_imponible + iva
+            descuento_pronto_pago_decimal = Decimal('0')
+            
+            # Crear albarán (factura pendiente de formalizar)
+            factura = Factura(
+                pedido_id=None,  # Albarán directo sin pedido
+                presupuesto_id=None,  # Albarán directo sin presupuesto
+                serie=serie,
+                numero=numero,
+                fecha_expedicion=fecha_expedicion,
+                tipo_factura='F1',  # Factura completa (se formalizará después)
+                descripcion=descripcion,
+                nif=nif_cliente,
+                nombre=nombre_cliente,
+                importe_total=importe_total,
+                descuento_pronto_pago=descuento_pronto_pago_decimal,
+                tipo_iva=Decimal('21.00'),  # IVA por defecto 21%
+                estado='pendiente'  # Pendiente de formalizar
+            )
+            
+            db.session.add(factura)
+            db.session.flush()  # Para obtener el ID de la factura
+            
+            # Crear líneas de factura
+            for linea_data in lineas_data:
+                linea_factura = LineaFactura(
+                    factura_id=factura.id,
+                    linea_pedido_id=None,  # Sin línea de pedido asociada
+                    descripcion=linea_data['descripcion'],
+                    cantidad=linea_data['cantidad'],
+                    talla=linea_data.get('talla'),
+                    precio_unitario=linea_data['precio_unitario'],
+                    descuento=linea_data['descuento'],
+                    precio_final=linea_data['precio_final'],
+                    importe=linea_data['importe']
+                )
+                db.session.add(linea_factura)
+            
+            # Los albaranes siempre se crean como pendientes (no se envían a Verifactu)
+            factura.estado = 'pendiente'
+            db.session.commit()
+            flash('Albarán creado correctamente. Está pendiente de formalizar.', 'success')
+            
+            return redirect(url_for('facturacion.listado_albaranes_retirada'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al crear el albarán: {str(e)}', 'error')
+            import traceback
+            traceback.print_exc()
+    
+    # GET: mostrar formulario
+    clientes = Cliente.query.order_by(Cliente.nombre).all()
+    # Establecer fecha de hoy por defecto
+    fecha_hoy = datetime.now().strftime('%Y-%m-%d')
+    return render_template('facturacion/nuevo_albaran.html', clientes=clientes, fecha_hoy=fecha_hoy)
+
+@facturacion_bp.route('/facturacion/albaran/<int:factura_id>/editar', methods=['GET', 'POST'])
+@login_required
+@not_usuario_required
+def editar_albaran(factura_id):
+    """Editar un albarán existente"""
+    factura = Factura.query.get_or_404(factura_id)
+    
+    # Verificar que es un albarán (número que empieza con 'A' y contiene '_', estado='pendiente')
+    if not (factura.numero.startswith('A') and '_' in factura.numero and factura.estado == 'pendiente'):
+        flash('Esta factura no es un albarán pendiente de formalizar', 'error')
+        return redirect(url_for('facturacion.listado_albaranes_retirada'))
+    
+    if request.method == 'POST':
+        try:
+            # Obtener datos del formulario
+            fecha_expedicion_str = request.form.get('fecha_expedicion', '')
+            descripcion = request.form.get('descripcion', '')
+            nombre_cliente = request.form.get('nombre_cliente', '')
+            nif_cliente = request.form.get('nif_cliente', '')
+            direccion_cliente = request.form.get('direccion_cliente', '')
+            poblacion_cliente = request.form.get('poblacion_cliente', '')
+            provincia_cliente = request.form.get('provincia_cliente', '')
+            codigo_postal_cliente = request.form.get('codigo_postal_cliente', '')
+            telefono_cliente = request.form.get('telefono_cliente', '')
+            email_cliente = request.form.get('email_cliente', '')
+            cliente_id = request.form.get('cliente_id', '')
+            descuento_pronto_pago = request.form.get('descuento_pronto_pago', '0') or '0'
+            
+            # Obtener líneas de albarán
+            descripciones = request.form.getlist('descripcion_linea[]')
+            cantidades = request.form.getlist('cantidad[]')
+            tallas = request.form.getlist('talla[]')
+            precios_unitarios = request.form.getlist('precio_unitario[]')
+            descuentos = request.form.getlist('descuento[]')
+            precios_finales = request.form.getlist('precio_final[]')
+            es_linea_texto = request.form.getlist('es_linea_texto[]')
+            
+            if not fecha_expedicion_str:
+                flash('La fecha de expedición es obligatoria', 'error')
+                return redirect(url_for('facturacion.editar_albaran', factura_id=factura_id))
+            
+            if not nombre_cliente:
+                flash('El nombre del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.editar_albaran', factura_id=factura_id))
+            
+            if not nif_cliente:
+                flash('El NIF/CIF del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.editar_albaran', factura_id=factura_id))
+            
+            if not direccion_cliente:
+                flash('La dirección del cliente es obligatoria', 'error')
+                return redirect(url_for('facturacion.editar_albaran', factura_id=factura_id))
+            
+            if not poblacion_cliente:
+                flash('La población del cliente es obligatoria', 'error')
+                return redirect(url_for('facturacion.editar_albaran', factura_id=factura_id))
+            
+            if not provincia_cliente:
+                flash('La provincia del cliente es obligatoria', 'error')
+                return redirect(url_for('facturacion.editar_albaran', factura_id=factura_id))
+            
+            if not codigo_postal_cliente:
+                flash('El código postal del cliente es obligatorio', 'error')
+                return redirect(url_for('facturacion.editar_albaran', factura_id=factura_id))
+            
+            if not descripciones or not any(descripciones):
+                flash('Debe haber al menos una línea en el albarán', 'error')
+                return redirect(url_for('facturacion.editar_albaran', factura_id=factura_id))
+            
+            # Procesar fecha
+            fecha_expedicion = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d').date()
+            
+            # Si hay cliente_id, obtener datos del cliente (pero permitir sobrescribir con los del formulario)
+            if cliente_id:
+                cliente = Cliente.query.get(cliente_id)
+                if cliente:
+                    if not nombre_cliente:
+                        nombre_cliente = cliente.nombre
+                    if not nif_cliente and cliente.nif:
+                        nif_cliente = cliente.nif
+                    if not direccion_cliente and cliente.direccion:
+                        direccion_cliente = cliente.direccion
+                    if not poblacion_cliente and cliente.poblacion:
+                        poblacion_cliente = cliente.poblacion
+                    if not provincia_cliente and cliente.provincia:
+                        provincia_cliente = cliente.provincia
+                    if not codigo_postal_cliente and cliente.codigo_postal:
+                        codigo_postal_cliente = cliente.codigo_postal
+                    if not telefono_cliente and cliente.telefono:
+                        telefono_cliente = cliente.telefono
+                    if not email_cliente and cliente.email:
+                        email_cliente = cliente.email
+            
+            # Calcular importe total
+            importe_total = Decimal('0.00')
+            lineas_data = []
+            for i in range(len(descripciones)):
+                if descripciones[i]:
+                    # Verificar si es línea de texto
+                    es_texto = i < len(es_linea_texto) and es_linea_texto[i] == '1'
+                    
+                    if es_texto:
+                        # Línea de texto: cantidad 0, sin precios
+                        cantidad = Decimal('0')
+                        precio_unitario = Decimal('0')
+                        descuento = Decimal('0')
+                        precio_final = Decimal('0')
+                        importe = Decimal('0')
+                        talla = None
+                    else:
+                        cantidad = Decimal(str(cantidades[i])) if i < len(cantidades) and cantidades[i] else Decimal('1')
+                        # Permitir precio vacío (None) para albaranes sin precio
+                        precio_unitario = None
+                        if i < len(precios_unitarios) and precios_unitarios[i] and precios_unitarios[i].strip():
+                            try:
+                                precio_unitario = Decimal(str(precios_unitarios[i]))
+                            except:
+                                precio_unitario = None
+                    
+                    # Procesar descuento
+                    descuento = Decimal('0')
+                    if i < len(descuentos) and descuentos[i]:
+                        try:
+                            descuento = Decimal(str(descuentos[i]))
+                        except:
+                            descuento = Decimal('0')
+                    
+                    # Procesar precio final (si existe, usar ese; sino calcular con descuento)
+                    precio_final = None
+                    if i < len(precios_finales) and precios_finales[i] and precios_finales[i].strip():
+                        try:
+                            precio_final = Decimal(str(precios_finales[i]))
+                        except:
+                            precio_final = None
+                    
+                    # Si no hay precio_unitario, precio_final e importe serán 0
+                    if precio_unitario is None:
+                        precio_unitario = Decimal('0')
+                        precio_final = Decimal('0')
+                        importe = Decimal('0')
+                    else:
+                        # Si no hay precio_final pero hay descuento, calcularlo
+                        if precio_final is None and descuento > 0:
+                            precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+                        elif precio_final is None:
+                            precio_final = precio_unitario
+                        
+                        # Calcular importe usando precio_final si existe
+                        importe = cantidad * precio_final
+                    
+                    talla = tallas[i] if i < len(tallas) and tallas[i] else None
+                    
+                    importe_total += importe
+                    
+                    lineas_data.append({
+                        'descripcion': descripciones[i],
+                        'cantidad': cantidad,
+                        'talla': talla,
+                        'precio_unitario': precio_unitario,
+                        'descuento': descuento,
+                        'precio_final': precio_final,
+                        'importe': importe
+                    })
+            
+            # Calcular IVA (21% sobre la base imponible)
+            base_imponible = importe_total
+            iva = base_imponible * Decimal('0.21')
+            subtotal = base_imponible + iva
+            
+            # Procesar descuento por pronto pago
+            descuento_pronto_pago_decimal = Decimal('0')
+            try:
+                descuento_pronto_pago_decimal = Decimal(str(descuento_pronto_pago))
+            except:
+                descuento_pronto_pago_decimal = Decimal('0')
+            
+            # Aplicar descuento por pronto pago al subtotal (base + IVA)
+            if descuento_pronto_pago_decimal > 0:
+                descuento_aplicado = subtotal * (descuento_pronto_pago_decimal / Decimal('100'))
+                importe_total = subtotal - descuento_aplicado
+            else:
+                importe_total = subtotal
+            
+            # Actualizar factura (albarán)
+            factura.fecha_expedicion = fecha_expedicion
+            factura.descripcion = descripcion
+            factura.nif = nif_cliente
+            factura.nombre = nombre_cliente
+            factura.importe_total = importe_total
+            factura.descuento_pronto_pago = descuento_pronto_pago_decimal
+            
+            # Eliminar líneas antiguas
+            LineaFactura.query.filter_by(factura_id=factura.id).delete()
+            
+            # Crear nuevas líneas de factura
+            for linea_data in lineas_data:
+                linea_factura = LineaFactura(
+                    factura_id=factura.id,
+                    linea_pedido_id=None,
+                    descripcion=linea_data['descripcion'],
+                    cantidad=linea_data['cantidad'],
+                    talla=linea_data.get('talla'),
+                    precio_unitario=linea_data['precio_unitario'],
+                    descuento=linea_data['descuento'],
+                    precio_final=linea_data['precio_final'],
+                    importe=linea_data['importe']
+                )
+                db.session.add(linea_factura)
+            
+            db.session.commit()
+            flash('Albarán actualizado correctamente.', 'success')
+            
+            return redirect(url_for('facturacion.listado_albaranes_retirada'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al actualizar el albarán: {str(e)}', 'error')
+            import traceback
+            traceback.print_exc()
+    
+    # GET: mostrar formulario con datos del albarán
+    clientes = Cliente.query.order_by(Cliente.nombre).all()
+    
+    # Preparar datos del albarán para el formulario
+    fecha_hoy = factura.fecha_expedicion.strftime('%Y-%m-%d') if factura.fecha_expedicion else datetime.now().strftime('%Y-%m-%d')
+    
+    # Buscar cliente por NIF si existe
+    cliente_seleccionado = None
+    datos_cliente = {
+        'nombre': factura.nombre or '',
+        'nif': factura.nif or '',
+        'direccion': '',
+        'poblacion': '',
+        'provincia': '',
+        'codigo_postal': '',
+        'telefono': '',
+        'email': ''
+    }
+    
+    if factura.nif:
+        cliente_seleccionado = Cliente.query.filter_by(nif=factura.nif).first()
+        if cliente_seleccionado:
+            datos_cliente['direccion'] = cliente_seleccionado.direccion or ''
+            datos_cliente['poblacion'] = cliente_seleccionado.poblacion or ''
+            datos_cliente['provincia'] = cliente_seleccionado.provincia or ''
+            datos_cliente['codigo_postal'] = cliente_seleccionado.codigo_postal or ''
+            datos_cliente['telefono'] = cliente_seleccionado.telefono or ''
+            datos_cliente['email'] = cliente_seleccionado.email or ''
+    
+    return render_template('facturacion/editar_albaran.html', 
+                         factura=factura,
+                         clientes=clientes, 
+                         fecha_hoy=fecha_hoy,
+                         cliente_seleccionado=cliente_seleccionado,
+                         datos_cliente=datos_cliente)
+
+def preparar_datos_imprimir_factura(factura_id):
+    """Función auxiliar para preparar todos los datos necesarios para imprimir la factura"""
+    from decimal import Decimal
+    from sqlalchemy.orm import joinedload
+    
+    # Cargar factura con todas las relaciones necesarias
+    factura = Factura.query.options(
+        joinedload(Factura.cliente),  # Cliente directo de la factura
+        joinedload(Factura.pedido).joinedload(Pedido.cliente),
+        joinedload(Factura.pedido).joinedload(Pedido.presupuesto).joinedload(Presupuesto.cliente),
+        joinedload(Factura.presupuesto).joinedload(Presupuesto.cliente),
+        joinedload(Factura.factura_rectificada)  # Factura original que se rectifica
+    ).get_or_404(factura_id)
+    
+    pedido = factura.pedido
+    presupuesto = factura.presupuesto
+    cliente_directo = factura.cliente  # Cliente directo de la factura (para facturas directas)
+    
+    # Si no hay presupuesto directo pero hay pedido, intentar obtenerlo del pedido
+    if not presupuesto and pedido and pedido.presupuesto:
+        presupuesto = pedido.presupuesto
+    
+    # Calcular totales usando precio_unitario y descuento de las líneas
+    # Usar el tipo de IVA guardado en la factura, o 21% por defecto
+    # IMPORTANTE: Verificar si es None explícitamente, no usar evaluación de verdad
+    # porque tipo_iva puede ser 0 (cero) y eso sería False pero válido
+    if factura.tipo_iva is not None:
+        if isinstance(factura.tipo_iva, Decimal):
+            tipo_iva = float(factura.tipo_iva)
+        else:
+            tipo_iva = float(factura.tipo_iva)
+    else:
+        tipo_iva = 21.0
+    base_imponible = Decimal('0.00')
+    
+    for linea in factura.lineas:
+        cantidad = Decimal(str(linea.cantidad))
+        precio_unitario = Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0.00')
+        descuento = Decimal(str(linea.descuento)) if linea.descuento else Decimal('0')
+        
+        # Calcular precio final con descuento
+        precio_final = precio_unitario
+        if descuento > 0:
+            precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100'))
+        
+        # Si hay precio_final guardado, usarlo
+        if linea.precio_final:
+            precio_final = Decimal(str(linea.precio_final))
+        
+        # Calcular total de la línea (sin IVA)
+        total_linea = cantidad * precio_final
+        base_imponible += total_linea
+    
+    iva_total = base_imponible * Decimal(str(tipo_iva)) / Decimal('100')
+    iva_total = iva_total.quantize(Decimal('0.01'))
+    subtotal = base_imponible + iva_total
+    
+    # Aplicar descuento por pronto pago si existe
+    descuento_pronto_pago = Decimal(str(factura.descuento_pronto_pago)) if factura.descuento_pronto_pago else Decimal('0')
+    if descuento_pronto_pago > 0:
+        descuento_aplicado = subtotal * (descuento_pronto_pago / Decimal('100'))
+        descuento_aplicado = descuento_aplicado.quantize(Decimal('0.01'))
+        total_con_iva = subtotal - descuento_aplicado
+        total_con_iva = total_con_iva.quantize(Decimal('0.01'))
+    else:
+        total_con_iva = subtotal
+    
+    # Calcular anticipo facturado si la factura viene de un presupuesto
+    anticipo_facturado = Decimal('0')
+    if presupuesto:
+        # Buscar factura de anticipo para este presupuesto
+        factura_anticipo = Factura.query.filter(
+            and_(Factura.presupuesto_id == presupuesto.id, Factura.es_anticipo == True)
+        ).first()
+        if factura_anticipo:
+            anticipo_facturado = factura_anticipo.importe_total if factura_anticipo.importe_total else Decimal('0')
+        elif presupuesto.anticipo:
+            anticipo_facturado = Decimal(str(presupuesto.anticipo))
+        
+        # Restar anticipo del total si existe
+        if anticipo_facturado > 0:
+            total_con_iva = total_con_iva - anticipo_facturado
+            if total_con_iva < 0:
+                total_con_iva = Decimal('0')
+            total_con_iva = total_con_iva.quantize(Decimal('0.01'))
+    
+    # Función auxiliar para convertir imagen a base64
+    def convertir_imagen_a_base64(ruta_imagen):
+        """Convertir imagen a base64"""
+        if not ruta_imagen or not os.path.exists(ruta_imagen):
+            return None
+        try:
+            with open(ruta_imagen, 'rb') as f:
+                imagen_data = f.read()
+                imagen_base64 = base64.b64encode(imagen_data).decode('utf-8')
+                # Detectar tipo MIME
+                if ruta_imagen.lower().endswith('.png'):
+                    return f'data:image/png;base64,{imagen_base64}'
+                elif ruta_imagen.lower().endswith(('.jpg', '.jpeg')):
+                    return f'data:image/jpeg;base64,{imagen_base64}'
+                elif ruta_imagen.lower().endswith('.gif'):
+                    return f'data:image/gif;base64,{imagen_base64}'
+                else:
+                    return f'data:image/png;base64,{imagen_base64}'  # Por defecto PNG
+        except Exception as e:
+            print(f"Error al leer imagen {ruta_imagen}: {e}")
+            return None
+    
+    # Convertir logo a base64
+    logo_base64 = None
+    logo_path = os.path.join(current_app.static_folder, 'logo1.png')
+    logo_base64 = convertir_imagen_a_base64(logo_path)
+    
+    # Detectar si es un albarán: número que empieza con 'A' seguido de año y mes (formato A2601_XXX)
+    # y estado='pendiente' (aún no formalizado)
+    es_albaran = (factura.numero.startswith('A') and 
+                  '_' in factura.numero and 
+                  factura.estado == 'pendiente' and
+                  factura.presupuesto_id is None and
+                  factura.pedido_id is None)
+    
+    return {
+        'factura': factura,
+        'pedido': pedido,
+        'presupuesto': presupuesto,
+        'cliente_directo': cliente_directo,  # Cliente directo de la factura
+        'base_imponible': float(base_imponible),
+        'iva_total': float(iva_total),
+        'total_con_iva': float(total_con_iva),
+        'tipo_iva': tipo_iva,
+        'logo_base64': logo_base64,
+        'es_albaran': es_albaran,
+        'anticipo_facturado': float(anticipo_facturado)
+    }
+
+@facturacion_bp.route('/facturacion/factura/<int:factura_id>/imprimir_anticipo')
+@login_required
+@not_usuario_required
+def imprimir_factura_anticipo(factura_id):
+    """Imprimir factura anticipo"""
+    factura = Factura.query.get_or_404(factura_id)
+    
+    if not factura.es_anticipo:
+        flash('Esta no es una factura anticipo', 'error')
+        return redirect(url_for('presupuestos.listado_solicitudes'))
+    
+    presupuesto = factura.presupuesto if factura.presupuesto_id else None
+    
+    # Calcular base imponible e IVA
+    tipo_iva = Decimal(str(factura.tipo_iva)) if factura.tipo_iva else Decimal('21')
+    base_imponible = factura.importe_total / (Decimal('1') + tipo_iva / Decimal('100'))
+    base_imponible = base_imponible.quantize(Decimal('0.01'))
+    iva_total = factura.importe_total - base_imponible
+    iva_total = iva_total.quantize(Decimal('0.01'))
+    
+    # Obtener logo en base64
+    logo_path = os.path.join(current_app.static_folder, 'logo1.png')
+    logo_base64 = None
+    if os.path.exists(logo_path):
+        with open(logo_path, 'rb') as f:
+            logo_data = f.read()
+            logo_base64 = base64.b64encode(logo_data).decode('utf-8')
+            logo_base64 = f'data:image/png;base64,{logo_base64}'
+    
+    return render_template('imprimir_factura_anticipo_pdf.html',
+                         factura=factura,
+                         presupuesto=presupuesto,
+                         base_imponible=base_imponible,
+                         iva_total=iva_total,
+                         tipo_iva=tipo_iva,
+                         logo_base64=logo_base64,
+                         use_base64=True)
+
+@facturacion_bp.route('/facturacion/factura/<int:factura_id>/descargar-pdf-anticipo')
+@login_required
+@not_usuario_required
+def descargar_pdf_factura_anticipo(factura_id):
+    """Descargar factura anticipo en formato PDF"""
+    try:
+        factura = Factura.query.get_or_404(factura_id)
+        
+        if not factura.es_anticipo:
+            flash('Esta no es una factura anticipo', 'error')
+            return redirect(url_for('presupuestos.listado_solicitudes'))
+        
+        presupuesto = factura.presupuesto if factura.presupuesto_id else None
+        
+        # Calcular base imponible e IVA
+        tipo_iva = Decimal(str(factura.tipo_iva)) if factura.tipo_iva else Decimal('21')
+        base_imponible = factura.importe_total / (Decimal('1') + tipo_iva / Decimal('100'))
+        base_imponible = base_imponible.quantize(Decimal('0.01'))
+        iva_total = factura.importe_total - base_imponible
+        iva_total = iva_total.quantize(Decimal('0.01'))
+        
+        # Obtener logo en base64
+        logo_path = os.path.join(current_app.static_folder, 'logo1.png')
+        logo_base64 = None
+        if os.path.exists(logo_path):
+            with open(logo_path, 'rb') as f:
+                logo_data = f.read()
+                logo_base64 = base64.b64encode(logo_data).decode('utf-8')
+                logo_base64 = f'data:image/png;base64,{logo_base64}'
+        
+        html = render_template('imprimir_factura_anticipo_pdf.html',
+                              factura=factura,
+                              presupuesto=presupuesto,
+                              base_imponible=base_imponible,
+                              iva_total=iva_total,
+                              tipo_iva=tipo_iva,
+                              logo_base64=logo_base64,
+                              use_base64=True)
+        
+        # Crear el PDF en memoria usando playwright
+        pdf_buffer = BytesIO()
+        
+        try:
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+                temp_file.write(html)
+                temp_html_path = temp_file.name
+            
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                page.goto(f'file://{temp_html_path}')
+                
+                pdf_bytes = page.pdf(
+                    format='A4',
+                    print_background=True,
+                    margin={
+                        'top': '10mm',
+                        'right': '10mm',
+                        'bottom': '10mm',
+                        'left': '10mm'
+                    }
+                )
+                
+                browser.close()
+                pdf_buffer.write(pdf_bytes)
+                pdf_buffer.seek(0)
+            
+            os.unlink(temp_html_path)
+            
+        except Exception as e:
+            if os.path.exists(temp_html_path):
+                try:
+                    os.unlink(temp_html_path)
+                except:
+                    pass
+            raise e
+        
+        response = make_response(pdf_buffer.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=factura_anticipo_{factura.serie}_{factura.numero}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        return redirect(url_for('presupuestos.listado_solicitudes'))
+
+@facturacion_bp.route('/facturacion/factura/<int:factura_id>/imprimir')
+@login_required
+@not_usuario_required
+def imprimir_factura(factura_id):
+    """Vista de impresión de una factura formalizada"""
+    factura = Factura.query.get_or_404(factura_id)
+    
+    # Si es una factura anticipo, usar el template específico
+    if factura.es_anticipo is True:
+        presupuesto = factura.presupuesto if factura.presupuesto_id else None
+        
+        # Calcular base imponible e IVA
+        tipo_iva = Decimal(str(factura.tipo_iva)) if factura.tipo_iva else Decimal('21')
+        base_imponible = factura.importe_total / (Decimal('1') + tipo_iva / Decimal('100'))
+        base_imponible = base_imponible.quantize(Decimal('0.01'))
+        iva_total = factura.importe_total - base_imponible
+        iva_total = iva_total.quantize(Decimal('0.01'))
+        
+        # Obtener logo en base64
+        logo_path = os.path.join(current_app.static_folder, 'logo1.png')
+        logo_base64 = None
+        if os.path.exists(logo_path):
+            with open(logo_path, 'rb') as f:
+                logo_data = f.read()
+                logo_base64 = base64.b64encode(logo_data).decode('utf-8')
+                logo_base64 = f'data:image/png;base64,{logo_base64}'
+        
+        return render_template('imprimir_factura_anticipo_pdf.html',
+                             factura=factura,
+                             presupuesto=presupuesto,
+                             base_imponible=base_imponible,
+                             iva_total=iva_total,
+                             tipo_iva=tipo_iva,
+                             logo_base64=logo_base64,
+                             use_base64=True)
+    else:
+        datos = preparar_datos_imprimir_factura(factura_id)
+        return render_template('imprimir_factura.html', **datos)
+
+def preparar_datos_imprimir_albaran(factura_id=None, pedido_id=None):
+    """Función auxiliar para preparar todos los datos necesarios para imprimir el albarán"""
+    from decimal import Decimal
+    
+    if factura_id:
+        # Si tenemos factura_id, obtener factura y pedido
+        from sqlalchemy.orm import joinedload
+        factura = Factura.query.options(joinedload(Factura.cliente)).get_or_404(factura_id)
+        pedido = factura.pedido
+        presupuesto = factura.presupuesto
+        lineas = factura.lineas
+    elif pedido_id:
+        # Si solo tenemos pedido_id (prefactura), obtener pedido y usar sus líneas
+        pedido = Pedido.query.get_or_404(pedido_id)
+        factura = None
+        presupuesto = pedido.presupuesto if pedido else None
+        lineas = pedido.lineas
+    else:
+        raise ValueError("Se debe proporcionar factura_id o pedido_id")
+    
+    # Función auxiliar para convertir imagen a base64
+    def convertir_imagen_a_base64(ruta_imagen):
+        """Convertir imagen a base64"""
+        if not ruta_imagen or not os.path.exists(ruta_imagen):
+            return None
+        try:
+            with open(ruta_imagen, 'rb') as f:
+                imagen_data = f.read()
+                imagen_base64 = base64.b64encode(imagen_data).decode('utf-8')
+                # Detectar tipo MIME
+                if ruta_imagen.lower().endswith('.png'):
+                    return f'data:image/png;base64,{imagen_base64}'
+                elif ruta_imagen.lower().endswith(('.jpg', '.jpeg')):
+                    return f'data:image/jpeg;base64,{imagen_base64}'
+                elif ruta_imagen.lower().endswith('.gif'):
+                    return f'data:image/gif;base64,{imagen_base64}'
+                else:
+                    return f'data:image/png;base64,{imagen_base64}'  # Por defecto PNG
+        except Exception as e:
+            print(f"Error al leer imagen {ruta_imagen}: {e}")
+            return None
+    
+    # Convertir logo a base64
+    logo_base64 = None
+    logo_path = os.path.join(current_app.static_folder, 'logo1.png')
+    logo_base64 = convertir_imagen_a_base64(logo_path)
+    
+    return {
+        'factura': factura,
+        'pedido': pedido,
+        'presupuesto': presupuesto,
+        'lineas': lineas,
+        'logo_base64': logo_base64
+    }
+
+@facturacion_bp.route('/facturacion/factura/<int:factura_id>/descargar-pdf')
+@login_required
+@not_usuario_required
+def descargar_pdf_factura(factura_id):
+    """Descargar factura en formato PDF (con precios) o albarán si es tipo albarán"""
+    try:
+        factura = Factura.query.get_or_404(factura_id)
+        html = None  # Inicializar html
+        datos = None  # Inicializar datos
+        es_anticipo = factura.es_anticipo is True  # Guardar si es anticipo
+        datos_albaran = None  # Inicializar datos_albaran
+        
+        # Si es una factura anticipo, usar el template específico
+        if es_anticipo:
+            presupuesto = factura.presupuesto if factura.presupuesto_id else None
+            
+            # Calcular base imponible e IVA
+            tipo_iva = Decimal(str(factura.tipo_iva)) if factura.tipo_iva else Decimal('21')
+            base_imponible = factura.importe_total / (Decimal('1') + tipo_iva / Decimal('100'))
+            base_imponible = base_imponible.quantize(Decimal('0.01'))
+            iva_total = factura.importe_total - base_imponible
+            iva_total = iva_total.quantize(Decimal('0.01'))
+            
+            # Obtener logo en base64
+            logo_path = os.path.join(current_app.static_folder, 'logo1.png')
+            logo_base64 = None
+            if os.path.exists(logo_path):
+                with open(logo_path, 'rb') as f:
+                    logo_data = f.read()
+                    logo_base64 = base64.b64encode(logo_data).decode('utf-8')
+                    logo_base64 = f'data:image/png;base64,{logo_base64}'
+            
+            html = render_template('imprimir_factura_anticipo_pdf.html',
+                                 factura=factura,
+                                 presupuesto=presupuesto,
+                                 base_imponible=base_imponible,
+                                 iva_total=iva_total,
+                                 tipo_iva=tipo_iva,
+                                 logo_base64=logo_base64,
+                                 use_base64=True)
+        else:
+            try:
+                datos = preparar_datos_imprimir_factura(factura_id)
+                
+                if datos is None:
+                    flash('Error al preparar los datos de la factura', 'error')
+                    return redirect(url_for('presupuestos.listado_solicitudes'))
+                
+                # Si es un albarán, usar el template de albarán (sin precios)
+                if datos.get('es_albaran', False):
+                    # Preparar datos para albarán
+                    datos_albaran = preparar_datos_imprimir_albaran(factura_id=factura_id)
+                    if datos_albaran:
+                        html = render_template('imprimir_albaran_pdf.html', 
+                                             **datos_albaran,
+                                             use_base64=True)
+                    else:
+                        flash('Error al preparar los datos del albarán', 'error')
+                        return redirect(url_for('presupuestos.listado_solicitudes'))
+                else:
+                    # Renderizar el HTML como factura (con precios)
+                    html = render_template('imprimir_factura_pdf.html', 
+                                         **datos,
+                                         use_base64=True)
+            except Exception as e:
+                flash(f'Error al preparar el PDF: {str(e)}', 'error')
+                import traceback
+                traceback.print_exc()
+                return redirect(url_for('presupuestos.listado_solicitudes'))
+        
+        # Verificar que html se haya definido
+        if html is None:
+            flash('Error al preparar el PDF de la factura', 'error')
+            return redirect(url_for('presupuestos.listado_solicitudes'))
+        
+        # Crear el PDF en memoria usando playwright
+        pdf_buffer = BytesIO()
+        
+        try:
+            # Guardar HTML temporalmente para que playwright pueda acceder a él
+            # Crear un archivo HTML temporal
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+                temp_file.write(html)
+                temp_html_path = temp_file.name
+            
+            # Usar playwright para generar el PDF
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                
+                # Cargar el HTML desde el archivo temporal
+                page.goto(f'file://{temp_html_path}')
+                
+                # Generar PDF
+                pdf_bytes = page.pdf(
+                    format='A4',
+                    print_background=True,
+                    margin={
+                        'top': '10mm',
+                        'right': '10mm',
+                        'bottom': '10mm',
+                        'left': '10mm'
+                    }
+                )
+                
+                browser.close()
+            
+            # Escribir el PDF al buffer
+            pdf_buffer.write(pdf_bytes)
+            
+            # Limpiar archivo temporal
+            try:
+                os.unlink(temp_html_path)
+            except:
+                pass
+            
+        except Exception as pdf_error:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error al crear PDF con playwright: {error_trace}")
+            flash(f'Error al generar PDF: {str(pdf_error)}', 'error')
+            return redirect(url_for('presupuestos.listado_solicitudes'))
+        
+        # Preparar la respuesta con el PDF
+        pdf_buffer.seek(0)
+        response = make_response(pdf_buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        
+        # Nombre del archivo según el tipo de factura
+        if es_anticipo:
+            response.headers['Content-Disposition'] = f'inline; filename=factura_anticipo_{factura.serie}_{factura.numero}.pdf'
+        elif datos_albaran:
+            numero_pedido = datos_albaran['pedido'].id if datos_albaran.get('pedido') else 'N/A'
+            response.headers['Content-Disposition'] = f'inline; filename=albaran_pedido_{numero_pedido}.pdf'
+        elif datos:
+            response.headers['Content-Disposition'] = f'inline; filename=factura_{factura.serie}_{factura.numero}.pdf'
+        else:
+            response.headers['Content-Disposition'] = f'inline; filename=factura_{factura.serie}_{factura.numero}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error completo al generar PDF: {error_trace}")
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        return redirect(url_for('presupuestos.listado_solicitudes'))
+
+@facturacion_bp.route('/facturacion/factura/<int:factura_id>/descargar-albaran')
+@login_required
+@not_usuario_required
+def descargar_pdf_albaran_factura(factura_id):
+    """Descargar albarán en formato PDF desde una factura formalizada"""
+    try:
+        datos = preparar_datos_imprimir_albaran(factura_id=factura_id)
+        
+        # Renderizar el HTML del albarán
+        html = render_template('imprimir_albaran_pdf.html', 
+                             **datos,
+                             use_base64=True)
+        
+        # Crear el PDF en memoria usando playwright
+        pdf_buffer = BytesIO()
+        
+        try:
+            # Guardar HTML temporalmente para que playwright pueda acceder a él
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+                temp_file.write(html)
+                temp_html_path = temp_file.name
+            
+            # Usar playwright para generar el PDF
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                
+                # Cargar el HTML desde el archivo temporal
+                page.goto(f'file://{temp_html_path}')
+                
+                # Generar PDF
+                pdf_bytes = page.pdf(
+                    format='A4',
+                    print_background=True,
+                    margin={
+                        'top': '10mm',
+                        'right': '10mm',
+                        'bottom': '10mm',
+                        'left': '10mm'
+                    }
+                )
+                
+                browser.close()
+            
+            # Escribir el PDF al buffer
+            pdf_buffer.write(pdf_bytes)
+            
+            # Limpiar archivo temporal
+            try:
+                os.unlink(temp_html_path)
+            except:
+                pass
+            
+        except Exception as pdf_error:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error al crear PDF con playwright: {error_trace}")
+            flash(f'Error al generar PDF: {str(pdf_error)}', 'error')
+            return redirect(url_for('presupuestos.listado_solicitudes'))
+        
+        # Preparar la respuesta con el PDF
+        pdf_buffer.seek(0)
+        response = make_response(pdf_buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        numero_pedido = datos['pedido'].id if datos['pedido'] else 'N/A'
+        response.headers['Content-Disposition'] = f'inline; filename=albaran_pedido_{numero_pedido}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error completo al generar PDF: {error_trace}")
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        return redirect(url_for('presupuestos.listado_solicitudes'))
+
+@facturacion_bp.route('/facturacion/pedido/<int:pedido_id>/descargar-albaran')
+@login_required
+@not_usuario_required
+def descargar_pdf_albaran_pedido(pedido_id):
+    """Descargar albarán en formato PDF desde un pedido (prefactura)"""
+    try:
+        datos = preparar_datos_imprimir_albaran(pedido_id=pedido_id)
+        
+        # Renderizar el HTML del albarán
+        html = render_template('imprimir_albaran_pdf.html', 
+                             **datos,
+                             use_base64=True)
+        
+        # Crear el PDF en memoria usando playwright
+        pdf_buffer = BytesIO()
+        
+        try:
+            # Guardar HTML temporalmente para que playwright pueda acceder a él
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.html', delete=False, encoding='utf-8') as temp_file:
+                temp_file.write(html)
+                temp_html_path = temp_file.name
+            
+            # Usar playwright para generar el PDF
+            with sync_playwright() as p:
+                browser = p.chromium.launch(headless=True)
+                page = browser.new_page()
+                
+                # Cargar el HTML desde el archivo temporal
+                page.goto(f'file://{temp_html_path}')
+                
+                # Generar PDF
+                pdf_bytes = page.pdf(
+                    format='A4',
+                    print_background=True,
+                    margin={
+                        'top': '10mm',
+                        'right': '10mm',
+                        'bottom': '10mm',
+                        'left': '10mm'
+                    }
+                )
+                
+                browser.close()
+            
+            # Escribir el PDF al buffer
+            pdf_buffer.write(pdf_bytes)
+            
+            # Limpiar archivo temporal
+            try:
+                os.unlink(temp_html_path)
+            except:
+                pass
+            
+        except Exception as pdf_error:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"Error al crear PDF con playwright: {error_trace}")
+            flash(f'Error al generar PDF: {str(pdf_error)}', 'error')
+            return redirect(url_for('presupuestos.listado_solicitudes'))
+        
+        # Preparar la respuesta con el PDF
+        pdf_buffer.seek(0)
+        response = make_response(pdf_buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=albaran_pedido_{pedido_id}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error completo al generar PDF: {error_trace}")
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        return redirect(url_for('presupuestos.listado_solicitudes'))
+
+@facturacion_bp.route('/facturacion/facturar_albaranes', methods=['GET', 'POST'])
+@login_required
+@not_usuario_required
+@emision_facturas_desactivada
+def facturar_albaranes():
+    """Seleccionar cliente y mostrar sus albaranes pendientes para facturar"""
+    if request.method == 'POST':
+        # Obtener cliente seleccionado
+        cliente_id = request.form.get('cliente_id', '')
+        if not cliente_id:
+            flash('Debe seleccionar un cliente', 'error')
+            return redirect(url_for('facturacion.facturar_albaranes'))
+        
+        cliente = Cliente.query.get_or_404(cliente_id)
+        
+        # Obtener albaranes pendientes del cliente (por NIF)
+        albaranes = Factura.query.filter(
+            and_(
+                Factura.estado == 'pendiente',
+                Factura.presupuesto_id.is_(None),
+                Factura.pedido_id.is_(None),
+                Factura.numero.like('A%_%'),
+                Factura.nif == cliente.nif
+            )
+        ).order_by(Factura.fecha_expedicion.asc()).all()
+        
+        if not albaranes:
+            flash(f'El cliente {cliente.nombre} no tiene albaranes pendientes de facturar', 'info')
+            return redirect(url_for('facturacion.facturar_albaranes'))
+        
+        fecha_hoy = datetime.now().strftime('%Y-%m-%d')
+        # IVA por defecto: el de la ficha del cliente (21 si no tiene o no es uno de los permitidos)
+        tipo_iva_default = 21
+        if cliente.tipo_iva is not None:
+            try:
+                v = int(float(cliente.tipo_iva))
+                if v in (0, 4, 10, 21):
+                    tipo_iva_default = v
+            except (ValueError, TypeError):
+                pass
+        return render_template('facturacion/seleccionar_albaranes.html', 
+                             cliente=cliente, 
+                             albaranes=albaranes,
+                             fecha_hoy=fecha_hoy,
+                             tipo_iva_default=tipo_iva_default)
+    
+    # GET: mostrar formulario de selección de cliente
+    # Solo mostrar clientes que tengan albaranes pendientes
+    clientes = Cliente.query.join(
+        Factura, Cliente.nif == Factura.nif
+    ).filter(
+        and_(
+            Factura.estado == 'pendiente',
+            Factura.presupuesto_id.is_(None),
+            Factura.pedido_id.is_(None),
+            Factura.numero.like('A%_%')
+        )
+    ).distinct().order_by(Cliente.nombre).all()
+    return render_template('facturacion/seleccionar_cliente_albaranes.html', clientes=clientes)
+
+@facturacion_bp.route('/facturacion/facturar_albaranes/procesar', methods=['POST'])
+@login_required
+@not_usuario_required
+@emision_facturas_desactivada
+def procesar_facturacion_albaranes():
+    """Procesar la facturación de múltiples albaranes seleccionados"""
+    try:
+        # Obtener datos del formulario
+        cliente_id = request.form.get('cliente_id', '')
+        fecha_expedicion_str = request.form.get('fecha_expedicion', '')
+        descripcion = request.form.get('descripcion', '')
+        descuento_pronto_pago = request.form.get('descuento_pronto_pago', '0') or '0'
+        tipo_iva_form = request.form.get('tipo_iva', '')
+        albaranes_ids = request.form.getlist('albaranes_seleccionados[]')
+        
+        if not cliente_id:
+            flash('Debe seleccionar un cliente', 'error')
+            return redirect(url_for('facturacion.facturar_albaranes'))
+        
+        if not fecha_expedicion_str:
+            flash('La fecha de expedición es obligatoria', 'error')
+            return redirect(url_for('facturacion.facturar_albaranes'))
+        
+        if not albaranes_ids:
+            flash('Debe seleccionar al menos un albarán para facturar', 'error')
+            return redirect(url_for('facturacion.facturar_albaranes'))
+        
+        # Procesar fecha
+        fecha_expedicion = datetime.strptime(fecha_expedicion_str, '%Y-%m-%d').date()
+        
+        # Obtener cliente
+        cliente = Cliente.query.get_or_404(cliente_id)
+        
+        # Tipo de IVA: el de la ficha del cliente por defecto, o el indicado en el formulario
+        if tipo_iva_form not in ('', None):
+            try:
+                tipo_iva_decimal = Decimal(str(tipo_iva_form))
+            except (ValueError, TypeError):
+                tipo_iva_decimal = Decimal(str(cliente.tipo_iva)) if cliente.tipo_iva is not None else Decimal('21.00')
+        else:
+            tipo_iva_decimal = Decimal(str(cliente.tipo_iva)) if cliente.tipo_iva is not None else Decimal('21.00')
+        
+        # Obtener albaranes seleccionados
+        albaranes = Factura.query.filter(
+            Factura.id.in_([int(id) for id in albaranes_ids]),
+            Factura.estado == 'pendiente',
+            Factura.numero.like('A%_%')
+        ).all()
+        
+        if not albaranes:
+            flash('No se encontraron albaranes válidos para facturar', 'error')
+            return redirect(url_for('facturacion.facturar_albaranes'))
+        
+        # Verificar que todos los albaranes pertenecen al mismo cliente (mismo NIF)
+        nif_cliente = cliente.nif
+        for albaran in albaranes:
+            if albaran.nif != nif_cliente:
+                flash('Todos los albaranes deben pertenecer al mismo cliente', 'error')
+                return redirect(url_for('facturacion.facturar_albaranes'))
+        
+        # Generar número de factura automáticamente
+        serie = 'A'
+        numero = obtener_siguiente_numero_factura(fecha_expedicion)
+        
+        # Agregar todas las líneas de todos los albaranes seleccionados
+        lineas_data = []
+        importe_total = Decimal('0.00')
+        
+        for albaran in albaranes:
+            for linea in albaran.lineas:
+                cantidad = Decimal(str(linea.cantidad)) if linea.cantidad else Decimal('1')
+                precio_unitario = Decimal(str(linea.precio_unitario)) if linea.precio_unitario else Decimal('0')
+                descuento = Decimal(str(linea.descuento)) if linea.descuento else Decimal('0')
+                precio_final = Decimal(str(linea.precio_final)) if linea.precio_final else precio_unitario
+                importe = Decimal(str(linea.importe)) if linea.importe else (cantidad * precio_final)
+                
+                importe_total += importe
+                
+                lineas_data.append({
+                    'descripcion': linea.descripcion or f'Albarán {albaran.numero}',
+                    'cantidad': cantidad,
+                    'talla': linea.talla if linea.talla else None,
+                    'precio_unitario': precio_unitario,
+                    'descuento': descuento,
+                    'precio_final': precio_final,
+                    'importe': importe,
+                    'albaran_id': albaran.id
+                })
+        
+        # Calcular IVA con el tipo indicado (cliente o formulario)
+        base_imponible = importe_total
+        iva = base_imponible * (tipo_iva_decimal / Decimal('100'))
+        subtotal = base_imponible + iva
+        
+        # Procesar descuento por pronto pago
+        descuento_pronto_pago_decimal = Decimal('0')
+        try:
+            descuento_pronto_pago_decimal = Decimal(str(descuento_pronto_pago))
+        except:
+            descuento_pronto_pago_decimal = Decimal('0')
+        
+        # Aplicar descuento por pronto pago al subtotal (base + IVA)
+        if descuento_pronto_pago_decimal > 0:
+            descuento_aplicado = subtotal * (descuento_pronto_pago_decimal / Decimal('100'))
+            importe_total = subtotal - descuento_aplicado
+        else:
+            importe_total = subtotal
+        
+        # Crear factura consolidada
+        factura = Factura(
+            pedido_id=None,
+            presupuesto_id=None,
+            serie=serie,
+            numero=numero,
+            fecha_expedicion=fecha_expedicion,
+            tipo_factura='F1',
+            descripcion=descripcion or f'Factura consolidada de {len(albaranes)} albarán(es)',
+            nif=cliente.nif or '',
+            nombre=cliente.nombre,
+            importe_total=importe_total,
+            descuento_pronto_pago=descuento_pronto_pago_decimal,
+            tipo_iva=tipo_iva_decimal,
+            estado='pendiente'
+        )
+        
+        db.session.add(factura)
+        db.session.flush()
+        
+        # Crear líneas de factura desde los albaranes
+        for linea_data in lineas_data:
+            linea_factura = LineaFactura(
+                factura_id=factura.id,
+                linea_pedido_id=None,
+                descripcion=linea_data['descripcion'],
+                cantidad=linea_data['cantidad'],
+                talla=linea_data.get('talla'),
+                precio_unitario=linea_data['precio_unitario'],
+                descuento=linea_data['descuento'],
+                precio_final=linea_data['precio_final'],
+                importe=linea_data['importe']
+            )
+            db.session.add(linea_factura)
+        
+        # Marcar albaranes como facturados (cambiar estado a 'confirmado')
+        for albaran in albaranes:
+            albaran.estado = 'confirmado'
+        
+        # ============================================
+        # CÓDIGO VERIFACTU COMENTADO - Se puede restaurar más adelante
+        # ============================================
+        # # Verificar si el envío a Verifactu está activado
+        # from models import Configuracion
+        # config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+        # verifactu_enviar_activo = True
+        # if config:
+        #     verifactu_enviar_activo = config.valor.lower() == 'true'
+        # 
+        # # Enviar a Verifactu solo si está activado y hay token
+        # verifactu_url = os.environ.get('VERIFACTU_URL', 'https://api.verifacti.com/verifactu/create')
+        # verifactu_token = os.environ.get('VERIFACTU_TOKEN', '')
+        # 
+        # if verifactu_token and verifactu_enviar_activo:
+        #     # Preparar datos para la API
+        #     tipo_impositivo = 21
+        #     lineas_payload = []
+        #     total_base_imponible = Decimal('0.00')
+        #     total_cuota_repercutida = Decimal('0.00')
+        #     
+        #     for linea_data in lineas_data:
+        #         importe_con_iva = linea_data['importe']
+        #         base_imponible = importe_con_iva / (Decimal('1') + Decimal(str(tipo_impositivo)) / Decimal('100'))
+        #         cuota_repercutida = base_imponible * (Decimal(str(tipo_impositivo)) / Decimal('100'))
+        #         
+        #         base_imponible = base_imponible.quantize(Decimal('0.01'))
+        #         cuota_repercutida = cuota_repercutida.quantize(Decimal('0.01'))
+        #         
+        #         total_base_imponible += base_imponible
+        #         total_cuota_repercutida += cuota_repercutida
+        #         
+        #         lineas_payload.append({
+        #             'base_imponible': str(base_imponible),
+        #             'tipo_impositivo': str(tipo_impositivo),
+        #             'cuota_repercutida': str(cuota_repercutida)
+        #         })
+        #     
+        #     payload = {
+        #         'serie': factura.serie,
+        #         'numero': factura.numero,
+        #         'fecha_expedicion': factura.fecha_expedicion.strftime('%d-%m-%Y'),
+        #         'tipo_factura': factura.tipo_factura,
+        #         'descripcion': factura.descripcion or 'Descripcion de la operacion',
+        #         'nif': factura.nif or '',
+        #         'nombre': factura.nombre,
+        #         'lineas': lineas_payload,
+        #         'importe_total': str(factura.importe_total)
+        #     }
+        #     
+        #     headers = {
+        #         'Content-Type': 'application/json',
+        #         'Authorization': f'Bearer {verifactu_token}'
+        #     }
+        #     
+        #     try:
+        #         response = requests.post(verifactu_url, json=payload, headers=headers, timeout=30)
+        #         
+        #         if response.status_code == 200 or response.status_code == 201:
+        #             response_data = response.json()
+        #             factura.huella_verifactu = json.dumps(response_data)
+        #             factura.estado = 'confirmado'
+        #             factura.fecha_confirmacion = datetime.utcnow()
+        #             db.session.commit()
+        #             flash(f'Factura {factura.serie}-{factura.numero} creada y enviada a Verifactu correctamente. {len(albaranes)} albarán(es) facturado(s).', 'success')
+        #         else:
+        #             factura.estado = 'error'
+        #             factura.huella_verifactu = json.dumps({
+        #                 'error': response.text,
+        #                 'status_code': response.status_code
+        #             })
+        #             db.session.commit()
+        #             flash(f'Error al enviar a Verifactu: {response.status_code} - {response.text}', 'error')
+        #     except requests.exceptions.RequestException as e:
+        #         factura.estado = 'error'
+        #         factura.huella_verifactu = json.dumps({'error': str(e)})
+        #         db.session.commit()
+        #         flash(f'Error de conexión con Verifactu: {str(e)}', 'error')
+        # elif not verifactu_enviar_activo:
+        #     factura.estado = 'pendiente'
+        #     db.session.commit()
+        #     flash(f'Factura {factura.serie}-{factura.numero} creada. El envío automático a Verifactu está desactivado. {len(albaranes)} albarán(es) facturado(s).', 'info')
+        # else:
+        #     factura.estado = 'pendiente'
+        #     db.session.commit()
+        #     flash(f'Factura {factura.serie}-{factura.numero} creada. Configure VERIFACTU_TOKEN para enviar automáticamente. {len(albaranes)} albarán(es) facturado(s).', 'warning')
+        
+        # Estado por defecto sin Verifactu
+        factura.estado = 'pendiente'
+        db.session.commit()
+        flash(f'Factura {factura.serie}-{factura.numero} creada correctamente. {len(albaranes)} albarán(es) facturado(s).', 'success')
+        
+        return redirect(url_for('facturacion.menu_ventas'))
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al facturar los albaranes: {str(e)}', 'error')
+        import traceback
+        traceback.print_exc()
+        return redirect(url_for('facturacion.facturar_albaranes'))
+
+@facturacion_bp.route('/facturacion/procesar-cobro-factura', methods=['POST'])
+@login_required
+@not_usuario_required
+def procesar_cobro_factura():
+    """Procesar el cobro de una factura (completa o parcial)"""
+    try:
+        factura_id = request.form.get('factura_id')
+        tipo_cobro = request.form.get('tipo_cobro')  # 'completa' o 'parcial'
+        
+        if not factura_id:
+            return jsonify({'success': False, 'error': 'ID de factura no proporcionado'}), 400
+        
+        factura = Factura.query.get_or_404(int(factura_id))
+        
+        if tipo_cobro == 'completa':
+            # Cobrar completa: importe_pagado = importe_total, estado_cobro = 'cobrada'
+            factura.importe_pagado = factura.importe_total
+            factura.estado_cobro = 'cobrada'
+        elif tipo_cobro == 'parcial':
+            # Cobrar parcialmente: sumar importe_parcial a importe_pagado
+            importe_parcial = request.form.get('importe_parcial')
+            if not importe_parcial:
+                return jsonify({'success': False, 'error': 'Importe parcial no proporcionado'}), 400
+            
+            try:
+                importe_parcial_decimal = Decimal(str(importe_parcial))
+                importe_total_decimal = Decimal(str(factura.importe_total))
+                importe_pagado_actual = Decimal(str(factura.importe_pagado)) if factura.importe_pagado else Decimal('0')
+                importe_pendiente = importe_total_decimal - importe_pagado_actual
+                
+                # Validar que el importe parcial no sea mayor que el pendiente
+                if importe_parcial_decimal > importe_pendiente:
+                    return jsonify({'success': False, 'error': 'El importe a cobrar no puede ser mayor que el importe pendiente'}), 400
+                
+                if importe_parcial_decimal <= 0:
+                    return jsonify({'success': False, 'error': 'El importe a cobrar debe ser mayor que 0'}), 400
+                
+                # Actualizar importe_pagado
+                nuevo_importe_pagado = importe_pagado_actual + importe_parcial_decimal
+                factura.importe_pagado = nuevo_importe_pagado
+                
+                # Si ya se ha pagado todo, marcar como cobrada, sino cobrada_parcialmente
+                if nuevo_importe_pagado >= importe_total_decimal:
+                    factura.estado_cobro = 'cobrada'
+                    factura.importe_pagado = importe_total_decimal  # Asegurar que no exceda el total
+                else:
+                    factura.estado_cobro = 'cobrada_parcialmente'
+                    
+            except (ValueError, TypeError) as e:
+                return jsonify({'success': False, 'error': f'Importe inválido: {str(e)}'}), 400
+        else:
+            return jsonify({'success': False, 'error': 'Tipo de cobro no válido'}), 400
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Cobro procesado correctamente. Estado: {factura.estado_cobro}'
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Error al procesar el cobro: {str(e)}'}), 500
+
+
+@facturacion_bp.route('/facturacion/anular-cobro-factura', methods=['POST'])
+@login_required
+@not_usuario_required
+def anular_cobro_factura():
+    """Anular el cobro de una factura: estado_cobro a pendiente e importe_pagado a 0"""
+    try:
+        factura_id = request.form.get('factura_id')
+        if not factura_id:
+            if request.accept_mimetypes.best == 'application/json':
+                return jsonify({'success': False, 'error': 'ID de factura no proporcionado'}), 400
+            flash('ID de factura no proporcionado', 'error')
+            return redirect(request.referrer or url_for('facturacion.menu_ventas'))
+
+        factura = Factura.query.get_or_404(int(factura_id))
+
+        factura.estado_cobro = 'pendiente'
+        factura.importe_pagado = Decimal('0')
+        db.session.commit()
+
+        if request.accept_mimetypes.best == 'application/json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({
+                'success': True,
+                'message': 'Cobro anulado correctamente.'
+            })
+        flash('Cobro anulado correctamente.', 'success')
+        return redirect(request.referrer or url_for('facturacion.menu_ventas'))
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        if request.accept_mimetypes.best == 'application/json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'error': str(e)}), 500
+        flash('Error al anular el cobro: ' + str(e), 'error')
+        return redirect(request.referrer or url_for('facturacion.menu_ventas'))
+

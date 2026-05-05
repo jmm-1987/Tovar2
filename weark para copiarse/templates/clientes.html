@@ -1,0 +1,887 @@
+{% extends "base.html" %}
+
+{% block title %}Clientes - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<div class="clientes-container">
+    <div class="clientes-header">
+        <h2>Gestión de Clientes</h2>
+        <div style="display: flex; gap: 10px;">
+            <a href="{{ url_for('clientes.gestion_categorias') }}" class="btn btn-secondary">📁 Gestionar Categorías</a>
+            <button onclick="abrirModalCrear()" class="btn btn-success">➕ Crear Cliente</button>
+        </div>
+    </div>
+
+    <!-- Barra de búsqueda y ordenamiento -->
+    <div style="margin-bottom: 20px; display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
+        <form method="GET" action="{{ url_for('clientes.gestion_clientes') }}" style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 300px;">
+            <div style="position: relative; flex: 1;">
+                <input type="text" name="busqueda" id="busqueda" value="{{ busqueda }}" placeholder="Buscar por nombre fiscal, nombre comercial, NIF, población..." style="width: 100%; padding: 10px 40px 10px 15px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 14px;">
+                <span style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: #6c757d; font-size: 18px;">🔍</span>
+            </div>
+            <div style="min-width: 200px;">
+                <select name="categoria_filtro" id="categoria_filtro" style="width: 100%; padding: 10px 12px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 14px; cursor: pointer;">
+                    <option value="">Todas las categorías</option>
+                    {% for categoria in categorias %}
+                    <option value="{{ categoria.id }}" {% if categoria_filtro == categoria.id|string %}selected{% endif %}>{{ categoria.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <input type="hidden" name="orden" value="{{ orden }}">
+            <button type="submit" class="btn btn-primary" style="padding: 10px 20px; border-radius: 8px;">Buscar</button>
+            {% if busqueda or categoria_filtro %}
+            <a href="{{ url_for('clientes.gestion_clientes', orden=orden) }}" class="btn btn-secondary" style="padding: 10px 20px; border-radius: 8px;">Limpiar</a>
+            {% endif %}
+        </form>
+        
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <label for="orden" style="font-size: 14px; font-weight: 500; color: #495057;">Ordenar por:</label>
+            <select name="orden" id="orden" onchange="cambiarOrden(this.value)" style="padding: 8px 12px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 14px; cursor: pointer;">
+                <option value="id" {% if orden == 'id' %}selected{% endif %}>ID</option>
+                <option value="nombre" {% if orden == 'nombre' %}selected{% endif %}>Nombre Fiscal (A-Z)</option>
+            </select>
+        </div>
+    </div>
+
+    {% if clientes %}
+    <div class="table-container">
+        <table class="clientes-table" id="tabla_clientes">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre Fiscal</th>
+                    <th>Nombre Comercial</th>
+                    <th>Categoría</th>
+                    <th>Población</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="tabla_clientes_body">
+                {% for cliente in clientes %}
+                <tr data-search="{{ (cliente.id|string ~ ' ' ~ cliente.nombre ~ ' ' ~ (cliente.alias or '') ~ ' ' ~ (cliente.nif or '') ~ ' ' ~ (cliente.poblacion or '') ~ ' ' ~ (cliente.provincia or ''))|lower }}">
+                    <td>{{ cliente.id }}</td>
+                    <td>{{ cliente.nombre }}</td>
+                    <td>{{ cliente.alias or '-' }}</td>
+                    <td>{{ cliente.categoria_obj.nombre if cliente.categoria_obj else '-' }}</td>
+                    <td>{{ cliente.poblacion or '-' }}</td>
+                    <td class="acciones-cell">
+                        <a href="{{ url_for('clientes.ficha_cliente', id=cliente.id) }}" class="btn btn-sm btn-primary">Ver Ficha</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="no-data">
+        <p>No hay clientes registrados.</p>
+        <button onclick="abrirModalCrear()" class="btn btn-success">Crear Primer Cliente</button>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Buscador de clientes en la lista (similar al de Nueva Solicitud: filtra mientras se escribe)
+document.addEventListener('DOMContentLoaded', function() {
+    const input = document.getElementById('busqueda');
+    const tbody = document.getElementById('tabla_clientes_body');
+    if (!input || !tbody) return;
+
+    const filas = Array.from(tbody.querySelectorAll('tr'));
+
+    input.addEventListener('input', function() {
+        const term = this.value.toLowerCase().trim();
+
+        filas.forEach(tr => {
+            const hayTexto = tr.dataset.search || '';
+            if (!term || hayTexto.includes(term)) {
+                tr.style.display = '';
+            } else {
+                tr.style.display = 'none';
+            }
+        });
+    });
+});
+</script>
+
+<!-- Modal para crear cliente -->
+<div id="modalCrearCliente" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Crear Nuevo Cliente</h3>
+            <span class="close" onclick="cerrarModalCrear()">&times;</span>
+        </div>
+        <form method="POST" id="formCrearCliente" class="modal-form" onsubmit="limpiarDatosGuardadosCliente('cliente_draft')" oninput="guardarDatosFormularioCliente(this, 'cliente_draft')">
+            <div class="form-section">
+                <h4>Información Principal</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nombre">Nombre Fiscal *</label>
+                        <input type="text" name="nombre" id="nombre" required placeholder="Razón social o nombre fiscal">
+                    </div>
+                    <div class="form-group">
+                        <label for="alias">Nombre Comercial</label>
+                        <input type="text" name="alias" id="alias" placeholder="Nombre comercial">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nif">NIF/CIF</label>
+                        <input type="text" name="nif" id="nif" placeholder="A15022510" maxlength="20">
+                    </div>
+                    <div class="form-group">
+                        <label for="fecha_alta">Fecha de Alta</label>
+                        <input type="date" name="fecha_alta" id="fecha_alta">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Dirección Fiscal</h4>
+                <div class="form-group">
+                    <label for="direccion">Dirección</label>
+                    <input type="text" name="direccion" id="direccion" placeholder="Calle y número">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="poblacion">Población</label>
+                        <input type="text" name="poblacion" id="poblacion" placeholder="Ciudad">
+                    </div>
+                    <div class="form-group">
+                        <label for="provincia">Provincia</label>
+                        <input type="text" name="provincia" id="provincia" placeholder="Provincia">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="codigo_postal">Código Postal</label>
+                        <input type="text" name="codigo_postal" id="codigo_postal" placeholder="28001" maxlength="10">
+                    </div>
+                    <div class="form-group">
+                        <label for="pais">País</label>
+                        <input type="text" name="pais" id="pais" placeholder="España" value="España">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Información Adicional</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="categoria_id">Categoría</label>
+                        <select name="categoria_id" id="categoria_id">
+                            <option value="">Sin categoría</option>
+                            {% for categoria in categorias %}
+                            <option value="{{ categoria.id }}">{{ categoria.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="comercial_id">Comercial Asignado</label>
+                        <select name="comercial_id" id="comercial_id">
+                            <option value="">Sin comercial asignado</option>
+                            {% for comercial in comerciales %}
+                            <option value="{{ comercial.id }}">{{ comercial.nombre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="numero_cuenta">Número de Cuenta</label>
+                        <input type="text" name="numero_cuenta" id="numero_cuenta" placeholder="ES24-3456-3456-3456-3456-3456" maxlength="29">
+                        <small style="color: #666; font-size: 11px;">Formato: ES seguido de 22 dígitos (ESXX-XXXX-XXXX-XXXX-XXXX-XXXX). Opcional.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="tipo_iva">Tipo de IVA (%) *</label>
+                        <select name="tipo_iva" id="tipo_iva" required>
+                            <option value="21" selected>21%</option>
+                            <option value="10">10%</option>
+                            <option value="4">4%</option>
+                            <option value="0">0%</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Contacto</h4>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="telefono">Teléfono</label>
+                        <input type="text" name="telefono" id="telefono" placeholder="Teléfono fijo">
+                    </div>
+                    <div class="form-group">
+                        <label for="movil">Móvil</label>
+                        <input type="text" name="movil" id="movil" placeholder="Teléfono móvil">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="email_general">Email General</label>
+                        <input type="email" name="email_general" id="email_general" placeholder="email@ejemplo.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="email_comunicaciones">Email Comunicaciones</label>
+                        <input type="email" name="email_comunicaciones" id="email_comunicaciones" placeholder="email@ejemplo.com">
+                        <small style="color: #666; font-size: 11px;">Para avisos de estados</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h4>Direcciones de Envío Alternativas</h4>
+                <div id="direcciones-envio-container">
+                    <!-- Las direcciones se añadirán dinámicamente aquí -->
+                </div>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="añadirDireccionEnvio()" style="margin-top: 10px;">
+                    ➕ Añadir Dirección de Envío
+                </button>
+            </div>
+
+            <div class="form-section">
+                <h4>Personas de Contacto</h4>
+                <div id="personas-contacto-container">
+                    <!-- Las personas de contacto se añadirán dinámicamente aquí -->
+                </div>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="añadirPersonaContacto()" style="margin-top: 10px;">
+                    ➕ Añadir Persona de Contacto
+                </button>
+            </div>
+
+            <div class="form-section">
+                <h4>Anotaciones</h4>
+                <div class="form-group">
+                    <label for="anotaciones">Anotaciones</label>
+                    <textarea name="anotaciones" id="anotaciones" rows="2" placeholder="Notas adicionales"></textarea>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">Crear Cliente</button>
+                <button type="button" class="btn btn-secondary" onclick="cerrarModalCrear()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.clientes-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px 2px;
+}
+
+.clientes-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.table-container {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow-x: auto;
+}
+
+.clientes-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.clientes-table th,
+.clientes-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.clientes-table th {
+    background: #f8f9fa;
+    font-weight: 600;
+    color: #555;
+    position: sticky;
+    top: 0;
+}
+
+.clientes-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.acciones-cell {
+    white-space: nowrap;
+}
+
+.acciones-cell .btn {
+    margin-right: 5px;
+}
+
+.no-data {
+    text-align: center;
+    padding: 60px 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.no-data p {
+    font-size: 18px;
+    color: #999;
+    margin-bottom: 20px;
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+    overflow-y: auto;
+}
+
+.modal-content {
+    background-color: white;
+    margin: 3% auto;
+    padding: 0;
+    border-radius: 10px;
+    max-width: 700px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+    border-bottom: 2px solid #e0e0e0;
+    background: #f8f9fa;
+    border-radius: 10px 10px 0 0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 18px;
+}
+
+.close {
+    color: #aaa;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
+}
+
+.modal-form {
+    padding: 20px;
+}
+
+.form-section {
+    margin-bottom: 18px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.form-section:last-of-type {
+    border-bottom: none;
+}
+
+.form-section h4 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    color: #2c3e50;
+    font-size: 14px;
+    font-weight: 600;
+    border-bottom: 1px solid #667eea;
+    padding-bottom: 6px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 500;
+    color: #555;
+    font-size: 13px;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 13px;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.form-group input:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 2px solid #e0e0e0;
+}
+
+.btn-sm {
+    padding: 6px 12px;
+    font-size: 14px;
+}
+</style>
+
+<script>
+const STORAGE_KEY_CLIENTE = 'cliente_draft';
+
+function abrirModalCrear() {
+    const modal = document.getElementById('modalCrearCliente');
+    const form = document.getElementById('formCrearCliente');
+    modal.style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    
+    // Restaurar datos guardados
+    const datosGuardados = localStorage.getItem(STORAGE_KEY_CLIENTE);
+    if (datosGuardados) {
+        try {
+            const datos = JSON.parse(datosGuardados);
+            Object.keys(datos).forEach(key => {
+                const input = form.querySelector(`[name="${key}"]`);
+                if (input) {
+                    if (input.type === 'checkbox' || input.type === 'radio') {
+                        input.checked = datos[key] === input.value;
+                    } else {
+                        input.value = datos[key] || '';
+                    }
+                }
+            });
+            
+            // Restaurar direcciones de envío si existen
+            if (datos.direcciones_envio) {
+                datos.direcciones_envio.forEach((dir, index) => {
+                    if (index === 0) return; // La primera ya está en el formulario
+                    añadirDireccionEnvio();
+                    const container = document.getElementById('direcciones-envio-container');
+                    const ultimaDir = container.lastElementChild;
+                    if (ultimaDir) {
+                        // Buscar por patrón de nombre (direcciones_envio_direccion_X)
+                        const direccionInput = ultimaDir.querySelector('[name*="direcciones_envio_direccion"]');
+                        const poblacionInput = ultimaDir.querySelector('[name*="direcciones_envio_poblacion"]');
+                        const provinciaInput = ultimaDir.querySelector('[name*="direcciones_envio_provincia"]');
+                        const codigoPostalInput = ultimaDir.querySelector('[name*="direcciones_envio_codigo_postal"]');
+                        
+                        if (direccionInput) direccionInput.value = dir.direccion || '';
+                        if (poblacionInput) poblacionInput.value = dir.poblacion || '';
+                        if (provinciaInput) provinciaInput.value = dir.provincia || '';
+                        if (codigoPostalInput) codigoPostalInput.value = dir.codigo_postal || '';
+                    }
+                });
+            }
+            
+            // Restaurar personas de contacto si existen
+            if (datos.personas_contacto) {
+                datos.personas_contacto.forEach((persona, index) => {
+                    if (index === 0) return; // La primera ya está en el formulario
+                    añadirPersonaContacto();
+                    const container = document.getElementById('personas-contacto-container');
+                    const ultimaPersona = container.lastElementChild;
+                    if (ultimaPersona) {
+                        // Buscar por patrón de nombre (personas_contacto_nombre_X)
+                        const nombreInput = ultimaPersona.querySelector('[name*="personas_contacto_nombre"]');
+                        const cargoInput = ultimaPersona.querySelector('[name*="personas_contacto_cargo"]');
+                        const telefonoInput = ultimaPersona.querySelector('[name*="personas_contacto_movil"]');
+                        const emailInput = ultimaPersona.querySelector('[name*="personas_contacto_email"]');
+                        
+                        if (nombreInput) nombreInput.value = persona.nombre || '';
+                        if (cargoInput) cargoInput.value = persona.cargo || '';
+                        if (telefonoInput) telefonoInput.value = persona.telefono || '';
+                        if (emailInput) emailInput.value = persona.email || '';
+                    }
+                });
+            }
+        } catch (e) {
+            console.error('Error al restaurar datos:', e);
+        }
+    }
+}
+
+function cerrarModalCrear() {
+    const modal = document.getElementById('modalCrearCliente');
+    const form = document.getElementById('formCrearCliente');
+    
+    // Guardar datos antes de cerrar
+    guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
+    
+    modal.style.display = 'none';
+    document.body.style.overflow = 'auto';
+    // NO hacer reset aquí, solo ocultar
+}
+
+function guardarDatosFormularioCliente(form, storageKey) {
+    const datos = {};
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        if (input.name && input.name !== 'csrf_token') {
+            if (input.type === 'checkbox' || input.type === 'radio') {
+                if (input.checked) {
+                    datos[input.name] = input.value;
+                }
+            } else {
+                datos[input.name] = input.value || '';
+            }
+        }
+    });
+    
+    // Guardar direcciones de envío (campos dinámicos con nombres como direcciones_envio_direccion_0, etc.)
+    const direcciones = [];
+    document.querySelectorAll('#direcciones-envio-container > div').forEach((div, index) => {
+        const direccionInput = div.querySelector(`[name="direcciones_envio_direccion_${index}"]`) || div.querySelector('[name*="direcciones_envio_direccion"]');
+        const poblacionInput = div.querySelector(`[name="direcciones_envio_poblacion_${index}"]`) || div.querySelector('[name*="direcciones_envio_poblacion"]');
+        const provinciaInput = div.querySelector(`[name="direcciones_envio_provincia_${index}"]`) || div.querySelector('[name*="direcciones_envio_provincia"]');
+        const codigoPostalInput = div.querySelector(`[name="direcciones_envio_codigo_postal_${index}"]`) || div.querySelector('[name*="direcciones_envio_codigo_postal"]');
+        
+        if (direccionInput || poblacionInput || provinciaInput || codigoPostalInput) {
+            direcciones.push({
+                direccion: direccionInput?.value || '',
+                poblacion: poblacionInput?.value || '',
+                provincia: provinciaInput?.value || '',
+                codigo_postal: codigoPostalInput?.value || ''
+            });
+        }
+    });
+    if (direcciones.length > 0) {
+        datos.direcciones_envio = direcciones;
+    }
+    
+    // Guardar personas de contacto (campos dinámicos con nombres como personas_contacto_nombre_0, etc.)
+    const personas = [];
+    document.querySelectorAll('#personas-contacto-container > div').forEach((div, index) => {
+        const nombreInput = div.querySelector(`[name="personas_contacto_nombre_${index}"]`) || div.querySelector('[name*="personas_contacto_nombre"]');
+        const cargoInput = div.querySelector(`[name="personas_contacto_cargo_${index}"]`) || div.querySelector('[name*="personas_contacto_cargo"]');
+        const telefonoInput = div.querySelector(`[name="personas_contacto_movil_${index}"]`) || div.querySelector('[name*="personas_contacto_movil"]');
+        const emailInput = div.querySelector(`[name="personas_contacto_email_${index}"]`) || div.querySelector('[name*="personas_contacto_email"]');
+        
+        if (nombreInput || cargoInput || telefonoInput || emailInput) {
+            personas.push({
+                nombre: nombreInput?.value || '',
+                cargo: cargoInput?.value || '',
+                telefono: telefonoInput?.value || '',
+                email: emailInput?.value || ''
+            });
+        }
+    });
+    if (personas.length > 0) {
+        datos.personas_contacto = personas;
+    }
+    
+    localStorage.setItem(storageKey, JSON.stringify(datos));
+}
+
+function limpiarDatosGuardadosCliente(storageKey) {
+    localStorage.removeItem(storageKey);
+}
+
+// Cerrar modal con ESC
+document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+        cerrarModalCrear();
+    }
+});
+
+// Función para cambiar el orden
+function cambiarOrden(nuevoOrden) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('orden', nuevoOrden);
+    // Mantener la búsqueda si existe
+    const busquedaInput = document.getElementById('busqueda');
+    if (busquedaInput && busquedaInput.value) {
+        url.searchParams.set('busqueda', busquedaInput.value);
+    } else {
+        url.searchParams.delete('busqueda');
+    }
+    // Mantener el filtro de categoría si existe
+    const categoriaFiltro = document.getElementById('categoria_filtro');
+    if (categoriaFiltro && categoriaFiltro.value) {
+        url.searchParams.set('categoria_filtro', categoriaFiltro.value);
+    } else {
+        url.searchParams.delete('categoria_filtro');
+    }
+    window.location.href = url.toString();
+}
+
+// Contador para direcciones de envío
+let contadorDirecciones = 0;
+
+// Contador para personas de contacto
+let contadorPersonasContacto = 0;
+
+function añadirPersonaContacto() {
+    const container = document.getElementById('personas-contacto-container');
+    const index = contadorPersonasContacto++;
+    
+    const personaDiv = document.createElement('div');
+    personaDiv.className = 'persona-contacto-item';
+    personaDiv.style.cssText = 'border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 5px; background: #f9f9f9;';
+    personaDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h5 style="margin: 0; font-size: 14px; color: #555;">Persona de Contacto ${index + 1}</h5>
+            <button type="button" class="btn btn-sm btn-danger" onclick="eliminarPersonaContacto(this)" style="padding: 4px 8px; font-size: 12px;">✕ Eliminar</button>
+        </div>
+        <input type="hidden" name="personas_contacto[]" value="1">
+        <div class="form-group" style="margin-bottom: 10px;">
+            <label>Nombre *</label>
+            <input type="text" name="personas_contacto_nombre_${index}" required placeholder="Nombre completo" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div class="form-group">
+                <label>Cargo</label>
+                <input type="text" name="personas_contacto_cargo_${index}" placeholder="Cargo o puesto" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div class="form-group">
+                <label>Móvil</label>
+                <input type="text" name="personas_contacto_movil_${index}" placeholder="Teléfono móvil" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Email</label>
+            <input type="email" name="personas_contacto_email_${index}" placeholder="email@ejemplo.com" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+        </div>
+    `;
+    
+    container.appendChild(personaDiv);
+    
+    // Agregar event listeners para guardar automáticamente
+    personaDiv.querySelectorAll('input').forEach(input => {
+        input.addEventListener('input', function() {
+            const form = document.getElementById('formCrearCliente');
+            if (form) guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
+        });
+        input.addEventListener('change', function() {
+            const form = document.getElementById('formCrearCliente');
+            if (form) guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
+        });
+    });
+}
+
+function eliminarPersonaContacto(button) {
+    button.closest('.persona-contacto-item').remove();
+    // Guardar después de eliminar
+    const form = document.getElementById('formCrearCliente');
+    if (form) guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
+}
+
+function añadirDireccionEnvio() {
+    const container = document.getElementById('direcciones-envio-container');
+    const index = contadorDirecciones++;
+    
+    const direccionDiv = document.createElement('div');
+    direccionDiv.className = 'direccion-envio-item';
+    direccionDiv.style.cssText = 'border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 5px; background: #f9f9f9;';
+    direccionDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h5 style="margin: 0; font-size: 14px; color: #555;">Dirección Envío ${index + 2}</h5>
+            <button type="button" class="btn btn-sm btn-danger" onclick="eliminarDireccionEnvio(this)" style="padding: 4px 8px; font-size: 12px;">✕ Eliminar</button>
+        </div>
+        <input type="hidden" name="direcciones_envio[]" value="1">
+        <input type="hidden" name="direcciones_envio_nombre_${index}" value="Dirección envío ${index + 2}">
+        <div class="form-group" style="margin-bottom: 10px;">
+            <label>Dirección</label>
+            <textarea name="direcciones_envio_direccion_${index}" rows="2" placeholder="Dirección completa" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div class="form-group">
+                <label>Población</label>
+                <input type="text" name="direcciones_envio_poblacion_${index}" placeholder="Ciudad" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div class="form-group">
+                <label>Provincia</label>
+                <input type="text" name="direcciones_envio_provincia_${index}" placeholder="Provincia" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+                <label>Código Postal</label>
+                <input type="text" name="direcciones_envio_codigo_postal_${index}" placeholder="28001" maxlength="10" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div class="form-group">
+                <label>País</label>
+                <input type="text" name="direcciones_envio_pais_${index}" placeholder="España" value="España" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(direccionDiv);
+    
+    // Agregar event listeners para guardar automáticamente
+    direccionDiv.querySelectorAll('input, textarea').forEach(input => {
+        input.addEventListener('input', function() {
+            const form = document.getElementById('formCrearCliente');
+            if (form) guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
+        });
+        input.addEventListener('change', function() {
+            const form = document.getElementById('formCrearCliente');
+            if (form) guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
+        });
+    });
+}
+
+function eliminarDireccionEnvio(button) {
+    button.closest('.direccion-envio-item').remove();
+    // Guardar después de eliminar
+    const form = document.getElementById('formCrearCliente');
+    if (form) guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
+}
+
+// Formatear número de cuenta automáticamente
+// Guardar datos automáticamente mientras el usuario escribe
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('formCrearCliente');
+    if (form) {
+        // Guardar datos en cada cambio
+        form.addEventListener('input', function() {
+            guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
+        });
+        form.addEventListener('change', function() {
+            guardarDatosFormularioCliente(form, STORAGE_KEY_CLIENTE);
+        });
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const numeroCuentaInput = document.getElementById('numero_cuenta');
+    if (numeroCuentaInput) {
+        // No forzar ES si el campo está vacío, permitir que esté vacío
+        
+        numeroCuentaInput.addEventListener('input', function(e) {
+            let value = e.target.value.toUpperCase();
+            
+            // Si el campo está vacío, permitir que esté vacío
+            if (!value || value.trim() === '') {
+                e.target.value = '';
+                return;
+            }
+            
+            // Forzar que empiece con ES solo si hay contenido
+            if (!value.startsWith('ES')) {
+                // Si hay números al inicio, añadir ES al principio
+                const numbers = value.replace(/\D/g, '');
+                if (numbers.length > 0) {
+                    value = 'ES' + numbers.substring(0, 22);
+                } else {
+                    // Si no hay números, permitir que esté vacío
+                    e.target.value = '';
+                    return;
+                }
+            } else {
+                // Extraer solo los números después de ES
+                const afterES = value.substring(2).replace(/\D/g, '');
+                
+                // Limitar a 22 dígitos
+                const numbers = afterES.substring(0, 22);
+                
+                // Formatear: ES + 2 dígitos + guión + resto en grupos de 4
+                let formatted = 'ES';
+                if (numbers.length > 0) {
+                    // Primeros 2 dígitos sin guión
+                    formatted += numbers.substring(0, 2);
+                    // Añadir guión después de los 2 primeros dígitos
+                    if (numbers.length > 2) {
+                        formatted += '-';
+                        // Resto de dígitos en grupos de 4
+                        const rest = numbers.substring(2);
+                        for (let i = 0; i < rest.length; i++) {
+                            if (i > 0 && i % 4 === 0) {
+                                formatted += '-';
+                            }
+                            formatted += rest[i];
+                        }
+                    }
+                }
+                value = formatted;
+            }
+            
+            e.target.value = value;
+        });
+        
+        // Manejar el evento de pegar
+        numeroCuentaInput.addEventListener('paste', function(e) {
+            e.preventDefault();
+            const paste = (e.clipboardData || window.clipboardData).getData('text').toUpperCase();
+            
+            // Extraer solo números (y ES si está al inicio)
+            let numbers = '';
+            if (paste.startsWith('ES')) {
+                numbers = paste.substring(2).replace(/\D/g, '');
+            } else {
+                numbers = paste.replace(/\D/g, '');
+            }
+            
+            // Limitar a 22 dígitos
+            numbers = numbers.substring(0, 22);
+            
+            // Formatear: ES + 2 dígitos + guión + resto en grupos de 4
+            let formatted = 'ES';
+            if (numbers.length > 0) {
+                formatted += numbers.substring(0, 2);
+                if (numbers.length > 2) {
+                    formatted += '-';
+                    const rest = numbers.substring(2);
+                    for (let i = 0; i < rest.length; i++) {
+                        if (i > 0 && i % 4 === 0) {
+                            formatted += '-';
+                        }
+                        formatted += rest[i];
+                    }
+                }
+            }
+            
+            e.target.value = formatted;
+        });
+        
+        // Manejar el evento de focus para asegurar que siempre tenga ES
+        numeroCuentaInput.addEventListener('focus', function(e) {
+            if (!e.target.value || !e.target.value.toUpperCase().startsWith('ES')) {
+                e.target.value = 'ES';
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
+

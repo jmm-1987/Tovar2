@@ -1,0 +1,741 @@
+{% extends "base.html" %}
+
+{% block title %}Facturación - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<style>
+.container {
+    padding-top: 10px !important;
+    padding-left: 5px !important;
+    padding-right: 5px !important;
+    max-width: 100% !important;
+}
+header {
+    margin-bottom: 0.8rem !important;
+}
+h2::after {
+    display: none;
+}
+</style>
+<h2 style="margin: 0 0 8px 0; padding-bottom: 0; font-size: 1.3rem;">Facturación</h2>
+
+<!-- FILTROS -->
+<div style="margin-bottom: 15px;">
+    <div class="filtros-container" style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); padding: 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #e9ecef;">
+        <form method="GET" action="{{ url_for('facturacion.facturacion') }}" id="filtros-form" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+            <!-- Mantener otros filtros al cambiar tipo (no incluir estado porque viene del select) -->
+            {% if fecha_desde %}<input type="hidden" name="fecha_desde" value="{{ fecha_desde }}">{% endif %}
+            {% if fecha_hasta %}<input type="hidden" name="fecha_hasta" value="{{ fecha_hasta }}">{% endif %}
+            
+            <div class="filtro-group" style="display: flex; flex-direction: column; gap: 6px; min-width: 200px;">
+                <label style="font-size: 0.75rem; font-weight: 600; color: #495057; display: flex; align-items: center; gap: 4px;">
+                    <span>📋</span> Tipo
+                </label>
+                <div style="display: flex; gap: 0; border: 2px solid #dee2e6; border-radius: 6px; overflow: hidden; background: white;">
+                    <button type="button" class="tipo-selector-btn {% if tipo_vista == 'pendientes' %}active{% endif %}" 
+                            onclick="cambiarTipoVista('pendientes')"
+                            style="flex: 1; padding: 6px 12px; border: none; background: {% if tipo_vista == 'pendientes' %}#007bff{% else %}#ffffff{% endif %}; color: {% if tipo_vista == 'pendientes' %}#ffffff{% else %}#495057{% endif %}; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">
+                        Pendientes
+                    </button>
+                    <button type="button" class="tipo-selector-btn {% if tipo_vista == 'formalizadas' %}active{% endif %}" 
+                            onclick="cambiarTipoVista('formalizadas')"
+                            style="flex: 1; padding: 6px 12px; border: none; border-left: 2px solid #dee2e6; background: {% if tipo_vista == 'formalizadas' %}#007bff{% else %}#ffffff{% endif %}; color: {% if tipo_vista == 'formalizadas' %}#ffffff{% else %}#495057{% endif %}; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease;">
+                        Formalizadas
+                    </button>
+                </div>
+                <input type="hidden" name="tipo_vista" id="tipo_vista_input" value="{{ tipo_vista }}">
+            </div>
+            
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                <label for="estado" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>🏷️</span> Estado
+                </label>
+                <select name="estado" id="estado" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                    <option value="">Todos los estados</option>
+                    {% for estado in estados %}
+                    <option value="{{ estado }}" {% if estado_filtro == estado %}selected{% endif %}>
+                        {% if estado == 'pendiente' %}Pendiente
+                        {% elif estado == 'cobrada_parcialmente' %}Cobrada Parcialmente
+                        {% elif estado == 'cobrada' %}Cobrada
+                        {% else %}{{ estado.replace('_', ' ')|title }}
+                        {% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                <label for="fecha_desde" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>📅</span> Fecha Desde
+                </label>
+                <input type="date" name="fecha_desde" id="fecha_desde" value="{{ fecha_desde }}" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease;">
+            </div>
+            
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                <label for="fecha_hasta" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>📅</span> Fecha Hasta
+                </label>
+                <input type="date" name="fecha_hasta" id="fecha_hasta" value="{{ fecha_hasta }}" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease;">
+            </div>
+            
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 2; min-width: 220px;">
+                <label for="busqueda_facturas_ventas" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>🔍</span> Buscar
+                </label>
+                <div style="position: relative;">
+                    <input type="text" id="busqueda_facturas_ventas" name="busqueda" value="{{ busqueda or '' }}" placeholder="Filtrar por cliente, número, estado..." 
+                           style="width: 100%; padding: 6px 30px 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem;">
+                    <span style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: #6c757d; font-size: 14px;">🔍</span>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 8px; align-items: flex-end;">
+                <button type="submit" class="btn btn-primary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
+                    🔍 Buscar
+                </button>
+                {% if tipo_vista != 'pendientes' or estado_filtro or fecha_desde or fecha_hasta %}
+                <a href="{{ url_for('facturacion.facturacion') }}" class="btn btn-secondary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; transition: all 0.3s ease;">
+                    🗑️ Limpiar
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function cambiarTipoVista(tipo) {
+    document.getElementById('tipo_vista_input').value = tipo;
+    document.getElementById('filtros-form').submit();
+}
+</script>
+
+<!-- BOTONES PARA CREAR FACTURA DIRECTA Y NUEVO ALBARÁN -->
+<div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;">
+    <div id="totales-filtro" style="padding: 10px 20px; background: #f8f9fa; border-radius: 6px; border: 2px solid #28a745; flex: 1; min-width: 300px;">
+        <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+            <div style="font-weight: 600; color: #212529;">
+                <span style="color: #666; font-size: 0.9rem;">Total:</span>
+                <span id="total-total" style="font-size: 1.1rem; color: #212529; margin-left: 5px;">0.00 €</span>
+            </div>
+            <div style="font-weight: 600; color: #28a745;">
+                <span style="color: #666; font-size: 0.9rem;">Cobrado:</span>
+                <span id="total-cobrado" style="font-size: 1.1rem; color: #28a745; margin-left: 5px;">0.00 €</span>
+            </div>
+            <div style="font-weight: 600; color: #dc3545;">
+                <span style="color: #666; font-size: 0.9rem;">Pendiente:</span>
+                <span id="total-pendiente" style="font-size: 1.1rem; color: #dc3545; margin-left: 5px;">0.00 €</span>
+            </div>
+        </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="{{ url_for('facturacion.nueva_factura') }}" class="btn btn-success" style="padding: 10px 20px; background: #28a745; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(40,167,69,0.3); transition: all 0.3s ease;">
+                ➕ Crear Factura Directa
+            </a>
+            <a href="{{ url_for('facturacion.nuevo_albaran') }}" class="btn btn-primary" style="padding: 10px 20px; background: #007bff; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
+                📄 Nuevo Albarán
+            </a>
+        </div>
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="{{ url_for('facturacion.facturar_albaranes') }}" class="btn btn-warning" style="padding: 10px 20px; background: #ffc107; color: #212529; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(255,193,7,0.3); transition: all 0.3s ease;">
+                🧾 Facturar Albaranes
+            </a>
+            <a href="{{ url_for('facturacion.crear_factura_anticipo') }}" class="btn btn-info" style="padding: 10px 20px; background: #17a2b8; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(23,162,184,0.3); transition: all 0.3s ease;">
+                💰 Crear Factura Anticipo
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- SECCIÓN DE PREFACTURAS (Pendientes de formalizar) -->
+{% if tipo_vista == 'pendientes' %}
+
+{% if prefacturas %}
+<div class="table-container" style="background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; margin-bottom: 40px;">
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); border-bottom: 2px solid #1a252f;">
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem;">ID</th>
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Cliente</th>
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Tipo</th>
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Estado</th>
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Fecha Aceptación</th>
+                <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Líneas</th>
+                <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Acciones</th>
+            </tr>
+        </thead>
+        <tbody id="tabla_prefacturas_body">
+            {% for prefactura in prefacturas %}
+            {% set es_solicitud = prefactura.__class__.__name__ == 'Presupuesto' %}
+            {% set es_albaran = prefactura.__class__.__name__ == 'Factura' and prefactura.numero.startswith('A') and '_' in prefactura.numero %}
+            <tr class="pedido-row" style="border-bottom: 1px solid #e9ecef; transition: all 0.3s ease;"
+                data-search="{{ (prefactura.id|string ~ ' ' ~ (prefactura.cliente.nombre if prefactura.cliente else prefactura.nombre if es_albaran else '') ~ ' ' ~ (prefactura.tipo_pedido or '') ~ ' ' ~ prefactura.estado)|lower }}">
+                <td style="padding: 8px 10px; color: #212529; font-weight: 600; font-size: 0.85rem;">#{{ prefactura.id }}</td>
+                <td style="padding: 8px 10px; color: #212529; font-weight: 500; font-size: 0.85rem;">
+                    {% if es_albaran %}
+                        {{ prefactura.nombre if prefactura.nombre else 'N/A' }}
+                    {% else %}
+                    {{ prefactura.cliente.nombre if prefactura.cliente else 'N/A' }}
+                    {% endif %}
+                </td>
+                <td style="padding: 8px 10px; color: #212529; font-size: 0.85rem;">
+                    {% if es_solicitud %}
+                        Solicitud - {{ prefactura.tipo_pedido if prefactura.tipo_pedido else 'N/A' }}
+                    {% elif es_albaran %}
+                        Albarán - {{ prefactura.numero }}
+                    {% else %}
+                        {{ prefactura.tipo_pedido }}
+                    {% endif %}
+                </td>
+                <td style="padding: 8px 10px; font-size: 0.85rem;">
+                    <span class="badge badge-estado-{{ prefactura.estado.lower()|replace(' ', '-')|replace('ó', 'o')|replace('í', 'i')|replace('é', 'e') }}">
+                        {{ prefactura.estado }}
+                    </span>
+                </td>
+                <td style="padding: 8px 10px; color: #212529; font-size: 0.85rem;">
+                    {% if es_solicitud %}
+                        {% if prefactura.fecha_aceptado %}
+                            {{ prefactura.fecha_aceptado.strftime('%d/%m/%Y') }}
+                        {% else %}
+                            <span style="color: #999;">-</span>
+                        {% endif %}
+                    {% elif es_albaran %}
+                        {% if prefactura.fecha_expedicion %}
+                            {{ prefactura.fecha_expedicion.strftime('%d/%m/%Y') }}
+                        {% else %}
+                            <span style="color: #999;">-</span>
+                        {% endif %}
+                    {% else %}
+                        {% if prefactura.fecha_aceptacion %}
+                            {{ prefactura.fecha_aceptacion.strftime('%d/%m/%Y') }}
+                        {% else %}
+                            <span style="color: #999;">-</span>
+                        {% endif %}
+                    {% endif %}
+                </td>
+                <td style="padding: 8px 10px; text-align: center; color: #212529; font-size: 0.85rem;">
+                    {{ prefactura.lineas|length }} línea{{ 's' if prefactura.lineas|length != 1 else '' }}
+                </td>
+                <td style="padding: 8px 10px; text-align: center; font-size: 0.85rem;">
+                    {% if es_solicitud %}
+                        <a href="{{ url_for('facturacion.ver_factura_solicitud', presupuesto_id=prefactura.id) }}" 
+                           class="btn btn-info" 
+                           style="padding: 2px 6px; font-size: 0.7rem; text-decoration: none; display: inline-block; margin-right: 2px;">
+                            Hacer Factura
+                        </a>
+                        <a href="{{ url_for('presupuestos.descargar_albaran_solicitud', solicitud_id=prefactura.id) }}" 
+                           class="btn btn-secondary" 
+                           style="padding: 2px 6px; font-size: 0.7rem; text-decoration: none; display: inline-block;"
+                           target="_blank">
+                            📋 Alb
+                        </a>
+                    {% elif es_albaran %}
+                        <a href="{{ url_for('facturacion.editar_albaran', factura_id=prefactura.id) }}" 
+                           class="btn btn-info" 
+                           style="padding: 2px 6px; font-size: 0.7rem; text-decoration: none; display: inline-block; margin-right: 2px;">
+                            ✏️ Edit
+                        </a>
+                        <a href="{{ url_for('facturacion.descargar_pdf_factura', factura_id=prefactura.id) }}" 
+                           class="btn btn-secondary" 
+                           style="padding: 2px 6px; font-size: 0.7rem; text-decoration: none; display: inline-block;"
+                           target="_blank">
+                            📄 PDF
+                        </a>
+                    {% else %}
+                        <a href="{{ url_for('facturacion.ver_factura', pedido_id=prefactura.id) }}" 
+                           class="btn btn-info" 
+                           style="padding: 2px 6px; font-size: 0.7rem; text-decoration: none; display: inline-block; margin-right: 2px;">
+                            Hacer Factura
+                        </a>
+                        <a href="{{ url_for('facturacion.descargar_pdf_albaran_pedido', pedido_id=prefactura.id) }}" 
+                           class="btn btn-secondary" 
+                           style="padding: 2px 6px; font-size: 0.7rem; text-decoration: none; display: inline-block;"
+                           target="_blank">
+                            📋 Alb
+                        </a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div style="background: white; border-radius: 8px; padding: 40px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 40px;">
+    <p style="color: #999; font-size: 1.1rem; margin: 0;">No hay prefacturas pendientes.</p>
+</div>
+{% endif %}
+
+<!-- SECCIÓN DE FACTURAS (Ya formalizadas) -->
+{% else %}
+
+{% if facturas %}
+<div class="table-container" style="background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;">
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background: linear-gradient(135deg, #27ae60 0%, #229954 100%); border-bottom: 2px solid #1e8449;">
+                <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; width: 40px; font-size: 0.85rem;">
+                    <input type="checkbox" id="selectAllFacturas" onchange="toggleAllFacturas(this)" style="cursor: pointer;">
+                </th>
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem; width: 100px;">Serie-Nº</th>
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Cliente</th>
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem; width: 110px;">Fecha Expedición</th>
+                <th style="padding: 8px 10px; text-align: right; color: #ffffff; font-weight: 600; font-size: 0.85rem; width: 120px;">Importe Total</th>
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem; width: 130px;">Estado Cobro</th>
+                <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; font-size: 0.85rem; width: 280px;">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for factura in facturas %}
+            {% set importe_total_val = factura.importe_total|float %}
+            {% set importe_pagado_val = factura.importe_pagado|float if factura.importe_pagado else 0.0 %}
+            {% set importe_pendiente_val = importe_total_val - importe_pagado_val %}
+            <tr class="factura-row" style="border-bottom: 1px solid #e9ecef; transition: all 0.3s ease;"
+                data-importe-total="{{ importe_total_val }}" data-importe-pagado="{{ importe_pagado_val }}" data-importe-pendiente="{{ importe_pendiente_val }}"
+                data-search="{{ (factura.serie ~ '-' ~ factura.numero ~ ' ' ~ (factura.nombre or '') ~ ' ' ~ (factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else '-') ~ ' ' ~ (factura.estado_cobro or ''))|lower }}">
+                <td style="padding: 8px 10px; text-align: center;">
+                    <input type="checkbox" class="factura-checkbox" onchange="actualizarTotalesSeleccion()" value="{{ factura.id }}" style="cursor: pointer;">
+                </td>
+                <td style="padding: 8px 10px; color: #212529; font-weight: 600; font-size: 0.85rem;">{{ factura.serie }}-{{ factura.numero }}</td>
+                <td style="padding: 8px 10px; color: #212529; font-weight: 500; font-size: 0.85rem;">
+                    {{ factura.nombre }}
+                </td>
+                <td style="padding: 8px 10px; color: #212529; font-size: 0.85rem;">
+                    {% if factura.fecha_expedicion %}
+                        {{ factura.fecha_expedicion.strftime('%d/%m/%Y') }}
+                    {% else %}
+                        <span style="color: #999;">-</span>
+                    {% endif %}
+                </td>
+                <td style="padding: 8px 10px; color: #212529; font-weight: 600; text-align: right; font-size: 0.85rem;">
+                    {{ "%.2f"|format(importe_total_val) }} €
+                </td>
+                <td style="padding: 8px 10px; font-size: 0.85rem;">
+                    {% set estado_cobro_val = factura.estado_cobro if factura.estado_cobro else 'pendiente' %}
+                    <span class="badge badge-estado-{{ estado_cobro_val.lower()|replace(' ', '-')|replace('ó', 'o')|replace('í', 'i')|replace('é', 'e') }}">
+                        {{ estado_cobro_val|replace('_', ' ')|title }}
+                    </span>
+                    {% if estado_cobro_val == 'cobrada_parcialmente' %}
+                        <div style="font-size: 0.7rem; color: #666; margin-top: 2px;">
+                            Pagado: {{ "%.2f"|format(importe_pagado_val) }} € / Pendiente: {{ "%.2f"|format(importe_pendiente_val) }} €
+                        </div>
+                    {% endif %}
+                </td>
+                <td style="padding: 8px 10px; text-align: center; min-width: 280px;">
+                    <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
+                    {% if not factura.pedido_id %}
+                        <a href="{{ url_for('facturacion.editar_factura', factura_id=factura.id) }}" 
+                           class="btn btn-warning" 
+                           style="padding: 2px 5px; font-size: 0.65rem; text-decoration: none; display: inline-block; white-space: nowrap; background-color: #ffc107; color: #212529; border: none; border-radius: 4px;">
+                            ✏️ Edit
+                        </a>
+                    {% endif %}
+                    <a href="{{ url_for('facturacion.descargar_pdf_factura', factura_id=factura.id) }}" 
+                       class="btn btn-danger" 
+                           style="padding: 2px 5px; font-size: 0.65rem; text-decoration: none; display: inline-block; white-space: nowrap; background-color: #dc3545; color: white; border: none; border-radius: 4px;"
+                       target="_blank">
+                        📄 PDF
+                    </a>
+                    <a href="{{ url_for('facturacion.descargar_pdf_albaran_factura', factura_id=factura.id) }}" 
+                       class="btn btn-info" 
+                           style="padding: 2px 5px; font-size: 0.65rem; text-decoration: none; display: inline-block; white-space: nowrap; border-radius: 4px;"
+                       target="_blank">
+                        📋 Alb
+                    </a>
+                    {% if estado_cobro_val != 'cobrada' %}
+                        <button type="button" 
+                                class="btn btn-primary" 
+                                onclick="abrirModalCobrar({{ factura.id }}, '{{ factura.serie }}', '{{ factura.numero }}', {{ importe_total_val }}, {{ importe_pagado_val }}, {{ importe_pendiente_val }})"
+                                style="padding: 2px 5px; font-size: 0.65rem; white-space: nowrap; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                            Cobrar
+                        </button>
+                    {% endif %}
+                    {% if estado_cobro_val in ('cobrada', 'cobrada_parcialmente') %}
+                        <button type="button" 
+                                class="btn btn-warning btn-anular-cobro" 
+                                onclick="anularCobro({{ factura.id }}, '{{ factura.serie }}-{{ factura.numero }}')"
+                                style="padding: 2px 5px; font-size: 0.65rem; white-space: nowrap; background-color: #fd7e14; color: white; border: none; border-radius: 4px; cursor: pointer;"
+                                title="Anular cobro">
+                            <svg width="14" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle;">
+                                <rect x="0.5" y="0.5" width="13" height="9" rx="1" fill="#28a745"/>
+                                <line x1="1" y1="2.8" x2="13" y2="2.8" stroke="white" stroke-width="0.4" opacity="0.9"/>
+                                <line x1="4.5" y1="0.5" x2="4.5" y2="9.5" stroke="white" stroke-width="0.3" opacity="0.7"/>
+                                <line x1="9.5" y1="0.5" x2="9.5" y2="9.5" stroke="white" stroke-width="0.3" opacity="0.7"/>
+                                <path d="M2 2L12 8M12 2L2 8" stroke="#dc3545" stroke-width="1" stroke-linecap="round"/>
+                            </svg>
+                        </button>
+                    {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div style="background: white; border-radius: 8px; padding: 40px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+    <p style="color: #999; font-size: 1.1rem; margin: 0;">No hay facturas formalizadas aún.</p>
+</div>
+{% endif %}
+{% endif %}
+
+<!-- Modal para cobrar factura -->
+<div id="modalCobrar" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5);">
+    <div style="background-color: #fefefe; margin: 10% auto; padding: 20px; border: 1px solid #888; width: 90%; max-width: 500px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 2px solid #e9ecef; padding-bottom: 10px;">
+            <h3 style="margin: 0; color: #212529;">Cobrar Factura</h3>
+            <span id="cerrarModalCobrar" style="color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; line-height: 20px;">&times;</span>
+        </div>
+        
+        <div id="infoFactura" style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 6px;">
+            <p style="margin: 5px 0;"><strong>Factura:</strong> <span id="modalSerieNumero"></span></p>
+            <p style="margin: 5px 0;"><strong>Importe Total:</strong> <span id="modalImporteTotal"></span> €</p>
+            <p style="margin: 5px 0;"><strong>Ya Pagado:</strong> <span id="modalImportePagado"></span> €</p>
+            <p style="margin: 5px 0;"><strong>Pendiente:</strong> <span id="modalImportePendiente"></span> €</p>
+        </div>
+        
+        <form id="formCobrar" onsubmit="procesarCobro(event)">
+            <input type="hidden" id="facturaIdCobrar" name="factura_id">
+            
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: #495057;">Tipo de cobro:</label>
+                <div style="display: flex; gap: 15px;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="radio" name="tipo_cobro" value="completa" checked onchange="toggleImporteParcial(false)" style="margin-right: 8px;">
+                        <span>Cobrar Completa</span>
+                    </label>
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="radio" name="tipo_cobro" value="parcial" onchange="toggleImporteParcial(true)" style="margin-right: 8px;">
+                        <span>Cobrar Parcialmente</span>
+                    </label>
+                </div>
+            </div>
+            
+            <div id="divImporteParcial" style="display: none; margin-bottom: 20px;">
+                <label for="importeParcial" style="display: block; margin-bottom: 8px; font-weight: 600; color: #495057;">Importe a cobrar:</label>
+                <input type="number" 
+                       id="importeParcial" 
+                       name="importe_parcial" 
+                       step="0.01" 
+                       min="0.01" 
+                       required
+                       style="width: 100%; padding: 8px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 1rem;">
+                <small style="color: #6c757d; display: block; margin-top: 5px;">Máximo: <span id="maxImporteParcial"></span> €</small>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 25px; padding-top: 15px; border-top: 2px solid #e9ecef;">
+                <button type="button" 
+                        onclick="cerrarModalCobrar()" 
+                        style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                    Cancelar
+                </button>
+                <button type="submit" 
+                        style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                    Confirmar Cobro
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let facturaActualCobrar = null;
+
+function abrirModalCobrar(facturaId, serie, numero, importeTotal, importePagado, importePendiente) {
+    facturaActualCobrar = {
+        id: facturaId,
+        serie: serie,
+        numero: numero,
+        importeTotal: importeTotal,
+        importePagado: importePagado,
+        importePendiente: importePendiente
+    };
+    
+    document.getElementById('facturaIdCobrar').value = facturaId;
+    document.getElementById('modalSerieNumero').textContent = serie + '-' + numero;
+    document.getElementById('modalImporteTotal').textContent = importeTotal.toFixed(2);
+    document.getElementById('modalImportePagado').textContent = importePagado.toFixed(2);
+    document.getElementById('modalImportePendiente').textContent = importePendiente.toFixed(2);
+    document.getElementById('maxImporteParcial').textContent = importePendiente.toFixed(2);
+    
+    // Resetear formulario
+    document.querySelector('input[name="tipo_cobro"][value="completa"]').checked = true;
+    toggleImporteParcial(false);
+    document.getElementById('importeParcial').value = '';
+    
+    document.getElementById('modalCobrar').style.display = 'block';
+}
+
+function cerrarModalCobrar() {
+    document.getElementById('modalCobrar').style.display = 'none';
+    facturaActualCobrar = null;
+}
+
+function toggleImporteParcial(mostrar) {
+    const divImporteParcial = document.getElementById('divImporteParcial');
+    const inputImporte = document.getElementById('importeParcial');
+    
+    if (mostrar) {
+        divImporteParcial.style.display = 'block';
+        inputImporte.required = true;
+        inputImporte.max = facturaActualCobrar ? facturaActualCobrar.importePendiente : 0;
+    } else {
+        divImporteParcial.style.display = 'none';
+        inputImporte.required = false;
+        inputImporte.value = '';
+    }
+}
+
+function procesarCobro(event) {
+    event.preventDefault();
+    
+    const facturaId = document.getElementById('facturaIdCobrar').value;
+    const tipoCobro = document.querySelector('input[name="tipo_cobro"]:checked').value;
+    const importeParcial = tipoCobro === 'parcial' ? parseFloat(document.getElementById('importeParcial').value) : null;
+    
+    if (tipoCobro === 'parcial' && (!importeParcial || importeParcial <= 0)) {
+        alert('Por favor, introduce un importe válido');
+        return;
+    }
+    
+    if (tipoCobro === 'parcial' && importeParcial > facturaActualCobrar.importePendiente) {
+        alert('El importe a cobrar no puede ser mayor que el importe pendiente');
+        return;
+    }
+    
+    // Realizar petición AJAX
+    const formData = new FormData();
+    formData.append('factura_id', facturaId);
+    formData.append('tipo_cobro', tipoCobro);
+    if (tipoCobro === 'parcial') {
+        formData.append('importe_parcial', importeParcial);
+    }
+    
+    fetch('{{ url_for("facturacion.procesar_cobro_factura") }}', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            cerrarModalCobrar();
+            // Recargar la página para mostrar los cambios
+            window.location.reload();
+        } else {
+            alert('Error al procesar el cobro: ' + (data.error || 'Error desconocido'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al procesar el cobro');
+    });
+}
+
+function anularCobro(facturaId, serieNumero) {
+    if (!confirm('¿Anular el cobro de la factura ' + serieNumero + '? El estado pasará a Pendiente y el importe pagado a 0.')) {
+        return;
+    }
+    const formData = new FormData();
+    formData.append('factura_id', facturaId);
+
+    fetch('{{ url_for("facturacion.anular_cobro_factura") }}', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'No se pudo anular el cobro'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al anular el cobro');
+    });
+}
+
+// Cerrar modal al hacer clic fuera de él
+window.onclick = function(event) {
+    const modal = document.getElementById('modalCobrar');
+    if (event.target == modal) {
+        cerrarModalCobrar();
+    }
+}
+
+// Cerrar modal con la X
+document.getElementById('cerrarModalCobrar').onclick = cerrarModalCobrar;
+
+// Funciones para selección de facturas y cálculo de totales
+function toggleAllFacturas(checkbox) {
+    const checkboxes = document.querySelectorAll('.factura-checkbox');
+    checkboxes.forEach(cb => {
+        cb.checked = checkbox.checked;
+    });
+    actualizarTotalesFiltro();
+}
+
+function actualizarTotalesFiltro() {
+    // Calcular totales de todas las facturas visibles en la tabla (según el filtro)
+    const rows = document.querySelectorAll('.factura-row');
+    
+    let totalTotal = 0;
+    let totalCobrado = 0;
+    let totalPendiente = 0;
+    
+    rows.forEach(row => {
+        const importeTotal = parseFloat(row.getAttribute('data-importe-total')) || 0;
+        const importePagado = parseFloat(row.getAttribute('data-importe-pagado')) || 0;
+        const importePendiente = parseFloat(row.getAttribute('data-importe-pendiente')) || 0;
+        
+        totalTotal += importeTotal;
+        totalCobrado += importePagado;
+        totalPendiente += importePendiente;
+    });
+    
+    document.getElementById('total-total').textContent = totalTotal.toFixed(2) + ' €';
+    document.getElementById('total-cobrado').textContent = totalCobrado.toFixed(2) + ' €';
+    document.getElementById('total-pendiente').textContent = totalPendiente.toFixed(2) + ' €';
+    
+    // Actualizar el checkbox de "seleccionar todos" si existe
+    const selectAllCheckbox = document.getElementById('selectAllFacturas');
+    if (selectAllCheckbox) {
+        const allCheckboxes = document.querySelectorAll('.factura-checkbox');
+        const checkedCount = document.querySelectorAll('.factura-checkbox:checked').length;
+        selectAllCheckbox.checked = checkedCount === allCheckboxes.length && allCheckboxes.length > 0;
+        selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < allCheckboxes.length;
+    }
+}
+
+// Calcular totales al cargar la página y preparar buscadores
+document.addEventListener('DOMContentLoaded', function() {
+    actualizarTotalesFiltro();
+
+    const inputBusqueda = document.getElementById('busqueda_facturas_ventas');
+    if (inputBusqueda) {
+        const filasPref = Array.from(document.querySelectorAll('#tabla_prefacturas_body .pedido-row'));
+        const filasFact = Array.from(document.querySelectorAll('.factura-row'));
+
+        inputBusqueda.addEventListener('input', function() {
+            const term = this.value.toLowerCase().trim();
+
+            // Filtrar prefacturas (vista pendientes)
+            filasPref.forEach(tr => {
+                const texto = tr.dataset.search || '';
+                tr.style.display = !term || texto.includes(term) ? '' : 'none';
+            });
+
+            // Filtrar facturas formalizadas (vista formalizadas)
+            filasFact.forEach(tr => {
+                const texto = tr.dataset.search || '';
+                tr.style.display = !term || texto.includes(term) ? '' : 'none';
+            });
+
+            // Recalcular totales solo con las visibles
+            actualizarTotalesFiltro();
+        });
+    }
+});
+</script>
+
+<style>
+.filtro-input:hover {
+    border-color: #adb5bd !important;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+}
+
+.filtro-input:focus {
+    outline: none;
+    border-color: #007bff !important;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+}
+
+select.filtro-input {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23495057' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 30px !important;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0,123,255,0.4) !important;
+}
+
+.btn-secondary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(108,117,125,0.3);
+}
+
+.pedido-row:hover, .factura-row:hover {
+    background-color: #f8f9fa;
+    transform: translateX(2px);
+    box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+}
+
+.btn-info {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+    font-weight: 500;
+}
+
+.btn-info:hover {
+    background: linear-gradient(135deg, #2980b9 0%, #21618c 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(52, 152, 219, 0.4);
+    color: white;
+    text-decoration: none;
+}
+
+.btn-secondary {
+    background: #95a5a6;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.btn-secondary:hover {
+    background: #7f8c8d;
+    transform: translateY(-2px);
+    color: white;
+    text-decoration: none;
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(39, 174, 96, 0.3);
+    font-weight: 500;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #229954 0%, #1e8449 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(39, 174, 96, 0.4);
+    color: white;
+    text-decoration: none;
+}
+
+.table-container {
+    animation: slideUp 0.5s ease-out;
+}
+</style>
+{% endblock %}

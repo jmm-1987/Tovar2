@@ -1,0 +1,1076 @@
+"""Rutas de configuración (solo supervisor)"""
+from flask import Blueprint, render_template, request, redirect, url_for, flash, send_file, jsonify, current_app
+from flask_login import login_required, current_user
+from extensions import db
+from models import Usuario, Comercial, Cliente, Prenda, Pedido, LineaPedido, Presupuesto, LineaPresupuesto, Ticket, LineaTicket, Factura, LineaFactura, PlantillaEmail, Proveedor, Configuracion, DiaFestivo
+from utils.auth import supervisor_required, not_usuario_required
+from datetime import datetime
+import io
+import csv
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Font, PatternFill, Alignment
+from werkzeug.utils import secure_filename
+import os
+import shutil
+import sqlite3
+
+configuracion_bp = Blueprint('configuracion', __name__)
+
+@configuracion_bp.route('/configuracion')
+@login_required
+@supervisor_required
+def index():
+    """Panel de configuración principal"""
+    usuarios = Usuario.query.all()
+    return render_template('configuracion/index.html', usuarios=usuarios)
+
+@configuracion_bp.route('/configuracion/usuarios', methods=['GET', 'POST'])
+@login_required
+@supervisor_required
+def gestion_usuarios():
+    """Gestión de usuarios"""
+    if request.method == 'POST':
+        try:
+            usuario = request.form.get('usuario')
+            password = request.form.get('password')
+            correo = request.form.get('correo')
+            telefono = request.form.get('telefono', '')
+            rol = request.form.get('rol')
+            
+            if not usuario or not password or not correo or not rol:
+                flash('Todos los campos son obligatorios', 'error')
+                return redirect(url_for('configuracion.gestion_usuarios'))
+            
+            # Verificar si el usuario ya existe
+            if Usuario.query.filter_by(usuario=usuario).first():
+                flash('El usuario ya existe', 'error')
+                return redirect(url_for('configuracion.gestion_usuarios'))
+            
+            nuevo_usuario = Usuario(
+                usuario=usuario,
+                correo=correo,
+                telefono=telefono,
+                rol=rol,
+                activo=True
+            )
+            nuevo_usuario.set_password(password)
+            
+            db.session.add(nuevo_usuario)
+            db.session.flush()  # Para obtener el ID del usuario
+            
+            # Si el rol es comercial o administracion, crear registro en comerciales
+            if rol in ['comercial', 'administracion']:
+                comercial = Comercial(usuario_id=nuevo_usuario.id, _nombre=nuevo_usuario.usuario)
+                db.session.add(comercial)
+            
+            db.session.commit()
+            
+            flash('Usuario creado correctamente', 'success')
+            return redirect(url_for('configuracion.gestion_usuarios'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al crear usuario: {str(e)}', 'error')
+    
+    usuarios = Usuario.query.all()
+    return render_template('configuracion/usuarios.html', usuarios=usuarios)
+
+@configuracion_bp.route('/configuracion/usuarios/<int:id>/editar', methods=['POST'])
+@login_required
+@supervisor_required
+def editar_usuario(id):
+    """Editar usuario"""
+    usuario = Usuario.query.get_or_404(id)
+    rol_anterior = usuario.rol
+    
+    try:
+        usuario.correo = request.form.get('correo')
+        usuario.telefono = request.form.get('telefono', '')
+        nuevo_rol = request.form.get('rol')
+        usuario.rol = nuevo_rol
+        
+        # Si se proporciona nueva contraseña, actualizarla
+        nueva_password = request.form.get('password')
+        if nueva_password:
+            usuario.set_password(nueva_password)
+        
+        # Gestionar comercial según el rol
+        comercial_existente = Comercial.query.filter_by(usuario_id=usuario.id).first()
+        
+        if nuevo_rol in ['comercial', 'administracion']:
+            # Si cambió a comercial o administracion y no tiene comercial, crearlo
+            if not comercial_existente:
+                comercial = Comercial(usuario_id=usuario.id, _nombre=usuario.usuario)
+                db.session.add(comercial)
+        else:
+            # Si cambió a otro rol y tiene comercial, eliminarlo
+            if comercial_existente:
+                db.session.delete(comercial_existente)
+        
+        db.session.commit()
+        flash('Usuario actualizado correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al actualizar usuario: {str(e)}', 'error')
+    
+    return redirect(url_for('configuracion.gestion_usuarios'))
+
+@configuracion_bp.route('/configuracion/usuarios/<int:id>/eliminar', methods=['POST'])
+@login_required
+@supervisor_required
+def eliminar_usuario(id):
+    """Eliminar usuario (desactivar)"""
+    usuario = Usuario.query.get_or_404(id)
+    
+    # No permitir eliminar al supervisor actual
+    if usuario.id == current_user.id:
+        flash('No puedes desactivar tu propio usuario', 'error')
+        return redirect(url_for('configuracion.gestion_usuarios'))
+    
+    try:
+        usuario.activo = False
+        db.session.commit()
+        flash('Usuario desactivado correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al desactivar usuario: {str(e)}', 'error')
+    
+    return redirect(url_for('configuracion.gestion_usuarios'))
+
+@configuracion_bp.route('/configuracion/verifactu', methods=['GET', 'POST'])
+@login_required
+@supervisor_required
+def verifactu_info():
+    """Información y configuración de API Verifactu - FUNCIONALIDAD DESACTIVADA TEMPORALMENTE"""
+    # ============================================
+    # CÓDIGO VERIFACTU COMENTADO - Se puede restaurar más adelante
+    # ============================================
+    # if request.method == 'POST':
+    #     try:
+    #         # Obtener o crear la configuración
+    #         config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+    #         if not config:
+    #             config = Configuracion(
+    #                 clave='verifactu_enviar_activo',
+    #                 descripcion='Activar/desactivar el envío automático de facturas y tickets a Verifactu'
+    #             )
+    #             db.session.add(config)
+    #         
+    #         # Actualizar el valor según el checkbox
+    #         config.valor = 'true' if request.form.get('verifactu_enviar_activo') == 'on' else 'false'
+    #         config.fecha_actualizacion = datetime.utcnow()
+    #         
+    #         db.session.commit()
+    #         flash('Configuración de Verifactu actualizada correctamente', 'success')
+    #         return redirect(url_for('configuracion.verifactu_info'))
+    #     except Exception as e:
+    #         db.session.rollback()
+    #         flash(f'Error al actualizar configuración: {str(e)}', 'error')
+    # 
+    # # Obtener la configuración actual
+    # config = Configuracion.query.filter_by(clave='verifactu_enviar_activo').first()
+    # verifactu_activo = True  # Por defecto activado
+    # if config:
+    #     verifactu_activo = config.valor.lower() == 'true'
+    
+    # Mostrar como desactivado
+    verifactu_activo = False
+    
+    return render_template('configuracion/verifactu.html', verifactu_activo=verifactu_activo)
+
+@configuracion_bp.route('/configuracion/exportar')
+@login_required
+@supervisor_required
+def exportar_bd():
+    """Exportar base de datos"""
+    formato = request.args.get('formato', 'excel')
+    
+    if formato == 'excel':
+        return exportar_excel()
+    elif formato == 'txt':
+        return exportar_txt()
+    else:
+        flash('Formato no válido', 'error')
+        return redirect(url_for('configuracion.index'))
+
+def exportar_excel():
+    """Exportar base de datos a Excel"""
+    wb = Workbook()
+    
+    # Lista de modelos y sus nombres de hoja
+    modelos = [
+        ('Comerciales', Comercial),
+        ('Clientes', Cliente),
+        ('Prendas', Prenda),
+        ('Pedidos', Pedido),
+        ('LineasPedido', LineaPedido),
+        ('Presupuestos', Presupuesto),
+        ('LineasPresupuesto', LineaPresupuesto),
+        ('Tickets', Ticket),
+        ('LineasTicket', LineaTicket),
+        ('Facturas', Factura),
+        ('LineasFactura', LineaFactura),
+        ('Usuarios', Usuario),
+    ]
+    
+    for nombre_hoja, modelo in modelos:
+        ws = wb.create_sheet(title=nombre_hoja)
+        
+        # Obtener todos los registros
+        registros = modelo.query.all()
+        
+        if not registros:
+            continue
+        
+        # Obtener columnas del modelo
+        columnas = [col.name for col in modelo.__table__.columns]
+        
+        # Escribir encabezados
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF")
+        
+        for idx, col in enumerate(columnas, 1):
+            cell = ws.cell(row=1, column=idx, value=col)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center")
+        
+        # Escribir datos
+        for row_idx, registro in enumerate(registros, 2):
+            for col_idx, col in enumerate(columnas, 1):
+                valor = getattr(registro, col)
+                if isinstance(valor, datetime):
+                    valor = valor.strftime('%Y-%m-%d %H:%M:%S')
+                elif valor is None:
+                    valor = ''
+                ws.cell(row=row_idx, column=col_idx, value=valor)
+        
+        # Ajustar ancho de columnas
+        for col in ws.columns:
+            max_length = 0
+            col_letter = col[0].column_letter
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[col_letter].width = adjusted_width
+    
+    # Eliminar hoja por defecto
+    if 'Sheet' in wb.sheetnames:
+        wb.remove(wb['Sheet'])
+    
+    # Guardar en memoria
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    fecha = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'backup_bd_{fecha}.xlsx'
+    
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=filename
+    )
+
+def exportar_txt():
+    """Exportar base de datos a TXT (CSV)"""
+    output = io.StringIO()
+    
+    modelos = [
+        ('Comerciales', Comercial),
+        ('Clientes', Cliente),
+        ('Prendas', Prenda),
+        ('Pedidos', Pedido),
+        ('LineasPedido', LineaPedido),
+        ('Presupuestos', Presupuesto),
+        ('LineasPresupuesto', LineaPresupuesto),
+        ('Tickets', Ticket),
+        ('LineasTicket', LineaTicket),
+        ('Facturas', Factura),
+        ('LineasFactura', LineaFactura),
+        ('Usuarios', Usuario),
+    ]
+    
+    for nombre_tabla, modelo in modelos:
+        output.write(f'\n{"="*80}\n')
+        output.write(f'TABLA: {nombre_tabla}\n')
+        output.write(f'{"="*80}\n\n')
+        
+        registros = modelo.query.all()
+        
+        if not registros:
+            output.write('(Sin registros)\n\n')
+            continue
+        
+        # Obtener columnas
+        columnas = [col.name for col in modelo.__table__.columns]
+        
+        # Escribir encabezados
+        writer = csv.writer(output)
+        writer.writerow(columnas)
+        
+        # Escribir datos
+        for registro in registros:
+            fila = []
+            for col in columnas:
+                valor = getattr(registro, col)
+                if isinstance(valor, datetime):
+                    valor = valor.strftime('%Y-%m-%d %H:%M:%S')
+                elif valor is None:
+                    valor = ''
+                fila.append(str(valor))
+            writer.writerow(fila)
+        
+        output.write('\n')
+    
+    output.seek(0)
+    
+    fecha = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'backup_bd_{fecha}.txt'
+    
+    return send_file(
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        mimetype='text/plain',
+        as_attachment=True,
+        download_name=filename
+    )
+
+@configuracion_bp.route('/configuracion/importar', methods=['GET', 'POST'])
+@login_required
+@supervisor_required
+def importar_bd():
+    """Importar base de datos desde archivo"""
+    if request.method == 'POST':
+        if 'archivo' not in request.files:
+            flash('No se seleccionó ningún archivo', 'error')
+            return redirect(url_for('configuracion.importar_bd'))
+        
+        archivo = request.files['archivo']
+        if archivo.filename == '':
+            flash('No se seleccionó ningún archivo', 'error')
+            return redirect(url_for('configuracion.importar_bd'))
+        
+        formato = request.form.get('formato', 'excel')
+        
+        try:
+            if formato == 'excel':
+                flash('La importación desde Excel está en desarrollo', 'info')
+            elif formato == 'txt':
+                flash('La importación desde TXT está en desarrollo', 'info')
+            else:
+                flash('Formato no válido', 'error')
+        except Exception as e:
+            flash(f'Error al importar: {str(e)}', 'error')
+        
+        return redirect(url_for('configuracion.importar_bd'))
+    
+    return render_template('configuracion/importar.html')
+
+@configuracion_bp.route('/configuracion/plantillas-email')
+@login_required
+@supervisor_required
+def plantillas_email():
+    """Gestión de plantillas de email"""
+    # Mostrar todas las plantillas (ya no hay plantillas de pedidos)
+    plantillas = PlantillaEmail.query.order_by(PlantillaEmail.tipo).all()
+    return render_template('configuracion/plantillas_email.html', plantillas=plantillas)
+
+@configuracion_bp.route('/configuracion/plantillas-email/<int:id>/editar', methods=['GET', 'POST'])
+@login_required
+@supervisor_required
+def editar_plantilla_email(id):
+    """Editar plantilla de email"""
+    plantilla = PlantillaEmail.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        try:
+            plantilla.asunto = request.form.get('asunto', '')
+            plantilla.cuerpo = request.form.get('cuerpo', '')
+            # Checkbox: si viene marcado es 'on', si no viene es None
+            plantilla.enviar_activo = request.form.get('enviar_activo') == 'on'
+            plantilla.fecha_actualizacion = datetime.utcnow()
+            
+            db.session.commit()
+            flash('Plantilla actualizada correctamente', 'success')
+            return redirect(url_for('configuracion.plantillas_email'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al actualizar plantilla: {str(e)}', 'error')
+    
+    return render_template('configuracion/editar_plantilla_email.html', plantilla=plantilla)
+
+@configuracion_bp.route('/configuracion/plantillas-email/<int:id>/toggle', methods=['POST'])
+@login_required
+@supervisor_required
+def toggle_plantilla_email(id):
+    """Activar/desactivar el envío de una plantilla de email"""
+    plantilla = PlantillaEmail.query.get_or_404(id)
+    try:
+        # Invertir el estado actual
+        plantilla.enviar_activo = not plantilla.enviar_activo
+        plantilla.fecha_actualizacion = datetime.utcnow()
+        db.session.commit()
+        
+        estado = 'activada' if plantilla.enviar_activo else 'desactivada'
+        flash(f'Plantilla {estado} correctamente', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error al cambiar el estado de la plantilla: {str(e)}', 'error')
+    
+    return redirect(url_for('configuracion.plantillas_email'))
+
+@configuracion_bp.route('/configuracion/descargar-bd')
+@login_required
+@supervisor_required
+def descargar_bd():
+    """Descargar el archivo de base de datos SQLite"""
+    try:
+        # Obtener la ruta de la base de datos desde la configuración
+        database_uri = current_app.config['SQLALCHEMY_DATABASE_URI']
+        
+        # Extraer la ruta del archivo desde sqlite:///ruta
+        if database_uri.startswith('sqlite:///'):
+            db_path = database_uri.replace('sqlite:///', '')
+            # En Windows, puede venir con barras normales, convertir a barras del sistema
+            db_path = os.path.normpath(db_path)
+        else:
+            flash('No se pudo determinar la ruta de la base de datos', 'error')
+            return redirect(url_for('configuracion.index'))
+        
+        # Verificar que el archivo existe
+        if not os.path.exists(db_path):
+            flash('El archivo de base de datos no existe', 'error')
+            return redirect(url_for('configuracion.index'))
+        
+        # Crear una copia temporal con nombre con fecha
+        fecha = datetime.now().strftime('%Y%m%d_%H%M%S')
+        nombre_archivo = f'pedidos_backup_{fecha}.db'
+        
+        # Crear un archivo temporal en memoria
+        temp_file = io.BytesIO()
+        with open(db_path, 'rb') as f:
+            temp_file.write(f.read())
+        temp_file.seek(0)
+        
+        return send_file(
+            temp_file,
+            mimetype='application/x-sqlite3',
+            as_attachment=True,
+            download_name=nombre_archivo
+        )
+        
+    except Exception as e:
+        flash(f'Error al descargar la base de datos: {str(e)}', 'error')
+        return redirect(url_for('configuracion.index'))
+
+@configuracion_bp.route('/configuracion/importar-bd-sqlite', methods=['GET', 'POST'])
+@login_required
+@supervisor_required
+def importar_bd_sqlite():
+    """Importar/cargar un archivo SQLite para reemplazar la base de datos actual"""
+    if request.method == 'POST':
+        try:
+            # Verificar que se subió un archivo
+            if 'archivo' not in request.files:
+                flash('No se seleccionó ningún archivo', 'error')
+                return redirect(url_for('configuracion.importar_bd_sqlite'))
+            
+            archivo = request.files['archivo']
+            if archivo.filename == '':
+                flash('No se seleccionó ningún archivo', 'error')
+                return redirect(url_for('configuracion.importar_bd_sqlite'))
+            
+            # Verificar extensión
+            if not archivo.filename.lower().endswith('.db'):
+                flash('El archivo debe ser un archivo SQLite (.db)', 'error')
+                return redirect(url_for('configuracion.importar_bd_sqlite'))
+            
+            # Obtener la ruta de la base de datos actual
+            database_uri = current_app.config['SQLALCHEMY_DATABASE_URI']
+            
+            if not database_uri.startswith('sqlite:///'):
+                flash('No se pudo determinar la ruta de la base de datos', 'error')
+                return redirect(url_for('configuracion.importar_bd_sqlite'))
+            
+            db_path = database_uri.replace('sqlite:///', '')
+            db_path = os.path.normpath(db_path)
+            
+            # Validar que el archivo subido es SQLite válido (verificar header)
+            archivo.seek(0)
+            header = archivo.read(16)
+            archivo.seek(0)
+            
+            # SQLite tiene un header específico: "SQLite format 3\000"
+            if not header.startswith(b'SQLite format 3\x00'):
+                flash('El archivo no es un archivo SQLite válido', 'error')
+                return redirect(url_for('configuracion.importar_bd_sqlite'))
+            
+            # Verificar que el directorio destino existe y es escribible
+            db_dir = os.path.dirname(db_path)
+            if db_dir and not os.path.exists(db_dir):
+                try:
+                    os.makedirs(db_dir, exist_ok=True)
+                except Exception as e:
+                    flash(f'Error: No se pudo crear el directorio {db_dir}: {str(e)}', 'error')
+                    return redirect(url_for('configuracion.importar_bd_sqlite'))
+            
+            # Verificar permisos de escritura
+            if not os.access(db_dir if db_dir else os.path.dirname(os.path.abspath(db_path)), os.W_OK):
+                flash(f'Error: No se tienen permisos de escritura en el directorio destino', 'error')
+                return redirect(url_for('configuracion.importar_bd_sqlite'))
+            
+            # Cerrar todas las conexiones de la base de datos antes de reemplazar
+            db.session.close()
+            db.engine.dispose()
+            
+            # Hacer backup de la base de datos actual antes de reemplazarla
+            backup_path = None
+            if os.path.exists(db_path):
+                fecha_backup = datetime.now().strftime('%Y%m%d_%H%M%S')
+                backup_path = db_path.replace('.db', f'_backup_{fecha_backup}.db')
+                try:
+                    shutil.copy2(db_path, backup_path)
+                    flash(f'Backup creado: {os.path.basename(backup_path)}', 'info')
+                except Exception as e:
+                    flash(f'Advertencia: No se pudo crear backup automático: {str(e)}', 'warning')
+            
+            # Guardar el nuevo archivo usando shutil para mayor robustez
+            # Primero guardar en un archivo temporal y luego moverlo
+            temp_path = db_path + '.tmp'
+            try:
+                archivo.save(temp_path)
+                # Verificar que el archivo temporal se guardó correctamente
+                if not os.path.exists(temp_path):
+                    raise Exception('No se pudo guardar el archivo temporal')
+                
+                # Si existe la BD actual, eliminarla antes de mover el nuevo
+                if os.path.exists(db_path):
+                    os.remove(db_path)
+                
+                # Mover el archivo temporal a la ubicación final
+                shutil.move(temp_path, db_path)
+                
+                # Verificar que el archivo final existe y tiene contenido
+                if not os.path.exists(db_path) or os.path.getsize(db_path) == 0:
+                    raise Exception('El archivo no se guardó correctamente')
+                
+            except Exception as e:
+                # Si hay error, intentar restaurar el backup si existe
+                if backup_path and os.path.exists(backup_path):
+                    try:
+                        shutil.copy2(backup_path, db_path)
+                        flash(f'Error al guardar. Se restauró el backup automático.', 'warning')
+                    except:
+                        pass
+                raise e
+            
+            # Reinicializar la conexión de la base de datos
+            db.engine.dispose()
+            db.create_all()
+            
+            # Mostrar información sobre dónde se guardó
+            flash(f'Base de datos importada correctamente en: {db_path}', 'success')
+            return redirect(url_for('configuracion.index'))
+            
+        except Exception as e:
+            flash(f'Error al importar la base de datos: {str(e)}', 'error')
+            import traceback
+            traceback.print_exc()
+            return redirect(url_for('configuracion.importar_bd_sqlite'))
+    
+    # Obtener información sobre la ruta de la base de datos para mostrarla al usuario
+    database_uri = current_app.config['SQLALCHEMY_DATABASE_URI']
+    db_path_info = 'No disponible'
+    if database_uri.startswith('sqlite:///'):
+        db_path_info = database_uri.replace('sqlite:///', '')
+        db_path_info = os.path.normpath(db_path_info)
+    
+    return render_template('configuracion/importar_bd_sqlite.html', db_path=db_path_info)
+
+@configuracion_bp.route('/configuracion/importar-clientes', methods=['GET', 'POST'])
+@login_required
+@supervisor_required
+def importar_clientes():
+    """Importar clientes desde archivo Excel"""
+    if request.method == 'POST':
+        if 'archivo' not in request.files:
+            flash('No se seleccionó ningún archivo', 'error')
+            return redirect(url_for('configuracion.importar_clientes'))
+        
+        archivo = request.files['archivo']
+        if archivo.filename == '':
+            flash('No se seleccionó ningún archivo', 'error')
+            return redirect(url_for('configuracion.importar_clientes'))
+        
+        # Validar extensión
+        if not archivo.filename.endswith(('.xlsx', '.xls')):
+            flash('El archivo debe ser Excel (.xlsx o .xls)', 'error')
+            return redirect(url_for('configuracion.importar_clientes'))
+        
+        temp_path = None
+        try:
+            # Guardar archivo temporalmente
+            filename = secure_filename(archivo.filename)
+            temp_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+            os.makedirs(os.path.dirname(temp_path), exist_ok=True)
+            archivo.save(temp_path)
+            
+            # Cargar el archivo Excel
+            wb = load_workbook(temp_path, data_only=True)
+            ws = wb.active
+            
+            # Leer la primera fila para obtener los encabezados
+            headers = []
+            for cell in ws[1]:
+                headers.append(str(cell.value) if cell.value else '')
+            
+            # Mapeo de columnas del Excel a campos de la base de datos
+            column_map = {}
+            for idx, header in enumerate(headers):
+                if header and header.strip():
+                    header_upper = header.upper()
+                    if 'NOMBRE FISCAL' in header_upper or ('NOMBRE' in header_upper and 'FISCAL' in header_upper):
+                        column_map['nombre'] = idx
+                    elif 'ALIAS' in header_upper:
+                        column_map['alias'] = idx
+                    elif ('TEL' in header_upper or 'TELEFONO' in header_upper) and 'MOVIL' not in header_upper:
+                        column_map['telefono'] = idx
+                    elif 'MOVIL' in header_upper or ('M' in header_upper and 'VIL' in header_upper):
+                        column_map['movil'] = idx
+                    elif 'E-MAIL' in header_upper or 'EMAIL' in header_upper:
+                        column_map['email'] = idx
+                    elif 'PERSONA' in header_upper and 'CONTACTO' in header_upper:
+                        column_map['personas_contacto'] = idx
+                    elif 'N.I.F' in header_upper or ('NIF' in header_upper and '.' in header):
+                        column_map['nif'] = idx
+                    elif 'DOMICILIO' in header_upper or 'DIRECCION' in header_upper:
+                        column_map['direccion'] = idx
+                    elif 'POBLACI' in header_upper:
+                        column_map['poblacion'] = idx
+                    elif ('C' in header_upper or 'COD' in header_upper) and 'POSTAL' in header_upper:
+                        column_map['codigo_postal'] = idx
+                    elif 'PROVINCIA' in header_upper:
+                        column_map['provincia'] = idx
+                    elif 'ANOTACIONES' in header_upper:
+                        column_map['anotaciones'] = idx
+            
+            # Verificar que tenemos al menos nombre
+            if 'nombre' not in column_map:
+                flash('No se encontró la columna "NOMBRE FISCAL" en el archivo', 'error')
+                os.remove(temp_path)
+                return redirect(url_for('configuracion.importar_clientes'))
+            
+            # Leer datos desde la fila 2 en adelante
+            clientes_importados = 0
+            clientes_duplicados = 0
+            errores = 0
+            
+            for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                try:
+                    # Obtener valores de las celdas según el mapeo
+                    valores = {}
+                    for campo, col_idx in column_map.items():
+                        if col_idx < len(row):
+                            valor = row[col_idx].value
+                            if valor is not None and str(valor).strip() != '':
+                                if isinstance(valor, (int, float)):
+                                    if campo in ['telefono', 'movil', 'codigo_postal']:
+                                        valor = str(int(valor))
+                                    else:
+                                        valor = str(int(valor))
+                                else:
+                                    valor = str(valor).strip()
+                                
+                                if campo != 'email' and valor:
+                                    valor = valor.upper()
+                                
+                                # Procesar código postal
+                                if campo == 'codigo_postal' and valor:
+                                    valor_str = ''.join(filter(str.isdigit, str(valor)))
+                                    if valor_str.isdigit() and len(valor_str) == 4:
+                                        valor = '0' + valor_str
+                                
+                                valores[campo] = valor if valor else None
+                            else:
+                                valores[campo] = None
+                        else:
+                            valores[campo] = None
+                    
+                    # Verificar que al menos tenga nombre
+                    if not valores.get('nombre'):
+                        continue
+                    
+                    # Verificar si el cliente ya existe
+                    cliente_existente = None
+                    if valores.get('nif'):
+                        cliente_existente = Cliente.query.filter_by(nif=valores['nif']).first()
+                    
+                    if not cliente_existente:
+                        cliente_existente = Cliente.query.filter_by(nombre=valores['nombre']).first()
+                    
+                    if cliente_existente:
+                        clientes_duplicados += 1
+                        continue
+                    
+                    # Preparar email en minúsculas
+                    email = valores.get('email')
+                    if email:
+                        email = email.lower()
+                    
+                    # Crear nuevo cliente
+                    cliente = Cliente(
+                        nombre=valores.get('nombre'),
+                        alias=valores.get('alias'),
+                        nif=valores.get('nif'),
+                        direccion=valores.get('direccion'),
+                        poblacion=valores.get('poblacion'),
+                        provincia=valores.get('provincia'),
+                        codigo_postal=valores.get('codigo_postal'),
+                        pais='España',
+                        telefono=valores.get('telefono'),
+                        movil=valores.get('movil'),
+                        email=email,
+                        personas_contacto=valores.get('personas_contacto'),
+                        anotaciones=valores.get('anotaciones'),
+                        fecha_alta=datetime.now().date()
+                    )
+                    
+                    db.session.add(cliente)
+                    clientes_importados += 1
+                    
+                    if clientes_importados % 50 == 0:
+                        db.session.commit()
+                        
+                except Exception as e:
+                    errores += 1
+                    continue
+            
+            # Hacer commit final
+            db.session.commit()
+            
+            # Eliminar archivo temporal
+            os.remove(temp_path)
+            
+            flash(f'Importación completada: {clientes_importados} clientes importados, {clientes_duplicados} duplicados omitidos, {errores} errores', 'success')
+            return redirect(url_for('configuracion.index'))
+            
+        except Exception as e:
+            db.session.rollback()
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            flash(f'Error al importar clientes: {str(e)}', 'error')
+            import traceback
+            traceback.print_exc()
+            return redirect(url_for('configuracion.importar_clientes'))
+    
+    return render_template('configuracion/importar_clientes.html')
+
+@configuracion_bp.route('/configuracion/importar-proveedores', methods=['GET', 'POST'])
+@login_required
+@supervisor_required
+def importar_proveedores():
+    """Importar proveedores desde archivo Excel"""
+    if request.method == 'POST':
+        if 'archivo' not in request.files:
+            flash('No se seleccionó ningún archivo', 'error')
+            return redirect(url_for('configuracion.importar_proveedores'))
+        
+        archivo = request.files['archivo']
+        if archivo.filename == '':
+            flash('No se seleccionó ningún archivo', 'error')
+            return redirect(url_for('configuracion.importar_proveedores'))
+        
+        # Validar extensión
+        if not archivo.filename.endswith(('.xlsx', '.xls')):
+            flash('El archivo debe ser Excel (.xlsx o .xls)', 'error')
+            return redirect(url_for('configuracion.importar_proveedores'))
+        
+        temp_path = None
+        try:
+            # Guardar archivo temporalmente
+            filename = secure_filename(archivo.filename)
+            temp_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
+            os.makedirs(os.path.dirname(temp_path), exist_ok=True)
+            archivo.save(temp_path)
+            
+            # Cargar el archivo Excel
+            wb = load_workbook(temp_path, data_only=True)
+            ws = wb.active
+            
+            # Leer la primera fila para obtener los encabezados
+            headers = []
+            for cell in ws[1]:
+                headers.append(str(cell.value) if cell.value else '')
+            
+            # Mapeo de columnas del Excel a campos de la base de datos
+            column_map = {}
+            for idx, header in enumerate(headers):
+                if header and header.strip():
+                    header_upper = header.upper()
+                    if 'NOMBRE' in header_upper and 'FISCAL' not in header_upper:
+                        column_map['nombre'] = idx
+                    elif 'CIF' in header_upper or 'NIF' in header_upper:
+                        column_map['cif'] = idx
+                    elif ('TEL' in header_upper or 'TELEFONO' in header_upper) and 'MOVIL' not in header_upper:
+                        column_map['telefono'] = idx
+                    elif 'MOVIL' in header_upper or ('M' in header_upper and 'VIL' in header_upper):
+                        column_map['movil'] = idx
+                    elif 'E-MAIL' in header_upper or 'EMAIL' in header_upper or 'CORREO' in header_upper:
+                        column_map['correo'] = idx
+                    elif 'PERSONA' in header_upper and 'CONTACTO' in header_upper:
+                        column_map['persona_contacto'] = idx
+            
+            # Verificar que tenemos al menos nombre
+            if 'nombre' not in column_map:
+                flash('No se encontró la columna "NOMBRE" en el archivo', 'error')
+                os.remove(temp_path)
+                return redirect(url_for('configuracion.importar_proveedores'))
+            
+            # Leer datos desde la fila 2 en adelante
+            proveedores_importados = 0
+            proveedores_duplicados = 0
+            errores = 0
+            
+            for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), start=2):
+                try:
+                    # Obtener valores de las celdas según el mapeo
+                    valores = {}
+                    for campo, col_idx in column_map.items():
+                        if col_idx < len(row):
+                            valor = row[col_idx].value
+                            if valor is not None and str(valor).strip() != '':
+                                if isinstance(valor, (int, float)):
+                                    if campo in ['telefono', 'movil']:
+                                        valor = str(int(valor))
+                                    else:
+                                        valor = str(int(valor))
+                                else:
+                                    valor = str(valor).strip()
+                                
+                                if campo not in ['correo', 'email'] and valor:
+                                    valor = valor.upper()
+                                
+                                valores[campo] = valor if valor else None
+                            else:
+                                valores[campo] = None
+                        else:
+                            valores[campo] = None
+                    
+                    # Verificar que al menos tenga nombre
+                    if not valores.get('nombre'):
+                        continue
+                    
+                    # Verificar si el proveedor ya existe
+                    proveedor_existente = None
+                    if valores.get('cif'):
+                        proveedor_existente = Proveedor.query.filter_by(cif=valores['cif']).first()
+                    
+                    if not proveedor_existente:
+                        proveedor_existente = Proveedor.query.filter_by(nombre=valores['nombre']).first()
+                    
+                    if proveedor_existente:
+                        proveedores_duplicados += 1
+                        continue
+                    
+                    # Preparar correo en minúsculas
+                    correo = valores.get('correo')
+                    if correo:
+                        correo = correo.lower()
+                    
+                    # Crear nuevo proveedor
+                    proveedor = Proveedor(
+                        nombre=valores.get('nombre'),
+                        cif=valores.get('cif'),
+                        telefono=valores.get('telefono'),
+                        movil=valores.get('movil'),
+                        correo=correo,
+                        persona_contacto=valores.get('persona_contacto'),
+                        activo=True
+                    )
+                    
+                    db.session.add(proveedor)
+                    proveedores_importados += 1
+                    
+                    if proveedores_importados % 50 == 0:
+                        db.session.commit()
+                        
+                except Exception as e:
+                    errores += 1
+                    continue
+            
+            # Hacer commit final
+            db.session.commit()
+            
+            # Eliminar archivo temporal
+            os.remove(temp_path)
+            
+            flash(f'Importación completada: {proveedores_importados} proveedores importados, {proveedores_duplicados} duplicados omitidos, {errores} errores', 'success')
+            return redirect(url_for('configuracion.index'))
+            
+        except Exception as e:
+            db.session.rollback()
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            flash(f'Error al importar proveedores: {str(e)}', 'error')
+            import traceback
+            traceback.print_exc()
+            return redirect(url_for('configuracion.importar_proveedores'))
+    
+    return render_template('configuracion/importar_proveedores.html')
+
+@configuracion_bp.route('/configuracion/dias-festivos', methods=['GET', 'POST'])
+@login_required
+@supervisor_required
+def gestion_dias_festivos():
+    """Gestión de días festivos para cálculos de fechas"""
+    if request.method == 'POST':
+        accion = request.form.get('accion')
+        
+        if accion == 'guardar_configuracion':
+            # Guardar configuración de sábados y domingos
+            excluir_sabados = request.form.get('excluir_sabados') == 'on'
+            excluir_domingos = request.form.get('excluir_domingos') == 'on'
+            
+            # Guardar en Configuracion
+            config_sabados = Configuracion.query.filter_by(clave='excluir_sabados').first()
+            if not config_sabados:
+                config_sabados = Configuracion(clave='excluir_sabados', descripcion='Excluir sábados de cálculos de fechas')
+                db.session.add(config_sabados)
+            config_sabados.valor = 'true' if excluir_sabados else 'false'
+            config_sabados.fecha_actualizacion = datetime.utcnow()
+            
+            config_domingos = Configuracion.query.filter_by(clave='excluir_domingos').first()
+            if not config_domingos:
+                config_domingos = Configuracion(clave='excluir_domingos', descripcion='Excluir domingos de cálculos de fechas')
+                db.session.add(config_domingos)
+            config_domingos.valor = 'true' if excluir_domingos else 'false'
+            config_domingos.fecha_actualizacion = datetime.utcnow()
+            
+            db.session.commit()
+            flash('Configuración guardada correctamente', 'success')
+        
+        elif accion == 'crear':
+            fecha_str = request.form.get('fecha', '').strip()
+            nombre = request.form.get('nombre', '').strip()
+            
+            if fecha_str and nombre:
+                try:
+                    fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+                    # Verificar si ya existe
+                    dia_existente = DiaFestivo.query.filter_by(fecha=fecha).first()
+                    if dia_existente:
+                        flash('Ya existe un día festivo para esa fecha', 'error')
+                    else:
+                        nuevo_dia = DiaFestivo(fecha=fecha, nombre=nombre, activo=True)
+                        db.session.add(nuevo_dia)
+                        db.session.commit()
+                        flash('Día festivo creado correctamente', 'success')
+                except ValueError:
+                    flash('Fecha no válida', 'error')
+                except Exception as e:
+                    db.session.rollback()
+                    flash(f'Error: {str(e)}', 'error')
+        
+        elif accion == 'editar':
+            dia_id = request.form.get('dia_id')
+            fecha_str = request.form.get('fecha', '').strip()
+            nombre = request.form.get('nombre', '').strip()
+            
+            if dia_id and fecha_str and nombre:
+                try:
+                    dia = DiaFestivo.query.get_or_404(dia_id)
+                    fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+                    
+                    # Verificar si la nueva fecha ya existe en otro registro
+                    dia_existente = DiaFestivo.query.filter_by(fecha=fecha).filter(DiaFestivo.id != dia_id).first()
+                    if dia_existente:
+                        flash('Ya existe un día festivo para esa fecha', 'error')
+                    else:
+                        dia.fecha = fecha
+                        dia.nombre = nombre
+                        db.session.commit()
+                        flash('Día festivo actualizado correctamente', 'success')
+                except ValueError:
+                    flash('Fecha no válida', 'error')
+                except Exception as e:
+                    db.session.rollback()
+                    flash(f'Error: {str(e)}', 'error')
+        
+        elif accion == 'eliminar':
+            dia_id = request.form.get('dia_id')
+            if dia_id:
+                try:
+                    dia = DiaFestivo.query.get_or_404(dia_id)
+                    db.session.delete(dia)
+                    db.session.commit()
+                    flash('Día festivo eliminado correctamente', 'success')
+                except Exception as e:
+                    db.session.rollback()
+                    flash(f'Error: {str(e)}', 'error')
+        
+        elif accion == 'activar' or accion == 'desactivar':
+            dia_id = request.form.get('dia_id')
+            if dia_id:
+                try:
+                    dia = DiaFestivo.query.get_or_404(dia_id)
+                    dia.activo = (accion == 'activar')
+                    db.session.commit()
+                    flash('Día festivo actualizado correctamente', 'success')
+                except Exception as e:
+                    db.session.rollback()
+                    flash(f'Error: {str(e)}', 'error')
+        
+        return redirect(url_for('configuracion.gestion_dias_festivos'))
+    
+    # Obtener configuración de sábados y domingos
+    config_sabados = Configuracion.query.filter_by(clave='excluir_sabados').first()
+    excluir_sabados = config_sabados.valor.lower() == 'true' if config_sabados else False
+    
+    config_domingos = Configuracion.query.filter_by(clave='excluir_domingos').first()
+    excluir_domingos = config_domingos.valor.lower() == 'true' if config_domingos else False
+    
+    # Obtener días festivos
+    dias_festivos = DiaFestivo.query.order_by(DiaFestivo.fecha).all()
+    
+    return render_template('configuracion/dias_festivos.html', 
+                         dias_festivos=dias_festivos,
+                         excluir_sabados=excluir_sabados,
+                         excluir_domingos=excluir_domingos)
+
+@configuracion_bp.route('/configuracion/migrar-comentarios-cliente')
+@login_required
+@supervisor_required
+def migrar_comentarios_cliente():
+    """Migración temporal: Añadir columna comentarios_cliente a presupuestos"""
+    try:
+        # Obtener la ruta de la base de datos desde la configuración
+        database_uri = current_app.config['SQLALCHEMY_DATABASE_URI']
+        # Extraer la ruta del archivo (sqlite:///ruta/archivo.db)
+        database_path = database_uri.replace('sqlite:///', '').replace('sqlite:///', '')
+        
+        # Conectar a la base de datos
+        conn = sqlite3.connect(database_path)
+        cursor = conn.cursor()
+        
+        # Verificar si la columna ya existe
+        cursor.execute("PRAGMA table_info(presupuestos)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'comentarios_cliente' in columns:
+            flash('La columna comentarios_cliente ya existe en la tabla presupuestos', 'info')
+        else:
+            # Añadir la columna
+            cursor.execute("ALTER TABLE presupuestos ADD COLUMN comentarios_cliente TEXT")
+            conn.commit()
+            flash('Columna comentarios_cliente añadida exitosamente', 'success')
+        
+        conn.close()
+        return redirect(url_for('configuracion.index'))
+        
+    except Exception as e:
+        flash(f'Error al ejecutar la migración: {str(e)}', 'error')
+        return redirect(url_for('configuracion.index'))

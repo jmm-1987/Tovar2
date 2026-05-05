@@ -1,0 +1,610 @@
+PROMPT PARA REESTRUCTURAR Y REGENERAR LA APLICACIÓN TOVAR2
+================================================================================
+
+CONTEXTO Y OBJETIVO
+================================================================================
+Necesito regenerar desde cero una aplicación web Flask para la gestión integral 
+de una empresa de textil personalizado (confección, bordado, serigrafía, sublimación).
+
+La aplicación actual funciona correctamente pero necesita una mejor arquitectura:
+- Mejor organización de clases y separación de responsabilidades
+- Facturación más aislada y modular
+- Código más mantenible y escalable
+- Mismas funcionalidades pero con mejor estructura
+
+TECNOLOGÍAS Y STACK TECNOLÓGICO
+================================================================================
+- Backend: Flask 3.0+ (Python)
+- Base de datos: SQLite (compatible con PostgreSQL para producción)
+- ORM: SQLAlchemy (Flask-SQLAlchemy 3.1+)
+- Autenticación: Flask-Login
+- Email: Flask-Mail
+- PDF: Playwright (generación de PDFs desde HTML)
+- Frontend: HTML, CSS, JavaScript (vanilla, sin frameworks)
+- Templates: Jinja2
+- Servidor: Gunicorn (producción)
+- Variables de entorno: python-dotenv
+- Otros: openpyxl (Excel), requests, paramiko (SFTP)
+
+ESTRUCTURA DE DIRECTORIOS RECOMENDADA
+================================================================================
+tovar2/
+├── app/
+│   ├── __init__.py              # Factory pattern para crear app Flask
+│   ├── config.py                # Configuración (desarrollo/producción)
+│   ├── extensions.py            # Extensiones (db, login_manager, mail)
+│   │
+│   ├── models/                  # Modelos organizados por dominio
+│   │   ├── __init__.py
+│   │   ├── base.py              # Modelo base con métodos comunes
+│   │   ├── user.py              # Usuario, Comercial
+│   │   ├── client.py            # Cliente, CategoriaCliente, DireccionEnvio
+│   │   ├── product.py           # Prenda
+│   │   ├── request.py           # Presupuesto, LineaPresupuesto, RegistroEstadoSolicitud
+│   │   ├── order.py             # Pedido, LineaPedido (si se mantiene separado)
+│   │   ├── invoice.py           # Factura, LineaFactura (MÓDULO AISLADO)
+│   │   ├── delivery_note.py     # Albarán (puede ser tipo de Factura o entidad separada)
+│   │   ├── ticket.py            # Ticket, LineaTicket (facturas simplificadas)
+│   │   ├── expense.py           # Proveedor, FacturaProveedor, Empleado, Nomina
+│   │   └── config.py            # PlantillaEmail, Configuracion, DiaFestivo
+│   │
+│   ├── services/                # Lógica de negocio (aísla de rutas)
+│   │   ├── __init__.py
+│   │   ├── invoice_service.py   # Servicios de facturación (AISLADO)
+│   │   ├── delivery_note_service.py  # Servicios de albaranes
+│   │   ├── request_service.py   # Servicios de solicitudes/presupuestos
+│   │   ├── order_service.py     # Servicios de pedidos
+│   │   ├── client_service.py    # Servicios de clientes
+│   │   ├── ticket_service.py    # Servicios de tickets
+│   │   ├── pdf_service.py       # Generación de PDFs (común)
+│   │   ├── email_service.py      # Envío de emails
+│   │   ├── numeration_service.py # Numeración (facturas, albaranes, solicitudes)
+│   │   └── auth_service.py      # Lógica de autenticación
+│   │
+│   ├── repositories/            # Acceso a datos (patrón Repository)
+│   │   ├── __init__.py
+│   │   ├── invoice_repository.py
+│   │   ├── delivery_note_repository.py
+│   │   ├── client_repository.py
+│   │   ├── request_repository.py
+│   │   └── ... (otros repositorios según necesidad)
+│   │
+│   ├── api/                     # Blueprints/Rutas organizados
+│   │   ├── __init__.py
+│   │   ├── auth/
+│   │   │   └── routes.py        # Login, logout, gestión usuarios
+│   │   ├── clients/
+│   │   │   └── routes.py        # CRUD clientes
+│   │   ├── requests/
+│   │   │   └── routes.py        # Solicitudes/presupuestos
+│   │   ├── invoices/            # FACTURACIÓN AISLADA
+│   │   │   ├── __init__.py
+│   │   │   ├── routes.py        # Rutas de facturas directas
+│   │   │   └── validators.py    # Validadores específicos de facturas
+│   │   ├── delivery_notes/      # ALBARANES AISLADOS
+│   │   │   ├── __init__.py
+│   │   │   └── routes.py        # Rutas de albaranes
+│   │   ├── tickets/
+│   │   │   └── routes.py        # Facturas simplificadas
+│   │   ├── orders/
+│   │   │   └── routes.py        # Pedidos (si se mantiene separado)
+│   │   ├── expenses/
+│   │   │   └── routes.py        # Gastos (proveedores, nóminas)
+│   │   ├── products/
+│   │   │   └── routes.py        # Maestros de prendas
+│   │   ├── web_client/          # Área cliente web
+│   │   │   └── routes.py        # Dashboard cliente, pedidos cliente
+│   │   ├── reports/
+│   │   │   └── routes.py        # Informes
+│   │   └── config/
+│   │       └── routes.py        # Configuración del sistema
+│   │
+│   ├── utils/                   # Utilidades
+│   │   ├── __init__.py
+│   │   ├── decorators.py        # Decoradores personalizados
+│   │   ├── validators.py        # Validadores genéricos
+│   │   ├── formatters.py        # Formateo (fechas, números, etc.)
+│   │   └── ... (mantener sftp_upload, email, fechas, numeracion)
+│   │
+│   └── templates/               # Templates Jinja2 (mantener estructura actual)
+│       ├── base.html
+│       ├── auth/
+│       ├── clients/
+│       ├── requests/
+│       ├── invoices/            # Templates de facturas
+│       ├── delivery_notes/      # Templates de albaranes
+│       ├── tickets/
+│       ├── expenses/
+│       ├── products/
+│       ├── web_client/
+│       ├── reports/
+│       └── config/
+│
+├── static/                      # Archivos estáticos (mantener)
+│   ├── css/
+│   ├── uploads/
+│   └── ...
+│
+├── instance/                    # Base de datos SQLite (desarrollo)
+│
+├── tests/                       # Tests unitarios e integración (opcional)
+│
+├── migrations/                  # Alembic migrations (recomendado)
+│
+├── requirements.txt
+├── .env.example
+├── app.py                       # Punto de entrada (simple, usa factory)
+└── README.md
+
+MODELOS Y ENTIDADES PRINCIPALES
+================================================================================
+
+1. USUARIOS Y AUTENTICACIÓN
+   - Usuario: usuarios del sistema (roles: comercial, administracion, supervisor, usuario)
+   - Comercial: vinculado a Usuario, puede crear pedidos
+
+2. CLIENTES
+   - Cliente: información completa del cliente, puede tener acceso web
+   - CategoriaCliente: categorías configurables
+   - DireccionEnvio: direcciones de envío del cliente
+   - PersonasContacto: personas de contacto (puede ser tabla o JSON)
+
+3. PRODUCTOS
+   - Prenda: maestros de prendas (nombre, tipo, descripción)
+
+4. SOLICITUDES/PRESUPUESTOS (PRESUPUESTOS = solicitudes en estado inicial)
+   - Presupuesto: solicitud inicial (número formato aamm_contador, ej: 2601_01)
+     - Estados: presupuesto, rechazado, aceptado, mockup, en preparacion, 
+       revision y empaquetado, entregado al cliente
+     - Subestados: para mockup (encargado a, REVISIÓN CLIENTE, CAMBIOS 1/2, 
+       RECHAZADO, aceptado) y en preparacion (hacer marcada, imprimir, 
+       calandra, corte, confeccion, sublimacion, bordado)
+   - LineaPresupuesto: líneas del presupuesto (prenda, cantidad, talla, 
+     precio_unitario, descuento, precio_final, importe)
+   - RegistroEstadoSolicitud: historial de cambios de estado
+
+5. PEDIDOS (opcional, puede fusionarse con Presupuesto cuando estado = "aceptado")
+   - Pedido: puede venir de Presupuesto o ser independiente
+   - LineaPedido: líneas del pedido
+
+6. FACTURACIÓN (MÓDULO AISLADO - CRÍTICO)
+   - Factura: facturas directas (NO vinculadas a presupuestos)
+     - serie, numero, fecha_expedicion, tipo_factura
+     - cliente_id, datos_cliente (snapshot)
+     - base_imponible, tipo_iva, iva, total
+     - estado, huella_verifactu (integración Verifactu)
+   - LineaFactura: líneas de la factura
+     - descripcion, cantidad, talla, precio_unitario, descuento, 
+       precio_final, importe
+     - es_linea_texto (para líneas informativas sin precio)
+   
+   - Albarán/Delivery Note: puede ser tipo especial de Factura (tipo='albaran') 
+     O entidad separada
+     - Mismo formato que Factura pero SIN precios visibles en PDF
+     - Puede tener presupuesto_id vinculado
+     - Líneas pueden ir sin precios
+     - Líneas de texto permitidas
+
+7. TICKETS (Facturas Simplificadas)
+   - Ticket: facturas simplificadas (tipo F2)
+   - LineaTicket: líneas del ticket
+
+8. GASTOS
+   - Proveedor: proveedores
+   - FacturaProveedor: facturas de proveedores
+   - Empleado: empleados
+   - Nomina: nóminas de empleados
+
+9. CONFIGURACIÓN
+   - PlantillaEmail: plantillas de email configurables
+   - Configuracion: configuración general
+   - DiaFestivo: días festivos configurables
+
+FUNCIONALIDADES PRINCIPALES
+================================================================================
+
+1. AUTENTICACIÓN Y AUTORIZACIÓN
+   - Login/Logout
+   - Roles: comercial, administracion, supervisor, usuario
+   - Clientes pueden tener acceso web (login separado)
+   - Decoradores para control de acceso
+
+2. GESTIÓN DE CLIENTES
+   - CRUD completo de clientes
+   - Categorías configurables
+   - Direcciones de envío múltiples
+   - Personas de contacto
+   - Búsqueda y filtros
+   - Exportación/importación
+
+3. SOLICITUDES/PRESUPUESTOS
+   - Crear solicitud (presupuesto inicial)
+   - Estados y subestados configurables
+   - Asignación de mockups a usuarios
+   - Seguimiento de fechas límite (mockup: 3 días)
+   - Imágenes múltiples (portada + hasta 5 adicionales)
+   - PDF de presupuesto generado con Playwright
+   - Hoja de trabajo para seguimiento interno
+   - Numeración automática (aamm_contador)
+   - Historial de cambios de estado
+
+4. FACTURACIÓN (MÓDULO CRÍTICO - DEBE ESTAR AISLADO)
+   A. FACTURAS DIRECTAS
+      - Crear factura directa (sin presupuesto)
+      - Múltiples líneas con descripción, cantidad, talla, precios
+      - Líneas de texto informativas (sin precios)
+      - Cálculo automático: descuento %, precio final, IVA, total
+      - Tipos IVA: 21%, 10%, 4%, 0%
+      - Serie y numeración automática
+      - PDF con precios visibles
+      - Integración Verifactu (huella digital)
+   
+   B. ALBARANES/DELIVERY NOTES (AISLADOS)
+      - Crear albarán independiente o desde presupuesto
+      - Líneas sin precios opcionales (para albaranes sin coste)
+      - Líneas de texto informativas
+      - Duplicación de líneas
+      - PDF SIN precios visibles (solo descripción, talla, cantidad)
+      - Sin número de cuenta en PDF
+      - Numeración automática independiente
+      - Vinculación opcional a presupuestos
+
+   C. PREFACTURAS
+      - Vista de presupuestos aceptados pendientes de facturar
+      - Crear factura desde presupuesto
+      - Crear múltiples albaranes desde presupuesto
+
+5. TICKETS (Facturas Simplificadas)
+   - Crear ticket tipo F2
+   - Cálculo IVA: incrementar o desglosar
+   - Generación PDF
+   - Integración Verifactu
+
+6. PEDIDOS (si se mantiene separado de Presupuesto)
+   - Gestión de pedidos en fabricación
+   - Estados: Pendiente, Diseño, En preparación, Todo listo, Enviado, 
+     Entregado al cliente
+
+7. GASTOS
+   - Gestión de proveedores
+   - Facturas de proveedores
+   - Gestión de empleados
+   - Nóminas
+
+8. MAESTROS
+   - Gestión de prendas (productos base)
+
+9. ÁREA CLIENTE WEB
+   - Login cliente
+   - Dashboard con sus pedidos/facturas
+   - Crear pedidos desde cliente web
+   - Ver estado de pedidos
+   - Ver facturas y descargar PDFs
+
+10. INFORMES
+    - Informes de facturación
+    - Informes de solicitudes
+    - Informes de gastos
+    - Exportación a Excel
+
+11. CONFIGURACIÓN
+    - Gestión de usuarios
+    - Plantillas de email configurables
+    - Días festivos
+    - Configuración general
+
+REQUISITOS ESPECÍFICOS DE ARQUITECTURA
+================================================================================
+
+1. FACTURACIÓN DEBE ESTAR COMPLETAMENTE AISLADA
+   - Módulo separado en services/invoice_service.py
+   - Rutas en api/invoices/ y api/delivery_notes/
+   - Validadores específicos
+   - Repositorio independiente (opcional pero recomendado)
+   - NO mezclar lógica de facturas con presupuestos/pedidos
+
+2. SEPARACIÓN DE RESPONSABILIDADES
+   - Routes: Solo manejo de requests/responses, validación básica
+   - Services: Toda la lógica de negocio
+   - Repositories: Acceso a datos (opcional, puede usar modelos directamente)
+   - Models: Solo definición de entidades y relaciones
+
+3. USAR PATRÓN FACTORY PARA FLASK APP
+   - app/__init__.py con create_app() function
+   - Configuración por entorno (development, production)
+   - app.py simple que llama a create_app()
+
+4. SERVICIOS COMO CLASES O FUNCIONES
+   - InvoiceService: clase con métodos para operaciones de facturación
+   - DeliveryNoteService: clase con métodos para albaranes
+   - PDFService: clase para generación de PDFs (común)
+   - Etc.
+
+5. VALIDACIÓN
+   - Validadores en utils/validators.py (genéricos)
+   - Validadores específicos en módulos (ej: invoices/validators.py)
+   - Usar marshmallow o pydantic (opcional pero recomendado)
+
+6. MANEJO DE ERRORES
+   - Excepciones personalizadas por dominio
+   - Manejo centralizado de errores
+   - Logging apropiado
+
+7. CÁLCULOS FINANCIEROS
+   - Usar Decimal para todos los cálculos monetarios
+   - Servicio de cálculo separado (ej: InvoiceCalculator)
+   - Validar cálculos en tests
+
+REQUISITOS ESPECÍFICOS DE FUNCIONALIDAD
+================================================================================
+
+1. PDFs GENERADOS CON PLAYWRIGHT
+   - Templates HTML + CSS
+   - Generación desde HTML a PDF
+   - Soporte para imágenes (base64 o rutas)
+   - Múltiples formatos: factura, albarán, presupuesto, ticket
+
+2. NUMERACIÓN AUTOMÁTICA
+   - Facturas: serie + numero secuencial
+   - Albaranes: serie + numero secuencial (independiente)
+   - Solicitudes: formato aamm_contador (ej: 2601_01)
+
+3. INTEGRACIÓN VERIFACTU
+   - API para generar huella digital de facturas/tickets
+   - Almacenar respuesta en base de datos
+   - Estados: pendiente, enviado, confirmado, error
+
+4. GESTIÓN DE ARCHIVOS
+   - Subida de imágenes (diseños, mockups, portadas)
+   - SFTP para almacenamiento remoto (opcional)
+   - Organización por carpetas (solicitudes, clientes, etc.)
+
+5. EMAILS
+   - Plantillas configurables
+   - Envío de notificaciones por cambio de estado
+   - Adjuntar PDFs
+
+6. LOCALSTORAGE EN FRONTEND
+   - Guardar datos de formularios modales (crear cliente, etc.)
+   - Restaurar al reabrir modales
+   - Limpiar al enviar formulario
+
+CARACTERÍSTICAS ESPECIALES DE FACTURACIÓN
+================================================================================
+
+1. FACTURAS DIRECTAS
+   - Cálculo de IVA dinámico (0%, 4%, 10%, 21%)
+   - Cálculo en tiempo real en frontend
+   - Líneas de texto sin precio
+   - Duplicación de líneas
+
+2. ALBARANES
+   - Líneas pueden ir sin precio (precio_unitario opcional)
+   - Líneas de texto informativas (es_linea_texto = True)
+   - Primera línea de texto va al principio
+   - "Agregar línea" siempre agrega línea normal
+   - "Agregar línea de texto" agrega línea informativa
+   - Duplicación de líneas (mantiene descripción y precios, 
+     limpia talla, cantidad = 1)
+   - PDF sin número de cuenta
+   - PDF muestra: Descripción (60%), Talla (15%), Cantidad (25%)
+   - PDF sin precios visibles
+
+3. PREFACTURAS
+   - Vista de presupuestos aceptados sin factura
+   - Crear factura desde presupuesto (copia líneas)
+   - Crear albarán desde presupuesto (copia líneas sin precios opcionales)
+
+CARACTERÍSTICAS ESPECIALES DE SOLICITUDES
+================================================================================
+
+1. ESTADOS Y SUBESTADOS
+   - Sistema de estados principal
+   - Subestados para estados complejos (mockup, en preparacion)
+   - Historial de cambios
+
+2. MOCKUPS
+   - Asignación a usuarios
+   - Fecha límite (3 días automático)
+   - Subestados: encargado a, REVISIÓN CLIENTE, CAMBIOS 1/2, RECHAZADO, aceptado
+
+3. PREPARACIÓN
+   - Subestados: hacer marcada, imprimir, calandra, corte, confeccion, 
+     sublimacion, bordado
+   - Asignación de "hacer marcada" a usuario
+
+4. IMÁGENES
+   - Portada (primera página PDF)
+   - Hasta 5 imágenes adicionales con descripciones
+   - Almacenamiento en static/uploads/solicitudes/
+
+5. HOJA DE TRABAJO
+   - PDF interno para seguimiento
+   - Información de estado, fechas, asignaciones
+
+EJEMPLOS DE CÓDIGO - ESTRUCTURA DESEADA
+================================================================================
+
+EJEMPLO 1: InvoiceService (servicio aislado)
+---------------------------------------------
+# app/services/invoice_service.py
+
+from decimal import Decimal
+from app.models.invoice import Factura, LineaFactura
+from app.services.pdf_service import PDFService
+
+class InvoiceService:
+    def __init__(self, db_session, numeration_service, pdf_service):
+        self.db = db_session
+        self.numeration = numeration_service
+        self.pdf = pdf_service
+    
+    def create_invoice(self, cliente_id, lineas_data, tipo_iva=21):
+        """Crear factura directa"""
+        # Validar datos
+        # Calcular totales
+        # Crear factura y líneas
+        # Guardar en BD
+        return factura
+    
+    def calculate_totals(self, lineas_data, tipo_iva):
+        """Calcular base imponible, IVA, total"""
+        # Lógica de cálculo
+        return base_imponible, iva, total
+    
+    def generate_pdf(self, factura_id):
+        """Generar PDF de factura"""
+        factura = Factura.query.get(factura_id)
+        return self.pdf.generate_invoice_pdf(factura)
+
+
+EJEMPLO 2: DeliveryNoteService (servicio aislado)
+--------------------------------------------------
+# app/services/delivery_note_service.py
+
+class DeliveryNoteService:
+    def __init__(self, db_session, numeration_service, pdf_service):
+        self.db = db_session
+        self.numeration = numeration_service
+        self.pdf = pdf_service
+    
+    def create_delivery_note(self, cliente_id, lineas_data, presupuesto_id=None):
+        """Crear albarán (puede venir de presupuesto o independiente)"""
+        # Permitir líneas sin precio
+        # Permitir líneas de texto
+        # Crear albarán y líneas
+        return albaran
+    
+    def create_from_request(self, presupuesto_id):
+        """Crear albarán desde presupuesto"""
+        # Copiar líneas del presupuesto
+        # Opcionalmente sin precios
+        return albaran
+
+
+EJEMPLO 3: Routes aisladas
+--------------------------
+# app/api/invoices/routes.py
+
+from flask import Blueprint, request, jsonify
+from app.services.invoice_service import InvoiceService
+from app.extensions import db
+
+invoices_bp = Blueprint('invoices', __name__)
+
+@invoices_bp.route('/invoices', methods=['POST'])
+@login_required
+def create_invoice():
+    service = InvoiceService(db.session, ...)
+    invoice = service.create_invoice(...)
+    return jsonify(invoice.to_dict())
+
+
+EJEMPLO 4: Factory Pattern
+--------------------------
+# app/__init__.py
+
+from flask import Flask
+from app.config import Config
+from app.extensions import db, login_manager, mail
+
+def create_app(config_class=Config):
+    app = Flask(__name__)
+    app.config.from_object(config_class)
+    
+    # Inicializar extensiones
+    db.init_app(app)
+    login_manager.init_app(app)
+    mail.init_app(app)
+    
+    # Registrar blueprints
+    from app.api.auth.routes import auth_bp
+    from app.api.invoices.routes import invoices_bp
+    from app.api.delivery_notes.routes import delivery_notes_bp
+    # ... otros blueprints
+    
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(invoices_bp, url_prefix='/api')
+    app.register_blueprint(delivery_notes_bp, url_prefix='/api')
+    
+    return app
+
+
+# app.py (punto de entrada)
+
+from app import create_app
+from app.config import DevelopmentConfig
+
+app = create_app(DevelopmentConfig)
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+
+CONSIDERACIONES ADICIONALES
+================================================================================
+
+1. MIGRACIÓN DE DATOS
+   - Mantener compatibilidad con estructura de BD actual si es posible
+   - Scripts de migración si cambia estructura
+   - Considerar Alembic para migraciones futuras
+
+2. RENDIMIENTO
+   - Optimizar queries (joinedload, select_related)
+   - Cachear cálculos costosos si es necesario
+   - Paginación en listados grandes
+
+3. SEGURIDAD
+   - Validar todos los inputs
+   - CSRF protection
+   - SQL injection prevention (SQLAlchemy ya lo previene)
+   - XSS prevention (Jinja2 escapa por defecto)
+   - Control de acceso por roles
+
+4. TESTING (RECOMENDADO)
+   - Tests unitarios para servicios
+   - Tests de integración para rutas
+   - Tests de cálculo financiero
+
+5. DOCUMENTACIÓN
+   - Docstrings en todas las clases y métodos
+   - Comentarios en código complejo
+   - README actualizado
+
+ENTREGABLES ESPERADOS
+================================================================================
+
+1. Código fuente completo con la estructura descrita
+2. Base de datos con modelos y relaciones correctas
+3. Todas las funcionalidades actuales implementadas
+4. Facturación completamente aislada y modular
+5. Servicios separados de rutas
+6. Templates actualizados para nueva estructura de rutas
+7. Configuración para desarrollo y producción
+8. README con instrucciones de instalación y uso
+9. requirements.txt actualizado
+
+NOTAS FINALES
+================================================================================
+
+- Mantener todas las funcionalidades existentes
+- Mejorar organización sin romper funcionalidad
+- Priorizar facturación aislada como módulo crítico
+- Código limpio, legible y mantenible
+- Preparado para escalar en el futuro
+- Compatible con despliegue en Render u otro hosting
+- Usar buenas prácticas de Python y Flask
+
+================================================================================
+FIN DEL PROMPT
+================================================================================
+
+
+
+
+
+
+
+
+
+

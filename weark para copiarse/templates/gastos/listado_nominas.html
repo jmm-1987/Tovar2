@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block title %}Nóminas - Gastos{% endblock %}
+
+{% block content %}
+<div class="clientes-container">
+    <div class="clientes-header">
+        <h2>Nóminas</h2>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <a href="{{ url_for('gastos.listado_empleados') }}" class="btn btn-secondary" style="text-decoration: none;">📋 Empleados</a>
+            <a href="{{ url_for('gastos.nueva_nomina') }}" class="btn btn-success">➕ Nueva Nómina</a>
+            {% if nominas_ia_pendientes %}
+            <button type="button" class="btn btn-warning" id="btnNominasIA">
+                🤖 Nóminas IA ({{ nominas_ia_pendientes }})
+            </button>
+            {% else %}
+            <button type="button" class="btn btn-outline-secondary" disabled>
+                🤖 Nóminas IA (0)
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    <div style="margin-bottom: 25px;">
+        <div class="filtros-container" style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #e9ecef;">
+            <form method="GET" action="{{ url_for('gastos.listado_nominas') }}" style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                    <label for="año_desde" style="font-size: 0.875rem; font-weight: 600; color: #495057; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                        <span>📅</span> Año Desde
+                    </label>
+                    <select name="año_desde" id="año_desde" class="filtro-input" style="padding: 10px 14px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                        <option value="">Todos</option>
+                        {% for año in años %}
+                        <option value="{{ año }}" {% if año_desde|string == año|string %}selected{% endif %}>{{ año }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                    <label for="mes_desde" style="font-size: 0.875rem; font-weight: 600; color: #495057; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                        <span>📆</span> Mes Desde
+                    </label>
+                    <select name="mes_desde" id="mes_desde" class="filtro-input" style="padding: 10px 14px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                        <option value="">Todos</option>
+                        {% set meses_nombres = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] %}
+                        {% for i in range(1, 13) %}
+                        <option value="{{ i }}" {% if mes_desde == i|string %}selected{% endif %}>{{ meses_nombres[i] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                    <label for="año_hasta" style="font-size: 0.875rem; font-weight: 600; color: #495057; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                        <span>📅</span> Año Hasta
+                    </label>
+                    <select name="año_hasta" id="año_hasta" class="filtro-input" style="padding: 10px 14px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                        <option value="">Todos</option>
+                        {% for año in años %}
+                        <option value="{{ año }}" {% if año_hasta|string == año|string %}selected{% endif %}>{{ año }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                    <label for="mes_hasta" style="font-size: 0.875rem; font-weight: 600; color: #495057; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
+                        <span>📆</span> Mes Hasta
+                    </label>
+                    <select name="mes_hasta" id="mes_hasta" class="filtro-input" style="padding: 10px 14px; border: 2px solid #dee2e6; border-radius: 8px; font-size: 0.9rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                        <option value="">Todos</option>
+                        {% for i in range(1, 13) %}
+                        <option value="{{ i }}" {% if mes_hasta == i|string %}selected{% endif %}>{{ meses_nombres[i] }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div style="display: flex; gap: 10px; align-items: flex-end;">
+                    <button type="submit" class="btn btn-primary" style="padding: 10px 20px; border-radius: 8px; font-weight: 600; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
+                        🔍 Buscar
+                    </button>
+                    {% if año_desde or mes_desde or año_hasta or mes_hasta %}
+                    <a href="{{ url_for('gastos.listado_nominas') }}" class="btn btn-secondary" style="padding: 10px 20px; border-radius: 8px; font-weight: 600; transition: all 0.3s ease;">
+                        🗑️ Limpiar
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <style>
+    .filtro-input:hover {
+        border-color: #adb5bd !important;
+        box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+    }
+
+    .filtro-input:focus {
+        outline: none;
+        border-color: #007bff !important;
+        box-shadow: 0 0 0 3px rgba(0,123,255,0.25);
+    }
+
+    select.filtro-input {
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23495057' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 12px center;
+        padding-right: 35px !important;
+        appearance: none;
+        -webkit-appearance: none;
+        -moz-appearance: none;
+    }
+
+    .btn-primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0,123,255,0.4) !important;
+    }
+
+    .btn-secondary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(108,117,125,0.3);
+    }
+    </style>
+
+    {% if nominas %}
+    <div class="table-container">
+        <table class="clientes-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Empleado</th>
+                    <th>Mes</th>
+                    <th>Año</th>
+                    <th>Total Devengado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for nomina in nominas %}
+                <tr>
+                    <td>{{ nomina.id }}</td>
+                    <td>{{ nomina.empleado.nombre if nomina.empleado else 'N/A' }}</td>
+                    <td>
+                        {% set meses = ['', 'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'] %}
+                        {{ meses[nomina.mes] }}
+                    </td>
+                    <td>{{ nomina.año }}</td>
+                    <td><strong>{{ "%.2f"|format(nomina.total_devengado) }} €</strong></td>
+                    <td class="acciones-cell">
+                        <a href="{{ url_for('gastos.editar_nomina', nomina_id=nomina.id) }}" class="btn btn-sm btn-primary">Editar</a>
+                        <form method="POST" action="{{ url_for('gastos.eliminar_nomina', nomina_id=nomina.id) }}" style="display: inline;" onsubmit="return confirm('¿Está seguro de eliminar esta nómina?');">
+                            <button type="submit" class="btn btn-sm btn-danger">Eliminar</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="no-data">
+        <p>No hay nóminas registradas.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{# Modal para validar Nóminas IA #}
+{% if nomina_ia_actual %}
+<div id="modalNominaIAOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:998;"></div>
+<div id="modalNominaIA" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); background:#fff; border-radius:12px; max-width:900px; width:95%; max-height:90vh; overflow:hidden; box-shadow:0 10px 40px rgba(0,0,0,0.25); z-index:999;">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-bottom:1px solid #dee2e6; background:#f8f9fa;">
+        <h3 style="margin:0; font-size:1rem; font-weight:600;">Validar Nómina IA pendiente</h3>
+        <button id="modalNominaIAClose" style="border:none; background:transparent; font-size:20px; cursor:pointer;">×</button>
+    </div>
+    <div style="display:flex; gap:16px; padding:16px; max-height:calc(90vh - 60px); overflow:auto; flex-wrap:wrap;">
+        <div style="flex:1 1 55%; min-width:280px; text-align:center;">
+            <div style="border:1px solid #dee2e6; border-radius:8px; padding:8px; background:#000; max-height:70vh; overflow:auto;">
+                <img src="{{ url_for('static', filename=nomina_ia_actual.imagen_ruta.replace('static/', '')) }}"
+                     alt="Imagen nómina IA"
+                     style="max-width:100%; height:auto; cursor:zoom-in;"
+                     onclick="this.style.transform = this.style.transform ? '' : 'scale(1.5)'; this.style.transformOrigin='center top';">
+            </div>
+            <small style="display:block; margin-top:6px; color:#6c757d;">Haz clic en la imagen para hacer zoom.</small>
+        </div>
+        <div style="flex:1 1 40%; min-width:260px;">
+            <form method="POST" action="{{ url_for('gastos.validar_nomina_ia') }}">
+                <input type="hidden" name="ia_id" value="{{ nomina_ia_actual.id }}">
+                <div class="form-group">
+                    <label>Empleado (texto libre)</label>
+                    <input type="text" name="empleado_nombre" class="form-control"
+                           value="{{ nomina_ia_actual.empleado_nombre or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Mes</label>
+                    <input type="number" min="1" max="12" name="mes" class="form-control"
+                           value="{{ nomina_ia_actual.mes or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Año</label>
+                    <input type="number" name="año" class="form-control"
+                           value="{{ nomina_ia_actual.año or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Total devengado</label>
+                    <input type="number" step="0.01" name="total_devengado" class="form-control"
+                           value="{{ nomina_ia_actual.total_devengado or '' }}">
+                </div>
+                <div class="form-group">
+                    <label>Observaciones</label>
+                    <textarea name="observaciones" class="form-control" rows="3"></textarea>
+                </div>
+                <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:10px;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('modalNominaIAClose').click();">Cerrar</button>
+                    <button type="submit" class="btn btn-primary">Validar y crear nómina</button>
+                </div>
+            </form>
+            <p style="margin-top:10px; font-size:0.85rem; color:#6c757d;">
+                Al validar, se creará una nómina normal con estos datos y esta nómina IA se marcará como procesada.
+            </p>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const btnNominasIA = document.getElementById('btnNominasIA');
+    const modalNominaIA = document.getElementById('modalNominaIA');
+    const modalOverlay = document.getElementById('modalNominaIAOverlay');
+    const modalClose = document.getElementById('modalNominaIAClose');
+
+    function closeModalNominaIA() {
+        if (modalNominaIA) modalNominaIA.style.display = 'none';
+        if (modalOverlay) modalOverlay.style.display = 'none';
+    }
+
+    if (btnNominasIA && modalNominaIA && modalOverlay) {
+        btnNominasIA.addEventListener('click', function() {
+            modalNominaIA.style.display = 'block';
+            modalOverlay.style.display = 'block';
+        });
+    }
+    if (modalClose) {
+        modalClose.addEventListener('click', closeModalNominaIA);
+    }
+    if (modalOverlay) {
+        modalOverlay.addEventListener('click', closeModalNominaIA);
+    }
+});
+</script>
+{% endif %}

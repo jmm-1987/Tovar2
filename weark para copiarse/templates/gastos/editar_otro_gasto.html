@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Editar {{ nombre_tipo }} - Gastos{% endblock %}
+
+{% block content %}
+<h2>Editar {{ nombre_tipo }}</h2>
+
+<form method="POST">
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="fecha">Fecha *</label>
+            <input type="date" name="fecha" id="fecha" value="{{ gasto.fecha.strftime('%Y-%m-%d') if gasto.fecha else '' }}" required>
+        </div>
+        <div class="form-group-compact">
+            <label for="importe">Importe (€) *</label>
+            <input type="number" name="importe" id="importe" step="0.01" min="0" value="{{ "%.2f"|format(gasto.importe) if gasto.importe else '0' }}" required>
+        </div>
+        <div class="form-group-compact">
+            <label for="periodo">Período</label>
+            <input type="text" name="periodo" id="periodo" value="{{ gasto.periodo or '' }}" placeholder="Ej: T1 2024, 01/2024">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="observaciones">Observaciones</label>
+        <textarea name="observaciones" id="observaciones" rows="3">{{ gasto.observaciones or '' }}</textarea>
+    </div>
+
+    <div class="actions">
+        <button type="submit" class="btn btn-success">Guardar</button>
+        <a href="{{ url_for('gastos.listado_otro_gasto', tipo_gasto=tipo_gasto) }}" class="btn btn-danger">Cancelar</a>
+    </div>
+</form>
+{% endblock %}

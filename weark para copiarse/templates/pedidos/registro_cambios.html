@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Registro de Cambios - Pedido #{{ pedido.id }}{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="{{ url_for('pedidos.ver_pedido', pedido_id=pedido.id) }}" class="btn btn-primary">← Volver al Pedido</a>
+</div>
+
+<h2>📋 Registro de Cambios - Pedido #{{ pedido.id }}</h2>
+
+{% if registros %}
+<div class="card" style="background-color: white; padding: 20px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 20px;">
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="border-bottom: 2px solid #2c3e50; background-color: #2c3e50;">
+                <th style="padding: 12px; text-align: left; color: #ffffff; font-weight: bold;">Fecha y Hora</th>
+                <th style="padding: 12px; text-align: left; color: #ffffff; font-weight: bold;">Tipo</th>
+                <th style="padding: 12px; text-align: left; color: #ffffff; font-weight: bold;">Línea</th>
+                <th style="padding: 12px; text-align: left; color: #ffffff; font-weight: bold;">Estado Anterior</th>
+                <th style="padding: 12px; text-align: left; color: #ffffff; font-weight: bold;">Estado Nuevo</th>
+                <th style="padding: 12px; text-align: left; color: #ffffff; font-weight: bold;">Usuario</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for registro in registros %}
+            <tr style="border-bottom: 1px solid #e0e0e0;">
+                <td style="padding: 12px; color: #666;">
+                    {{ registro.fecha_cambio.strftime('%d/%m/%Y %H:%M:%S') }}
+                </td>
+                <td style="padding: 12px;">
+                    {% if registro.tipo_cambio == 'pedido' %}
+                        <span style="background-color: #3498db; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Pedido</span>
+                    {% else %}
+                        <span style="background-color: #9b59b6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">Línea</span>
+                    {% endif %}
+                </td>
+                <td style="padding: 12px; color: #666;">
+                    {% if registro.linea_id %}
+                        {% set linea_encontrada = None %}
+                        {% for linea in pedido.lineas %}
+                            {% if linea.id == registro.linea_id %}
+                                {% set linea_encontrada = linea %}
+                            {% endif %}
+                        {% endfor %}
+                        {% if linea_encontrada %}
+                            {{ linea_encontrada.nombre_mostrar or linea_encontrada.nombre or ('Línea #' + registro.linea_id|string) }}
+                        {% else %}
+                            Línea #{{ registro.linea_id }}
+                        {% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td style="padding: 12px;">
+                    {% if registro.estado_anterior %}
+                        <span style="background-color: #95a5a6; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px;">{{ registro.estado_anterior }}</span>
+                    {% else %}
+                        <span style="color: #999;">-</span>
+                    {% endif %}
+                </td>
+                <td style="padding: 12px;">
+                    <span style="background-color: #27ae60; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold;">{{ registro.estado_nuevo }}</span>
+                </td>
+                <td style="padding: 12px; color: #666;">
+                    {{ registro.usuario.usuario if registro.usuario else 'N/A' }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="card" style="background-color: white; padding: 40px; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-top: 20px; text-align: center;">
+    <p style="color: #999; font-size: 16px;">No hay registros de cambios de estado para este pedido.</p>
+</div>
+{% endif %}
+
+<style>
+.card {
+    margin-bottom: 20px;
+}
+
+table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+</style>
+{% endblock %}
+

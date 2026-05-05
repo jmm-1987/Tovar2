@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}Ticket {{ ticket.serie }}-{{ ticket.numero }} - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<div style="margin-bottom: 20px;">
+    <a href="{{ url_for('tickets.listado_tickets') }}" class="btn btn-primary" style="padding: 10px 20px; text-decoration: none; display: inline-block;">
+        ← Volver al Listado
+    </a>
+    <a href="{{ url_for('tickets.editar_ticket', ticket_id=ticket.id) }}" class="btn btn-warning" style="padding: 10px 20px; text-decoration: none; display: inline-block; margin-left: 10px; background-color: #ffc107; color: #000;">
+        ✏️ Editar
+    </a>
+    <a href="{{ url_for('tickets.imprimir_ticket', ticket_id=ticket.id) }}" target="_blank" class="btn btn-success" style="padding: 10px 20px; text-decoration: none; display: inline-block; margin-left: 10px;">
+        🖨️ Imprimir
+    </a>
+    <a href="{{ url_for('tickets.descargar_pdf_ticket', ticket_id=ticket.id) }}" class="btn btn-info" style="padding: 10px 20px; text-decoration: none; display: inline-block; margin-left: 10px;">
+        📄 Descargar PDF
+    </a>
+    {% if ticket.estado != 'confirmado' %}
+    <form method="POST" action="{{ url_for('tickets.reenviar_ticket', ticket_id=ticket.id) }}" style="display: inline; margin-left: 10px;">
+        <button type="submit" class="btn btn-warning" style="padding: 10px 20px;">Reenviar a Verifactu</button>
+    </form>
+    {% endif %}
+</div>
+
+<div class="factura-card" style="background: white; border-radius: 8px; padding: 30px; margin-bottom: 30px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); animation: slideUp 0.5s ease-out;">
+    <!-- Encabezado con logo -->
+    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 30px; border-bottom: 2px solid #e0e0e0; padding-bottom: 20px;">
+        <div style="flex: 1;">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" style="max-height: 80px; max-width: 200px;">
+        </div>
+        <div style="text-align: right; flex: 1;">
+            <h2 style="margin: 0 0 10px 0; color: #2c3e50; font-size: 1.8rem;">FACTURA SIMPLIFICADA</h2>
+            <p style="margin: 5px 0; color: #666; font-size: 1.1rem;"><strong>Serie:</strong> {{ ticket.serie }}</p>
+            <p style="margin: 5px 0; color: #666; font-size: 1.1rem;"><strong>Número:</strong> {{ ticket.numero }}</p>
+            <p style="margin: 5px 0; color: #666; font-size: 1.1rem;"><strong>Fecha:</strong> {{ ticket.fecha_expedicion.strftime('%d/%m/%Y') }}</p>
+            <p style="margin: 5px 0; color: #666; font-size: 1.1rem;"><strong>Tipo:</strong> {{ ticket.tipo_factura }}</p>
+        </div>
+    </div>
+
+    <!-- Estado del ticket -->
+    <div style="margin-bottom: 25px; padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid 
+        {% if ticket.estado == 'confirmado' %}#28a745
+        {% elif ticket.estado == 'enviado' %}#17a2b8
+        {% elif ticket.estado == 'error' %}#dc3545
+        {% else %}#ffc107
+        {% endif %};">
+        <p style="margin: 0; font-weight: bold; color: #2c3e50;">
+            <strong>Estado:</strong> 
+            <span class="badge badge-estado-{{ ticket.estado }}">
+                {% if ticket.estado == 'pendiente' %}
+                    Pendiente
+                {% elif ticket.estado == 'enviado' %}
+                    Enviado
+                {% elif ticket.estado == 'confirmado' %}
+                    Confirmado
+                {% elif ticket.estado == 'error' %}
+                    Error
+                {% else %}
+                    {{ ticket.estado }}
+                {% endif %}
+            </span>
+        </p>
+        {% if ticket.fecha_confirmacion %}
+        <p style="margin: 5px 0 0 0; color: #666; font-size: 0.9rem;">
+            <strong>Fecha de confirmación:</strong> {{ ticket.fecha_confirmacion.strftime('%d/%m/%Y %H:%M:%S') }}
+        </p>
+        {% endif %}
+    </div>
+
+    <!-- Datos del cliente -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 30px;">
+        <div class="datos-cliente" style="background: #f8f9fa; padding: 20px; border-radius: 6px; border: 1px solid #e9ecef;">
+            <h3 style="margin: 0 0 15px 0; color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; font-size: 1.2rem;">Datos del Cliente</h3>
+            <p style="margin: 8px 0;"><strong>Nombre:</strong> {{ ticket.nombre }}</p>
+            {% if ticket.nif %}
+            <p style="margin: 8px 0;"><strong>NIF:</strong> {{ ticket.nif }}</p>
+            {% endif %}
+        </div>
+
+        <div class="info-ticket" style="background: #f8f9fa; padding: 20px; border-radius: 6px; border: 1px solid #e9ecef;">
+            <h3 style="margin: 0 0 15px 0; color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; font-size: 1.2rem;">Información del Ticket</h3>
+            {% if ticket.descripcion %}
+            <p style="margin: 8px 0;"><strong>Descripción:</strong> {{ ticket.descripcion }}</p>
+            {% endif %}
+            {% if ticket.forma_pago %}
+            <p style="margin: 8px 0;"><strong>Forma de Pago:</strong> 
+                {% if ticket.forma_pago.lower() == 'efectivo' %}
+                    <span style="color: #28a745; font-weight: 600;">💵 Efectivo</span>
+                {% elif ticket.forma_pago.lower() == 'tarjeta' %}
+                    <span style="color: #007bff; font-weight: 600;">💳 Tarjeta</span>
+                {% elif ticket.forma_pago.lower() == 'bizum' %}
+                    <span style="color: #6f42c1; font-weight: 600;">📱 Bizum</span>
+                {% elif ticket.forma_pago.lower() == 'transferencia' %}
+                    <span style="color: #17a2b8; font-weight: 600;">🏦 Transferencia</span>
+                {% else %}
+                    {{ ticket.forma_pago }}
+                {% endif %}
+            </p>
+            {% endif %}
+            <p style="margin: 8px 0;"><strong>Fecha de creación:</strong> {{ ticket.fecha_creacion.strftime('%d/%m/%Y %H:%M:%S') }}</p>
+        </div>
+    </div>
+
+    <!-- Líneas del ticket -->
+    <div class="lineas-ticket" style="margin-top: 30px;">
+        <h3 style="margin: 0 0 20px 0; color: #2c3e50; border-bottom: 2px solid #2c3e50; padding-bottom: 12px; font-size: 1.3rem;">Líneas del Ticket</h3>
+        
+        {% if ticket.lineas %}
+        <div style="overflow-x: auto;">
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; background: white;">
+                <thead>
+                    <tr style="background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%); border-bottom: 2px solid #dee2e6;">
+                        <th style="padding: 15px; text-align: left; color: #ffffff; font-weight: 600;">Descripción</th>
+                        <th style="padding: 15px; text-align: center; color: #ffffff; font-weight: 600;">Cantidad</th>
+                        <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Precio Unitario (sin IVA) (€)</th>
+                        <th style="padding: 15px; text-align: right; color: #ffffff; font-weight: 600;">Total (sin IVA) (€)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for linea in ticket.lineas %}
+                    <tr class="linea-ticket" style="border-bottom: 1px solid #e9ecef;">
+                        <td style="padding: 15px; color: #495057;">{{ linea.descripcion }}</td>
+                        <td style="padding: 15px; text-align: center; color: #495057; font-weight: 500;">{{ "%.2f"|format(linea.cantidad) }}</td>
+                        <td style="padding: 15px; text-align: right; color: #495057;">
+                            {# Mostrar precio sin IVA - para tickets antiguos con desglosar, calcular sin IVA #}
+                            {% if ticket.tipo_calculo_iva == 'desglosar' %}
+                                {# Para tickets antiguos, puede que el precio incluya IVA #}
+                                {% set precio_sin_iva = (linea.precio_unitario|float / 1.21)|round(2) %}
+                                {{ "%.2f"|format(precio_sin_iva) }}
+                            {% else %}
+                                {# Precio ya es sin IVA #}
+                                {{ "%.2f"|format(linea.precio_unitario) }}
+                            {% endif %}
+                        </td>
+                        <td style="padding: 15px; text-align: right; color: #495057; font-weight: bold;">
+                            {# Mostrar importe sin IVA - para tickets antiguos con desglosar, calcular sin IVA #}
+                            {% if ticket.tipo_calculo_iva == 'desglosar' %}
+                                {# Para tickets antiguos, puede que el importe incluya IVA #}
+                                {% set importe_sin_iva = (linea.importe|float / 1.21)|round(2) %}
+                                {{ "%.2f"|format(importe_sin_iva) }}
+                            {% else %}
+                                {# Importe ya es sin IVA #}
+                                {{ "%.2f"|format(linea.importe) }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr style="border-top: 2px solid #2c3e50; background: #f8f9fa;">
+                        <td colspan="3" style="padding: 15px; text-align: right; font-weight: bold; color: #2c3e50;">Base Imponible (€):</td>
+                        <td style="padding: 15px; text-align: right;">
+                            {% set base_imponible = (ticket.importe_total|float / 1.21)|round(2) %}
+                            <span style="font-weight: bold; color: #2c3e50;">{{ "%.2f"|format(base_imponible) }}</span>
+                        </td>
+                    </tr>
+                    <tr style="background: #f8f9fa;">
+                        <td colspan="3" style="padding: 15px; text-align: right; font-weight: bold; color: #2c3e50;">IVA (21%) (€):</td>
+                        <td style="padding: 15px; text-align: right;">
+                            {% set iva_total = ((ticket.importe_total|float) - base_imponible)|round(2) %}
+                            <span style="font-weight: bold; color: #2c3e50;">{{ "%.2f"|format(iva_total) }}</span>
+                        </td>
+                    </tr>
+                    <tr style="border-top: 3px solid #2c3e50; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);">
+                        <td colspan="3" style="padding: 20px 15px; text-align: right; font-weight: bold; color: #2c3e50; font-size: 1.1rem;">Total (€):</td>
+                        <td style="padding: 20px 15px; text-align: right;">
+                            <span style="font-weight: bold; font-size: 1.5em; color: #27ae60;">{{ "%.2f"|format(ticket.importe_total) }}</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div style="padding: 30px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef; text-align: center;">
+            <p style="color: #999; font-style: italic; margin: 0; font-size: 1.1rem;">Este ticket no tiene líneas.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Información de Verifactu -->
+    {% if ticket.huella_verifactu %}
+    <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 6px; border: 1px solid #e9ecef;">
+        <h3 style="margin: 0 0 15px 0; color: #2c3e50; font-size: 1.2rem;">Respuesta de Verifactu</h3>
+        <pre style="background: white; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 0.9rem; max-height: 300px;">{{ ticket.huella_verifactu }}</pre>
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.badge-estado-pendiente {
+    background-color: #ffc107;
+    color: #000;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+.badge-estado-enviado {
+    background-color: #17a2b8;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+.badge-estado-confirmado {
+    background-color: #28a745;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+.badge-estado-error {
+    background-color: #dc3545;
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+</style>
+{% endblock %}
+
+
+
+

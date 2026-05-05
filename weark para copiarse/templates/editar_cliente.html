@@ -1,0 +1,477 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Cliente - {{ cliente.nombre }}{% endblock %}
+
+{% block content %}
+<div class="editar-cliente-container">
+    <h2>✏️ Editar Cliente: {{ cliente.nombre }}</h2>
+    
+    <form method="POST" class="cliente-form" autocomplete="off">
+        <div class="form-section">
+            <h3>Información Principal</h3>
+            <div class="form-group">
+                <label for="nombre">Nombre Fiscal *</label>
+                <input type="text" name="nombre" id="nombre" value="{{ cliente.nombre }}" required>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="alias">Nombre Comercial</label>
+                    <input type="text" name="alias" id="alias" value="{{ cliente.alias or '' }}" placeholder="Nombre comercial">
+                </div>
+                <div class="form-group">
+                    <label for="nif">NIF/CIF</label>
+                    <input type="text" name="nif" id="nif" value="{{ cliente.nif or '' }}" maxlength="20">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="fecha_alta">Fecha de Alta</label>
+                    <input type="date" name="fecha_alta" id="fecha_alta" value="{{ cliente.fecha_alta.strftime('%Y-%m-%d') if cliente.fecha_alta else '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="categoria_id">Categoría</label>
+                    <select name="categoria_id" id="categoria_id">
+                        <option value="">Sin categoría</option>
+                        {% for categoria in categorias %}
+                        <option value="{{ categoria.id }}" {% if cliente.categoria_id == categoria.id %}selected{% endif %}>{{ categoria.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="comercial_id">Comercial Asignado</label>
+                    <select name="comercial_id" id="comercial_id">
+                        <option value="">Sin comercial asignado</option>
+                        {% for comercial in comerciales %}
+                        <option value="{{ comercial.id }}" {% if cliente.comercial_id == comercial.id %}selected{% endif %}>{{ comercial.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="numero_cuenta">Número de Cuenta</label>
+                    <input type="text" name="numero_cuenta" id="numero_cuenta" value="{{ cliente.numero_cuenta or '' }}" placeholder="ES24-3456-3456-3456-3456-3456" maxlength="29">
+                    <small style="color: #666; font-size: 12px;">Formato: ES seguido de 22 dígitos (ESXX-XXXX-XXXX-XXXX-XXXX-XXXX). Opcional.</small>
+                </div>
+                <div class="form-group">
+                    <label for="tipo_iva">Tipo de IVA (%) *</label>
+                    <select name="tipo_iva" id="tipo_iva" required>
+                        <option value="21" {% if not cliente.tipo_iva or cliente.tipo_iva == 21 %}selected{% endif %}>21%</option>
+                        <option value="10" {% if cliente.tipo_iva == 10 %}selected{% endif %}>10%</option>
+                        <option value="4" {% if cliente.tipo_iva == 4 %}selected{% endif %}>4%</option>
+                        <option value="0" {% if cliente.tipo_iva == 0 %}selected{% endif %}>0%</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Contacto</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="telefono">Teléfono</label>
+                    <input type="text" name="telefono" id="telefono" value="{{ cliente.telefono or '' }}" placeholder="Teléfono fijo">
+                </div>
+                <div class="form-group">
+                    <label for="movil">Móvil</label>
+                    <input type="text" name="movil" id="movil" value="{{ cliente.movil or '' }}" placeholder="Teléfono móvil">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="email_general">Email General</label>
+                    <input type="email" name="email_general" id="email_general" value="{{ cliente.email_general or '' }}" placeholder="email@ejemplo.com">
+                </div>
+                <div class="form-group">
+                    <label for="email_comunicaciones">Email Comunicaciones</label>
+                    <input type="email" name="email_comunicaciones" id="email_comunicaciones" value="{{ cliente.email_comunicaciones or '' }}" placeholder="email@ejemplo.com">
+                    <small style="color: #666; font-size: 12px;">Para avisos de estados</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Personas de Contacto</h3>
+            {% if cliente.personas_contacto_list %}
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 15px;">
+                <thead>
+                    <tr style="background: #f8f9fa; border-bottom: 2px solid #e0e0e0;">
+                        <th style="padding: 8px; text-align: left; font-size: 12px; color: #555;">Nombre</th>
+                        <th style="padding: 8px; text-align: left; font-size: 12px; color: #555;">Cargo</th>
+                        <th style="padding: 8px; text-align: left; font-size: 12px; color: #555;">Móvil</th>
+                        <th style="padding: 8px; text-align: left; font-size: 12px; color: #555;">Email</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for persona in cliente.personas_contacto_list %}
+                    <tr style="border-bottom: 1px solid #e0e0e0;">
+                        <td style="padding: 8px; font-size: 13px;">{{ persona.nombre }}</td>
+                        <td style="padding: 8px; font-size: 13px;">{{ persona.cargo or '-' }}</td>
+                        <td style="padding: 8px; font-size: 13px;">{{ persona.movil or '-' }}</td>
+                        <td style="padding: 8px; font-size: 13px;">{{ persona.email or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p style="color: #999; font-style: italic; margin-bottom: 15px;">No hay personas de contacto registradas.</p>
+            {% endif %}
+            <div style="padding: 10px; background: #e3f2fd; border-radius: 5px; color: #1565c0; font-size: 14px;">
+                💡 Las personas de contacto se gestionan desde la <a href="{{ url_for('clientes.ficha_cliente', id=cliente.id) }}" style="color: #1976d2; font-weight: 600; text-decoration: underline;">ficha del cliente</a>.
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Dirección</h3>
+            <div class="form-group">
+                <label for="direccion">Dirección</label>
+                <textarea name="direccion" id="direccion" rows="3">{{ cliente.direccion or '' }}</textarea>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="poblacion">Población</label>
+                    <input type="text" name="poblacion" id="poblacion" value="{{ cliente.poblacion or '' }}">
+                </div>
+                <div class="form-group">
+                    <label for="provincia">Provincia</label>
+                    <input type="text" name="provincia" id="provincia" value="{{ cliente.provincia or '' }}">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="codigo_postal">Código Postal</label>
+                    <input type="text" name="codigo_postal" id="codigo_postal" value="{{ cliente.codigo_postal or '' }}" maxlength="10">
+                </div>
+                <div class="form-group">
+                    <label for="pais">País</label>
+                    <input type="text" name="pais" id="pais" value="{{ cliente.pais or 'España' }}">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h3>Acceso Web</h3>
+            <div class="form-group">
+                <label for="usuario_web">Usuario Web</label>
+                <input type="text" name="usuario_web" id="usuario_web" value="{{ cliente.usuario_web or '' }}" placeholder="Usuario para acceso web del cliente" autocomplete="off">
+                <small style="color: #666; font-size: 12px;">Si se completa, el cliente podrá acceder a su área web</small>
+            </div>
+            <div class="form-group">
+                <label for="password_web">Contraseña Web</label>
+                <input type="password" name="password_web" id="password_web" value="" placeholder="Dejar vacío para no cambiar" autocomplete="new-password">
+                <small style="color: #666; font-size: 12px;">Solo completar si deseas cambiar la contraseña</small>
+            </div>
+            {% if cliente.tiene_acceso_web() %}
+            <div style="padding: 10px; background: #d4edda; border-radius: 5px; color: #155724; font-size: 14px;">
+                ✓ El cliente tiene acceso web configurado
+            </div>
+            {% else %}
+            <div style="padding: 10px; background: #fff3cd; border-radius: 5px; color: #856404; font-size: 14px;">
+                ⚠ El cliente no tiene acceso web configurado
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="form-section">
+            <h3>Direcciones de Envío Alternativas</h3>
+            <div id="direcciones-envio-container">
+                {% for direccion in cliente.direcciones_envio %}
+                <div class="direccion-envio-item" style="border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 5px; background: #f9f9f9;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h5 style="margin: 0; font-size: 14px; color: #555;">{{ direccion.nombre }}</h5>
+                        <button type="button" class="btn btn-sm btn-danger" onclick="eliminarDireccionEnvio(this)" style="padding: 4px 8px; font-size: 12px;">✕ Eliminar</button>
+                    </div>
+                    <input type="hidden" name="direcciones_envio[]" value="1">
+                    <input type="hidden" name="direcciones_envio_nombre_{{ loop.index0 }}" value="{{ direccion.nombre }}">
+                    <div class="form-group" style="margin-bottom: 10px;">
+                        <label>Dirección</label>
+                        <textarea name="direcciones_envio_direccion_{{ loop.index0 }}" rows="2" placeholder="Dirección completa" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">{{ direccion.direccion or '' }}</textarea>
+                    </div>
+                    <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                        <div class="form-group">
+                            <label>Población</label>
+                            <input type="text" name="direcciones_envio_poblacion_{{ loop.index0 }}" value="{{ direccion.poblacion or '' }}" placeholder="Ciudad" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        <div class="form-group">
+                            <label>Provincia</label>
+                            <input type="text" name="direcciones_envio_provincia_{{ loop.index0 }}" value="{{ direccion.provincia or '' }}" placeholder="Provincia" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </div>
+                    <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div class="form-group">
+                            <label>Código Postal</label>
+                            <input type="text" name="direcciones_envio_codigo_postal_{{ loop.index0 }}" value="{{ direccion.codigo_postal or '' }}" placeholder="28001" maxlength="10" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        <div class="form-group">
+                            <label>País</label>
+                            <input type="text" name="direcciones_envio_pais_{{ loop.index0 }}" value="{{ direccion.pais or 'España' }}" placeholder="España" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="añadirDireccionEnvio()" style="margin-top: 10px;">
+                ➕ Añadir Dirección de Envío
+            </button>
+        </div>
+
+        <div class="form-section">
+            <h3>Anotaciones</h3>
+            <div class="form-group">
+                <label for="anotaciones">Anotaciones</label>
+                <textarea name="anotaciones" id="anotaciones" rows="5">{{ cliente.anotaciones or '' }}</textarea>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+            <a href="{{ url_for('clientes.ficha_cliente', id=cliente.id) }}" class="btn btn-secondary">Cancelar</a>
+        </div>
+    </form>
+</div>
+
+<style>
+.editar-cliente-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 20px 2px;
+}
+
+.cliente-form {
+    background: white;
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.form-section {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.form-section:last-of-type {
+    border-bottom: none;
+}
+
+.form-section h3 {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: #2c3e50;
+    border-bottom: 2px solid #667eea;
+    padding-bottom: 10px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #555;
+}
+
+.form-group input,
+.form-group textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    box-sizing: border-box;
+}
+
+.form-group textarea {
+    resize: vertical;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 2px solid #e0e0e0;
+}
+</style>
+
+<script>
+// Contador para direcciones de envío (iniciar desde el número de direcciones existentes)
+let contadorDirecciones = {{ cliente.direcciones_envio|length }};
+
+function añadirDireccionEnvio() {
+    const container = document.getElementById('direcciones-envio-container');
+    const index = contadorDirecciones++;
+    
+    const direccionDiv = document.createElement('div');
+    direccionDiv.className = 'direccion-envio-item';
+    direccionDiv.style.cssText = 'border: 1px solid #ddd; padding: 15px; margin-bottom: 10px; border-radius: 5px; background: #f9f9f9;';
+    direccionDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h5 style="margin: 0; font-size: 14px; color: #555;">Dirección Envío ${index + 2}</h5>
+            <button type="button" class="btn btn-sm btn-danger" onclick="eliminarDireccionEnvio(this)" style="padding: 4px 8px; font-size: 12px;">✕ Eliminar</button>
+        </div>
+        <input type="hidden" name="direcciones_envio[]" value="1">
+        <input type="hidden" name="direcciones_envio_nombre_${index}" value="Dirección envío ${index + 2}">
+        <div class="form-group" style="margin-bottom: 10px;">
+            <label>Dirección</label>
+            <textarea name="direcciones_envio_direccion_${index}" rows="2" placeholder="Dirección completa" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+            <div class="form-group">
+                <label>Población</label>
+                <input type="text" name="direcciones_envio_poblacion_${index}" placeholder="Ciudad" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div class="form-group">
+                <label>Provincia</label>
+                <input type="text" name="direcciones_envio_provincia_${index}" placeholder="Provincia" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+        <div class="form-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+                <label>Código Postal</label>
+                <input type="text" name="direcciones_envio_codigo_postal_${index}" placeholder="28001" maxlength="10" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+            <div class="form-group">
+                <label>País</label>
+                <input type="text" name="direcciones_envio_pais_${index}" placeholder="España" value="España" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(direccionDiv);
+}
+
+function eliminarDireccionEnvio(button) {
+    button.closest('.direccion-envio-item').remove();
+}
+
+// Formatear número de cuenta automáticamente
+document.addEventListener('DOMContentLoaded', function() {
+    const numeroCuentaInput = document.getElementById('numero_cuenta');
+    if (numeroCuentaInput) {
+        // Solo formatear si hay un valor, no forzar ES si está vacío
+        if (numeroCuentaInput.value && !numeroCuentaInput.value.toUpperCase().startsWith('ES')) {
+                // Si hay un valor existente que empieza con números, formatearlo
+                const numbers = numeroCuentaInput.value.replace(/\D/g, '').substring(0, 22);
+                if (numbers.length > 0) {
+                    let formatted = 'ES';
+                    // Primeros 2 dígitos sin guión
+                        formatted += numbers.substring(0, 2);
+                        // Añadir guión después de los 2 primeros dígitos
+                        if (numbers.length > 2) {
+                            formatted += '-';
+                            // Resto de dígitos en grupos de 4
+                            const rest = numbers.substring(2);
+                            for (let i = 0; i < rest.length; i++) {
+                                if (i > 0 && i % 4 === 0) {
+                                    formatted += '-';
+                                }
+                                formatted += rest[i];
+                        }
+                    }
+                    numeroCuentaInput.value = formatted;
+            }
+        }
+        
+        numeroCuentaInput.addEventListener('input', function(e) {
+            let value = e.target.value.toUpperCase();
+            
+            // Si el campo está vacío, permitir que esté vacío
+            if (!value || value.trim() === '') {
+                e.target.value = '';
+                return;
+            }
+            
+            // Forzar que empiece con ES solo si hay contenido
+            if (!value.startsWith('ES')) {
+                // Si hay números al inicio, añadir ES al principio
+                const numbers = value.replace(/\D/g, '');
+                if (numbers.length > 0) {
+                    value = 'ES' + numbers.substring(0, 22);
+                } else {
+                    // Si no hay números, permitir que esté vacío
+                    e.target.value = '';
+                    return;
+                }
+            } else {
+                // Extraer solo los números después de ES
+                const afterES = value.substring(2).replace(/\D/g, '');
+                
+                // Limitar a 22 dígitos
+                const numbers = afterES.substring(0, 22);
+                
+                // Formatear: ES + 2 dígitos + guión + resto en grupos de 4
+                let formatted = 'ES';
+                if (numbers.length > 0) {
+                    // Primeros 2 dígitos sin guión
+                    formatted += numbers.substring(0, 2);
+                    // Añadir guión después de los 2 primeros dígitos
+                    if (numbers.length > 2) {
+                        formatted += '-';
+                        // Resto de dígitos en grupos de 4
+                        const rest = numbers.substring(2);
+                        for (let i = 0; i < rest.length; i++) {
+                            if (i > 0 && i % 4 === 0) {
+                                formatted += '-';
+                            }
+                            formatted += rest[i];
+                        }
+                    }
+                }
+                value = formatted;
+            }
+            
+            e.target.value = value;
+        });
+        
+        // Manejar el evento de pegar
+        numeroCuentaInput.addEventListener('paste', function(e) {
+            e.preventDefault();
+            const paste = (e.clipboardData || window.clipboardData).getData('text').toUpperCase();
+            
+            // Extraer solo números (y ES si está al inicio)
+            let numbers = '';
+            if (paste.startsWith('ES')) {
+                numbers = paste.substring(2).replace(/\D/g, '');
+            } else {
+                numbers = paste.replace(/\D/g, '');
+            }
+            
+            // Limitar a 22 dígitos
+            numbers = numbers.substring(0, 22);
+            
+            // Formatear: ES + 2 dígitos + guión + resto en grupos de 4
+            let formatted = 'ES';
+            if (numbers.length > 0) {
+                formatted += numbers.substring(0, 2);
+                if (numbers.length > 2) {
+                    formatted += '-';
+                    const rest = numbers.substring(2);
+                    for (let i = 0; i < rest.length; i++) {
+                        if (i > 0 && i % 4 === 0) {
+                            formatted += '-';
+                        }
+                        formatted += rest[i];
+                    }
+                }
+            }
+            
+            e.target.value = formatted;
+        });
+        
+        // No forzar ES al hacer focus, permitir campo vacío
+    }
+});
+</script>
+{% endblock %}
+

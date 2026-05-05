@@ -733,6 +733,28 @@ def migrate_database():
                         except Exception as e:
                             print(f"Error al agregar columna {columna}: {e}")
                             pass
+
+                # Portal cliente / respuestas de presupuesto (si faltan columnas)
+                columnas_portal_cliente = {
+                    'modificaciones_cliente': 'TEXT',
+                    'historial_respuestas_cliente': 'TEXT',
+                    'cliente_token': 'VARCHAR(128)',
+                    'cliente_token_expira_en': 'DATETIME',
+                    'cliente_enviado_at': 'DATETIME',
+                    'cliente_respondido_at': 'DATETIME',
+                    'cliente_respuesta': 'VARCHAR(50)',
+                    'respuesta_cliente_notif_vista_at': 'DATETIME'
+                }
+                for columna, tipo in columnas_portal_cliente.items():
+                    if columna not in columns_presupuesto:
+                        try:
+                            with db.engine.connect() as conn:
+                                conn.execute(text(f'ALTER TABLE presupuestos ADD COLUMN {columna} {tipo}'))
+                                conn.commit()
+                                print(f"Migración: Columna {columna} agregada exitosamente")
+                        except Exception as e:
+                            print(f"Error al agregar columna {columna}: {e}")
+                            pass
                 
                 # Verificar y agregar columnas de descripciones de imágenes
                 columnas_descripciones = {

@@ -1,0 +1,15 @@
+Flask==3.0.0
+Flask-SQLAlchemy==3.1.1
+Flask-Login==0.6.3
+Flask-Mail==0.10.0
+Werkzeug==3.0.1
+gunicorn==21.2.0
+requests==2.31.0
+python-dotenv==1.0.0
+openpyxl==3.1.2
+xhtml2pdf==0.2.16
+weasyprint>=60.0
+playwright>=1.40.0
+reportlab>=4.0.0
+Pillow>=10.0.0
+paramiko>=3.4.0

@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}Nueva Nómina - Gastos{% endblock %}
+
+{% block content %}
+<h2>Nueva Nómina</h2>
+
+<form method="POST">
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="empleado_id">Empleado *</label>
+            <select name="empleado_id" id="empleado_id" required>
+                <option value="">Seleccione un empleado</option>
+                {% for empleado in empleados %}
+                <option value="{{ empleado.id }}">{{ empleado.nombre }}</option>
+                {% endfor %}
+            </select>
+            <small style="color: #666; font-size: 0.85em; display: block; margin-top: 5px;">¿No encuentra el empleado? <a href="#" onclick="abrirModalEmpleado(); return false;" style="cursor: pointer; color: #667eea; text-decoration: underline;">Crear nuevo empleado</a></small>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="mes">Mes *</label>
+            <select name="mes" id="mes" required>
+                <option value="">Seleccione un mes</option>
+                <option value="1">Enero</option>
+                <option value="2">Febrero</option>
+                <option value="3">Marzo</option>
+                <option value="4">Abril</option>
+                <option value="5">Mayo</option>
+                <option value="6">Junio</option>
+                <option value="7">Julio</option>
+                <option value="8">Agosto</option>
+                <option value="9">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+            </select>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="año">Año *</label>
+            <input type="number" name="año" id="año" min="2000" max="2100" value="{{ año_actual }}" required>
+        </div>
+    </div>
+
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="total_devengado">Total Devengado *</label>
+            <input type="number" name="total_devengado" id="total_devengado" step="0.01" min="0" required placeholder="0.00">
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="observaciones">Observaciones</label>
+        <textarea name="observaciones" id="observaciones" rows="3" placeholder="Observaciones adicionales..."></textarea>
+    </div>
+
+    <div class="actions">
+        <button type="submit" class="btn btn-success">Guardar Nómina</button>
+        <a href="{{ url_for('gastos.listado_nominas') }}" class="btn btn-danger">Cancelar</a>
+    </div>
+</form>
+
+<!-- Modal para crear nuevo empleado -->
+<div id="modalNuevoEmpleado" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Nuevo Empleado</h3>
+            <span class="close" onclick="cerrarModalEmpleado()">&times;</span>
+        </div>
+        <form id="formNuevoEmpleado" class="modal-form">
+            <div class="form-group">
+                <label for="modal_nombre">Nombre *</label>
+                <input type="text" name="nombre" id="modal_nombre" required placeholder="Nombre del empleado">
+            </div>
+
+            <div class="form-group">
+                <label for="modal_dni">DNI</label>
+                <input type="text" name="dni" id="modal_dni" placeholder="DNI del empleado">
+            </div>
+
+            <div class="form-group">
+                <label for="modal_telefono">Teléfono</label>
+                <input type="text" name="telefono" id="modal_telefono" placeholder="Teléfono de contacto">
+            </div>
+
+            <div class="form-group">
+                <label for="modal_correo">Correo Electrónico</label>
+                <input type="email" name="correo" id="modal_correo" placeholder="correo@ejemplo.com">
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" onclick="cerrarModalEmpleado()" class="btn btn-secondary">Cancelar</button>
+                <button type="submit" class="btn btn-success">Guardar Empleado</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 0;
+    border: none;
+    width: 90%;
+    max-width: 600px;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 30px;
+    border-bottom: 2px solid #e0e0e0;
+    background: #f8f9fa;
+    border-radius: 10px 10px 0 0;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #2c3e50;
+}
+
+.close {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+    line-height: 1;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
+}
+
+.modal-form {
+    padding: 30px;
+}
+
+.modal-form .form-group {
+    margin-bottom: 15px;
+}
+
+.modal-form .form-group label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 500;
+    color: #555;
+    font-size: 14px;
+}
+
+.modal-form .form-group input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.modal-form .form-group input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1);
+}
+
+.modal-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 2px solid #e0e0e0;
+}
+</style>
+
+<script>
+function abrirModalEmpleado() {
+    document.getElementById('modalNuevoEmpleado').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+    // Limpiar formulario
+    document.getElementById('formNuevoEmpleado').reset();
+}
+
+function cerrarModalEmpleado() {
+    document.getElementById('modalNuevoEmpleado').style.display = 'none';
+    document.body.style.overflow = 'auto';
+    // Limpiar formulario
+    document.getElementById('formNuevoEmpleado').reset();
+}
+
+// Cerrar modal al hacer clic fuera de él
+window.onclick = function(event) {
+    const modal = document.getElementById('modalNuevoEmpleado');
+    if (event.target == modal) {
+        cerrarModalEmpleado();
+    }
+}
+
+// Manejar envío del formulario del modal
+document.getElementById('formNuevoEmpleado').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const submitButton = this.querySelector('button[type="submit"]');
+    const originalText = submitButton.textContent;
+    
+    // Deshabilitar botón durante el envío
+    submitButton.disabled = true;
+    submitButton.textContent = 'Guardando...';
+    
+    try {
+        const response = await fetch('{{ url_for("gastos.nuevo_empleado") }}', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            // Agregar el nuevo empleado al select
+            const select = document.getElementById('empleado_id');
+            const option = document.createElement('option');
+            option.value = data.empleado.id;
+            option.textContent = data.empleado.nombre;
+            option.selected = true;
+            select.appendChild(option);
+            
+            // Cerrar modal
+            cerrarModalEmpleado();
+            
+            // Mostrar mensaje de éxito
+            alert('Empleado creado correctamente');
+        } else {
+            alert('Error: ' + data.message);
+            submitButton.disabled = false;
+            submitButton.textContent = originalText;
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al crear el empleado. Por favor, intente nuevamente.');
+        submitButton.disabled = false;
+        submitButton.textContent = originalText;
+    }
+});
+</script>
+{% endblock %}
+

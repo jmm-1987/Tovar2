@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle Resultados Nuevo{% endblock %}
+
+{% block content %}
+<div class="detalle-container">
+    <h2>📎 {{ titulo }}</h2>
+    <p class="subtitulo">{{ mes_nombre }} {{ año }}</p>
+
+    <div class="resumen-box">
+        <div><strong>Ingresos FD:</strong> {{ "%.2f"|format(resumen.ingresos_fd) }} €</div>
+        <div><strong>Ingresos considerados (cancelado):</strong> {{ "%.2f"|format(resumen.ingresos) }} €</div>
+        <div><strong>Total gastos:</strong> {{ "%.2f"|format(resumen.total_gastos) }} €</div>
+        <div><strong>Resultado (FD - Gastos):</strong> {{ "%.2f"|format(resumen.resultado) }} €</div>
+    </div>
+
+    {% for seccion in secciones %}
+    <div class="seccion">
+        <h3>{{ seccion.titulo }} - {{ "%.2f"|format(seccion.total) }} €</h3>
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Referencia</th>
+                        <th>Cliente / Empleado</th>
+                        <th>Detalle</th>
+                        <th>Importe</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if seccion.filas %}
+                        {% for f in seccion.filas %}
+                        <tr>
+                            <td>{{ f.fecha }}</td>
+                            <td>{{ f.referencia }}</td>
+                            <td>{{ f.cliente }}</td>
+                            <td>{{ f.detalle }}</td>
+                            <td class="importe">{{ "%.2f"|format(f.importe) }} €</td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="vacio">Sin registros para esta sección.</td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endfor %}
+
+    <a class="btn btn-secondary" href="{{ url_for('informes.resultados_nuevo', año=año) }}">Volver a Resultados nuevo</a>
+</div>
+
+<style>
+.detalle-container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+.subtitulo { color: #666; margin-top: -8px; margin-bottom: 18px; }
+.resumen-box { background: #f8f9fb; border: 1px solid #e8ebf0; border-radius: 8px; padding: 12px 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-bottom: 20px; }
+.nota { color: #b07d00; font-size: 0.9em; }
+.seccion { background: #fff; border: 1px solid #ececec; border-radius: 8px; padding: 14px; margin-bottom: 16px; }
+.seccion h3 { margin: 0 0 10px; color: #2f3e4f; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 8px 10px; border-bottom: 1px solid #efefef; text-align: left; }
+th { background: #fafafa; color: #4b5563; font-weight: 600; }
+td.importe { text-align: right; font-weight: 600; }
+.vacio { text-align: center; color: #7a7a7a; }
+</style>
+{% endblock %}

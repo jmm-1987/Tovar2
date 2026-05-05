@@ -294,6 +294,10 @@ class Presupuesto(db.Model):
     
     # Comentarios visibles al cliente (aparecen en los PDFs)
     comentarios_cliente = db.Column(db.Text)
+    # Comentarios de respuesta del cliente desde portal público (última respuesta)
+    modificaciones_cliente = db.Column(db.Text)
+    # JSON: lista de {en, accion, subestado, respuesta, comentario}
+    historial_respuestas_cliente = db.Column(db.Text)
     
     # Información para la fabricación
     tipo_producto = db.Column(db.String(200), nullable=False)  # Tipo de producto
@@ -335,6 +339,13 @@ class Presupuesto(db.Model):
     
     # Timestamp
     fecha_creacion = db.Column(db.DateTime, default=datetime.utcnow)
+    cliente_token = db.Column(db.String(128), nullable=True, index=True)
+    cliente_token_expira_en = db.Column(db.DateTime, nullable=True)
+    cliente_enviado_at = db.Column(db.DateTime, nullable=True)
+    cliente_respondido_at = db.Column(db.DateTime, nullable=True)
+    cliente_respuesta = db.Column(db.String(50), nullable=True)
+    # Cuándo el personal abrió la ficha del presupuesto y leyó la notificación de respuesta
+    respuesta_cliente_notif_vista_at = db.Column(db.DateTime, nullable=True)
     
     # Anticipo facturado (importe con IVA incluido)
     anticipo = db.Column(db.Numeric(10, 2), nullable=False, default=0)  # Importe del anticipo facturado

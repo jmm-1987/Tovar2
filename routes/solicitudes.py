@@ -4,6 +4,7 @@ from flask_login import login_required
 from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 import os
+import json
 import tempfile
 from io import BytesIO
 from extensions import db
@@ -13,8 +14,11 @@ from flask import jsonify
 from playwright.sync_api import sync_playwright
 from decimal import Decimal
 import base64
+import secrets
+from urllib.parse import quote
 from utils.sftp_upload import upload_file_to_sftp, download_file_from_sftp, get_file_url, file_exists_on_sftp
 from utils.numeracion import obtener_siguiente_numero_solicitud
+from utils.email import enviar_email_enlace_presupuesto_cliente, enviar_email_notificacion_respuesta_cliente
 
 solicitudes_bp = Blueprint('solicitudes', __name__)
 
@@ -22,6 +26,7 @@ solicitudes_bp = Blueprint('solicitudes', __name__)
 ESTADOS_SOLICITUD = [
     'presupuesto',
     'rechazado',
+    'cancelado',
     'aceptado',
     'mockup',
     'en preparacion',
@@ -60,6 +65,230 @@ ESTADOS_FECHAS = {
     'entregado al cliente': 'fecha_entregado_cliente'
 }
 
+
+def _obtener_productos_solicitud_json(solicitud):
+    """Devuelve productos del esquema JSON guardado en referencias_web."""
+    raw = (solicitud.referencias_web or '').strip()
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+        if not isinstance(data, list):
+            return []
+        productos = []
+        for idx, p in enumerate(data, start=1):
+            if not isinstance(p, dict):
+                continue
+            productos.append({
+                'numero': p.get('numero') or idx,
+                'tipo_producto': (p.get('tipo') or '').strip(),
+                'colores_principales': '',
+                'colores_secundarios': '',
+                'ubicacion_logo': '',
+                'referencias_diseno': p.get('referencias_diseno', ''),
+                'comentarios': p.get('comentarios', ''),
+                'logos': p.get('logos', []) if isinstance(p.get('logos', []), list) else [],
+                'fotos': p.get('fotos', []) if isinstance(p.get('fotos', []), list) else [],
+                'tipo_tela': p.get('tipo_tela', ''),
+                'medidas': p.get('medidas', ''),
+                'grabacion': p.get('grabacion', ''),
+                'costuras': p.get('costuras', ''),
+                'tipo_grabacion': p.get('tipo_grabacion', ''),
+                'tipo_prenda': p.get('tipo_prenda', ''),
+                'color1': p.get('color1', ''),
+                'color2': p.get('color2', ''),
+                'color3': p.get('color3', ''),
+                'tipo_tejido': p.get('tipo_tejido', ''),
+                'marcada': p.get('marcada', ''),
+            })
+        return productos
+    except (TypeError, ValueError):
+        return []
+
+
+def _es_presupuesto_v2(solicitud):
+    """Indica si la solicitud usa el esquema nuevo JSON de productos."""
+    return len(_obtener_productos_solicitud_json(solicitud)) > 0
+
+
+def _token_expira_en():
+    dias = int(current_app.config.get('CLIENT_TOKEN_EXPIRY_DAYS', 7))
+    return datetime.utcnow() + timedelta(days=max(1, dias))
+
+
+def _generar_token_cliente(solicitud):
+    solicitud.cliente_token = secrets.token_urlsafe(32)
+    solicitud.cliente_token_expira_en = _token_expira_en()
+    return solicitud.cliente_token
+
+
+def _token_cliente_valido(solicitud, token):
+    if not token or token != solicitud.cliente_token:
+        return False
+    if not solicitud.cliente_token_expira_en:
+        return False
+    return solicitud.cliente_token_expira_en >= datetime.utcnow()
+
+
+def _url_publica_cliente(solicitud):
+    return url_for('solicitudes.ver_presupuesto_publico_cliente', token=solicitud.cliente_token, _external=True)
+
+
+def _parse_historial_respuestas_cliente(solicitud):
+    raw = (getattr(solicitud, 'historial_respuestas_cliente', None) or '').strip()
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+        return data if isinstance(data, list) else []
+    except (TypeError, ValueError):
+        return []
+
+
+def _notif_respuesta_cliente_pendiente(solicitud):
+    if not solicitud.cliente_respondido_at or not solicitud.cliente_respuesta:
+        return False
+    v = solicitud.respuesta_cliente_notif_vista_at
+    if v is None:
+        return True
+    return v < solicitud.cliente_respondido_at
+
+
+def _append_historial_respuesta_cliente(solicitud, accion, subestado, cliente_respuesta, comentario):
+    etiquetas_accion = {
+        'aceptar': 'Aceptar cantidades y diseños',
+        'cambios_1': 'Sugerir cambios (1)',
+        'cambios_2': 'Sugerir cambios (2)',
+        'rechazar': 'Rechazar',
+    }
+    hist = _parse_historial_respuestas_cliente(solicitud)
+    hist.append({
+        'en': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
+        'accion': accion,
+        'accion_label': etiquetas_accion.get(accion, accion),
+        'subestado': subestado,
+        'respuesta': cliente_respuesta,
+        'comentario': (comentario or '').strip(),
+    })
+    solicitud.historial_respuestas_cliente = json.dumps(hist, ensure_ascii=False)
+
+
+def _subir_imagen_solicitud_v2(file, nombre_archivo):
+    """Sube archivo de solicitud (SFTP con fallback local)."""
+    try:
+        file_content = file.read()
+        file.seek(0)
+        config = os.environ.get('SFTP_DIR', '/')
+        if config != '/':
+            remote_path = f"{config.rstrip('/')}/solicitudes/{nombre_archivo}"
+        else:
+            remote_path = f"/solicitudes/{nombre_archivo}"
+        ruta_subida = upload_file_to_sftp(file_content, remote_path)
+        if ruta_subida:
+            return ruta_subida
+        upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'solicitudes')
+        os.makedirs(upload_folder, exist_ok=True)
+        filepath = os.path.join(upload_folder, nombre_archivo)
+        file.seek(0)
+        file.save(filepath)
+        return os.path.join('solicitudes', nombre_archivo).replace('\\', '/')
+    except Exception:
+        upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'solicitudes')
+        os.makedirs(upload_folder, exist_ok=True)
+        filepath = os.path.join(upload_folder, nombre_archivo)
+        file.seek(0)
+        file.save(filepath)
+        return os.path.join('solicitudes', nombre_archivo).replace('\\', '/')
+
+
+def _extraer_productos_form_v2(form, max_productos=50):
+    productos = []
+    for i in range(1, max_productos + 1):
+        tipo = (form.get(f'prenda{i}_tipo', '') or '').strip().upper()
+        if not tipo:
+            break
+        item = {
+            'numero': i,
+            'tipo': tipo,
+            'comentarios': (form.get(f'prenda{i}_comentarios', '') or '').strip(),
+            'referencias_diseno': (form.get(f'prenda{i}_referencias_diseno', '') or '').strip(),
+            'logos': [],
+            'fotos': []
+        }
+        logos_raw = (form.get(f'prenda{i}_logos_json', '') or '').strip()
+        if logos_raw:
+            try:
+                logos = json.loads(logos_raw)
+                if isinstance(logos, list):
+                    item['logos'] = logos
+            except (TypeError, ValueError):
+                item['logos'] = []
+        if tipo == 'LONA':
+            item.update({
+                'tipo_tela': (form.get(f'prenda{i}_tipo_tela', '') or '').strip(),
+                'medidas': (form.get(f'prenda{i}_medidas', '') or '').strip(),
+                'grabacion': (form.get(f'prenda{i}_grabacion', '') or '').strip(),
+                'costuras': (form.get(f'prenda{i}_costuras', '') or '').strip(),
+            })
+        elif tipo == 'TELA POR METROS':
+            item.update({
+                'tipo_tela': (form.get(f'prenda{i}_tipo_tela', '') or '').strip(),
+                'medidas': (form.get(f'prenda{i}_medidas', '') or '').strip(),
+            })
+        elif tipo == 'GRABACION':
+            item.update({
+                'tipo_grabacion': (form.get(f'prenda{i}_tipo_grabacion', '') or '').strip(),
+                'tipo_prenda': (form.get(f'prenda{i}_tipo_prenda', '') or '').strip(),
+            })
+        elif tipo == 'ROPA':
+            item.update({
+                'tipo_prenda': (form.get(f'prenda{i}_tipo_prenda', '') or '').strip(),
+                'color1': (form.get(f'prenda{i}_color1', '') or '').strip(),
+                'color2': (form.get(f'prenda{i}_color2', '') or '').strip(),
+                'color3': (form.get(f'prenda{i}_color3', '') or '').strip(),
+                'tipo_tejido': (form.get(f'prenda{i}_tipo_tejido', '') or '').strip(),
+                'marcada': (form.get(f'prenda{i}_marcada', '') or '').strip(),
+            })
+        productos.append(item)
+    return productos
+
+
+def _validar_productos_v2(productos, files):
+    if not productos:
+        return ['Debe añadir al menos un producto']
+    errores = []
+    tipos_validos = {'LONA', 'TELA POR METROS', 'GRABACION', 'ROPA'}
+    for p in productos:
+        n = p.get('numero')
+        t = (p.get('tipo') or '').upper()
+        pref = f"Producto {n}"
+        if t not in tipos_validos:
+            errores.append(f"{pref}: tipo no válido")
+            continue
+        if t == 'LONA':
+            for k in ['tipo_tela', 'medidas', 'grabacion', 'costuras']:
+                if not p.get(k):
+                    errores.append(f'{pref}: falta {k}')
+            fotos = [f for f in files.getlist(f'prenda{n}_fotos[]') if getattr(f, 'filename', '')]
+            if not fotos:
+                errores.append(f'{pref}: debe tener al menos una foto')
+        elif t == 'TELA POR METROS':
+            for k in ['tipo_tela', 'medidas']:
+                if not p.get(k):
+                    errores.append(f'{pref}: falta {k}')
+            fotos = [f for f in files.getlist(f'prenda{n}_fotos[]') if getattr(f, 'filename', '')]
+            if not fotos:
+                errores.append(f'{pref}: debe tener al menos una foto')
+        elif t == 'GRABACION':
+            for k in ['tipo_grabacion', 'tipo_prenda']:
+                if not p.get(k):
+                    errores.append(f'{pref}: falta {k}')
+        elif t == 'ROPA':
+            for k in ['tipo_prenda', 'color1', 'color2', 'tipo_tejido', 'marcada']:
+                if not p.get(k):
+                    errores.append(f'{pref}: falta {k}')
+    return errores
+
 @solicitudes_bp.route('/solicitudes')
 @login_required
 def listado_solicitudes():
@@ -70,10 +299,14 @@ def listado_solicitudes():
         joinedload(Presupuesto.comercial)
     )
     
+    # Incluir rechazados/cancelados solo si se solicita (o si se filtra por estado)
+    incluir_rechazados = request.args.get('incluir_rechazados', '') in ('1', 'on', 'true', 'yes', 'si')
     # Filtro por estado específico
     estado_filtro = request.args.get('estado', '')
     if estado_filtro:
         query = query.filter(Presupuesto.estado == estado_filtro)
+    elif not incluir_rechazados:
+        query = query.filter(Presupuesto.estado.notin_(['rechazado', 'cancelado']))
     
     # Filtro por fecha desde
     fecha_desde = request.args.get('fecha_desde', '')
@@ -214,7 +447,8 @@ def listado_solicitudes():
                          cliente_id=cliente_id,
                          comercial_id=comercial_id,
                          sort_by=sort_by,
-                         sort_order=sort_order)
+                         sort_order=sort_order,
+                         incluir_rechazados=incluir_rechazados)
 
 @solicitudes_bp.route('/solicitudes/nueva', methods=['GET', 'POST'])
 @login_required
@@ -611,6 +845,202 @@ def nueva_solicitud():
                          categorias=categorias,
                          form_data=None)
 
+
+@solicitudes_bp.route('/solicitudes/nueva-2', methods=['GET', 'POST'])
+@login_required
+def nueva_solicitud_v2():
+    """Crear presupuesto con esquema de productos tipo WEARK."""
+    if request.method == 'POST':
+        try:
+            comercial_id = request.form.get('comercial_id')
+            cliente_id = request.form.get('cliente_id')
+            tipo_pedido = request.form.get('tipo_pedido')
+            forma_pago = request.form.get('forma_pago', '')
+            fecha_objetivo_str = request.form.get('fecha_objetivo', '')
+
+            productos = _extraer_productos_form_v2(request.form)
+            errores_productos = _validar_productos_v2(productos, request.files)
+
+            # Compatibilidad con modelo legacy
+            tipo_producto = 'N/A'
+            colores_principales = ''
+            colores_secundarios = ''
+            ubicacion_logo = ''
+            referencias_web = '[]'
+            datos_adicionales = '[]'
+            comentarios_cliente = request.form.get('comentarios_cliente', '')
+            seguimiento = request.form.get('seguimiento', '')
+
+            if not comercial_id or not cliente_id or not tipo_pedido:
+                flash('Debe completar todos los campos obligatorios', 'error')
+                clientes = Cliente.query.order_by(Cliente.nombre).all()
+                comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
+                prendas = Prenda.query.order_by(Prenda.nombre).all()
+                categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
+                return render_template('solicitudes/nueva_v2.html', clientes=clientes, comerciales=comerciales, prendas=prendas, categorias=categorias, form_data=request.form)
+
+            if errores_productos:
+                flash(' | '.join(errores_productos[:6]), 'error')
+                clientes = Cliente.query.order_by(Cliente.nombre).all()
+                comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
+                prendas = Prenda.query.order_by(Prenda.nombre).all()
+                categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
+                return render_template('solicitudes/nueva_v2.html', clientes=clientes, comerciales=comerciales, prendas=prendas, categorias=categorias, form_data=request.form)
+
+            solicitud = Presupuesto(
+                comercial_id=comercial_id,
+                cliente_id=cliente_id,
+                tipo_pedido=tipo_pedido,
+                forma_pago=forma_pago,
+                seguimiento=seguimiento,
+                comentarios_cliente=comentarios_cliente,
+                tipo_producto=tipo_producto,
+                colores_principales=colores_principales,
+                colores_secundarios=colores_secundarios,
+                ubicacion_logo=ubicacion_logo,
+                referencias_web=referencias_web,
+                datos_adicionales=datos_adicionales,
+                estado='presupuesto'
+            )
+
+            if not solicitud.fecha_presupuesto:
+                solicitud.fecha_presupuesto = datetime.now().date()
+            fecha_creacion = solicitud.fecha_presupuesto or datetime.now().date()
+            solicitud.numero_solicitud = obtener_siguiente_numero_solicitud(fecha_creacion)
+
+            if fecha_objetivo_str:
+                try:
+                    solicitud.fecha_objetivo = datetime.strptime(fecha_objetivo_str, '%Y-%m-%d').date()
+                except ValueError:
+                    pass
+
+            db.session.add(solicitud)
+            db.session.flush()
+
+            from flask_login import current_user
+            db.session.add(RegistroEstadoSolicitud(
+                presupuesto_id=solicitud.id,
+                estado='presupuesto',
+                subestado=None,
+                fecha_cambio=datetime.now(),
+                usuario_id=current_user.id if current_user.is_authenticated else None
+            ))
+
+            # Líneas (igual que el flujo actual)
+            prenda_ids = request.form.getlist('prenda_id[]')
+            prenda_nombres = request.form.getlist('prenda_nombre[]')
+            nombres = request.form.getlist('nombre[]')
+            nombres_mostrar = request.form.getlist('nombre_mostrar[]')
+            cargos = request.form.getlist('cargo[]')
+            cantidades = request.form.getlist('cantidad[]')
+            colores = request.form.getlist('color[]')
+            formas = request.form.getlist('forma[]')
+            tipos_manda = request.form.getlist('tipo_manda[]')
+            sexos = request.form.getlist('sexo[]')
+            tallas = request.form.getlist('talla[]')
+            tejidos = request.form.getlist('tejido[]')
+            precios_unitarios = request.form.getlist('precio_unitario[]')
+            descuentos = request.form.getlist('descuento[]')
+            precios_finales = request.form.getlist('precio_final[]')
+            max_len = max(len(prenda_ids), len(nombres_mostrar), len(cantidades))
+
+            for i in range(max_len):
+                prenda_id_val = prenda_ids[i] if i < len(prenda_ids) and prenda_ids[i] else None
+                prenda_nombre_val = prenda_nombres[i] if i < len(prenda_nombres) and prenda_nombres[i] else ''
+                nombre_mostrar_val = nombres_mostrar[i] if i < len(nombres_mostrar) and nombres_mostrar[i] else ''
+                nombre_val = nombres[i] if i < len(nombres) and nombres[i] else ''
+                if not (nombre_mostrar_val or nombre_val):
+                    continue
+                precio_unitario = None
+                if i < len(precios_unitarios) and precios_unitarios[i]:
+                    try:
+                        precio_unitario = Decimal(str(precios_unitarios[i]))
+                    except Exception:
+                        precio_unitario = None
+                nombre_mostrar_val = nombres_mostrar[i] if i < len(nombres_mostrar) and nombres_mostrar[i] else (nombres[i] if i < len(nombres) else '')
+                descuento = Decimal('0')
+                if i < len(descuentos) and descuentos[i]:
+                    try:
+                        descuento = Decimal(str(descuentos[i]))
+                    except Exception:
+                        descuento = Decimal('0')
+                precio_final = None
+                if i < len(precios_finales) and precios_finales[i]:
+                    try:
+                        precio_final = Decimal(str(precios_finales[i]))
+                    except Exception:
+                        precio_final = None
+                if precio_final is None and precio_unitario:
+                    precio_final = precio_unitario * (Decimal('1') - descuento / Decimal('100')) if descuento > 0 else precio_unitario
+                cantidad_val = float(Decimal(str(cantidades[i])) if i < len(cantidades) and cantidades[i] else Decimal('1'))
+                prenda_id_final = None
+                try:
+                    prenda_id_final = int(prenda_id_val) if prenda_id_val else None
+                except (ValueError, TypeError):
+                    prenda_id_final = None
+                prenda_nombre_texto_final = prenda_nombre_val.strip() if (not prenda_id_final and prenda_nombre_val and prenda_nombre_val.strip()) else None
+                db.session.add(LineaPresupuesto(
+                    presupuesto_id=solicitud.id,
+                    prenda_id=prenda_id_final,
+                    prenda_nombre_texto=prenda_nombre_texto_final,
+                    nombre=nombres[i] if i < len(nombres) else '',
+                    nombre_mostrar=nombre_mostrar_val,
+                    cargo=cargos[i] if i < len(cargos) else '',
+                    cantidad=cantidad_val,
+                    color=colores[i] if i < len(colores) else '',
+                    forma=formas[i] if i < len(formas) else '',
+                    tipo_manda=tipos_manda[i] if i < len(tipos_manda) else '',
+                    sexo=sexos[i] if i < len(sexos) else '',
+                    talla=tallas[i] if i < len(tallas) else '',
+                    tejido=tejidos[i] if i < len(tejidos) else '',
+                    precio_unitario=float(precio_unitario) if precio_unitario else None,
+                    descuento=float(descuento) if descuento else 0.0,
+                    precio_final=float(precio_final) if precio_final else None
+                ))
+
+            # Guardar fotos por producto
+            for p in productos:
+                n = p.get('numero')
+                if not n:
+                    continue
+                fotos_paths = []
+                for foto in request.files.getlist(f'prenda{n}_fotos[]'):
+                    if not foto or not foto.filename:
+                        continue
+                    filename = secure_filename(foto.filename)
+                    nombre_archivo = f"{solicitud.id}_producto_{n}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}_{filename}"
+                    ruta_relativa = _subir_imagen_solicitud_v2(foto, nombre_archivo)
+                    fotos_paths.append(ruta_relativa)
+                p['fotos'] = fotos_paths
+
+            referencias_web = json.dumps(productos, ensure_ascii=False)
+            solicitud.referencias_web = referencias_web
+            solicitud.datos_adicionales = referencias_web
+
+            if 'imagen_portada' in request.files:
+                file = request.files['imagen_portada']
+                if file and file.filename:
+                    filename = secure_filename(file.filename)
+                    solicitud.imagen_portada = _subir_imagen_solicitud_v2(file, f"{solicitud.id}_portada_{filename}")
+
+            db.session.commit()
+            flash('Presupuesto (2) creado correctamente', 'success')
+            return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud.id))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error al crear el presupuesto (2): {str(e)}', 'error')
+            clientes = Cliente.query.order_by(Cliente.nombre).all()
+            comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
+            prendas = Prenda.query.order_by(Prenda.nombre).all()
+            categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
+            return render_template('solicitudes/nueva_v2.html', clientes=clientes, comerciales=comerciales, prendas=prendas, categorias=categorias, form_data=request.form)
+
+    clientes = Cliente.query.order_by(Cliente.nombre).all()
+    comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
+    prendas = Prenda.query.order_by(Prenda.nombre).all()
+    categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
+    return render_template('solicitudes/nueva_v2.html', clientes=clientes, comerciales=comerciales, prendas=prendas, categorias=categorias, form_data=None)
+
 @solicitudes_bp.route('/solicitudes/<int:solicitud_id>')
 @login_required
 def ver_solicitud(solicitud_id):
@@ -624,6 +1054,8 @@ def ver_solicitud(solicitud_id):
         joinedload(Presupuesto.marcada_encargado_a)
     ).get_or_404(solicitud_id)
     
+    template_ver = 'solicitudes/ver_v2.html' if _es_presupuesto_v2(solicitud) else 'solicitudes/ver.html'
+
     # Verificar directamente en la base de datos si no hay líneas en la relación
     if not solicitud.lineas:
         lineas_directas = LineaPresupuesto.query.filter_by(presupuesto_id=solicitud_id).all()
@@ -648,9 +1080,9 @@ def ver_solicitud(solicitud_id):
     
     # Parsear prendas desde la BD para mostrarlas en la vista
     import re
-    prendas_info = []
+    prendas_info = _obtener_productos_solicitud_json(solicitud)
     
-    if solicitud.tipo_producto:
+    if not prendas_info and solicitud.tipo_producto:
         tipo_producto_texto = solicitud.tipo_producto
         
         # Detectar formato: si tiene " || " es el formato nuevo, si tiene " | " y contiene "Prenda" es el antiguo
@@ -777,7 +1209,10 @@ def ver_solicitud(solicitud_id):
     
     hoy = datetime.now().date()
     
-    return render_template('solicitudes/ver.html',
+    historial_respuestas = list(reversed(_parse_historial_respuestas_cliente(solicitud)))
+    notif_respuesta_cliente_pendiente = _notif_respuesta_cliente_pendiente(solicitud)
+
+    return render_template(template_ver,
                          solicitud=solicitud,
                          estados=ESTADOS_SOLICITUD,
                          subestados=SUBESTADOS,
@@ -785,7 +1220,9 @@ def ver_solicitud(solicitud_id):
                          registros_estado=registros_estado,
                          usuarios=usuarios,
                          hoy=hoy,
-                         prendas_info=prendas_info)  # Pasar prendas parseadas
+                         prendas_info=prendas_info,
+                         historial_respuestas=historial_respuestas,
+                         notif_respuesta_cliente_pendiente=notif_respuesta_cliente_pendiente)  # Pasar prendas parseadas
 
 @solicitudes_bp.route('/solicitudes/<int:solicitud_id>/cambiar-estado', methods=['POST'])
 @login_required
@@ -927,11 +1364,167 @@ def cambiar_estado_solicitud(solicitud_id):
     
     return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id))
 
+
+@solicitudes_bp.route('/solicitudes/<int:solicitud_id>/marcar-respuesta-cliente-vista', methods=['POST'])
+@login_required
+def marcar_respuesta_cliente_vista(solicitud_id):
+    """Marca la notificación de respuesta del cliente como vista."""
+    solicitud = Presupuesto.query.get_or_404(solicitud_id)
+    solicitud.respuesta_cliente_notif_vista_at = datetime.utcnow()
+    try:
+        db.session.commit()
+        flash('Marcado como visto.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'No se pudo guardar: {e}', 'error')
+    return redirect(url_for('solicitudes.ver_solicitud', solicitud_id=solicitud_id) + '#modificaciones-cliente')
+
+
+@solicitudes_bp.route('/solicitudes/<int:solicitud_id>/enviar-cliente', methods=['POST'])
+@login_required
+def enviar_presupuesto_a_cliente(solicitud_id):
+    """Genera enlace seguro para cliente y envía por WhatsApp o Email."""
+    from flask_login import current_user
+    solicitud = Presupuesto.query.options(joinedload(Presupuesto.cliente)).get_or_404(solicitud_id)
+    canal = (request.form.get('canal', '') or '').strip().lower()
+    destino_tipo = (request.form.get('destino_tipo', '') or '').strip().lower()
+    destino_manual = (request.form.get('destino_manual', '') or '').strip()
+
+    if canal not in ('whatsapp', 'email'):
+        return jsonify({'ok': False, 'error': 'Canal no válido'}), 400
+    if destino_tipo not in ('ficha', 'manual'):
+        return jsonify({'ok': False, 'error': 'Destino no válido'}), 400
+
+    cliente = solicitud.cliente
+    destino = destino_manual
+    if destino_tipo == 'ficha':
+        if canal == 'whatsapp':
+            destino = (cliente.movil or cliente.telefono or '').strip() if cliente else ''
+        else:
+            destino = (cliente.email_comunicaciones or cliente.email_general or cliente.email or '').strip() if cliente else ''
+
+    if not destino:
+        return jsonify({'ok': False, 'error': 'No hay destinatario disponible'}), 400
+
+    _generar_token_cliente(solicitud)
+    enlace = _url_publica_cliente(solicitud)
+    solicitud.cliente_enviado_at = datetime.utcnow()
+    solicitud.cliente_respondido_at = None
+    solicitud.cliente_respuesta = None
+    solicitud.modificaciones_cliente = None
+    solicitud.estado = 'mockup'
+    solicitud.subestado = 'REVISIÓN CLIENTE'
+    db.session.add(RegistroEstadoSolicitud(
+        presupuesto_id=solicitud.id,
+        estado='mockup',
+        subestado='REVISIÓN CLIENTE',
+        usuario_id=current_user.id if hasattr(current_user, 'id') else None
+    ))
+    db.session.commit()
+
+    if canal == 'whatsapp':
+        texto = f"Hola, te compartimos el Presupuesto {solicitud.numero_solicitud or solicitud.id}. Puedes revisarlo y responder aquí: {enlace}"
+        telefono = ''.join(ch for ch in destino if ch.isdigit())
+        wa_url = f"https://wa.me/{telefono}?text={quote(texto)}"
+        return jsonify({'ok': True, 'canal': 'whatsapp', 'redirect_url': wa_url})
+
+    ok_email, msg_email = enviar_email_enlace_presupuesto_cliente(solicitud, destino, enlace)
+    if not ok_email:
+        return jsonify({'ok': False, 'error': msg_email}), 500
+    return jsonify({'ok': True, 'canal': 'email', 'mensaje': 'Email enviado correctamente'})
+
+
+@solicitudes_bp.route('/cliente/presupuesto/<token>', methods=['GET'])
+def ver_presupuesto_publico_cliente(token):
+    """Vista pública de presupuesto para cliente por token."""
+    solicitud = Presupuesto.query.options(
+        joinedload(Presupuesto.lineas).joinedload(LineaPresupuesto.prenda),
+        joinedload(Presupuesto.cliente),
+        joinedload(Presupuesto.comercial)
+    ).filter_by(cliente_token=token).first_or_404()
+
+    if not _token_cliente_valido(solicitud, token):
+        return render_template('cliente/presupuesto_publico.html', token_expirado=True, solicitud=solicitud, historial_respuestas=[])
+
+    productos = _obtener_productos_solicitud_json(solicitud)
+    historial_respuestas = list(reversed(_parse_historial_respuestas_cliente(solicitud)))
+    return render_template('cliente/presupuesto_publico.html', token_expirado=False, solicitud=solicitud, prendas_info=productos, historial_respuestas=historial_respuestas)
+
+
+@solicitudes_bp.route('/cliente/presupuesto/<token>/descargar-pdf', methods=['GET'])
+def descargar_pdf_presupuesto_publico_cliente(token):
+    """Descarga PDF de la vista pública por token."""
+    solicitud = Presupuesto.query.filter_by(cliente_token=token).first_or_404()
+    if not _token_cliente_valido(solicitud, token):
+        flash('El enlace ha expirado. Solicita uno nuevo.', 'error')
+        return redirect(url_for('solicitudes.ver_presupuesto_publico_cliente', token=token))
+    try:
+        vista_publica_url = url_for('solicitudes.ver_presupuesto_publico_cliente', token=token, _external=True)
+        pdf_buffer = BytesIO()
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            page.goto(vista_publica_url, wait_until='networkidle')
+            page.emulate_media(media='screen')
+            page.wait_for_timeout(300)
+            pdf_bytes = page.pdf(format='A4', print_background=True, margin={'top': '6mm', 'right': '6mm', 'bottom': '6mm', 'left': '6mm'})
+            browser.close()
+        pdf_buffer.write(pdf_bytes)
+        pdf_buffer.seek(0)
+        response = make_response(pdf_buffer.read())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'inline; filename=presupuesto_{solicitud.numero_solicitud or solicitud.id}.pdf'
+        return response
+    except Exception as e:
+        flash(f'Error al generar PDF: {str(e)}', 'error')
+        return redirect(url_for('solicitudes.ver_presupuesto_publico_cliente', token=token))
+
+
+@solicitudes_bp.route('/cliente/presupuesto/<token>/responder', methods=['POST'])
+def responder_presupuesto_publico_cliente(token):
+    """Captura respuesta del cliente y actualiza subestado."""
+    solicitud = Presupuesto.query.options(joinedload(Presupuesto.cliente), joinedload(Presupuesto.comercial)).filter_by(cliente_token=token).first_or_404()
+    if not _token_cliente_valido(solicitud, token):
+        flash('El enlace ha expirado. Solicita uno nuevo.', 'error')
+        return redirect(url_for('solicitudes.ver_presupuesto_publico_cliente', token=token))
+
+    accion = (request.form.get('accion', '') or '').strip().lower()
+    comentario = (request.form.get('comentario', '') or '').strip()
+    mapping = {
+        'aceptar': ('aceptado', 'aceptado'),
+        'cambios_1': ('CAMBIOS 1', 'CAMBIOS 1'),
+        'cambios_2': ('CAMBIOS 2', 'CAMBIOS 2'),
+        'rechazar': ('RECHAZADO', 'RECHAZADO')
+    }
+    if accion not in mapping:
+        flash('Acción no válida.', 'error')
+        return redirect(url_for('solicitudes.ver_presupuesto_publico_cliente', token=token))
+
+    cliente_respuesta, subestado = mapping[accion]
+    solicitud.estado = 'mockup'
+    solicitud.subestado = subestado
+    solicitud.cliente_respuesta = cliente_respuesta
+    solicitud.modificaciones_cliente = comentario
+    solicitud.cliente_respondido_at = datetime.utcnow()
+    _append_historial_respuesta_cliente(solicitud, accion, subestado, cliente_respuesta, comentario)
+    db.session.add(RegistroEstadoSolicitud(
+        presupuesto_id=solicitud.id,
+        estado='mockup',
+        subestado=subestado,
+        usuario_id=None
+    ))
+    db.session.commit()
+
+    enviar_email_notificacion_respuesta_cliente(solicitud, comentario)
+    flash('Tu respuesta se ha enviado correctamente.', 'success')
+    return redirect(url_for('solicitudes.ver_presupuesto_publico_cliente', token=token))
+
 @solicitudes_bp.route('/solicitudes/<int:solicitud_id>/editar', methods=['GET', 'POST'])
 @login_required
 def editar_solicitud(solicitud_id):
     """Editar una solicitud"""
     solicitud = Presupuesto.query.get_or_404(solicitud_id)
+    template_editar = 'solicitudes/editar_v2.html' if _es_presupuesto_v2(solicitud) else 'solicitudes/editar.html'
     
     if request.method == 'POST':
         try:
@@ -980,7 +1573,7 @@ def editar_solicitud(solicitud_id):
                 comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
                 prendas = Prenda.query.order_by(Prenda.nombre).all()
                 categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
-                return render_template('solicitudes/editar.html',
+                return render_template(template_editar,
                                      solicitud=solicitud,
                                      clientes=clientes,
                                      comerciales=comerciales,
@@ -994,7 +1587,7 @@ def editar_solicitud(solicitud_id):
                 comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
                 prendas = Prenda.query.order_by(Prenda.nombre).all()
                 categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
-                return render_template('solicitudes/editar.html',
+                return render_template(template_editar,
                                      solicitud=solicitud,
                                      clientes=clientes,
                                      comerciales=comerciales,
@@ -1010,7 +1603,7 @@ def editar_solicitud(solicitud_id):
                     comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
                     prendas = Prenda.query.order_by(Prenda.nombre).all()
                     categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
-                    return render_template('solicitudes/editar.html',
+                    return render_template(template_editar,
                                          solicitud=solicitud,
                                          clientes=clientes,
                                          comerciales=comerciales,
@@ -1139,7 +1732,7 @@ def editar_solicitud(solicitud_id):
                 comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
                 prendas = Prenda.query.order_by(Prenda.nombre).all()
                 categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
-                return render_template('solicitudes/editar.html',
+                return render_template(template_editar,
                                      solicitud=solicitud,
                                      clientes=clientes,
                                      comerciales=comerciales,
@@ -1258,7 +1851,7 @@ def editar_solicitud(solicitud_id):
             comerciales = Comercial.query.join(Usuario).order_by(Usuario.usuario).all()
             prendas = Prenda.query.order_by(Prenda.nombre).all()
             categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
-            return render_template('solicitudes/editar.html',
+            return render_template(template_editar,
                                  solicitud=solicitud,
                                  clientes=clientes,
                                  comerciales=comerciales,
@@ -1401,7 +1994,7 @@ def editar_solicitud(solicitud_id):
     prendas = Prenda.query.order_by(Prenda.nombre).all()
     categorias = CategoriaCliente.query.filter_by(activo=True).order_by(CategoriaCliente.nombre).all()
     
-    return render_template('solicitudes/editar.html',
+    return render_template(template_editar,
                          solicitud=solicitud,
                          clientes=clientes,
                          comerciales=comerciales,

@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Factura de Proveedor - Gastos{% endblock %}
+
+{% block content %}
+<h2>Editar Factura de Proveedor</h2>
+
+<form method="POST">
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="proveedor_id">Proveedor *</label>
+            <select name="proveedor_id" id="proveedor_id" required>
+                <option value="">Seleccione un proveedor</option>
+                {% for proveedor in proveedores %}
+                <option value="{{ proveedor.id }}" {% if factura.proveedor_id == proveedor.id %}selected{% endif %}>{{ proveedor.nombre }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="numero_factura">Número de Factura *</label>
+            <input type="text" name="numero_factura" id="numero_factura" value="{{ factura.numero_factura }}" required>
+        </div>
+    </div>
+
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="fecha_factura">Fecha Factura *</label>
+            <input type="date" name="fecha_factura" id="fecha_factura" value="{{ factura.fecha_factura.strftime('%Y-%m-%d') if factura.fecha_factura else '' }}" required>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="fecha_vencimiento">Fecha Vencimiento</label>
+            <input type="date" name="fecha_vencimiento" id="fecha_vencimiento" value="{{ factura.fecha_vencimiento.strftime('%Y-%m-%d') if factura.fecha_vencimiento else '' }}">
+        </div>
+    </div>
+
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="base_imponible">Base Imponible *</label>
+            <input type="number" name="base_imponible" id="base_imponible" step="0.01" min="0" value="{{ "%.2f"|format(factura.base_imponible) }}" required>
+        </div>
+
+        <div class="form-group-compact">
+            <label for="tipo_iva">Tipo IVA (%) *</label>
+            <input type="number" name="tipo_iva" id="tipo_iva" step="0.01" min="0" max="100" value="{{ "%.2f"|format(factura.tipo_iva) }}" required>
+        </div>
+    </div>
+
+    <div class="form-row-compact">
+        <div class="form-group-compact">
+            <label for="estado">Estado *</label>
+            <select name="estado" id="estado" required>
+                <option value="pendiente" {% if factura.estado == 'pendiente' %}selected{% endif %}>Pendiente</option>
+                <option value="pagada" {% if factura.estado == 'pagada' %}selected{% endif %}>Pagada</option>
+                <option value="vencida" {% if factura.estado == 'vencida' %}selected{% endif %}>Vencida</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="observaciones">Observaciones</label>
+        <textarea name="observaciones" id="observaciones" rows="3" placeholder="Observaciones adicionales...">{{ factura.observaciones or '' }}</textarea>
+    </div>
+
+    <div class="actions">
+        <button type="submit" class="btn btn-success">Actualizar Factura</button>
+        <a href="{{ url_for('gastos.listado_facturas_proveedor') }}" class="btn btn-danger">Cancelar</a>
+    </div>
+</form>
+
+<script>
+document.getElementById('base_imponible').addEventListener('input', calcularTotal);
+document.getElementById('tipo_iva').addEventListener('input', calcularTotal);
+
+function calcularTotal() {
+    const baseImponible = parseFloat(document.getElementById('base_imponible').value) || 0;
+    const tipoIva = parseFloat(document.getElementById('tipo_iva').value) || 0;
+    const importeIva = baseImponible * tipoIva / 100;
+    const total = baseImponible + importeIva;
+    
+    console.log('Base:', baseImponible, 'IVA:', importeIva, 'Total:', total);
+}
+</script>
+{% endblock %}
+

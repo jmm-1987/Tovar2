@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}Crear Factura Anticipo - Solicitud {{ presupuesto.numero_solicitud or presupuesto.id }}{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 800px; margin-top: 20px;">
+    <h2>Crear Factura Anticipo</h2>
+    <p style="color: #666; margin-bottom: 20px;">Solicitud: <strong>{{ presupuesto.numero_solicitud or presupuesto.id }}</strong> - {{ presupuesto.cliente.nombre if presupuesto.cliente else 'N/A' }}</p>
+    
+    <form method="POST" action="{{ url_for('facturacion.crear_factura_anticipo') }}">
+        <input type="hidden" name="presupuesto_id" value="{{ presupuesto.id }}">
+        
+        <div style="background: #e7f3ff; padding: 15px; border-radius: 6px; border: 1px solid #b3d9ff; margin-bottom: 20px;">
+            <p style="margin: 0; color: #2c3e50; font-weight: 600;">
+                <strong>Total de la solicitud (con IVA):</strong> 
+                <span style="font-size: 1.2rem; color: #007bff;">{{ "%.2f"|format(total_con_iva) }} €</span>
+            </p>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 20px;">
+            <label for="fecha_expedicion" style="font-weight: 600; margin-bottom: 8px; display: block;">Fecha de Expedición *</label>
+            <input type="date" name="fecha_expedicion" id="fecha_expedicion" value="{{ fecha_hoy }}" required 
+                   class="form-control" style="width: 100%; padding: 10px; font-size: 1rem; border: 2px solid #dee2e6; border-radius: 6px;">
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 20px;">
+            <label for="importe_anticipo" style="font-weight: 600; margin-bottom: 8px; display: block;">
+                ¿Qué importe anticipado deseas facturar? (con IVA incluido) *
+            </label>
+            <input type="number" name="importe_anticipo" id="importe_anticipo" step="0.01" min="0.01" required 
+                   class="form-control" style="width: 100%; padding: 10px; font-size: 1rem; border: 2px solid #dee2e6; border-radius: 6px;"
+                   placeholder="0.00">
+            <small style="color: #666; font-size: 0.85rem; margin-top: 5px; display: block;">
+                El importe debe incluir el IVA. El sistema desglosará automáticamente la base imponible y el IVA.
+            </small>
+        </div>
+        
+        <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 30px;">
+            <a href="{{ url_for('facturacion.crear_factura_anticipo') }}" class="btn btn-secondary" style="padding: 10px 20px; background: #6c757d; color: white; text-decoration: none; border-radius: 6px; font-weight: 600; display: inline-block;">
+                Cancelar
+            </a>
+            <button type="submit" class="btn btn-success" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer;">
+                Generar Factura Anticipo
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+

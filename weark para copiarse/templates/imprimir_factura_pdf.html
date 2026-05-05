@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if es_albaran is defined and es_albaran %}Albarán{% elif factura.es_rectificativa %}Factura Rectificativa{% else %}Factura{% endif %} {{ factura.serie }}-{{ factura.numero }}</title>
+    <style type="text/css">
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        @page {
+            size: A4;
+            margin: 5mm 10mm 10mm 10mm;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f5f5f5;
+            padding: 10px;
+            color: #333;
+            font-size: 12px;
+        }
+        
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            background: white;
+            margin: 0 auto 10px;
+            padding: 5mm 10mm 5mm 10mm;
+            padding-bottom: 32mm; /* deja espacio para el pie fijo */
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            page-break-after: auto;
+            page-break-inside: avoid;
+            box-sizing: border-box;
+            position: relative;
+        }
+        
+        .page-content {
+            min-height: calc(297mm - 40mm);
+            padding-bottom: 20mm;
+        }
+        
+        .footer-datos {
+            margin-top: 12px;
+            padding: 8px 0 0;
+            font-size: 10px;
+            color: #666;
+            line-height: 1.3;
+            text-align: justify;
+            position: absolute;
+            left: 10mm;
+            right: 10mm;
+            bottom: 8mm;
+        }
+        
+        .footer-legal {
+            margin-top: 4px;
+            padding-top: 4px;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .footer-datos .iban {
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .page:last-child {
+            page-break-after: auto;
+        }
+        
+        .page:only-child {
+            page-break-after: auto;
+        }
+        
+        .no-print {
+            text-align: center;
+            margin-top: 20px;
+            padding: 20px;
+        }
+        
+        .no-print .btn {
+            display: inline-block;
+            padding: 10px 20px;
+            margin: 0 10px;
+            background: #007bff;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .no-print .btn-secondary {
+            background: #6c757d;
+        }
+        
+        .no-print .btn:hover {
+            opacity: 0.9;
+        }
+        
+        .factura-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .logo-section {
+            flex: 0 0 auto;
+        }
+        
+        .logo-section img {
+            width: 120px;
+            height: 120px;
+            object-fit: contain;
+        }
+        
+        .factura-title {
+            flex: 1;
+            text-align: center;
+            align-self: center;
+        }
+        
+        .factura-title h1 {
+            font-size: 1.8em;
+            color: #2c3e50;
+            margin-bottom: 0;
+            font-weight: bold;
+        }
+        
+        .ocultar-precios {
+            display: none !important;
+        }
+        
+        .factura-info {
+            text-align: right;
+            flex: 0 0 auto;
+            min-width: 200px;
+        }
+        
+        .factura-info p {
+            margin: 3px 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .datos-section {
+            margin-bottom: 12px;
+            display: table;
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 10px;
+        }
+        
+        .datos-box {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #e9ecef;
+            display: table-cell;
+            width: 50%;
+            vertical-align: top;
+        }
+        
+        .datos-box h3 {
+            color: #2c3e50;
+            border-bottom: 1px solid #2c3e50;
+            padding-bottom: 3px;
+            margin-bottom: 5px;
+            font-size: 1rem;
+        }
+        
+        .datos-box p {
+            margin: 2px 0;
+            color: #495057;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+        
+        .lineas-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .lineas-table thead {
+            background: #f8f9fa;
+            color: #000000;
+        }
+        
+        .lineas-table th {
+            padding: 5px 8px;
+            text-align: left;
+            font-weight: 600;
+            border: 1px solid #dee2e6;
+            font-size: 0.9em;
+            color: #000000;
+        }
+        
+        .lineas-table td {
+            padding: 5px 8px;
+            border: 1px solid #e9ecef;
+            color: #495057;
+            font-size: 0.85em;
+        }
+        
+        .lineas-table tbody tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        
+        .totales-section {
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 2px solid #2c3e50;
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            font-size: 0.95em;
+        }
+        
+        .total-row.base {
+            color: #495057;
+        }
+        
+        .total-row.iva {
+            color: #495057;
+        }
+        
+        .total-row.final {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #27ae60;
+            border-top: 2px solid #2c3e50;
+            padding-top: 8px;
+            margin-top: 5px;
+        }
+        
+        .total-label {
+            font-weight: 600;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .no-print {
+                display: none;
+            }
+            
+            .page {
+                margin: 0;
+                box-shadow: none;
+                page-break-after: auto;
+                page-break-inside: avoid;
+                overflow: hidden;
+            }
+            
+            .page:last-child {
+                page-break-after: auto;
+            }
+            
+            .page:only-child {
+                page-break-after: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- PÁGINA 1: CONTENIDO DE LA FACTURA -->
+    <div class="page">
+        <div class="factura-header">
+            <div class="logo-section">
+                {% if use_base64 is defined and use_base64 and logo_base64 %}
+                <img src="{{ logo_base64 }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
+                {% elif base_url is defined and base_url %}
+                <img src="{{ base_url }}{{ url_for('static', filename='logo1.png') }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
+                {% else %}
+                <img src="{{ url_for('static', filename='logo1.png', _external=True) }}" alt="Logo" style="width: 120px; height: 120px; object-fit: contain;">
+                {% endif %}
+            </div>
+            <div class="factura-title">
+                <h1>{% if es_albaran is defined and es_albaran %}ALBARÁN{% elif factura.es_rectificativa %}FACTURA RECTIFICATIVA{% else %}FACTURA{% endif %}</h1>
+            </div>
+            <div class="factura-info">
+                <p><strong>Weark Custom Tovar Sl</strong></p>
+                <p>B06763502</p>
+                <p>C/Marquesa de Pinares, 11</p>
+                <p>06800-Mérida (Badajoz)</p>
+
+            </div>
+        </div>
+
+        <div class="datos-section">
+            <div class="datos-box">
+                <h3>Datos del {% if es_albaran is defined and es_albaran %}Albarán{% elif factura.es_rectificativa %}Factura Rectificativa{% else %}Factura{% endif %}</h3>
+                <p><strong>Número:</strong> {{ factura.serie }}-{{ factura.numero }}</p>
+                <p><strong>Fecha:</strong> {{ factura.fecha_expedicion.strftime('%d/%m/%Y') if factura.fecha_expedicion else 'N/A' }}</p>
+                {% if factura.es_rectificativa and factura.factura_rectificada %}
+                <p><strong>Rectifica a:</strong> {{ factura.factura_rectificada.serie }}-{{ factura.factura_rectificada.numero }} ({{ factura.factura_rectificada.fecha_expedicion.strftime('%d/%m/%Y') if factura.factura_rectificada.fecha_expedicion else 'N/A' }})</p>
+                {% endif %}
+                {% if pedido %}
+                <p><strong>Pedido:</strong> #{{ pedido.id }}{% if pedido.presupuesto_id %} (Presupuesto #{{ pedido.presupuesto_id }}){% endif %}</p>
+                {% endif %}
+                {% if pedido and pedido.comercial %}
+                <p><strong>Comercial:</strong> {{ pedido.comercial.nombre if pedido.comercial else 'N/A' }}{% if pedido.comercial and pedido.comercial.usuario and pedido.comercial.usuario.telefono %} - {{ pedido.comercial.usuario.telefono }}{% endif %}</p>
+                {% endif %}
+                {% if pedido and pedido.tipo_pedido %}
+                <p><strong>Tipo:</strong> {{ pedido.tipo_pedido }}</p>
+                {% endif %}
+                {% if pedido and pedido.forma_pago %}
+                <p><strong>Forma de Pago:</strong> {{ pedido.forma_pago }}</p>
+                {% endif %}
+                
+                <h3 style="margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6;">Datos del Cliente</h3>
+                {% set cliente_data_source = None %}
+                {% set cliente_nombre = None %}
+                {% set cliente_direccion = None %}
+                {% set cliente_cp = None %}
+                {% set cliente_poblacion = None %}
+                {% set cliente_provincia = None %}
+                {% set cliente_nif = None %}
+                
+                {# PRIORIDAD 1: Cliente directo de la factura (para facturas directas) #}
+                {% if cliente_directo %}
+                    {% set cliente_data_source = cliente_directo %}
+                {# PRIORIDAD 2: Cliente desde presupuesto #}
+                {% elif presupuesto and presupuesto.cliente %}
+                    {% set cliente_data_source = presupuesto.cliente %}
+                {# PRIORIDAD 3: Cliente desde pedido #}
+                {% elif pedido and pedido.cliente %}
+                    {% set cliente_data_source = pedido.cliente %}
+                {# PRIORIDAD 4: Cliente desde pedido.presupuesto #}
+                {% elif pedido and pedido.presupuesto and pedido.presupuesto.cliente %}
+                    {% set cliente_data_source = pedido.presupuesto.cliente %}
+                {% endif %}
+                
+                {% if cliente_data_source %}
+                    {% set cliente_nombre = cliente_data_source.nombre %}
+                    {% set cliente_direccion = cliente_data_source.direccion %}
+                    {% set cliente_cp = cliente_data_source.codigo_postal %}
+                    {% set cliente_poblacion = cliente_data_source.poblacion %}
+                    {% set cliente_provincia = cliente_data_source.provincia %}
+                    {% set cliente_nif = cliente_data_source.nif %}
+                {% else %}
+                    {# Fallback a datos copiados en la factura #}
+                    {% set cliente_nombre = factura.nombre %}
+                    {% set cliente_nif = factura.nif %}
+                {% endif %}
+                
+                {# Mostrar nombre #}
+                {% if cliente_nombre %}
+                <p><strong>{{ cliente_nombre }}</strong></p>
+                {% endif %}
+                
+                {# Mostrar dirección #}
+                {% if cliente_direccion %}
+                <p>{{ cliente_direccion }}</p>
+                {% endif %}
+                
+                {# Mostrar CP-Población-Provincia #}
+                {% if cliente_cp or cliente_poblacion or cliente_provincia %}
+                <p>
+                    {% if cliente_cp %}{{ cliente_cp }}{% endif %}
+                    {% if cliente_cp and cliente_poblacion %}-{% endif %}
+                    {% if cliente_poblacion %}{{ cliente_poblacion }}{% endif %}
+                    {% if (cliente_cp or cliente_poblacion) and cliente_provincia %}-{% endif %}
+                    {% if cliente_provincia %}{{ cliente_provincia }}{% endif %}
+                </p>
+                {% endif %}
+                
+                {# Mostrar NIF/CIF #}
+                {% if cliente_nif %}
+                <p><strong>NIF/CIF:</strong> {{ cliente_nif }}</p>
+                {% endif %}
+            </div>
+            <div class="datos-box">
+                {% if factura.descripcion %}
+                <h3>Descripción</h3>
+                <p>{{ factura.descripcion }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        
+        
+        {% if factura.lineas %}
+        {# Verificar si hay algún descuento mayor que 0 en alguna línea #}
+        {% set hay_descuentos = False %}
+        {% for linea_check in factura.lineas %}
+            {% set descuento_check = (linea_check.descuento if linea_check.descuento else 0)|float %}
+            {% if descuento_check > 0 %}
+                {% set hay_descuentos = True %}
+            {% endif %}
+        {% endfor %}
+        <table class="lineas-table">
+            <thead>
+                <tr>
+                    <th style="width: {% if hay_descuentos and not (es_albaran is defined and es_albaran) %}48%{% elif not (es_albaran is defined and es_albaran) %}52%{% else %}60%{% endif %};">Descripción</th>
+                    <th style="width: 7%; text-align: center;">Cantidad</th>
+                    <th style="width: 8%; text-align: center;">Talla</th>
+                    {% if not (es_albaran is defined and es_albaran) %}
+                    <th style="width: 10%; text-align: right;">Precio Unit.</th>
+                    {% if hay_descuentos %}
+                    <th style="width: 8%; text-align: right;">Descuento</th>
+                    <th style="width: 10%; text-align: right;">Precio Final</th>
+                    {% else %}
+                    <th style="width: 18%; text-align: right;">Precio Final</th>
+                    {% endif %}
+                    <th style="width: 9%; text-align: right;">Total</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for linea in factura.lineas %}
+                {% set precio_unitario_val = linea.precio_unitario if linea.precio_unitario else 0 %}
+                {% set cantidad_val = linea.cantidad if linea.cantidad else 0 %}
+                {% set descuento_val = linea.descuento if linea.descuento else 0 %}
+                {% set precio_final_val = linea.precio_final if linea.precio_final else None %}
+                {% set precio_unit = precio_unitario_val|float %}
+                {% set cantidad = cantidad_val|float %}
+                {% set descuento = descuento_val|float %}
+                {% set es_linea_texto = cantidad == 0 and (not precio_unitario_val or precio_unitario_val == 0) %}
+                {% if precio_final_val %}
+                    {% set precio_final = precio_final_val|float %}
+                {% else %}
+                    {% set precio_final = precio_unit %}
+                    {% if descuento > 0 %}
+                        {% set precio_final = precio_unit * (1 - descuento / 100) %}
+                    {% endif %}
+                {% endif %}
+                {% set total_linea = precio_final * cantidad %}
+                {# Primero intentar usar la talla directamente de la línea (para facturas directas) #}
+                {% set talla_linea = linea.talla if linea.talla else None %}
+                {# Si no hay talla en la línea, buscar en presupuesto o pedido #}
+                {% if not talla_linea %}
+                    {% if factura.presupuesto_id and factura.presupuesto %}
+                        {% for linea_presupuesto in factura.presupuesto.lineas %}
+                            {% if linea_presupuesto.nombre_mostrar == linea.descripcion or linea_presupuesto.nombre == linea.descripcion %}
+                                {% set talla_linea = linea_presupuesto.talla %}
+                            {% endif %}
+                        {% endfor %}
+                    {% elif factura.pedido_id and factura.pedido %}
+                        {% for linea_pedido in factura.pedido.lineas %}
+                            {% if linea_pedido.nombre_mostrar == linea.descripcion or linea_pedido.nombre == linea.descripcion %}
+                                {% set talla_linea = linea_pedido.talla %}
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
+                {% endif %}
+                <tr>
+                    {% if es_linea_texto %}
+                        {% if es_albaran is defined and es_albaran %}
+                        <td colspan="3" style="font-style: italic; color: #666;">{{ linea.descripcion }}</td>
+                        {% else %}
+                        <td colspan="{% if hay_descuentos %}7{% else %}6{% endif %}" style="font-style: italic; color: #666;">{{ linea.descripcion }}</td>
+                        {% endif %}
+                    {% else %}
+                    <td>{{ linea.descripcion }}</td>
+                    <td style="text-align: center;">{{ "%.2f"|format(cantidad) }}</td>
+                    <td style="text-align: center;">{{ talla_linea or '-' }}</td>
+                    {% if not (es_albaran is defined and es_albaran) %}
+                    <td style="text-align: right;">{{ "%.2f"|format(precio_unit) }} €</td>
+                    {% if hay_descuentos %}
+                    <td style="text-align: right;">
+                        {% if descuento > 0 %}
+                            <span style="color: #d32f2f; font-weight: bold;">{{ "%.0f"|format(descuento) }}%</span>
+                        {% else %}
+                            <span style="color: #999;">-</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right;">
+                        {% if descuento > 0 %}
+                            <span style="color: #d32f2f; font-weight: bold;">{{ "%.2f"|format(precio_final) }} €</span>
+                        {% else %}
+                            <span>{{ "%.2f"|format(precio_unit) }} €</span>
+                        {% endif %}
+                    </td>
+                    {% else %}
+                    <td style="text-align: right;">{{ "%.2f"|format(precio_unit) }} €</td>
+                    {% endif %}
+                    <td style="text-align: right; font-weight: bold;">{{ "%.2f"|format(total_linea|float) }} €</td>
+                    {% endif %}
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        {% if not (es_albaran is defined and es_albaran) %}
+        <div class="totales-section">
+            <div class="total-row base">
+                <span class="total-label">Base Imponible:</span>
+                <span>{{ "%.2f"|format(base_imponible) }} €</span>
+            </div>
+            <div class="total-row iva">
+                {% set tipo_iva_formateado = "%.0f"|format(tipo_iva) if tipo_iva|round(1) == tipo_iva|round(0) else "%.1f"|format(tipo_iva) %}
+                <span class="total-label">IVA ({{ tipo_iva_formateado }}%):</span>
+                <span>{{ "%.2f"|format(iva_total) }} €</span>
+            </div>
+            <div class="total-row">
+                <span class="total-label">Subtotal:</span>
+                <span>{{ "%.2f"|format(base_imponible + iva_total) }} €</span>
+            </div>
+            {% if factura.descuento_pronto_pago and factura.descuento_pronto_pago > 0 %}
+            {% set subtotal = base_imponible + iva_total %}
+            {% set descuento_pronto_pago_float = factura.descuento_pronto_pago|float %}
+            {% set descuento_pronto_pago_aplicado = subtotal * (descuento_pronto_pago_float / 100.0) %}
+            <div class="total-row" style="background: #fff3cd; color: #856404;">
+                <span class="total-label">Descuento Pronto Pago ({{ "%.2f"|format(descuento_pronto_pago_float) }}%):</span>
+                <span style="color: #856404;">-{{ "%.2f"|format(descuento_pronto_pago_aplicado) }} €</span>
+            </div>
+            {% endif %}
+            {% if anticipo_facturado is defined and anticipo_facturado > 0 %}
+            <div class="total-row" style="background: #e7f3ff; color: #0066cc;">
+                <span class="total-label">Anticipo ya facturado:</span>
+                <span style="color: #0066cc; font-weight: bold;">-{{ "%.2f"|format(anticipo_facturado) }} €</span>
+            </div>
+            {% endif %}
+            <div class="total-row final">
+                <span class="total-label">TOTAL:</span>
+                <span>{{ "%.2f"|format(total_con_iva) }} €</span>
+            </div>
+        </div>
+        {% endif %}
+        {% else %}
+        <p style="padding: 30px; background: #f8f9fa; border-radius: 6px; text-align: center; color: #999;">
+            Esta factura no tiene líneas registradas.
+        </p>
+        {% endif %}
+        </div>
+        
+        <!-- Pie de página con información de protección de datos -->
+     
+        <div class="footer-datos">
+            <p><span class="iban">Número de cuenta | IBAN:ES2200495247862816942248</span></p>
+            <div class="footer-legal">
+                <p style="margin: 0;"><strong>WEARK CUSTOM TOVAR SL;</strong> Finalidad: Prestar los servicios solicitados y enviar comunicaciones comerciales vía electrónica; Legitimación: Ejecución de un contrato, interés legítimo del Responsable; Destinatarios: Están previstas cesiones de datos a: previstas transferencias a terceros países (whatsapp); Derechos: Tiene derecho a acceder, rectificar y suprimir los datos, así como otros derechos, indicados en la información adicional, que puede ejercer dirigiéndose a marisa@weark.es o C/ MARQUESA DE PINARES, 11 - 06800 - MERIDA; Procedencia: El propio. En la información completa de las cláusulas informativas.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="no-print">
+        <button onclick="window.print()" class="btn btn-primary">Imprimir</button>
+        <a href="{{ url_for('facturacion.facturacion') }}" class="btn btn-secondary">Volver</a>
+    </div>
+</body>
+</html>

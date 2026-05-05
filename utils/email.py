@@ -7,6 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 import os
 from io import BytesIO
+from urllib.parse import quote
 
 def obtener_plantilla(tipo):
     """Obtener plantilla de email por tipo"""
@@ -291,6 +292,42 @@ def enviar_email_cambio_estado_solicitud(solicitud, nuevo_estado, subestado=None
         print(f"DEBUG: Excepción en enviar_email_cambio_estado_solicitud: {str(e)}")
         print(traceback.format_exc())
         return False, f'Error al enviar email: {str(e)}'
+
+
+def enviar_email_enlace_presupuesto_cliente(solicitud, destinatario, enlace_publico):
+    """Envía al cliente el enlace público del presupuesto."""
+    try:
+        asunto = f"Revisión de presupuesto #{solicitud.numero_solicitud or solicitud.id}"
+        cuerpo = (
+            f"Hola,\n\n"
+            f"Te compartimos el enlace para revisar tu presupuesto:\n{enlace_publico}\n\n"
+            f"Si necesitas cambios, puedes responder desde esa misma página.\n\n"
+            f"Gracias."
+        )
+        msg = Message(subject=asunto, recipients=[destinatario], body=cuerpo)
+        mail.send(msg)
+        return True, 'Email enviado correctamente'
+    except Exception as e:
+        return False, f'Error al enviar email: {str(e)}'
+
+
+def enviar_email_notificacion_respuesta_cliente(solicitud, comentario):
+    """Notifica internamente que el cliente respondió desde portal público."""
+    try:
+        destino = current_app.config.get('MAIL_USERNAME') or current_app.config.get('MAIL_DEFAULT_SENDER')
+        if not destino:
+            return False, 'Sin destinatario de notificación'
+        asunto = f"Cliente respondió presupuesto #{solicitud.numero_solicitud or solicitud.id}"
+        cuerpo = (
+            f"Cliente: {solicitud.cliente.nombre if solicitud.cliente else 'N/A'}\n"
+            f"Estado/Subestado: {solicitud.estado} / {solicitud.subestado or '-'}\n"
+            f"Comentario:\n{(comentario or '').strip() or '-'}\n"
+        )
+        msg = Message(subject=asunto, recipients=[destino], body=cuerpo)
+        mail.send(msg)
+        return True, 'Notificación enviada'
+    except Exception as e:
+        return False, f'Error al enviar notificación: {str(e)}'
 
 
 

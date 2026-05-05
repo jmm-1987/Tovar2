@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Albaranes de retirada - Gestión de Pedidos{% endblock %}
+
+{% block content %}
+<style>
+    .container {
+        padding-top: 10px !important;
+        padding-left: 5px !important;
+        padding-right: 5px !important;
+        max-width: 100% !important;
+    }
+    header {
+        margin-bottom: 0.8rem !important;
+    }
+    h2::after { display: none; }
+
+    .badge-estado-pendiente { background: #dc3545; color: #fff; }
+    .badge-estado-enviado { background: #0d6efd; color: #fff; }
+    .badge-estado-confirmado { background: #28a745; color: #fff; }
+    .badge-estado-error { background: #6c757d; color: #fff; }
+</style>
+
+<h2 style="margin: 0 0 6px 0; padding-bottom: 0; font-size: 1.2rem;">Albaranes de retirada</h2>
+
+<div style="margin-bottom: 15px;">
+    <div class="filtros-container" style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); padding: 12px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #e9ecef;">
+        <form method="GET" action="{{ url_for('facturacion.listado_albaranes_retirada') }}" style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;">
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 180px;">
+                <label for="estado" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>🏷️</span> Estado
+                </label>
+                <select name="estado" id="estado" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease; cursor: pointer;">
+                    <option value="">Todos los estados</option>
+                    {% for estado in estados %}
+                        <option value="{{ estado }}" {% if estado_filtro == estado %}selected{% endif %}>
+                            {{ estado|replace('_', ' ')|title }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                <label for="fecha_desde" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>📅</span> Fecha Desde
+                </label>
+                <input type="date" name="fecha_desde" id="fecha_desde" value="{{ fecha_desde }}" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease;">
+            </div>
+
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 1; min-width: 150px;">
+                <label for="fecha_hasta" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>📅</span> Fecha Hasta
+                </label>
+                <input type="date" name="fecha_hasta" id="fecha_hasta" value="{{ fecha_hasta }}" class="filtro-input" style="padding: 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem; background: white; color: #495057; transition: all 0.3s ease;">
+            </div>
+
+            <div class="filtro-group" style="display: flex; flex-direction: column; flex: 2; min-width: 220px;">
+                <label for="busqueda_albaranes" style="font-size: 0.75rem; font-weight: 600; color: #495057; margin-bottom: 3px; display: flex; align-items: center; gap: 4px;">
+                    <span>🔍</span> Buscar
+                </label>
+                <div style="position: relative;">
+                    <input type="text"
+                           id="busqueda_albaranes"
+                           name="busqueda"
+                           value="{{ busqueda or '' }}"
+                           placeholder="Cliente, NIF, número..."
+                           style="width: 100%; padding: 6px 30px 6px 10px; border: 2px solid #dee2e6; border-radius: 6px; font-size: 0.85rem;">
+                    <span style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #6c757d; font-size: 14px;">🔍</span>
+                </div>
+            </div>
+
+            <div style="display: flex; gap: 8px; align-items: flex-end;">
+                <button type="submit" class="btn btn-primary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; box-shadow: 0 2px 4px rgba(0,123,255,0.3); transition: all 0.3s ease;">
+                    🔍 Buscar
+                </button>
+
+                {% if estado_filtro or fecha_desde or fecha_hasta or busqueda %}
+                <a href="{{ url_for('facturacion.listado_albaranes_retirada') }}" class="btn btn-secondary" style="padding: 6px 12px; border-radius: 6px; font-weight: 600; font-size: 0.85rem; transition: all 0.3s ease;">
+                    🗑️ Limpiar
+                </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if albaranes %}
+<div class="table-container" style="background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; margin-bottom: 40px;">
+    <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%); border-bottom: 2px solid #1a252f;">
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem;">ID</th>
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Número</th>
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Cliente</th>
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Estado</th>
+                <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; font-size: 0.8rem;" title="FacturaDirecta">FD</th>
+                <th style="padding: 8px 10px; text-align: left; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Fecha</th>
+                <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Líneas</th>
+                <th style="padding: 8px 10px; text-align: center; color: #ffffff; font-weight: 600; font-size: 0.85rem;">Acciones</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for albaran in albaranes %}
+                {% set estado_limpio = albaran.estado|lower|replace(' ', '-')|replace('ó', 'o')|replace('í', 'i')|replace('é', 'e') %}
+                <tr style="border-bottom: 1px solid #e9ecef; transition: all 0.3s ease;">
+                    <td style="padding: 8px 10px; color: #212529; font-weight: 600; font-size: 0.85rem;">#{{ albaran.id }}</td>
+                    <td style="padding: 8px 10px; color: #212529; font-weight: 600; font-size: 0.85rem;">{{ albaran.numero }}</td>
+                    <td style="padding: 8px 10px; color: #212529; font-size: 0.85rem;">
+                        {{ albaran.nombre if albaran.nombre else (albaran.cliente.nombre if albaran.cliente else 'N/A') }}
+                        {% if albaran.nif %}<span style="color:#6c757d; font-size:0.8rem;">({{ albaran.nif }})</span>{% endif %}
+                    </td>
+                    <td style="padding: 8px 10px;">
+                        <span class="badge {{ 'badge-estado-' ~ estado_limpio }}" style="padding: 3px 8px; border-radius: 12px; font-size: 0.8rem; font-weight: 600; display: inline-block;">
+                            {{ albaran.estado }}
+                        </span>
+                    </td>
+                    <td style="padding: 8px 10px; text-align: center;">
+                        {% if albaran.fd_deliverynote_uuid %}
+                        <span title="Enviado a FacturaDirecta{% if albaran.fd_deliverynote_doc_number %} ({{ albaran.fd_deliverynote_doc_number }}){% endif %}" style="display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 700; background: #198754; color: #fff; white-space: nowrap;">FD ✓</span>
+                        {% else %}
+                        <span title="No enviado a FacturaDirecta" style="display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; font-weight: 600; background: #e9ecef; color: #6c757d;">—</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 8px 10px; color: #212529; font-size: 0.85rem;">
+                        {% if albaran.fecha_expedicion %}
+                            {{ albaran.fecha_expedicion.strftime('%d/%m/%Y') }}
+                        {% else %}
+                            <span style="color: #999;">-</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 8px 10px; text-align: center; color: #212529; font-size: 0.85rem;">
+                        {{ albaran.lineas|length }} línea{{ 's' if albaran.lineas|length != 1 else '' }}
+                    </td>
+                    <td style="padding: 8px 10px; text-align: center; font-size: 0.85rem;">
+                        <div style="display: flex; gap: 6px; justify-content: center;">
+                            <a href="{{ url_for('facturacion.editar_albaran', factura_id=albaran.id) }}" class="btn btn-info" style="padding: 2px 6px; font-size: 0.7rem; text-decoration: none; display: inline-block;">
+                                ✏️ Edit
+                            </a>
+                            <a href="{{ url_for('facturacion.descargar_pdf_factura', factura_id=albaran.id) }}" class="btn btn-secondary" style="padding: 2px 6px; font-size: 0.7rem; text-decoration: none; display: inline-block;" target="_blank">
+                                📄 PDF
+                            </a>
+                            {% if albaran.fd_deliverynote_uuid and not config.get('FACTURADIRECTA_ALLOW_RESEND') %}
+                            <span title="Ya enviado a FD" style="display: inline-block; vertical-align: middle;">
+                                <button type="button" class="btn" disabled aria-disabled="true" style="padding: 2px 6px; font-size: 0.7rem; background:#adb5bd; color:#fff; border:none; border-radius:4px; cursor:not-allowed; opacity:0.95;">
+                                    ↗️ FD
+                                </button>
+                            </span>
+                            {% else %}
+                            {% set _fd_confirm_alb = '¿Reenviar a FacturaDirecta? Se actualizarán los datos FD en WEARK.' if (albaran.fd_deliverynote_uuid and config.get('FACTURADIRECTA_ALLOW_RESEND')) else '¿Enviar albarán a FacturaDirecta?' %}
+                            <form method="POST" action="{{ url_for('facturacion.enviar_albaran_retirada_a_facturadirecta', factura_id=albaran.id) }}" style="display:inline;" onsubmit="return confirm({{ _fd_confirm_alb|tojson }});">
+                                <button type="submit" class="btn" style="padding: 2px 6px; font-size: 0.7rem; background:#343a40; color:#fff; border:none; border-radius:4px;" title="{% if albaran.fd_deliverynote_uuid and config.get('FACTURADIRECTA_ALLOW_RESEND') %}Reenviar{% else %}Enviar{% endif %}">
+                                    ↗️ {% if albaran.fd_deliverynote_uuid and config.get('FACTURADIRECTA_ALLOW_RESEND') %}FD↻{% else %}FD{% endif %}
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div style="text-align: center; padding: 40px; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 40px;">
+    <p style="color: #6c757d; font-size: 1rem;">No se encontraron albaranes con los filtros aplicados.</p>
+</div>
+{% endif %}
+
+{% endblock %}
+
